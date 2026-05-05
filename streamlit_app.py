@@ -228,15 +228,13 @@ with tabs[0]:
         
         sipoc_key = f"editor_sipoc_{st.session_state.current_project_idx}"
         
-        # Initialisation si vide
         if "sipoc_data" not in p:
-            p["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "Étape 1", "Output": "", "Customer": ""}]
+            p["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "Début", "Output": "", "Customer": ""}]
 
-        # Création des colonnes pour l'affichage côte à côte
         col_sipoc, col_viz = st.columns([2, 1])
         
         with col_sipoc:
-            st.write("Remplissez le tableau :")
+            st.info("💡 Astuce : Cliquez sur le numéro à gauche d'une ligne pour l'insérer ou la supprimer.")
             edited_sipoc = st.data_editor(
                 p["sipoc_data"],
                 num_rows="dynamic",
@@ -244,18 +242,28 @@ with tabs[0]:
                 key=sipoc_key
             )
             
-            if st.button("✅ Valider le SIPOC & Actualiser le schéma", key=f"btn_sipoc_{st.session_state.current_project_idx}"):
+            if st.button("✅ Valider & Actualiser le flux", key=f"btn_sipoc_{st.session_state.current_project_idx}"):
                 p["sipoc_data"] = edited_sipoc
-                st.success("Données enregistrées !")
+                st.success("SIPOC enregistré !")
                 st.rerun()
 
         with col_viz:
             st.write("🖼️ Aperçu du Flux")
-            # On génère le schéma à partir des données sauvegardées dans 'p'
-            steps = [row["Process"] for row in p["sipoc_data"] if row.get("Process") and row["Process"].strip() != ""]
             
-            if steps:
-                mermaid_code = "graph TD\n" + " --> ".join([f'"{s}"' for s in steps])
+            # Nettoyage des données pour éviter les erreurs de syntaxe Mermaid
+            steps = []
+            for row in p["sipoc_data"]:
+                step_text = str(row.get("Process", "")).strip()
+                if step_text:
+                    # On enlève les caractères qui font planter Mermaid (guillemets, parenthèses...)
+                    clean_step = "".join(e for e in step_text if e.isalnum() or e in " _-")
+                    steps.append(clean_step)
+            
+            if len(steps) > 0:
+                # Construction sécurisée du flux : A -> B -> C
+                flow_definition = " --> ".join([f'ID{i}["{s}"]' for i, s in enumerate(steps)])
+                mermaid_code = f"graph TD\n{flow_definition}"
+                
                 st.components.v1.html(
                     f"""
                     <div class="mermaid" style="display: flex; justify-content: center;">
@@ -263,13 +271,13 @@ with tabs[0]:
                     </div>
                     <script type="module">
                     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
+                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' }});
                     </script>
                     """,
-                    height=400,
+                    height=450,
                 )
             else:
-                st.info("Ajoutez des étapes dans la colonne 'Process' pour voir le schéma.")
+                st.info("Complétez la colonne 'Process'.")
 
     # --- PHASE MEASURE ---
     with tabs[1]:
