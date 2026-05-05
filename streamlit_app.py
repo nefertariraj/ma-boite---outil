@@ -224,17 +224,20 @@ with tabs[0]:
 
         # 5. SIPOC & Schéma de Processus
         st.divider()
-        st.subheader("5. SIPOC & Cartographie")
+        st.subheader("5. SIPOC & Cartographie par Responsable")
         
         sipoc_key = f"editor_sipoc_{st.session_state.current_project_idx}"
         
         if "sipoc_data" not in p:
-            p["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "Début", "Output": "", "Customer": ""}]
+            p["sipoc_data"] = [
+                {"Supplier": "Acteur A", "Input": "", "Process": "Étape 1", "Output": "", "Customer": ""},
+                {"Supplier": "Acteur B", "Input": "", "Process": "Étape 2", "Output": "", "Customer": ""}
+            ]
 
-        col_sipoc, col_viz = st.columns([2, 1])
+        col_sipoc, col_viz = st.columns([1.5, 1.5])
         
         with col_sipoc:
-            st.info("💡 Astuce : Cliquez sur le numéro à gauche d'une ligne pour l'insérer ou la supprimer.")
+            st.info("💡 Le schéma à droite se divise selon la colonne 'Supplier'.")
             edited_sipoc = st.data_editor(
                 p["sipoc_data"],
                 num_rows="dynamic",
@@ -242,28 +245,49 @@ with tabs[0]:
                 key=sipoc_key
             )
             
-            if st.button("✅ Valider & Actualiser le flux", key=f"btn_sipoc_{st.session_state.current_project_idx}"):
+            if st.button("✅ Valider & Générer les couloirs", key=f"btn_sipoc_{st.session_state.current_project_idx}"):
                 p["sipoc_data"] = edited_sipoc
-                st.success("SIPOC enregistré !")
+                st.success("SIPOC mis à jour !")
                 st.rerun()
 
         with col_viz:
-            st.write("🖼️ Aperçu du Flux")
+            st.write("🖼️ Flux par Responsable (Swimlanes)")
             
-            # Nettoyage des données pour éviter les erreurs de syntaxe Mermaid
-            steps = []
-            for row in p["sipoc_data"]:
-                step_text = str(row.get("Process", "")).strip()
-                if step_text:
-                    # On enlève les caractères qui font planter Mermaid (guillemets, parenthèses...)
-                    clean_step = "".join(e for e in step_text if e.isalnum() or e in " _-")
-                    steps.append(clean_step)
+            # 1. Grouper les étapes par responsable (Supplier)
+            lanes = {}
+            steps_order = []
             
-            if len(steps) > 0:
-                # Construction sécurisée du flux : A -> B -> C
-                flow_definition = " --> ".join([f'ID{i}["{s}"]' for i, s in enumerate(steps)])
-                mermaid_code = f"graph TD\n{flow_definition}"
+            for i, row in enumerate(p["sipoc_data"]):
+                resp = str(row.get("Supplier", "Inconnu")).strip() or "Inconnu"
+                step = str(row.get("Process", "")).strip()
                 
+                if step:
+                    # Nettoyage du texte pour Mermaid
+                    clean_step = "".join(e for e in step if e.isalnum() or e in " _-")
+                    clean_resp = "".join(e for e in resp if e.isalnum() or e in " _-")
+                    
+                    if clean_resp not in lanes:
+                        lanes[clean_resp] = []
+                    
+                    node_id = f"step_{i}"
+                    lanes[clean_resp].append(f'{node_id}["{clean_step}"]')
+                    steps_order.append(node_id)
+
+            if steps_order:
+                # 2. Construction du code Mermaid avec subgraphs
+                mermaid_code = "graph LR\n" # LR pour lecture de gauche à droite (mieux pour les couloirs)
+                
+                for resp, nodes in lanes.items():
+                    mermaid_code += f"  subgraph {resp}\n"
+                    for node in nodes:
+                        mermaid_code += f"    {node}\n"
+                    mermaid_code += "  end\n"
+                
+                # 3. Création des liens entre les étapes (ordre chronologique)
+                if len(steps_order) > 1:
+                    links = " --> ".join(steps_order)
+                    mermaid_code += f"  {links}\n"
+
                 st.components.v1.html(
                     f"""
                     <div class="mermaid" style="display: flex; justify-content: center;">
@@ -271,13 +295,13 @@ with tabs[0]:
                     </div>
                     <script type="module">
                     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' }});
+                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral', flowchart: {{ useMaxWidth: true, htmlLabels: true }} }});
                     </script>
                     """,
-                    height=450,
+                    height=500,
                 )
             else:
-                st.info("Complétez la colonne 'Process'.")
+                st.info("Ajoutez des données dans 'Supplier' et 'Process'.")
 
     # --- PHASE MEASURE ---
     with tabs[1]:
