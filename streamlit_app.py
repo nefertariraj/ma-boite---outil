@@ -118,9 +118,9 @@ else:
                 # Simulation IA
                 p["problem"] = p_input
                 st.session_state.ai_suggest_ctq = [
-                    f"Réduction du temps de {p_name} (Lead Time)",
-                    f"Taux de conformité de {p_name} (%C&A)",
-                    f"Coût unitaire de {p_name}"
+                    f"Réduction du temps de {p['name']} (Lead Time)",
+                    f"Taux de conformité de {p['name']} (%C&A)",
+                    f"Coût unitaire de {p['name']}"
                 ]
         with col2:
             st.write("Propositions de l'IA (CTQ) :")
