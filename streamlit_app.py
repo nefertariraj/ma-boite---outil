@@ -224,23 +224,36 @@ with tabs[0]:
 
         # 5. SIPOC & Schéma de Processus
         st.divider()
-        st.subheader("5. SIPOC")
+        st.subheader("5. SIPOC & Cartographie")
+        
         sipoc_key = f"editor_sipoc_{st.session_state.current_project_idx}"
-        edited_sipoc = st.data_editor(
-            p.get("sipoc_data", [{"S": "", "I": "", "P": "", "O": "", "C": ""}]),
-            num_rows="dynamic",
-            use_container_width=True,
-            key=sipoc_key
-        )
-        if st.button("✅ Valider le SIPOC", key=f"save_sipoc_{st.session_state.current_project_idx}"):
-            p["sipoc_data"] = edited_sipoc
-            st.success("SIPOC enregistré !")
-            st.rerun()
+        
+        # Initialisation si vide
+        if "sipoc_data" not in p:
+            p["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "Étape 1", "Output": "", "Customer": ""}]
+
+        # Création des colonnes pour l'affichage côte à côte
+        col_sipoc, col_viz = st.columns([2, 1])
+        
+        with col_sipoc:
+            st.write("Remplissez le tableau :")
+            edited_sipoc = st.data_editor(
+                p["sipoc_data"],
+                num_rows="dynamic",
+                use_container_width=True,
+                key=sipoc_key
+            )
+            
+            if st.button("✅ Valider le SIPOC & Actualiser le schéma", key=f"btn_sipoc_{st.session_state.current_project_idx}"):
+                p["sipoc_data"] = edited_sipoc
+                st.success("Données enregistrées !")
+                st.rerun()
 
         with col_viz:
-            st.write("🖼️ Schéma du Process")
-            # Extraction des étapes pour le schéma
+            st.write("🖼️ Aperçu du Flux")
+            # On génère le schéma à partir des données sauvegardées dans 'p'
             steps = [row["Process"] for row in p["sipoc_data"] if row.get("Process") and row["Process"].strip() != ""]
+            
             if steps:
                 mermaid_code = "graph TD\n" + " --> ".join([f'"{s}"' for s in steps])
                 st.components.v1.html(
@@ -256,7 +269,7 @@ with tabs[0]:
                     height=400,
                 )
             else:
-                st.write("Ajoutez des étapes dans 'Process' pour voir le schéma.")
+                st.info("Ajoutez des étapes dans la colonne 'Process' pour voir le schéma.")
 
     # --- PHASE MEASURE ---
     with tabs[1]:
