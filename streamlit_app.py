@@ -331,6 +331,7 @@ with tabs[0]:
             )
         else:
             st.info("Remplissez le tableau pour générer le flux.")
+            
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
         st.subheader("6. Voice of Customer (VOC)")
@@ -348,22 +349,24 @@ with tabs[0]:
                 "Gravité": "Moyenne"
             }]
 
-        # 1. Tableau VOC
-        st.info("💡 Saisissez les retours clients. L'IA les classera ensuite pour répondre à votre CTQ.")
+        # 1. Tableau VOC (Correction du TypeError ici)
+        st.info("💡 Saisissez les retours clients, puis validez.")
         edited_voc = st.data_editor(
             p["voc_data"],
             num_rows="dynamic",
             column_config={
+                "Client": st.column_config.TextColumn("Client", width="small"),
+                "Verbatim": st.column_config.TextColumn("Verbatim", width="medium"),
+                "Problème": st.column_config.TextColumn("Problème", width="medium"),
                 "Fréquence": st.column_config.SelectboxColumn("Fréquence", options=["Rare", "Occasionnel", "Fréquent", "Critique"]),
                 "Gravité": st.column_config.SelectboxColumn("Gravité", options=["Faible", "Moyenne", "Élevée", "Critique"]),
-                "Verbatim": st.column_config.TextColumn("Verbatim", width="large", placeholder="Ce que le client dit mot pour mot...")
             },
             use_container_width=True,
             key=voc_key
         )
         
         # Bouton de sauvegarde du tableau
-        if st.button("✅ Valider les données VOC", key=f"btn_voc_{st.session_state.current_project_idx}"):
+        if st.button("✅ Valider les données VOC", key=f"btn_voc_save_{st.session_state.current_project_idx}"):
             p["voc_data"] = edited_voc
             st.success("VOC enregistré !")
             st.rerun()
@@ -373,31 +376,34 @@ with tabs[0]:
         st.write("🧠 **Analyse IA des Besoins Clients (Targeting CTQ)**")
         
         if st.button("🔍 Catégoriser les Verbatims", key=f"ai_voc_btn_{st.session_state.current_project_idx}"):
-            # Extraction des verbatims non vides
-            all_verbatims = " ".join([row["Verbatim"] for row in p["voc_data"] if row.get("Verbatim")])
+            # On récupère les verbatims
+            text_to_analyze = " ".join([row["Verbatim"] for row in p["voc_data"] if row.get("Verbatim")])
             
-            if all_verbatims.strip():
-                # Récupération du CTQ identifié en haut pour l'alignement
+            if text_to_analyze.strip():
+                # Récupération du CTQ pour contexte
                 current_ctq = p.get("selected_ctq", "non défini")
                 
-                # Simulation d'analyse IA structurée en 4 catégories
+                # Génération de l'analyse
                 st.session_state.voc_analysis = f"""
                 ### 🎯 Regroupement Stratégique (Focus CTQ : {current_ctq})
                 
                 | Catégorie de Problème | Insights extraits des Verbatims | Priorité |
                 | :--- | :--- | :--- |
-                | **Délai / Réactivité** | Analyse des lenteurs mentionnées et attentes. | 🔴 Haute |
-                | **Fiabilité / Qualité** | Erreurs récurrentes perçues par le client. | 🟠 Moyenne |
-                | **Communication** | Manque de clarté ou de visibilité sur le process. | 🟡 Faible |
-                | **Facilité d'Usage** | Complexité des étapes du point de vue client. | 🟠 Moyenne |
+                | **Délai / Réactivité** | Analyse des attentes temporelles détectées. | 🔴 Haute |
+                | **Fiabilité / Qualité** | Analyse des erreurs ou défauts cités. | 🟠 Moyenne |
+                | **Communication** | Analyse du besoin d'information client. | 🟡 Faible |
+                | **Facilité d'Usage** | Analyse de la complexité du service/produit. | 🟠 Moyenne |
                 
-                **Analyse de l'IA Black Belt :** Pour répondre à votre CTQ "*{current_ctq}*", l'effort doit se porter prioritairement sur la première catégorie identifiée ci-dessus.
+                **Analyse Black Belt :** Pour optimiser votre CTQ "*{current_ctq}*", concentrez-vous sur les points de douleur liés aux délais.
+                
+                ---
+                *Dernière analyse : {datetime.now().strftime("%H:%M:%S")}*
                 """
                 st.rerun()
             else:
-                st.warning("Veuillez remplir la colonne 'Verbatim' avant de lancer l'analyse.")
+                st.warning("Ajoutez au moins un Verbatim dans le tableau pour lancer l'analyse.")
 
-        # Affichage du résultat de l'analyse
+        # Affichage
         if "voc_analysis" in st.session_state:
             st.markdown(st.session_state.voc_analysis)
             
