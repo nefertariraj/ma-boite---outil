@@ -104,11 +104,10 @@ else:
 
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
-    # --- PHASE DEFINE ---
-    with tabs[0]:
+with tabs[0]:
         st.header("Phase Define")
         
- # 1. Problème & CTQ
+        # 1. Problème & CTQ
         st.subheader("1. Énoncé du Problème & CTQ")
         col1, col2 = st.columns(2)
         
@@ -117,7 +116,6 @@ else:
             p_input = st.text_area("Saisie libre", value=p["problem"], height=150, key=f"prob_in_{st.session_state.current_project_idx}")
             
             if st.button("🪄 Retranscrire via IA"):
-                # On enregistre le texte et on génère les suggestions proprement
                 p["problem"] = p_input
                 st.session_state.ai_suggest_ctq = [
                     "⏱️ Temps : Réduire le Lead Time global",
@@ -127,47 +125,30 @@ else:
                 ]
                 st.rerun() 
 
-       with col2:
+        with col2:
             st.write("Propositions de l'IA (CTQ) :")
             if 'ai_suggest_ctq' in st.session_state:
                 for ctq in st.session_state.ai_suggest_ctq:
                     if st.button(ctq, key=f"btn_{ctq}"):
                         p["selected_ctq"] = ctq
-                        # On force un rafraîchissement propre
                         st.rerun()
             
             st.divider()
             
-            # On affiche la zone de modification uniquement si un CTQ est sélectionné
             if "selected_ctq" in p and p["selected_ctq"]:
                 st.write("✍️ **Ajustez votre CTQ final :**")
-                
-                # Correction : On utilise une clé unique 'edit_ctq'
+                # Utilisation d'une clé unique pour éviter les doublons
                 new_val = st.text_input(
                     "Libellé du CTQ", 
                     value=p["selected_ctq"], 
                     key=f"edit_ctq_{st.session_state.current_project_idx}"
                 )
                 
-                # On ne met à jour que si la valeur change vraiment
                 if new_val != p["selected_ctq"]:
                     p["selected_ctq"] = new_val
                     st.rerun()
 
                 st.info(f"**CTQ validé :** {p['selected_ctq']}")
-            
-            
-            # 3. Zone de modification manuelle
-            if "selected_ctq" in p:
-                st.write("✍️ **Ajustez votre CTQ final :**")
-                # Cette case permet de modifier le texte suggéré ou d'en écrire un nouveau
-                final_ctq = st.text_input(
-                    "Libellé du CTQ", 
-                    value=p["selected_ctq"],
-                    help="Reformulez ici pour que ce soit précis et mesurable."
-                )
-                p["selected_ctq"] = final_ctq
-                st.info(f"**CTQ enregistré :** {p['selected_ctq']}")
 
         # 2. Équipe
         st.divider()
@@ -185,13 +166,11 @@ else:
         sub_col1, sub_col2 = st.columns(2)
         with sub_col1:
             st.info("📊 Diagramme de Gantt")
-            # Simulation Gantt
             fig = go.Figure(data=[go.Bar(x=[10, 20, 30, 15, 10], y=['D', 'M', 'A', 'I', 'C'], orientation='h')])
             st.plotly_chart(fig, use_container_width=True)
         with sub_col2:
             st.info("🗺️ SIPOC Visuel")
             st.text_area("Entrez les étapes (S-I-P-O-C)", "Fournisseurs > Entrées > Processus > Sorties > Clients")
-
     # --- PHASE MEASURE (Aperçu) ---
     with tabs[1]:
         st.header("Phase Measure")
