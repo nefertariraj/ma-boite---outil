@@ -147,23 +147,19 @@ with tabs[0]:
                 st.info(f"**CTQ validé :** {p['selected_ctq']}")
 
         # 2. Équipe Projet
+        st.divider()
         st.subheader("2. Équipe Projet")
-        # On définit une clé UNIQUE qui change selon le projet sélectionné
-        team_key = f"team_editor_{st.session_state.current_project_idx}"
-        
-        # Initialisation sécurisée
-        if "team_data" not in p: 
-            p["team_data"] = [{"Poste": "Sponsor", "Nom": ""}]
-
-        # On affiche l'éditeur
+        team_key = f"editor_team_{st.session_state.current_project_idx}"
         edited_team = st.data_editor(
-            p["team_data"], 
+            p.get("team_data", [{"Poste": "", "Nom": ""}]), 
             num_rows="dynamic",
             use_container_width=True,
             key=team_key
         )
-        # On sauvegarde immédiatement dans l'objet projet 'p'
-        p["team_data"] = edited_team
+        if st.button("✅ Valider l'équipe", key=f"save_team_{st.session_state.current_project_idx}"):
+            p["team_data"] = edited_team
+            st.success("Équipe enregistrée !")
+            st.rerun()
 
         # 3. Bénéfices attendus (Version Réactive & Personnalisée)
         st.divider()
@@ -214,34 +210,32 @@ with tabs[0]:
         # 4. Stakeholder Analysis
         st.divider()
         st.subheader("4. Stakeholder Analysis")
-        stake_key = f"stake_editor_{st.session_state.current_project_idx}"
-        
-        if "stakeholders" not in p:
-            p["stakeholders"] = [{"Name": "", "Neutral": True}]
-        
+        stake_key = f"editor_stake_{st.session_state.current_project_idx}"
         edited_stake = st.data_editor(
-            p["stakeholders"],
+            p.get("stakeholders", [{"Nom": "", "Impact": ""}]),
             num_rows="dynamic",
             use_container_width=True,
             key=stake_key
         )
-        p["stakeholders"] = edited_stake
+        if st.button("✅ Valider les stakeholders", key=f"save_stake_{st.session_state.current_project_idx}"):
+            p["stakeholders"] = edited_stake
+            st.success("Stakeholders enregistrés !")
+            st.rerun()
 
         # 5. SIPOC & Schéma de Processus
         st.divider()
         st.subheader("5. SIPOC")
-        sipoc_key = f"sipoc_editor_{st.session_state.current_project_idx}"
-        
-        if "sipoc_data" not in p:
-            p["sipoc_data"] = [{"Supplier": "", "Process": "Étape 1"}]
-        
+        sipoc_key = f"editor_sipoc_{st.session_state.current_project_idx}"
         edited_sipoc = st.data_editor(
-            p["sipoc_data"],
+            p.get("sipoc_data", [{"S": "", "I": "", "P": "", "O": "", "C": ""}]),
             num_rows="dynamic",
             use_container_width=True,
             key=sipoc_key
         )
-        p["sipoc_data"] = edited_sipoc
+        if st.button("✅ Valider le SIPOC", key=f"save_sipoc_{st.session_state.current_project_idx}"):
+            p["sipoc_data"] = edited_sipoc
+            st.success("SIPOC enregistré !")
+            st.rerun()
 
         with col_viz:
             st.write("🖼️ Schéma du Process")
