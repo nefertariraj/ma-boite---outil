@@ -164,7 +164,7 @@ with tabs[0]:
             key=f"team_edit_{st.session_state.current_project_idx}"
         )
 
-        # 3. Bénéfices attendus
+        # 3. Bénéfices attendus (Version Black Belt)
         st.divider()
         st.subheader("3. Bénéfices Attendus")
         col_ben1, col_ben2 = st.columns(2)
