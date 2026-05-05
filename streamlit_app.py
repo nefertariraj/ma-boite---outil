@@ -147,22 +147,23 @@ with tabs[0]:
                 st.info(f"**CTQ validé :** {p['selected_ctq']}")
 
         # 2. Équipe Projet
-        st.divider()
         st.subheader("2. Équipe Projet")
-        # On initialise un tableau si vide dans le dictionnaire du projet
-        if "team_data" not in p: 
-            p["team_data"] = [{"Poste": "Sponsor", "Nom": ""}, {"Poste": "Chef de projet", "Nom": ""}]
+        # On définit une clé UNIQUE qui change selon le projet sélectionné
+        team_key = f"team_editor_{st.session_state.current_project_idx}"
         
-        p["team_data"] = st.data_editor(
+        # Initialisation sécurisée
+        if "team_data" not in p: 
+            p["team_data"] = [{"Poste": "Sponsor", "Nom": ""}]
+
+        # On affiche l'éditeur
+        edited_team = st.data_editor(
             p["team_data"], 
-            num_rows="dynamic", # Active l'ajout et la suppression de lignes
-            column_config={
-                "Poste": st.column_config.TextColumn("Poste / Rôle", width="medium"),
-                "Nom": st.column_config.TextColumn("Nom du Membre", width="medium"),
-            },
+            num_rows="dynamic",
             use_container_width=True,
-            key=f"team_edit_{st.session_state.current_project_idx}"
+            key=team_key
         )
+        # On sauvegarde immédiatement dans l'objet projet 'p'
+        p["team_data"] = edited_team
 
         # 3. Bénéfices attendus (Version Réactive & Personnalisée)
         st.divider()
@@ -213,41 +214,34 @@ with tabs[0]:
         # 4. Stakeholder Analysis
         st.divider()
         st.subheader("4. Stakeholder Analysis")
-        if "stakeholders" not in p:
-            p["stakeholders"] = [{"Name": "", "Strongly Against": False, "Moderately Against": False, "Neutral": True, "Moderately Supportive": False, "Strongly Supportive": False}]
+        stake_key = f"stake_editor_{st.session_state.current_project_idx}"
         
-        p["stakeholders"] = st.data_editor(
+        if "stakeholders" not in p:
+            p["stakeholders"] = [{"Name": "", "Neutral": True}]
+        
+        edited_stake = st.data_editor(
             p["stakeholders"],
-            num_rows="dynamic", # Active l'ajout et la suppression de lignes
-            column_config={
-                "Name": "Nom de l'acteur",
-                "Strongly Against": st.column_config.CheckboxColumn("S. Against"),
-                "Moderately Against": st.column_config.CheckboxColumn("M. Against"),
-                "Neutral": st.column_config.CheckboxColumn("Neutral"),
-                "Moderately Supportive": st.column_config.CheckboxColumn("M. Supportive"),
-                "Strongly Supportive": st.column_config.CheckboxColumn("S. Supportive"),
-            },
+            num_rows="dynamic",
             use_container_width=True,
-            key=f"stake_edit_{st.session_state.current_project_idx}"
+            key=stake_key
         )
+        p["stakeholders"] = edited_stake
 
         # 5. SIPOC & Schéma de Processus
         st.divider()
-        st.subheader("5. SIPOC & Cartographie")
+        st.subheader("5. SIPOC")
+        sipoc_key = f"sipoc_editor_{st.session_state.current_project_idx}"
         
         if "sipoc_data" not in p:
-            p["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "Étape 1", "Output": "", "Customer": ""}]
+            p["sipoc_data"] = [{"Supplier": "", "Process": "Étape 1"}]
         
-        col_sipoc, col_viz = st.columns([2, 1])
-        
-        with col_sipoc:
-            st.write("Remplissez le tableau SIPOC :")
-            p["sipoc_data"] = st.data_editor(
-                p["sipoc_data"],
-                num_rows="dynamic", # Active l'ajout et la suppression de lignes
-                use_container_width=True,
-                key=f"sipoc_edit_{st.session_state.current_project_idx}"
-            )
+        edited_sipoc = st.data_editor(
+            p["sipoc_data"],
+            num_rows="dynamic",
+            use_container_width=True,
+            key=sipoc_key
+        )
+        p["sipoc_data"] = edited_sipoc
 
         with col_viz:
             st.write("🖼️ Schéma du Process")
