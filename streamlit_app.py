@@ -127,24 +127,35 @@ else:
                 ]
                 st.rerun() 
 
-        with col2:
+       with col2:
             st.write("Propositions de l'IA (CTQ) :")
             if 'ai_suggest_ctq' in st.session_state:
                 for ctq in st.session_state.ai_suggest_ctq:
                     if st.button(ctq, key=f"btn_{ctq}"):
                         p["selected_ctq"] = ctq
+                        # On force un rafraîchissement propre
                         st.rerun()
             
             st.divider()
             
-            if "selected_ctq" in p:
+            # On affiche la zone de modification uniquement si un CTQ est sélectionné
+            if "selected_ctq" in p and p["selected_ctq"]:
                 st.write("✍️ **Ajustez votre CTQ final :**")
-                # Zone de modification manuelle
-                final_ctq = st.text_input("Libellé du CTQ", value=p["selected_ctq"])
-                p["selected_ctq"] = final_ctq
-                st.info(f"**CTQ enregistré :** {p['selected_ctq']}")
+                
+                # Correction : On utilise une clé unique 'edit_ctq'
+                new_val = st.text_input(
+                    "Libellé du CTQ", 
+                    value=p["selected_ctq"], 
+                    key=f"edit_ctq_{st.session_state.current_project_idx}"
+                )
+                
+                # On ne met à jour que si la valeur change vraiment
+                if new_val != p["selected_ctq"]:
+                    p["selected_ctq"] = new_val
+                    st.rerun()
+
+                st.info(f"**CTQ validé :** {p['selected_ctq']}")
             
-            st.divider() # Petite ligne de séparation
             
             # 3. Zone de modification manuelle
             if "selected_ctq" in p:
