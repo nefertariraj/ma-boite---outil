@@ -146,25 +146,100 @@ with tabs[0]:
                     st.rerun()
                 st.info(f"**CTQ validé :** {p['selected_ctq']}")
 
-        # 2. Équipe & Suite de Define
+        # 2. Équipe Projet
         st.divider()
         st.subheader("2. Équipe Projet")
-        p["team"] = st.data_editor(p["team"], num_rows="dynamic", use_container_width=True)
+        # On initialise un tableau si vide dans le dictionnaire du projet
+        if "team_data" not in p: 
+            p["team_data"] = [{"Poste": "Sponsor", "Nom": ""}, {"Poste": "Chef de projet", "Nom": ""}]
         
+        p["team_data"] = st.data_editor(
+            p["team_data"], 
+            num_rows="dynamic", # Active l'ajout et la suppression de lignes
+            column_config={
+                "Poste": st.column_config.TextColumn("Poste / Rôle", width="medium"),
+                "Nom": st.column_config.TextColumn("Nom du Membre", width="medium"),
+            },
+            use_container_width=True,
+            key=f"team_edit_{st.session_state.current_project_idx}"
+        )
+
+        # 3. Bénéfices attendus
         st.divider()
-        st.subheader("3. Bénéfices attendus")
-        st.text_area("Bénéfices (IA assistée)", key="ben_in")
+        st.subheader("3. Bénéfices Attendus")
+        col_ben1, col_ben2 = st.columns(2)
         
+        with col_ben1:
+            ben_input = st.text_area("Décrivez les bénéfices visés (texte libre) :", height=150, key="ben_raw")
+            if st.button("🚀 Soumettre pour analyse IA"):
+                # Simulation de la retranscription IA
+                st.session_state.ai_benefits = f"💡 **Analyse IA - Bénéfices Mesurables :**\n\n1. **Financier :** Réduction des coûts de non-qualité.\n2. **Temps :** Diminution du temps de cycle sur l'étape clé.\n3. **Client :** Augmentation du score de satisfaction."
+        
+        with col_ben2:
+            if 'ai_benefits' in st.session_state:
+                st.info(st.session_state.ai_benefits)
+            else:
+                st.write("L'analyse IA apparaîtra ici après soumission.")
+
+        # 4. Stakeholder Analysis
         st.divider()
-        st.subheader("4. Cartographie & Planning")
-        sub_col1, sub_col2 = st.columns(2)
-        with sub_col1:
-            st.info("📊 Diagramme de Gantt")
-            fig = go.Figure(data=[go.Bar(x=[10, 20, 30, 15, 10], y=['D', 'M', 'A', 'I', 'C'], orientation='h')])
-            st.plotly_chart(fig, use_container_width=True)
-        with sub_col2:
-            st.info("🗺️ SIPOC Visuel")
-            st.text_area("Entrez les étapes (S-I-P-O-C)", "Fournisseurs > Entrées > Processus > Sorties > Clients")
+        st.subheader("4. Stakeholder Analysis")
+        if "stakeholders" not in p:
+            p["stakeholders"] = [{"Name": "", "Strongly Against": False, "Moderately Against": False, "Neutral": True, "Moderately Supportive": False, "Strongly Supportive": False}]
+        
+        p["stakeholders"] = st.data_editor(
+            p["stakeholders"],
+            num_rows="dynamic", # Active l'ajout et la suppression de lignes
+            column_config={
+                "Name": "Nom de l'acteur",
+                "Strongly Against": st.column_config.CheckboxColumn("S. Against"),
+                "Moderately Against": st.column_config.CheckboxColumn("M. Against"),
+                "Neutral": st.column_config.CheckboxColumn("Neutral"),
+                "Moderately Supportive": st.column_config.CheckboxColumn("M. Supportive"),
+                "Strongly Supportive": st.column_config.CheckboxColumn("S. Supportive"),
+            },
+            use_container_width=True,
+            key=f"stake_edit_{st.session_state.current_project_idx}"
+        )
+
+        # 5. SIPOC & Schéma de Processus
+        st.divider()
+        st.subheader("5. SIPOC & Cartographie")
+        
+        if "sipoc_data" not in p:
+            p["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "Étape 1", "Output": "", "Customer": ""}]
+        
+        col_sipoc, col_viz = st.columns([2, 1])
+        
+        with col_sipoc:
+            st.write("Remplissez le tableau SIPOC :")
+            p["sipoc_data"] = st.data_editor(
+                p["sipoc_data"],
+                num_rows="dynamic", # Active l'ajout et la suppression de lignes
+                use_container_width=True,
+                key=f"sipoc_edit_{st.session_state.current_project_idx}"
+            )
+
+        with col_viz:
+            st.write("🖼️ Schéma du Process")
+            # Extraction des étapes pour le schéma
+            steps = [row["Process"] for row in p["sipoc_data"] if row.get("Process") and row["Process"].strip() != ""]
+            if steps:
+                mermaid_code = "graph TD\n" + " --> ".join([f'"{s}"' for s in steps])
+                st.components.v1.html(
+                    f"""
+                    <div class="mermaid" style="display: flex; justify-content: center;">
+                    {mermaid_code}
+                    </div>
+                    <script type="module">
+                    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
+                    </script>
+                    """,
+                    height=400,
+                )
+            else:
+                st.write("Ajoutez des étapes dans 'Process' pour voir le schéma.")
 
     # --- PHASE MEASURE ---
     with tabs[1]:
