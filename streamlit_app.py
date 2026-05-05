@@ -234,74 +234,80 @@ with tabs[0]:
                 {"Supplier": "Acteur B", "Input": "", "Process": "Étape 2", "Output": "", "Customer": ""}
             ]
 
-        col_sipoc, col_viz = st.columns([1.5, 1.5])
+        # 1. Zone du Tableau (Pleine largeur)
+        st.info("💡 Le schéma ci-dessous s'organise selon la colonne 'Supplier' (Responsable).")
+        edited_sipoc = st.data_editor(
+            p["sipoc_data"],
+            num_rows="dynamic",
+            use_container_width=True,
+            key=sipoc_key
+        )
         
-        with col_sipoc:
-            st.info("💡 Le schéma à droite se divise selon la colonne 'Supplier'.")
-            edited_sipoc = st.data_editor(
-                p["sipoc_data"],
-                num_rows="dynamic",
-                use_container_width=True,
-                key=sipoc_key
+        # Bouton de validation
+        if st.button("✅ Valider les données & Actualiser le schéma", key=f"btn_sipoc_{st.session_state.current_project_idx}"):
+            p["sipoc_data"] = edited_sipoc
+            st.success("Données enregistrées !")
+            st.rerun()
+
+        st.write("---") # Ligne de séparation visuelle
+
+        # 2. Zone du Schéma (Pleine largeur en bas)
+        st.write("🖼️ **Vue synoptique du flux par Responsable (Swimlanes)**")
+        
+        # Préparation des données pour Mermaid
+        lanes = {}
+        steps_order = []
+        
+        for i, row in enumerate(p["sipoc_data"]):
+            resp = str(row.get("Supplier", "Inconnu")).strip() or "Inconnu"
+            step = str(row.get("Process", "")).strip()
+            
+            if step:
+                # Nettoyage strict pour éviter les erreurs de syntaxe Mermaid
+                clean_step = "".join(e for e in step if e.isalnum() or e in " _-")
+                clean_resp = "".join(e for e in resp if e.isalnum() or e in " _-")
+                
+                if clean_resp not in lanes:
+                    lanes[clean_resp] = []
+                
+                node_id = f"step_{i}"
+                lanes[clean_resp].append(f'{node_id}["{clean_step}"]')
+                steps_order.append(node_id)
+
+        if steps_order:
+            # Construction du code Mermaid
+            # LR (Left to Right) est souvent plus lisible en pleine largeur
+            mermaid_code = "graph LR\n" 
+            
+            for resp, nodes in lanes.items():
+                mermaid_code += f"  subgraph {resp}\n"
+                for node in nodes:
+                    mermaid_code += f"    {node}\n"
+                mermaid_code += "  end\n"
+            
+            if len(steps_order) > 1:
+                links = " --> ".join(steps_order)
+                mermaid_code += f"  {links}\n"
+
+            # Affichage du schéma en utilisant toute la largeur
+            st.components.v1.html(
+                f"""
+                <div class="mermaid" style="display: flex; justify-content: center; background-color: #f8f9fa; border-radius: 10px; padding: 20px;">
+                {mermaid_code}
+                </div>
+                <script type="module">
+                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                mermaid.initialize({{ 
+                    startOnLoad: true, 
+                    theme: 'neutral', 
+                    flowchart: {{ useMaxWidth: true, htmlLabels: true, curve: 'basis' }} 
+                }});
+                </script>
+                """,
+                height=600, # Augmentation de la hauteur pour plus de confort
             )
-            
-            if st.button("✅ Valider & Générer les couloirs", key=f"btn_sipoc_{st.session_state.current_project_idx}"):
-                p["sipoc_data"] = edited_sipoc
-                st.success("SIPOC mis à jour !")
-                st.rerun()
-
-        with col_viz:
-            st.write("🖼️ Flux par Responsable (Swimlanes)")
-            
-            # 1. Grouper les étapes par responsable (Supplier)
-            lanes = {}
-            steps_order = []
-            
-            for i, row in enumerate(p["sipoc_data"]):
-                resp = str(row.get("Supplier", "Inconnu")).strip() or "Inconnu"
-                step = str(row.get("Process", "")).strip()
-                
-                if step:
-                    # Nettoyage du texte pour Mermaid
-                    clean_step = "".join(e for e in step if e.isalnum() or e in " _-")
-                    clean_resp = "".join(e for e in resp if e.isalnum() or e in " _-")
-                    
-                    if clean_resp not in lanes:
-                        lanes[clean_resp] = []
-                    
-                    node_id = f"step_{i}"
-                    lanes[clean_resp].append(f'{node_id}["{clean_step}"]')
-                    steps_order.append(node_id)
-
-            if steps_order:
-                # 2. Construction du code Mermaid avec subgraphs
-                mermaid_code = "graph LR\n" # LR pour lecture de gauche à droite (mieux pour les couloirs)
-                
-                for resp, nodes in lanes.items():
-                    mermaid_code += f"  subgraph {resp}\n"
-                    for node in nodes:
-                        mermaid_code += f"    {node}\n"
-                    mermaid_code += "  end\n"
-                
-                # 3. Création des liens entre les étapes (ordre chronologique)
-                if len(steps_order) > 1:
-                    links = " --> ".join(steps_order)
-                    mermaid_code += f"  {links}\n"
-
-                st.components.v1.html(
-                    f"""
-                    <div class="mermaid" style="display: flex; justify-content: center;">
-                    {mermaid_code}
-                    </div>
-                    <script type="module">
-                    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral', flowchart: {{ useMaxWidth: true, htmlLabels: true }} }});
-                    </script>
-                    """,
-                    height=500,
-                )
-            else:
-                st.info("Ajoutez des données dans 'Supplier' et 'Process'.")
+        else:
+            st.info("Le schéma apparaîtra ici une fois que vous aurez rempli les colonnes 'Supplier' et 'Process'.")
 
     # --- PHASE MEASURE ---
     with tabs[1]:
