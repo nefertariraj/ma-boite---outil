@@ -251,63 +251,86 @@ with tabs[0]:
 
         st.write("---") # Ligne de séparation visuelle
 
-        # 2. Zone du Schéma (Pleine largeur en bas)
+        # --- 2. Zone du Schéma (Pleine largeur avec Export & Zoom) ---
+        st.write("---")
         st.write("🖼️ **Vue synoptique du flux par Responsable (Swimlanes)**")
         
-        # Préparation des données pour Mermaid
         lanes = {}
         steps_order = []
-        
         for i, row in enumerate(p["sipoc_data"]):
             resp = str(row.get("Supplier", "Inconnu")).strip() or "Inconnu"
             step = str(row.get("Process", "")).strip()
-            
             if step:
-                # Nettoyage strict pour éviter les erreurs de syntaxe Mermaid
                 clean_step = "".join(e for e in step if e.isalnum() or e in " _-")
                 clean_resp = "".join(e for e in resp if e.isalnum() or e in " _-")
-                
-                if clean_resp not in lanes:
-                    lanes[clean_resp] = []
-                
+                if clean_resp not in lanes: lanes[clean_resp] = []
                 node_id = f"step_{i}"
                 lanes[clean_resp].append(f'{node_id}["{clean_step}"]')
                 steps_order.append(node_id)
 
         if steps_order:
-            # Construction du code Mermaid
-            # LR (Left to Right) est souvent plus lisible en pleine largeur
             mermaid_code = "graph LR\n" 
-            
             for resp, nodes in lanes.items():
                 mermaid_code += f"  subgraph {resp}\n"
-                for node in nodes:
-                    mermaid_code += f"    {node}\n"
+                for node in nodes: mermaid_code += f"    {node}\n"
                 mermaid_code += "  end\n"
-            
             if len(steps_order) > 1:
-                links = " --> ".join(steps_order)
-                mermaid_code += f"  {links}\n"
+                mermaid_code += f"  " + " --> ".join(steps_order) + "\n"
 
-            # Affichage du schéma en utilisant toute la largeur
+            # Intégration de Mermaid avec fonctionnalités Export et Zoom
             st.components.v1.html(
                 f"""
-                <div class="mermaid" style="display: flex; justify-content: center; background-color: #f8f9fa; border-radius: 10px; padding: 20px;">
-                {mermaid_code}
+                <div id="mermaid-container" style="background-color: white; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+                    <div id="viz" class="mermaid">
+                        {mermaid_code}
+                    </div>
                 </div>
+                
+                <div style="margin-top: 10px; display: flex; gap: 10px;">
+                    <button onclick="downloadJPG()" style="padding: 8px 16px; cursor: pointer; background-color: #4CAF50; color: white; border: none; border-radius: 5px;">📥 Télécharger en JPG</button>
+                    <button onclick="openFullscreen()" style="padding: 8px 16px; cursor: pointer; background-color: #2196F3; color: white; border: none; border-radius: 5px;">🔍 Agrandir / Plein écran</button>
+                </div>
+
+                <canvas id="canvas" style="display:none;"></canvas>
+
                 <script type="module">
-                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                mermaid.initialize({{ 
-                    startOnLoad: true, 
-                    theme: 'neutral', 
-                    flowchart: {{ useMaxWidth: true, htmlLabels: true, curve: 'basis' }} 
-                }});
+                    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
+
+                    window.openFullscreen = function() {{
+                        var elem = document.getElementById("mermaid-container");
+                        if (elem.requestFullscreen) {{ elem.requestFullscreen(); }}
+                    }};
+
+                    window.downloadJPG = function() {{
+                        const svg = document.querySelector('#mermaid-container svg');
+                        const canvas = document.getElementById('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const svgData = new XMLSerializer().serializeToString(svg);
+                        const img = new Image();
+                        const svgBlob = new Blob([svgData], {{type: 'image/svg+xml;charset=utf-8'}});
+                        const url = URL.createObjectURL(svgBlob);
+
+                        img.onload = function() {{
+                            canvas.width = img.width * 2; // Qualité supérieure
+                            canvas.height = img.height * 2;
+                            ctx.fillStyle = "white";
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            const jpgUrl = canvas.toDataURL("image/jpeg", 0.9);
+                            const link = document.createElement("a");
+                            link.download = "SIPOC_Flux.jpg";
+                            link.href = jpgUrl;
+                            link.click();
+                        }};
+                        img.src = url;
+                    }};
                 </script>
                 """,
-                height=600, # Augmentation de la hauteur pour plus de confort
+                height=700,
             )
         else:
-            st.info("Le schéma apparaîtra ici une fois que vous aurez rempli les colonnes 'Supplier' et 'Process'.")
+            st.info("Remplissez le tableau pour générer le flux.")
 
     # --- PHASE MEASURE ---
     with tabs[1]:
