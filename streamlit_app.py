@@ -165,7 +165,7 @@ with tabs[0]:
         )
 
         # 3. Bénéfices attendus
-st.divider()
+        st.divider()
         st.subheader("3. Bénéfices Attendus")
         col_ben1, col_ben2 = st.columns(2)
         
