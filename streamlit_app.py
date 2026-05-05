@@ -108,27 +108,36 @@ else:
     with tabs[0]:
         st.header("Phase Define")
         
-        # 1. Problème & CTQ
+       # 1. Problème & CTQ
         st.subheader("1. Énoncé du Problème & CTQ")
         col1, col2 = st.columns(2)
         with col1:
             st.markdown('<p title="X correspond aux causes">Décrivez le problème en détail :</p>', unsafe_allow_html=True)
-            p_input = st.text_area("Saisie libre", value=p["problem"], height=150, key="prob_in")
+            # On utilise une clé dynamique pour que le texte soit bien capturé
+            p_input = st.text_area("Saisie libre", value=p["problem"], height=150, key=f"prob_in_{st.session_state.current_project_idx}")
+            
             if st.button("🪄 Retranscrire via IA"):
-                # Simulation IA
+                # Mise à jour du problème dans les données du projet
                 p["problem"] = p_input
+                # L'IA génère de nouveaux CTQ basés sur le NOUVEAU texte
                 st.session_state.ai_suggest_ctq = [
                     f"Réduction du temps de {p['name']} (Lead Time)",
                     f"Taux de conformité de {p['name']} (%C&A)",
-                    f"Coût unitaire de {p['name']}"
+                    f"Coût unitaire de {p['name']}",
+                    f"Qualité perçue de : {p_input[:20]}..." # Exemple basé sur ton texte
                 ]
+                st.rerun() # Force l'application à se rafraîchir pour afficher les nouveaux CTQ
+
         with col2:
             st.write("Propositions de l'IA (CTQ) :")
             if 'ai_suggest_ctq' in st.session_state:
                 for ctq in st.session_state.ai_suggest_ctq:
-                    if st.button(ctq):
+                    if st.button(ctq, key=f"btn_{ctq}"):
                         p["selected_ctq"] = ctq
                         st.success(f"CTQ validé : {ctq}")
+            
+            if "selected_ctq" in p:
+                st.info(f"**CTQ actuel :** {p['selected_ctq']}")
 
         # 2. Équipe
         st.divider()
