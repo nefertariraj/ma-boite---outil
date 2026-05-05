@@ -165,21 +165,50 @@ with tabs[0]:
         )
 
         # 3. Bénéfices attendus
-        st.divider()
+st.divider()
         st.subheader("3. Bénéfices Attendus")
         col_ben1, col_ben2 = st.columns(2)
         
         with col_ben1:
-            ben_input = st.text_area("Décrivez les bénéfices visés (texte libre) :", height=150, key="ben_raw")
-            if st.button("🚀 Soumettre pour analyse IA"):
-                # Simulation de la retranscription IA
-                st.session_state.ai_benefits = f"💡 **Analyse IA - Bénéfices Mesurables :**\n\n1. **Financier :** Réduction des coûts de non-qualité.\n2. **Temps :** Diminution du temps de cycle sur l'étape clé.\n3. **Client :** Augmentation du score de satisfaction."
+            # On récupère le texte libre
+            ben_input = st.text_area(
+                "Décrivez les avantages espérés (votre vision) :", 
+                height=150, 
+                key=f"ben_raw_{st.session_state.current_project_idx}"
+            )
+            
+            if st.button("🚀 Soumettre pour analyse IA Black Belt"):
+                if ben_input.strip() != "":
+                    # Simulation d'une réflexion de Black Belt (DMAIC focus)
+                    # Dans une version future, on enverrait 'ben_input' à un vrai modèle LLM
+                    st.session_state.ai_benefits = f"""
+                    ### 🧠 Analyse Stratégique Black Belt
+                    
+                    **1. Efficience Opérationnelle (Vitesse/Temps) :**
+                    *   Transformation de votre texte en : **Réduction du Lead Time de X%** sur le processus cible.
+                    *   Suppression des gaspillages (Mudas) identifiés : Attentes et mouvements inutiles.
+
+                    **2. Qualité & Satisfaction Client :**
+                    *   Objectif mesurable : Atteindre un **taux de conformité (%C&A)** de 95%.
+                    *   Impact : Diminution des réclamations clients liées à votre description.
+
+                    **3. Impact Financier (Hard/Soft Savings) :**
+                    *   Estimation : Valorisation du temps gagné en ETP (Équivalent Temps Plein).
+                    *   Réduction des coûts de non-qualité (rebuts/retouches).
+                    
+                    ---
+                    *Note : Cette analyse est basée sur votre saisie actuelle : "{ben_input[:50]}..."*
+                    """
+                    st.rerun()
+                else:
+                    st.warning("Veuillez d'abord saisir votre vision des bénéfices.")
         
         with col_ben2:
             if 'ai_benefits' in st.session_state:
-                st.info(st.session_state.ai_benefits)
+                st.success("Analyse terminée !")
+                st.markdown(st.session_state.ai_benefits)
             else:
-                st.write("L'analyse IA apparaîtra ici après soumission.")
+                st.info("En attente de votre texte pour lancer la réflexion Lean Six Sigma...")
 
         # 4. Stakeholder Analysis
         st.divider()
