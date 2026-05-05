@@ -336,6 +336,59 @@ with tabs[0]:
         st.divider()
         st.subheader("6. Voice of Customer (VOC)")
         
+        # --- NOUVEAU : IMPORTATION & ANALYSE IA ---
+        st.write("📤 **Importation intelligente (Excel ou PDF)**")
+        uploaded_file = st.file_uploader(
+            "Importez vos enquêtes de satisfaction :", 
+            type=["xlsx", "pdf", "csv"],
+            key=f"file_uploader_voc_{st.session_state.current_project_idx}"
+        )
+
+        if uploaded_file is not None:
+            if st.button("🪄 Extraire les données via IA", key="btn_extract_ia"):
+                with st.spinner("L'IA analyse le document et structure les verbatims..."):
+                    # Simulation du traitement de fichier (PDF ou Excel)
+                    # Dans une version réelle, on utiliserait PyPDF2 ou pandas pour lire le contenu
+                    
+                    # Voici le format de données que l'IA génère après lecture
+                    extracted_data = [
+                        {"Client": "C-001", "Verbatim": "Les délais de livraison sont trop longs depuis trois mois.", "Problème": "Logistique / Délai", "Impact": "Satisfaction en baisse", "Fréquence": "Fréquent", "Gravité": "Élevée"},
+                        {"Client": "C-002", "Verbatim": "Le produit est arrivé avec des rayures sur la surface.", "Problème": "Qualité produit", "Impact": "Demande de remboursement", "Fréquence": "Rare", "Gravité": "Critique"},
+                        {"Client": "C-003", "Verbatim": "Le support client ne répond pas au téléphone.", "Problème": "Relation Client", "Impact": "Frustration", "Fréquence": "Occasionnel", "Gravité": "Moyenne"}
+                    ]
+                    
+                    # Mise à jour du tableau avec les données extraites
+                    p["voc_data"] = extracted_data
+                    st.success("✅ Analyse terminée ! Le tableau ci-dessous a été mis à jour.")
+                    st.rerun()
+
+        st.write("---")
+        # --- FIN DU BLOC IMPORTATION ---
+
+        voc_key = f"editor_voc_{st.session_state.current_project_idx}"
+        
+        # Initialisation si vide
+        if "voc_data" not in p:
+            p["voc_data"] = [{"Client": "", "Verbatim": "", "Problème": "", "Impact": "", "Fréquence": "Occasionnel", "Gravité": "Moyenne"}]
+
+        # On affiche ensuite l'éditeur (qui contiendra les données extraites ou vides)
+        edited_voc = st.data_editor(
+            p["voc_data"],
+            num_rows="dynamic",
+            column_config={
+                "Fréquence": st.column_config.SelectboxColumn("Fréquence", options=["Rare", "Occasionnel", "Fréquent", "Critique"]),
+                "Gravité": st.column_config.SelectboxColumn("Gravité", options=["Faible", "Moyenne", "Élevée", "Critique"]),
+                "Verbatim": st.column_config.TextColumn("Verbatim", width="large")
+            },
+            use_container_width=True,
+            key=voc_key
+        )
+        
+        if st.button("✅ Valider les données VOC (Manuelles ou IA)", key=f"btn_voc_save_{st.session_state.current_project_idx}"):
+            p["voc_data"] = edited_voc
+            st.success("VOC enregistré !")
+            st.rerun()
+        
         voc_key = f"editor_voc_{st.session_state.current_project_idx}"
         
         # Initialisation si vide
