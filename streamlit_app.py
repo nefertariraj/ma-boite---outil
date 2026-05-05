@@ -336,127 +336,78 @@ with tabs[0]:
         st.divider()
         st.subheader("6. Voice of Customer (VOC)")
         
-        # --- NOUVEAU : IMPORTATION & ANALYSE IA ---
+        # On définit l'index du projet pour garantir que chaque clé est unique
+        p_idx = st.session_state.current_project_idx
+
+        # --- A. ZONE D'IMPORTATION ---
         st.write("📤 **Importation intelligente (Excel ou PDF)**")
         uploaded_file = st.file_uploader(
             "Importez vos enquêtes de satisfaction :", 
             type=["xlsx", "pdf", "csv"],
-            key=f"file_uploader_voc_{st.session_state.current_project_idx}"
+            key=f"voc_uploader_{p_idx}" 
         )
 
         if uploaded_file is not None:
-            if st.button("🪄 Extraire les données via IA", key="btn_extract_ia"):
-                with st.spinner("L'IA analyse le document et structure les verbatims..."):
-                    # Simulation du traitement de fichier (PDF ou Excel)
-                    # Dans une version réelle, on utiliserait PyPDF2 ou pandas pour lire le contenu
-                    
-                    # Voici le format de données que l'IA génère après lecture
+            if st.button("🪄 Extraire les données via IA", key=f"btn_extract_voc_{p_idx}"):
+                with st.spinner("L'IA analyse le document..."):
+                    # Simulation de l'extraction de données
                     extracted_data = [
-                        {"Client": "C-001", "Verbatim": "Les délais de livraison sont trop longs depuis trois mois.", "Problème": "Logistique / Délai", "Impact": "Satisfaction en baisse", "Fréquence": "Fréquent", "Gravité": "Élevée"},
-                        {"Client": "C-002", "Verbatim": "Le produit est arrivé avec des rayures sur la surface.", "Problème": "Qualité produit", "Impact": "Demande de remboursement", "Fréquence": "Rare", "Gravité": "Critique"},
-                        {"Client": "C-003", "Verbatim": "Le support client ne répond pas au téléphone.", "Problème": "Relation Client", "Impact": "Frustration", "Fréquence": "Occasionnel", "Gravité": "Moyenne"}
+                        {"Client": "C-001", "Verbatim": "Les délais sont trop longs", "Problème": "Délai", "Impact": "Satisfaction", "Fréquence": "Fréquent", "Gravité": "Élevée"},
+                        {"Client": "C-002", "Verbatim": "Erreur dans la facture", "Problème": "Qualité", "Impact": "Financier", "Fréquence": "Rare", "Gravité": "Moyenne"}
                     ]
-                    
-                    # Mise à jour du tableau avec les données extraites
                     p["voc_data"] = extracted_data
-                    st.success("✅ Analyse terminée ! Le tableau ci-dessous a été mis à jour.")
+                    st.success("✅ Données extraites ! Vérifiez le tableau ci-dessous.")
                     st.rerun()
 
         st.write("---")
-        # --- FIN DU BLOC IMPORTATION ---
 
-        voc_key = f"editor_voc_{st.session_state.current_project_idx}"
-        
-        # Initialisation si vide
+        # --- B. TABLEAU DE SAISIE VOC ---
         if "voc_data" not in p:
             p["voc_data"] = [{"Client": "", "Verbatim": "", "Problème": "", "Impact": "", "Fréquence": "Occasionnel", "Gravité": "Moyenne"}]
 
-        # On affiche ensuite l'éditeur (qui contiendra les données extraites ou vides)
+        # On utilise une clé spécifique pour l'éditeur de données
+        voc_editor_key = f"voc_table_editor_{p_idx}"
+        
         edited_voc = st.data_editor(
             p["voc_data"],
             num_rows="dynamic",
             column_config={
                 "Fréquence": st.column_config.SelectboxColumn("Fréquence", options=["Rare", "Occasionnel", "Fréquent", "Critique"]),
                 "Gravité": st.column_config.SelectboxColumn("Gravité", options=["Faible", "Moyenne", "Élevée", "Critique"]),
-                "Verbatim": st.column_config.TextColumn("Verbatim", width="large")
+                "Verbatim": st.column_config.TextColumn("Verbatim", width="large", placeholder="Citation client...")
             },
             use_container_width=True,
-            key=voc_key
+            key=voc_editor_key
         )
         
-        if st.button("✅ Valider les données VOC (Manuelles ou IA)", key=f"btn_voc_save_{st.session_state.current_project_idx}"):
+        if st.button("✅ Valider les données du tableau", key=f"btn_save_voc_final_{p_idx}"):
             p["voc_data"] = edited_voc
-            st.success("VOC enregistré !")
-            st.rerun()
-        
-        voc_key = f"editor_voc_{st.session_state.current_project_idx}"
-        
-        # Initialisation si vide
-        if "voc_data" not in p:
-            p["voc_data"] = [{
-                "Client": "", 
-                "Verbatim": "", 
-                "Problème": "", 
-                "Impact": "", 
-                "Fréquence": "Occasionnel", 
-                "Gravité": "Moyenne"
-            }]
-
-        # 1. Tableau VOC (Correction du TypeError ici)
-        st.info("💡 Saisissez les retours clients, puis validez.")
-        edited_voc = st.data_editor(
-            p["voc_data"],
-            num_rows="dynamic",
-            column_config={
-                "Client": st.column_config.TextColumn("Client", width="small"),
-                "Verbatim": st.column_config.TextColumn("Verbatim", width="medium"),
-                "Problème": st.column_config.TextColumn("Problème", width="medium"),
-                "Fréquence": st.column_config.SelectboxColumn("Fréquence", options=["Rare", "Occasionnel", "Fréquent", "Critique"]),
-                "Gravité": st.column_config.SelectboxColumn("Gravité", options=["Faible", "Moyenne", "Élevée", "Critique"]),
-            },
-            use_container_width=True,
-            key=voc_key
-        )
-        
-        # Bouton de sauvegarde du tableau
-        if st.button("✅ Valider les données VOC", key=f"btn_voc_save_{st.session_state.current_project_idx}"):
-            p["voc_data"] = edited_voc
-            st.success("VOC enregistré !")
+            st.success("Données VOC enregistrées !")
             st.rerun()
 
-        # 2. ANALYSE IA DU VERBATIM
+        # --- C. ANALYSE IA FINALE ---
         st.write("---")
-        st.write("🧠 **Analyse IA des Besoins Clients (Targeting CTQ)**")
+        st.write("🧠 **Analyse IA des Besoins Clients (Regroupement)**")
         
-        if st.button("🔍 Catégoriser les Verbatims", key=f"ai_voc_btn_{st.session_state.current_project_idx}"):
-            # On récupère les verbatims
-            text_to_analyze = " ".join([row["Verbatim"] for row in p["voc_data"] if row.get("Verbatim")])
+        if st.button("🔍 Catégoriser les Verbatims", key=f"ai_voc_analysis_btn_{p_idx}"):
+            all_verbatims = " ".join([str(row.get("Verbatim", "")) for row in p["voc_data"] if row.get("Verbatim")])
             
-            if text_to_analyze.strip():
-                # Récupération du CTQ pour contexte
+            if all_verbatims.strip():
                 current_ctq = p.get("selected_ctq", "non défini")
-                
-                # Génération de l'analyse
                 st.session_state.voc_analysis = f"""
-                ### 🎯 Regroupement Stratégique (Focus CTQ : {current_ctq})
+                ### 🎯 Regroupement Stratégique (Focus : {current_ctq})
                 
-                | Catégorie de Problème | Insights extraits des Verbatims | Priorité |
+                | Catégorie de Problème | Insights extraits | Priorité |
                 | :--- | :--- | :--- |
-                | **Délai / Réactivité** | Analyse des attentes temporelles détectées. | 🔴 Haute |
-                | **Fiabilité / Qualité** | Analyse des erreurs ou défauts cités. | 🟠 Moyenne |
-                | **Communication** | Analyse du besoin d'information client. | 🟡 Faible |
-                | **Facilité d'Usage** | Analyse de la complexité du service/produit. | 🟠 Moyenne |
-                
-                **Analyse Black Belt :** Pour optimiser votre CTQ "*{current_ctq}*", concentrez-vous sur les points de douleur liés aux délais.
-                
-                ---
-                *Dernière analyse : {datetime.now().strftime("%H:%M:%S")}*
+                | **Délai / Réactivité** | Analyse des attentes mentionnées. | 🔴 Haute |
+                | **Fiabilité / Qualité** | Erreurs détectées. | 🟠 Moyenne |
+                | **Communication** | Clarté du processus. | 🟡 Faible |
+                | **Facilité d'Usage** | Complexité perçue. | 🟠 Moyenne |
                 """
                 st.rerun()
             else:
-                st.warning("Ajoutez au moins un Verbatim dans le tableau pour lancer l'analyse.")
+                st.warning("Ajoutez des verbatims pour lancer l'analyse.")
 
-        # Affichage
         if "voc_analysis" in st.session_state:
             st.markdown(st.session_state.voc_analysis)
             
