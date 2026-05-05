@@ -105,6 +105,8 @@ else:
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
 with tabs[0]:
+# --- PHASE DEFINE ---
+    with tabs[0]:
         st.header("Phase Define")
         
         # 1. Problème & CTQ
@@ -137,30 +139,22 @@ with tabs[0]:
             
             if "selected_ctq" in p and p["selected_ctq"]:
                 st.write("✍️ **Ajustez votre CTQ final :**")
-                # Utilisation d'une clé unique pour éviter les doublons
-                new_val = st.text_input(
-                    "Libellé du CTQ", 
-                    value=p["selected_ctq"], 
-                    key=f"edit_ctq_{st.session_state.current_project_idx}"
-                )
+                new_val = st.text_input("Libellé du CTQ", value=p["selected_ctq"], key=f"edit_ctq_{st.session_state.current_project_idx}")
                 
                 if new_val != p["selected_ctq"]:
                     p["selected_ctq"] = new_val
                     st.rerun()
-
                 st.info(f"**CTQ validé :** {p['selected_ctq']}")
 
-        # 2. Équipe
+        # 2. Équipe & Suite de Define
         st.divider()
         st.subheader("2. Équipe Projet")
         p["team"] = st.data_editor(p["team"], num_rows="dynamic", use_container_width=True)
         
-        # 3. Bénéfices
         st.divider()
         st.subheader("3. Bénéfices attendus")
         st.text_area("Bénéfices (IA assistée)", key="ben_in")
         
-        # 4. Outils Visuels
         st.divider()
         st.subheader("4. Cartographie & Planning")
         sub_col1, sub_col2 = st.columns(2)
@@ -171,7 +165,8 @@ with tabs[0]:
         with sub_col2:
             st.info("🗺️ SIPOC Visuel")
             st.text_area("Entrez les étapes (S-I-P-O-C)", "Fournisseurs > Entrées > Processus > Sorties > Clients")
-    # --- PHASE MEASURE (Aperçu) ---
+
+    # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
         st.write(f"**CTQ Sélectionné :** {p.get('selected_ctq', 'Non défini')}")
