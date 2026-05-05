@@ -164,13 +164,12 @@ with tabs[0]:
             key=f"team_edit_{st.session_state.current_project_idx}"
         )
 
-        # 3. Bénéfices attendus (Version Black Belt)
+        # 3. Bénéfices attendus (Version Réactive & Personnalisée)
         st.divider()
         st.subheader("3. Bénéfices Attendus")
         col_ben1, col_ben2 = st.columns(2)
         
         with col_ben1:
-            # On récupère le texte libre
             ben_input = st.text_area(
                 "Décrivez les avantages espérés (votre vision) :", 
                 height=150, 
@@ -179,36 +178,37 @@ with tabs[0]:
             
             if st.button("🚀 Soumettre pour analyse IA Black Belt"):
                 if ben_input.strip() != "":
-                    # Simulation d'une réflexion de Black Belt (DMAIC focus)
-                    # Dans une version future, on enverrait 'ben_input' à un vrai modèle LLM
-                    st.session_state.ai_benefits = f"""
-                    ### 🧠 Analyse Stratégique Black Belt
+                    # --- LOGIQUE PERSONNALISÉE ---
+                    # On crée des variables basées sur TON texte pour personnaliser la réponse
+                    mots_cles = ben_input.lower()
                     
-                    **1. Efficience Opérationnelle (Vitesse/Temps) :**
-                    *   Transformation de votre texte en : **Réduction du Lead Time de X%** sur le processus cible.
-                    *   Suppression des gaspillages (Mudas) identifiés : Attentes et mouvements inutiles.
-
-                    **2. Qualité & Satisfaction Client :**
-                    *   Objectif mesurable : Atteindre un **taux de conformité (%C&A)** de 95%.
-                    *   Impact : Diminution des réclamations clients liées à votre description.
-
-                    **3. Impact Financier (Hard/Soft Savings) :**
-                    *   Estimation : Valorisation du temps gagné en ETP (Équivalent Temps Plein).
-                    *   Réduction des coûts de non-qualité (rebuts/retouches).
+                    # Simulation d'une réflexion dynamique
+                    analyse_custom = f"### 🧠 Analyse Spécifique Black Belt\n\n"
                     
-                    ---
-                    *Note : Cette analyse est basée sur votre saisie actuelle : "{ben_input[:50]}..."*
-                    """
+                    if "temps" in mots_cles or "vite" in mots_cles or "délai" in mots_cles:
+                        analyse_custom += "**Focus Vitesse :** Votre mention sur les délais suggère une opportunité de réduction du *Lead Time*. En LSS, nous viserons une diminution des gaspillages de type 'Attente'.\n\n"
+                    
+                    if "argent" in mots_cles or "coût" in mots_cles or "perte" in mots_cles:
+                        analyse_custom += "**Focus Financier :** L'aspect économique soulevé nécessite un calcul de *Hard Savings* sur les rebuts ou la non-qualité.\n\n"
+                    
+                    if "qualité" in mots_cles or "erreur" in mots_cles or "faute" in mots_cles:
+                        analyse_custom += "**Focus Qualité :** Pour corriger les erreurs mentionnées, le CTQ devra se concentrer sur le *First Pass Yield* (bon du premier coup).\n\n"
+
+                    analyse_custom += f"**Recommandation sur votre saisie :**\n> \"{ben_input}\"\n\n"
+                    analyse_custom += "--- \n*Analyse mise à jour le :* " + datetime.now().strftime("%H:%M:%S")
+                    
+                    # On stocke le résultat unique dans le session_state
+                    st.session_state.ai_benefits = analyse_custom
                     st.rerun()
                 else:
                     st.warning("Veuillez d'abord saisir votre vision des bénéfices.")
         
         with col_ben2:
             if 'ai_benefits' in st.session_state:
-                st.success("Analyse terminée !")
+                # On utilise une clé unique pour forcer l'affichage de la nouvelle analyse
                 st.markdown(st.session_state.ai_benefits)
             else:
-                st.info("En attente de votre texte pour lancer la réflexion Lean Six Sigma...")
+                st.info("En attente de votre texte pour lancer la réflexion...")
 
         # 4. Stakeholder Analysis
         st.divider()
