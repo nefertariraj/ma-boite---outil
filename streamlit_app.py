@@ -121,10 +121,14 @@ else:
                 p["problem"] = p_input
                 # L'IA génère de nouveaux CTQ basés sur le NOUVEAU texte
                 st.session_state.ai_suggest_ctq = [
-                    f"Réduction du temps de {p['name']} (Lead Time)",
-                    f"Taux de conformité de {p['name']} (%C&A)",
-                    f"Coût unitaire de {p['name']}",
-                    f"Qualité perçue de : {p_input[:20]}..." # Exemple basé sur ton texte
+                    if st.button("🪄 Retranscrire via IA"):
+                p["problem"] = p_input
+                # On propose des formulations plus "standard" et propres
+                st.session_state.ai_suggest_ctq = [
+                    "⏱️ Temps : Réduire le Lead Time global",
+                    "🎯 Qualité : Augmenter le taux de conformité (%C&A)",
+                    "💰 Coût : Réduire les coûts opérationnels",
+                    f"✨ Spécifique : {p_input[:30]}..."
                 ]
                 st.rerun() # Force l'application à se rafraîchir pour afficher les nouveaux CTQ
 
@@ -132,12 +136,24 @@ else:
             st.write("Propositions de l'IA (CTQ) :")
             if 'ai_suggest_ctq' in st.session_state:
                 for ctq in st.session_state.ai_suggest_ctq:
+                    # On crée des boutons pour choisir une suggestion
                     if st.button(ctq, key=f"btn_{ctq}"):
                         p["selected_ctq"] = ctq
-                        st.success(f"CTQ validé : {ctq}")
+                        st.rerun()
             
+            st.divider() # Petite ligne de séparation
+            
+            # 3. Zone de modification manuelle
             if "selected_ctq" in p:
-                st.info(f"**CTQ actuel :** {p['selected_ctq']}")
+                st.write("✍️ **Ajustez votre CTQ final :**")
+                # Cette case permet de modifier le texte suggéré ou d'en écrire un nouveau
+                final_ctq = st.text_input(
+                    "Libellé du CTQ", 
+                    value=p["selected_ctq"],
+                    help="Reformulez ici pour que ce soit précis et mesurable."
+                )
+                p["selected_ctq"] = final_ctq
+                st.info(f"**CTQ enregistré :** {p['selected_ctq']}")
 
         # 2. Équipe
         st.divider()
