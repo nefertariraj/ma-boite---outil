@@ -91,21 +91,23 @@ if st.session_state.current_project_idx is None:
                     st.rerun()
 
 else:
-    # VUE PROJET (DMAIC)
-    p = st.session_state.projects[st.session_state.current_project_idx]
-    
-    col_back, col_title = st.columns([1, 8])
-    with col_back:
-        if st.button("⬅️"):
-            st.session_state.current_project_idx = None
-            st.rerun()
-    with col_title:
-        st.title(f"Projet : {p['name']}")
+        # VUE PROJET (DMAIC)
+        p = st.session_state.projects[st.session_state.current_project_idx]
+        
+        col_back, col_title = st.columns([1, 8])
+        with col_back:
+            if st.button("⬅️"):
+                st.session_state.current_project_idx = None
+                st.rerun()
+        with col_title:
+            st.title(f"Projet : {p['name']}")
 
-    tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
+        # On crée les onglets ICI
+        tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
-with tabs[0]:
-# --- PHASE DEFINE ---
+        # IMPORTANT : Cette ligne doit être décalée vers la droite (alignée avec tabs)
+        with tabs[0]:
+    # --- PHASE DEFINE ---
     with tabs[0]:
         st.header("Phase Define")
         
