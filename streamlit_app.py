@@ -6,7 +6,6 @@ from datetime import datetime
 # --- CONFIGURATION DE LA PAGE & STYLE ---
 st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
 
-# Personnalisation des couleurs
 if 'primary_color' not in st.session_state:
     st.session_state.primary_color = "#1E3A8A" 
 
@@ -14,7 +13,6 @@ st.markdown(f"""
     <style>
     .stApp {{ background-color: #FFFFFF; }}
     .stButton>button {{ background-color: {st.session_state.primary_color}; color: white; border-radius: 5px; }}
-    .info-box {{ background-color: #F0F4F8; padding: 15px; border-left: 5px solid {st.session_state.primary_color}; border-radius: 5px; margin-bottom: 10px; }}
     .stTabs [data-baseweb="tab-list"] {{ gap: 24px; }}
     .stTabs [data-baseweb="tab"] {{ font-weight: bold; color: #4B5563; }}
     </style>
@@ -58,21 +56,25 @@ if st.session_state.current_project_idx is None:
     with st.expander("➕ Initialiser un nouveau projet"):
         p_name = st.text_input("Nom du projet")
         if st.button("Créer le projet"):
-            new_p = {
-                "name": p_name,
-                "status": "Define",
-                "sipoc_data": [],
-                "voc_data": [],
-                "selected_ctq": "Non défini"
-            }
-            st.session_state.projects.append(new_p)
-            st.rerun()
+            if p_name:
+                new_p = {
+                    "name": p_name,
+                    "status": "Define",
+                    "problem": "",         # Corrigé : ajouté pour éviter KeyError
+                    "sipoc_data": [{"Fournisseur": "", "Entrée": "", "Processus": "", "Sortie": "", "Client": ""}],
+                    "voc_data": [{"Client": "", "Verbatim": "", "Besoin": ""}],
+                    "selected_ctq": "Qualité",
+                    "team": pd.DataFrame(columns=["Poste", "Nom"]) # Corrigé : ajouté
+                }
+                st.session_state.projects.append(new_p)
+                st.success("Projet créé !")
+                st.rerun()
 
     cols = st.columns(3)
-    for idx, p in enumerate(st.session_state.projects):
+    for idx, proj in enumerate(st.session_state.projects):
         with cols[idx % 3]:
             with st.container(border=True):
-                st.subheader(p["name"])
+                st.subheader(proj["name"])
                 if st.button("Ouvrir", key=f"open_{idx}"):
                     st.session_state.current_project_idx = idx
                     st.rerun()
@@ -90,7 +92,6 @@ else:
     with col_title:
         st.title(f"Projet : {p['name']}")
 
-    # Création des onglets
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # --- PHASE DEFINE ---
