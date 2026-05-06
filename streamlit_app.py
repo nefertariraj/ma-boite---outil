@@ -237,87 +237,77 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & Schéma de Processus Automatisé ---
+       # --- 5. SIPOC & Schéma de Processus (Mode Formulaire) ---
         st.divider()
         st.subheader("5. SIPOC & Flux de processus")
 
-        # 1. Initialisation des données avec les 5 colonnes exactes
-        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or len(p["sipoc_data"]) == 0:
+        # 1. Initialisation des données
+        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [
-                {
-                    "Supplier": "Fournisseur", 
-                    "Input": "Entrée", 
-                    "Process": "Étape 1", 
-                    "Output": "Sortie", 
-                    "Customer": "Acteur A"
-                }
+                {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
             ]
 
-        # 2. Tableau SIPOC interactif
-        st.info("Utilisez le tableau ci-dessous. Pour ajouter une ligne, cliquez sur le '+' en bas du tableau. Pour supprimer, sélectionnez une ligne et appuyez sur 'Suppr'.")
-        
-        edited_sipoc = st.data_editor(
-            p["sipoc_data"],
-            num_rows="dynamic", # Active l'ajout/suppression de lignes
-            key=f"sipoc_editor_{p_idx}",
-            use_container_width=True,
-            column_order=("Supplier", "Input", "Process", "Output", "Customer")
-        )
-        p["sipoc_data"] = edited_sipoc
-
-        # 3. Génération du Cross-Functional Flowchart (Swimlane Verticale)
-        st.write("### Schéma de flux (Swimlanes par acteur)")
-
-        def generate_swimlane_chart(data):
-            # Configuration du graphique : TB = Top to Bottom (Vertical)
-            dot_code = """
-            digraph G {
-                rankdir=TB;
-                node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
-                edge [color="#2D3748", penwidth=1.5];
-                compound=true;
-            """
+        # 2. Utilisation d'un formulaire pour bloquer la réactualisation automatique
+        with st.form(key=f"sipoc_form_{p_idx}"):
+            st.info("Saisissez vos données ci-dessous. Le schéma sera mis à jour uniquement après avoir cliqué sur 'Valider'.")
             
-            df = pd.DataFrame(data)
-            # On ignore les lignes où le Process ou le Customer sont vides
-            df = df.dropna(subset=['Process', 'Customer'])
-            df = df[(df['Process'] != "") & (df['Customer'] != "")]
+            # On édite les données dans le formulaire
+            edited_sipoc = st.data_editor(
+                p["sipoc_data"],
+                num_rows="dynamic",
+                key=f"sipoc_editor_input_{p_idx}",
+                use_container_width=True,
+                column_order=("Supplier", "Input", "Process", "Output", "Customer")
+            )
+            
+            # Bouton de soumission du formulaire
+            submit_sipoc = st.form_submit_button("✅ Valider et Générer le Schéma")
 
-            if not df.empty:
-                # Les Swimlanes sont définies par la colonne 'Customer' (les acteurs)
-                actors = df['Customer'].unique()
-                
-                for i, actor in enumerate(actors):
-                    # cluster_ prefix est obligatoire pour que Graphviz dessine un cadre
-                    dot_code += f'    subgraph cluster_{i} {{\n'
-                    dot_code += f'        label = "{actor}";\n'
-                    dot_code += f'        style=filled; color="#EDF2F7";\n'
-                    dot_code += '        fontname="Arial-Bold"; fontsize="12";\n'
-                    
-                    # Filtrer les étapes appartenant à cet acteur
-                    actor_steps = df[df['Customer'] == actor]
-                    for idx, row in actor_steps.iterrows():
-                        dot_code += f'        "{row["Process"]}";\n'
-                    dot_code += '    }\n'
-                
-                # Création des liens entre les étapes (ordre chronologique du tableau)
-                steps = df['Process'].tolist()
-                for j in range(len(steps) - 1):
-                    dot_code += f'    "{steps[j]}" -> "{steps[j+1]}";\n'
-                    
-            dot_code += "}"
-            return dot_code
+        # 3. Traitement après validation
+        if submit_sipoc:
+            p["sipoc_data"] = edited_sipoc
+            st.success("Données enregistrées !")
 
-        # Rendu du schéma
+        # 4. Affichage du schéma (uniquement si des données existent)
         if p["sipoc_data"]:
-            try:
-                dot_graph = generate_swimlane_chart(p["sipoc_data"])
-                st.graphviz_chart(dot_graph)
-            except Exception:
-                st.caption("Le schéma s'affichera dès que les colonnes 'Process' et 'Customer' seront remplies.")
+            st.write("### Schéma de flux généré")
+            
+            def generate_swimlane_chart(data):
+                dot_code = """
+                digraph G {
+                    rankdir=TB;
+                    node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
+                    edge [color="#2D3748", penwidth=1.5];
+                    compound=true;
+                """
+                df = pd.DataFrame(data)
+                df = df.dropna(subset=['Process', 'Customer'])
+                df = df[(df['Process'] != "") & (df['Customer'] != "")]
 
-        if st.button("✅ Sauvegarder SIPOC & Schéma", key=f"save_sipoc_final_{p_idx}"):
-            st.success("Données SIPOC et flux enregistrés avec succès !")
+                if not df.empty:
+                    actors = df['Customer'].unique()
+                    for i, actor in enumerate(actors):
+                        dot_code += f'    subgraph cluster_{i} {{\n'
+                        dot_code += f'        label = "{actor}";\n'
+                        dot_code += f'        style=filled; color="#EDF2F7";\n'
+                        dot_code += '        fontname="Arial-Bold"; fontsize="12";\n'
+                        
+                        actor_steps = df[df['Customer'] == actor]
+                        for idx, row in actor_steps.iterrows():
+                            dot_code += f'        "{row["Process"]}";\n'
+                        dot_code += '    }\n'
+                    
+                    steps = df['Process'].tolist()
+                    for j in range(len(steps) - 1):
+                        dot_code += f'    "{steps[j]}" -> "{steps[j+1]}";\n'
+                dot_code += "}"
+                return dot_code
+
+            try:
+                chart_dot = generate_swimlane_chart(p["sipoc_data"])
+                st.graphviz_chart(chart_dot)
+            except Exception:
+                st.info("Remplissez les colonnes 'Process' et 'Customer' pour voir le schéma.")
             
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
