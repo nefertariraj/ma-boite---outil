@@ -104,7 +104,8 @@ else:
         
         with col1:
             st.markdown('<p title="X correspond aux causes">Décrivez le problème en détail :</p>', unsafe_allow_html=True)
-            p_input = st.text_area("Saisie libre", value=p["problem"], height=150, key=f"prob_in_{st.session_state.current_project_idx}")
+            # Utilisation de .get pour éviter le KeyError si le projet est ancien
+            p_input = st.text_area("Saisie libre", value=p.get("problem", ""), height=150, key=f"prob_in_{st.session_state.current_project_idx}")
             
             if st.button("🪄 Retranscrire via IA"):
                 p["problem"] = p_input
