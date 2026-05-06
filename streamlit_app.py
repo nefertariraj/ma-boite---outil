@@ -94,7 +94,7 @@ else:
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # --- PHASE DEFINE ---
-        with tabs[0]:
+    with tabs[0]:
         st.header("Phase Define")
         
         # 1. Problème & CTQ
