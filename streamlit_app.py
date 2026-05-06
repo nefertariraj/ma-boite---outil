@@ -6,9 +6,9 @@ from datetime import datetime
 # --- CONFIGURATION DE LA PAGE & STYLE ---
 st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
 
-# Personnalisation des couleurs (Modifiable dans les paramètres)
+# Personnalisation des couleurs
 if 'primary_color' not in st.session_state:
-    st.session_state.primary_color = "#1E3A8A" # Bleu nuit moderne
+    st.session_state.primary_color = "#1E3A8A" 
 
 st.markdown(f"""
     <style>
@@ -20,7 +20,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- GESTION DES DONNÉES & SÉCURITÉ ---
+# --- GESTION DES DONNÉES ---
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'projects' not in st.session_state:
@@ -31,82 +31,68 @@ if 'current_project_idx' not in st.session_state:
 # --- ÉCRAN DE CONNEXION ---
 if not st.session_state.authenticated:
     st.title("🔐 Lean Six Sigma - Personal Toolbox")
-    st.write("Veuillez vous identifier pour accéder à vos projets sécurisés.")
-    
     with st.container(border=True):
         user = st.text_input("Identifiant (Email Google)")
         pwd = st.text_input("Mot de passe", type="password")
         if st.button("Se connecter via Google Drive"):
-            if user and pwd: # Simulation de la validation Google
+            if user and pwd: 
                 st.session_state.authenticated = True
-                st.success("Connexion réussie. Accès à votre Drive autorisé.")
                 st.rerun()
     st.stop()
 
-# --- BARRE LATÉRALE (SIDEBAR) ---
+# --- BARRE LATÉRALE ---
 with st.sidebar:
     st.title("⚙️ Paramètres")
-    st.color_picker("Couleur de l'outil", st.session_state.primary_color, key="color_picker")
-    st.session_state.primary_color = st.session_state.color_picker
-    
+    color = st.color_picker("Couleur de l'outil", st.session_state.primary_color)
+    st.session_state.primary_color = color
     st.divider()
-    if st.button("📁 Sauvegarder sur Google Drive"):
-        st.toast("Projets synchronisés sur votre Drive !")
-    
-    st.download_button("📥 Exporter en Excel", data="Données simulées", file_name="Projet_LSS.xlsx")
-    
     if st.button("🚪 Déconnexion"):
         st.session_state.authenticated = False
+        st.session_state.current_project_idx = None
         st.rerun()
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
-    # PAGE D'ACCUEIL : GESTION DES PROJETS
     st.title("🚀 Mes Projets Lean Six Sigma")
     
-    # Création de projet
-    with st.expander("➕ Initialiser un nouveau projet Black Belt"):
+    with st.expander("➕ Initialiser un nouveau projet"):
         p_name = st.text_input("Nom du projet")
         if st.button("Créer le projet"):
             new_p = {
                 "name": p_name,
                 "status": "Define",
-                "problem": "",
-                "ctq": [],
-                "team": pd.DataFrame(columns=["Poste", "Nom"]),
-                "benefits": ""
+                "sipoc_data": [],
+                "voc_data": [],
+                "selected_ctq": "Non défini"
             }
             st.session_state.projects.append(new_p)
             st.rerun()
 
-    # Liste des projets
     cols = st.columns(3)
     for idx, p in enumerate(st.session_state.projects):
         with cols[idx % 3]:
             with st.container(border=True):
                 st.subheader(p["name"])
-                st.caption(f"Phase actuelle : {p['status']}")
                 if st.button("Ouvrir", key=f"open_{idx}"):
                     st.session_state.current_project_idx = idx
                     st.rerun()
 
 else:
-        # VUE PROJET (DMAIC)
-        p = st.session_state.projects[st.session_state.current_project_idx]
-        
-        col_back, col_title = st.columns([1, 8])
-        with col_back:
-            if st.button("⬅️"):
-                st.session_state.current_project_idx = None
-                st.rerun()
-        with col_title:
-            st.title(f"Projet : {p['name']}")
+    # --- VUE PROJET (DMAIC) ---
+    p_idx = st.session_state.current_project_idx
+    p = st.session_state.projects[p_idx]
+    
+    col_back, col_title = st.columns([1, 8])
+    with col_back:
+        if st.button("⬅️"):
+            st.session_state.current_project_idx = None
+            st.rerun()
+    with col_title:
+        st.title(f"Projet : {p['name']}")
 
-        # On crée les onglets ICI
-        tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
+    # Création des onglets
+    tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
-        # IMPORTANT : Cette ligne doit être décalée vers la droite (alignée avec tabs)
-        with tabs[0]:
     # --- PHASE DEFINE ---
         with tabs[0]:
         st.header("Phase Define")
