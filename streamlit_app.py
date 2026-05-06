@@ -336,27 +336,23 @@ with tabs[0]:
         st.divider()
         st.subheader("6. Voice of Customer (VOC)")
         
-        # On définit l'index du projet pour garantir que chaque clé est unique
         p_idx = st.session_state.current_project_idx
 
         # --- A. ZONE D'IMPORTATION ---
         st.write("📤 **Importation intelligente (Excel ou PDF)**")
         uploaded_file = st.file_uploader(
-            "Importez vos enquêtes de satisfaction :", 
+            "Importez vos enquêtes :", 
             type=["xlsx", "pdf", "csv"],
             key=f"voc_uploader_{p_idx}" 
         )
 
         if uploaded_file is not None:
             if st.button("🪄 Extraire les données via IA", key=f"btn_extract_voc_{p_idx}"):
-                with st.spinner("L'IA analyse le document..."):
-                    # Simulation de l'extraction de données
+                with st.spinner("Analyse en cours..."):
                     extracted_data = [
-                        {"Client": "C-001", "Verbatim": "Les délais sont trop longs", "Problème": "Délai", "Impact": "Satisfaction", "Fréquence": "Fréquent", "Gravité": "Élevée"},
-                        {"Client": "C-002", "Verbatim": "Erreur dans la facture", "Problème": "Qualité", "Impact": "Financier", "Fréquence": "Rare", "Gravité": "Moyenne"}
+                        {"Client": "C-001", "Verbatim": "Les délais sont trop longs", "Problème": "Délai", "Impact": "Satisfaction", "Fréquence": "Fréquent", "Gravité": "Élevée"}
                     ]
                     p["voc_data"] = extracted_data
-                    st.success("✅ Données extraites ! Vérifiez le tableau ci-dessous.")
                     st.rerun()
 
         st.write("---")
@@ -365,16 +361,25 @@ with tabs[0]:
         if "voc_data" not in p:
             p["voc_data"] = [{"Client": "", "Verbatim": "", "Problème": "", "Impact": "", "Fréquence": "Occasionnel", "Gravité": "Moyenne"}]
 
-        # On utilise une clé spécifique pour l'éditeur de données
         voc_editor_key = f"voc_table_editor_{p_idx}"
         
+        # Correction ici : on simplifie le column_config pour éviter le TypeError
         edited_voc = st.data_editor(
             p["voc_data"],
             num_rows="dynamic",
             column_config={
-                "Fréquence": st.column_config.SelectboxColumn("Fréquence", options=["Rare", "Occasionnel", "Fréquent", "Critique"]),
-                "Gravité": st.column_config.SelectboxColumn("Gravité", options=["Faible", "Moyenne", "Élevée", "Critique"]),
-                "Verbatim": st.column_config.TextColumn("Verbatim", width="large", placeholder="Citation client...")
+                "Fréquence": st.column_config.SelectboxColumn(
+                    "Fréquence", 
+                    options=["Rare", "Occasionnel", "Fréquent", "Critique"]
+                ),
+                "Gravité": st.column_config.SelectboxColumn(
+                    "Gravité", 
+                    options=["Faible", "Moyenne", "Élevée", "Critique"]
+                ),
+                "Verbatim": st.column_config.TextColumn(
+                    "Verbatim", 
+                    help="Citation directe du client"
+                )
             },
             use_container_width=True,
             key=voc_editor_key
@@ -387,26 +392,11 @@ with tabs[0]:
 
         # --- C. ANALYSE IA FINALE ---
         st.write("---")
-        st.write("🧠 **Analyse IA des Besoins Clients (Regroupement)**")
-        
         if st.button("🔍 Catégoriser les Verbatims", key=f"ai_voc_analysis_btn_{p_idx}"):
             all_verbatims = " ".join([str(row.get("Verbatim", "")) for row in p["voc_data"] if row.get("Verbatim")])
-            
             if all_verbatims.strip():
-                current_ctq = p.get("selected_ctq", "non défini")
-                st.session_state.voc_analysis = f"""
-                ### 🎯 Regroupement Stratégique (Focus : {current_ctq})
-                
-                | Catégorie de Problème | Insights extraits | Priorité |
-                | :--- | :--- | :--- |
-                | **Délai / Réactivité** | Analyse des attentes mentionnées. | 🔴 Haute |
-                | **Fiabilité / Qualité** | Erreurs détectées. | 🟠 Moyenne |
-                | **Communication** | Clarté du processus. | 🟡 Faible |
-                | **Facilité d'Usage** | Complexité perçue. | 🟠 Moyenne |
-                """
+                st.session_state.voc_analysis = f"### 🎯 Analyse IA\nBasée sur : {all_verbatims[:50]}..."
                 st.rerun()
-            else:
-                st.warning("Ajoutez des verbatims pour lancer l'analyse.")
 
         if "voc_analysis" in st.session_state:
             st.markdown(st.session_state.voc_analysis)
