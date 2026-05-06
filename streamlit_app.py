@@ -197,43 +197,45 @@ else:
             else:
                 st.info("En attente de votre texte pour lancer la réflexion...")
 
-        # 4. Stakeholder Analysis
+       # 4. Stakeholder Analysis
         st.divider()
         st.subheader("7. Stakeholder Analysis (Matrice d'adhésion)")
 
         # Initialisation des données si elles n'existent pas
         if "stakeholders" not in p:
-        p["stakeholders"] = [
-        {
-            "Name": "Sponsor",
-            "Strongly Against": False,
-            "Moderately Against": False,
-            "Neutral": True,
-            "Moderately Supportive": False,
-            "Strongly Supportive": False
-        }
-        ]
+            # On décale vers la droite ici
+            p["stakeholders"] = [
+                {
+                    "Name": "Sponsor",
+                    "Strongly Against": False,
+                    "Moderately Against": False,
+                    "Neutral": True,
+                    "Moderately Supportive": False,
+                    "Strongly Supportive": False
+                }
+            ]
 
         st.info("Cochez le niveau d'adhésion actuel pour chaque partie prenante. Vous pouvez ajouter/supprimer des lignes via les icônes du tableau.")
 
-        # Utilisation du data_editor avec configuration des colonnes en cases à cocher
+        # Utilisation du data_editor
         edited_stakeholders = st.data_editor(
-        p["stakeholders"],
-        num_rows="dynamic", # Permet d'ajouter/supprimer des lignes (icône + et poubelle)
-        key=f"stake_edit_{p_idx}",
-        use_container_width=True,
-        column_config={
-        "Strongly Against": st.column_config.CheckboxColumn(default=False),
-        "Moderately Against": st.column_config.CheckboxColumn(default=False),
-        "Neutral": st.column_config.CheckboxColumn(default=False),
-        "Moderately Supportive": st.column_config.CheckboxColumn(default=False),
-        "Strongly Supportive": st.column_config.CheckboxColumn(default=False),
-        }
+            p["stakeholders"],
+            num_rows="dynamic", 
+            key=f"stake_edit_{p_idx}",
+            use_container_width=True,
+            column_config={
+                "Strongly Against": st.column_config.CheckboxColumn(default=False),
+                "Moderately Against": st.column_config.CheckboxColumn(default=False),
+                "Neutral": st.column_config.CheckboxColumn(default=False),
+                "Moderately Supportive": st.column_config.CheckboxColumn(default=False),
+                "Strongly Supportive": st.column_config.CheckboxColumn(default=False),
+            }
         )
 
         if st.button("✅ Sauvegarder l'analyse des parties prenantes", key=f"save_stake_{p_idx}"):
-        p["stakeholders"] = edited_stakeholders
-        st.success("Analyse sauvegardée !")
+            # On décale aussi vers la droite ici
+            p["stakeholders"] = edited_stakeholders
+            st.success("Analyse sauvegardée !")
 
         # 5. SIPOC & Schéma de Processus
         st.divider()
