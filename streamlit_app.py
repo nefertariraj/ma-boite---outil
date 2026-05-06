@@ -106,7 +106,7 @@ else:
         tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # IMPORTANT : Cette ligne doit être décalée vers la droite (alignée avec tabs)
-    with tabs[0]:
+        with tabs[0]:
     # --- PHASE DEFINE ---
     with tabs[0]:
         st.header("Phase Define")
