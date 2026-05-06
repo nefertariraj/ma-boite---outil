@@ -199,18 +199,41 @@ else:
 
         # 4. Stakeholder Analysis
         st.divider()
-        st.subheader("4. Stakeholder Analysis")
-        stake_key = f"editor_stake_{st.session_state.current_project_idx}"
-        edited_stake = st.data_editor(
-            p.get("stakeholders", [{"Nom": "", "Impact": ""}]),
-            num_rows="dynamic",
-            use_container_width=True,
-            key=stake_key
+        st.subheader("7. Stakeholder Analysis (Matrice d'adhésion)")
+
+        # Initialisation des données si elles n'existent pas
+        if "stakeholders" not in p:
+        p["stakeholders"] = [
+        {
+            "Name": "Sponsor",
+            "Strongly Against": False,
+            "Moderately Against": False,
+            "Neutral": True,
+            "Moderately Supportive": False,
+            "Strongly Supportive": False
+        }
+        ]
+
+        st.info("Cochez le niveau d'adhésion actuel pour chaque partie prenante. Vous pouvez ajouter/supprimer des lignes via les icônes du tableau.")
+
+        # Utilisation du data_editor avec configuration des colonnes en cases à cocher
+        edited_stakeholders = st.data_editor(
+        p["stakeholders"],
+        num_rows="dynamic", # Permet d'ajouter/supprimer des lignes (icône + et poubelle)
+        key=f"stake_edit_{p_idx}",
+        use_container_width=True,
+        column_config={
+        "Strongly Against": st.column_config.CheckboxColumn(default=False),
+        "Moderately Against": st.column_config.CheckboxColumn(default=False),
+        "Neutral": st.column_config.CheckboxColumn(default=False),
+        "Moderately Supportive": st.column_config.CheckboxColumn(default=False),
+        "Strongly Supportive": st.column_config.CheckboxColumn(default=False),
+        }
         )
-        if st.button("✅ Valider les stakeholders", key=f"save_stake_{st.session_state.current_project_idx}"):
-            p["stakeholders"] = edited_stake
-            st.success("Stakeholders enregistrés !")
-            st.rerun()
+
+        if st.button("✅ Sauvegarder l'analyse des parties prenantes", key=f"save_stake_{p_idx}"):
+        p["stakeholders"] = edited_stakeholders
+        st.success("Analyse sauvegardée !")
 
         # 5. SIPOC & Schéma de Processus
         st.divider()
