@@ -76,44 +76,69 @@ with st.sidebar:
         
         st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")
 
-        # --- 2. EXPORT PDF ---
+        # --- 2. EXPORT PDF (Correction AttributeError) ---
         from fpdf import FPDF
+        
         def create_pdf(data_proj):
             pdf = FPDF()
             pdf.add_page()
-            pdf.set_font("Arial", 'B', 16)
+            # Utilisation de Helvetica (standard) au lieu de Arial pour éviter les erreurs de police
+            pdf.set_font("Helvetica", 'B', 16)
             pdf.cell(200, 10, f"Rapport de Projet : {data_proj['name']}", ln=True, align='C')
-            pdf.set_font("Arial", size=12)
+            
+            pdf.set_font("Helvetica", size=12)
             pdf.ln(10)
-            pdf.multi_cell(0, 10, f"Problématique : {data_proj.get('problem', 'Non défini')}")
-            return pdf.output(dest='S').encode('latin-1')
+            pdf.multi_cell(0, 10, f"Status : {data_proj.get('status', 'N/A')}")
+            pdf.multi_cell(0, 10, f"Problematique : {data_proj.get('problem', 'Non defini')}")
+            
+            # Retourne directement les octets du PDF
+            return pdf.output()
 
-        st.download_button(label="📄 Télécharger en PDF", data=create_pdf(p_exp), file_name=f"{project_name}.pdf", mime="application/pdf")
+        # Le bouton PDF corrigé
+        try:
+            pdf_bytes = create_pdf(p_exp)
+            st.download_button(
+                label="📄 Télécharger en PDF", 
+                data=pdf_bytes, 
+                file_name=f"{project_name}.pdf", 
+                mime="application/pdf"
+            )
+        except Exception as e:
+            st.error(f"Erreur PDF : {e}")
 
-        # --- 3. EXPORT POWERPOINT ---
+        # --- 3. EXPORT POWERPOINT (Finalisé) ---
         from pptx import Presentation
+        from pptx.util import Inches
+
         def create_pptx(data_proj):
             prs = Presentation()
-            # Slide de titre
-            slide = prs.slides.add_slide(prs.slide_layouts[0])
-            slide.shapes.title.text = data_proj['name']
-            slide.placeholders[1].text = "Rapport Lean Six Sigma - Phase Define"
             
-            # Slide SIPOC
-            slide_sipoc = prs.slides.add_slide(prs.slide_layouts[1])
-            slide_sipoc.shapes.title.text = "SIPOC Analysis"
-            return io.BytesIO()
+            # Slide 1 : Titre
+            slide_layout = prs.slide_layouts[0]
+            slide = prs.slides.add_slide(slide_layout)
+            slide.shapes.title.text = data_proj['name']
+            slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}\nGénéré via Ma Boîte à Outils"
+            
+            # Slide 2 : Problématique
+            slide_layout = prs.slide_layouts[1]
+            slide = prs.slides.add_slide(slide_layout)
+            slide.shapes.title.text = "Définition du Problème"
+            slide.placeholders[1].text = data_proj.get('problem', 'Aucun détail saisi.')
+            
+            buffer = io.BytesIO()
+            prs.save(buffer)
+            return buffer.getvalue()
 
-        # Note : Le bouton PPTX nécessite que python-pptx soit installé
         try:
-            buffer_pptx = io.BytesIO()
-            prs = Presentation()
-            slide = prs.slides.add_slide(prs.slide_layouts[0])
-            slide.shapes.title.text = project_name
-            prs.save(buffer_pptx)
-            st.download_button(label="📽️ Télécharger en PowerPoint", data=buffer_pptx.getvalue(), file_name=f"{project_name}.pptx")
-        except:
-            st.info("Export PowerPoint en attente de configuration serveur.")
+            pptx_bytes = create_pptx(p_exp)
+            st.download_button(
+                label="📽️ Télécharger en PowerPoint", 
+                data=pptx_bytes, 
+                file_name=f"{project_name}.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )
+        except Exception as e:
+            st.info("Configuration du module PowerPoint en cours...")
 
         # --- 4. EXPORT CSV (SIPOC uniquement) ---
         if p_exp.get('sipoc_data'):
