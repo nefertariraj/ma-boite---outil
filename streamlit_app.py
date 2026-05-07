@@ -48,10 +48,8 @@ with st.sidebar:
     
     # --- BOUTON SAUVEGARDER ---
     if st.button("💾 Sauvegarder tout"):
-        # Ici, tu pourras plus tard lier une base de données ou Google Drive
-        # Pour l'instant, on confirme que la session est à jour
+        # Note : Pour une sauvegarde persistante, il faudra lier une base de données.
         st.success("Données synchronisées dans la session !")
-        # Note : Pour une vraie sauvegarde persistante, il faudrait écrire dans un fichier JSON ou CSV.
 
     # --- SECTION EXPORT DU PROJET COMPLET ---
     if st.session_state.current_project_idx is not None:
@@ -60,106 +58,68 @@ with st.sidebar:
         
         p_exp = st.session_state.projects[st.session_state.current_project_idx]
         project_name = p_exp['name']
-
-        # --- 1. EXPORT EXCEL (Multi-feuilles) ---
         import io
-        buffer_xlsx = io.BytesIO()
-        with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
-            # Synthèse
-            pd.DataFrame([{"Projet": project_name, "Statut": p_exp['status'], "Définition": p_exp.get('problem', '')}]).to_excel(writer, sheet_name='Synthèse', index=False)
-            # SIPOC
-            if p_exp.get('sipoc_data'):
-                pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
-            # Stakeholders
-            if p_exp.get('stakeholders'):
-                pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
-        
-        st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")
 
-        Cette erreur spécifique à fpdf2 survient généralement lorsque la méthode multi_cell() essaie d'écrire dans une zone trop étroite (souvent parce que la largeur est fixée à 0 ou que les marges ne sont pas bien interprétées par le serveur).
+        # --- 1. EXPORT EXCEL ---
+        try:
+            buffer_xlsx = io.BytesIO()
+            with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
+                pd.DataFrame([{"Projet": project_name, "Statut": p_exp['status'], "Définition": p_exp.get('problem', '')}]).to_excel(writer, sheet_name='Synthèse', index=False)
+                if p_exp.get('sipoc_data'):
+                    pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
+                if p_exp.get('stakeholders'):
+                    pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
+            
+            st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")
+        except Exception as e:
+            st.error("Erreur Excel : Vérifiez openpyxl dans requirements.txt")
 
-Pour corriger cela de manière robuste, nous allons :
-
-Définir une largeur explicite (ex: 190mm pour une page A4).
-
-Ajouter une gestion automatique des sauts de ligne.
-
-Utiliser un encodage sécurisé pour éviter les problèmes de caractères spéciaux.
-
-Voici la fonction create_pdf corrigée. Remplace l'ancienne version par celle-ci :
-
-Python
-        # --- 2. EXPORT PDF (Code Corrigé) ---
+        # --- 2. EXPORT PDF ---
         from fpdf import FPDF
         
         def create_pdf(data_proj):
-            # Initialisation avec paramètres explicites
             pdf = FPDF(orientation="P", unit="mm", format="A4")
             pdf.add_page()
-            
-            # Marges de 10mm
             margin = 10
             pdf.set_margins(margin, margin, margin)
-            # Calcul de la largeur disponible (210mm - 20mm = 190mm)
             effective_width = pdf.w - 2 * margin
             
-            # Titre
             pdf.set_font("Helvetica", 'B', 16)
             pdf.cell(effective_width, 10, f"Rapport de Projet : {data_proj['name']}", ln=True, align='C')
             pdf.ln(10)
             
-            # Contenu
             pdf.set_font("Helvetica", size=12)
-            
-            # Statut
             pdf.set_font("Helvetica", 'B', 12)
             pdf.cell(40, 10, "Statut du projet :", ln=False)
             pdf.set_font("Helvetica", size=12)
             pdf.cell(0, 10, str(data_proj.get('status', 'N/A')), ln=True)
             pdf.ln(5)
             
-            # Problématique
             pdf.set_font("Helvetica", 'B', 12)
             pdf.cell(effective_width, 10, "Problematique / Definition :", ln=True)
             pdf.set_font("Helvetica", size=12)
-            
-            # multi_cell avec largeur explicite pour éviter l'AttributeError
             text_to_print = str(data_proj.get('problem', 'Non defini'))
             pdf.multi_cell(effective_width, 8, txt=text_to_print)
-            
             return pdf.output()
 
-        # Bloc d'affichage du bouton
         try:
             pdf_bytes = create_pdf(p_exp)
-            st.download_button(
-                label="📄 Télécharger en PDF", 
-                data=pdf_bytes, 
-                file_name=f"{project_name}.pdf", 
-                mime="application/pdf",
-                key=f"pdf_btn_{p_idx}"
-            )
+            st.download_button(label="📄 Télécharger en PDF", data=pdf_bytes, file_name=f"{project_name}.pdf", mime="application/pdf")
         except Exception as e:
-            st.warning("Complétez les informations du projet pour l'export PDF.")
+            st.warning("Erreur PDF : Vérifiez fpdf2 dans requirements.txt")
 
-        # --- 3. EXPORT POWERPOINT (Finalisé) ---
+        # --- 3. EXPORT POWERPOINT ---
         from pptx import Presentation
-        from pptx.util import Inches
-
+        
         def create_pptx(data_proj):
             prs = Presentation()
-            
-            # Slide 1 : Titre
-            slide_layout = prs.slide_layouts[0]
-            slide = prs.slides.add_slide(slide_layout)
+            slide = prs.slides.add_slide(prs.slide_layouts[0])
             slide.shapes.title.text = data_proj['name']
-            slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}\nGénéré via Ma Boîte à Outils"
+            slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}"
             
-            # Slide 2 : Problématique
-            slide_layout = prs.slide_layouts[1]
-            slide = prs.slides.add_slide(slide_layout)
-            slide.shapes.title.text = "Définition du Problème"
-            slide.placeholders[1].text = data_proj.get('problem', 'Aucun détail saisi.')
+            slide2 = prs.slides.add_slide(prs.slide_layouts[1])
+            slide2.shapes.title.text = "Définition du Problème"
+            slide2.placeholders[1].text = data_proj.get('problem', 'Non défini')
             
             buffer = io.BytesIO()
             prs.save(buffer)
@@ -167,19 +127,19 @@ Python
 
         try:
             pptx_bytes = create_pptx(p_exp)
-            st.download_button(
-                label="📽️ Télécharger en PowerPoint", 
-                data=pptx_bytes, 
-                file_name=f"{project_name}.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            )
+            st.download_button(label="📽️ Télécharger en PowerPoint", data=pptx_bytes, file_name=f"{project_name}.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
         except Exception as e:
-            st.info("Configuration du module PowerPoint en cours...")
+            st.info("Erreur PPTX : Vérifiez python-pptx dans requirements.txt")
 
-        # --- 4. EXPORT CSV (SIPOC uniquement) ---
+        # --- 4. EXPORT CSV ---
         if p_exp.get('sipoc_data'):
             csv_data = pd.DataFrame(p_exp['sipoc_data']).to_csv(index=False).encode('utf-8')
             st.download_button(label="📝 Télécharger SIPOC (CSV)", data=csv_data, file_name=f"{project_name}_sipoc.csv", mime="text/csv")
+    
+    st.divider()
+    if st.button("🚪 Déconnexion"):
+        st.session_state.authenticated = False
+        st.rerun()
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
