@@ -328,88 +328,97 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & Flowchart ---
-    p_idx = st.session_state.get('current_project_idx')
+       # --- 5. SIPOC & FLOWCHART ---
+p_idx = st.session_state.get('current_project_idx')
 
-    if p_idx is not None:
-        # Définition de 'p' pour tout le bloc projet
-        p = st.session_state.projects[p_idx]
-        
-        st.divider()
-        st.subheader("5. SIPOC & Flux de processus")
+if p_idx is not None:
+    p = st.session_state.projects[p_idx]
+    
+    st.divider()
+    st.subheader("5. SIPOC & Flux de processus")
 
-        # 1. Initialisation des données SIPOC
-        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or not p["sipoc_data"]:
-            p["sipoc_data"] = [
-                {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
-            ]
+    # 1. Initialisation des colonnes SIPOC
+    if "sipoc_data" not in p or not p["sipoc_data"]:
+        # Création d'une structure vide avec les 5 colonnes demandées
+        p["sipoc_data"] = [
+            {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
+        ]
 
-        # 2. Formulaire de saisie
-        with st.form(key=f"sipoc_form_final_{p_idx}"):
-            st.info("Saisissez les étapes ci-dessous. Le schéma se générera après validation.")
-            
-            column_config = {
-                "Supplier": st.column_config.TextColumn("Fournisseur"),
-                "Input": st.column_config.TextColumn("Entrée"),
-                "Process": st.column_config.TextColumn("Processus"),
-                "Output": st.column_config.TextColumn("Sortie"),
-                "Customer": st.column_config.TextColumn("Client"),
-            }
+    # 2. Éditeur de tableau (Gère l'ajout/suppression de lignes)
+    st.info("💡 Utilisez le '+' en bas du tableau pour ajouter une ligne et 'Suppr' pour en retirer.")
+    
+    # Configuration des colonnes
+    column_config = {
+        "Supplier": st.column_config.TextColumn("Supplier (Fournisseur)"),
+        "Input": st.column_config.TextColumn("Input (Entrée)"),
+        "Process": st.column_config.TextColumn("Process (Étape)"),
+        "Output": st.column_config.TextColumn("Output (Sortie)"),
+        "Customer": st.column_config.TextColumn("Customer (Acteur)"),
+    }
 
-            edited_sipoc = st.data_editor(
-                p["sipoc_data"],
-                num_rows="dynamic",
-                key=f"sipoc_editor_final_{p_idx}",
-                use_container_width=True,
-                column_config=column_config,
-                column_order=("Supplier", "Input", "Process", "Output", "Customer")
-            )
-            
-            submit_sipoc = st.form_submit_button("✅ Enregistrer et Générer le Schéma")
+    # Le data_editor remplace le besoin de boutons manuels pour ajouter/supprimer
+    edited_df = st.data_editor(
+        p["sipoc_data"],
+        column_config=column_config,
+        num_rows="dynamic",  # Active l'ajout/suppression de lignes
+        use_container_width=True,
+        key=f"sipoc_editor_{p_idx}",
+        column_order=("Supplier", "Input", "Process", "Output", "Customer")
+    )
 
-        # 3. Traitement de la validation
-        if submit_sipoc:
-            p["sipoc_data"] = edited_sipoc
-            st.success("Données SIPOC mises à jour !")
-            st.rerun()
+    # Sauvegarde automatique des modifications
+    p["sipoc_data"] = edited_df
 
-        # 4. Affichage du Schéma (si données présentes)
-        df_chart = pd.DataFrame(p["sipoc_data"])
-        if not df_chart.empty and 'Process' in df_chart.columns:
-            df_clean = df_chart.dropna(subset=['Process', 'Customer'])
-            df_clean = df_clean[(df_clean['Process'] != "") & (df_clean['Customer'] != "")]
+    # 3. Génération du Cross-Functional Flowchart (Swimlane Verticale)
+    df = pd.DataFrame(p["sipoc_data"])
+    
+    # On ne génère le schéma que si la colonne Process et Customer sont remplies
+    if not df.empty and 'Process' in df.columns:
+        df_clean = df.dropna(subset=['Process', 'Customer'])
+        df_clean = df_clean[(df_clean['Process'] != "") & (df_clean['Customer'] != "")]
 
-            if not df_clean.empty:
-                st.write("### 📉 Aperçu du Flux (Swimlanes)")
-                
-                def generate_viz(df):
-                    dot = """
-                    digraph G {
-                        rankdir=TB;
-                        newrank=true; 
-                        node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
-                        edge [color="#2D3748", penwidth=1.5];
-                    """
-                    actors = df['Customer'].unique()
-                    for i, actor in enumerate(actors):
-                        dot += f'    subgraph cluster_{i} {{\n'
-                        dot += f'        label = "{actor.upper()}";\n'
-                        dot += f'        style=filled; color="#F1F5F9"; fontname="Arial-Bold";\n'
-                        steps = df[df['Customer'] == actor]
-                        for idx, row in steps.iterrows():
-                            dot += f'        "step_{idx}" [label="{row["Process"]}"];\n'
-                        dot += '    }\n'
+        if not df_clean.empty:
+            st.write("---")
+            st.write("### 📉 Cross-Functional Flowchart")
+
+            def generate_swimlane_dot(data):
+                dot = """
+                digraph G {
+                    rankdir=TB;
+                    newrank=true;
+                    node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
+                    edge [color="#2D3748", penwidth=1.5];
+                """
+                # Création des Swimlanes par acteur (Customer)
+                actors = data['Customer'].unique()
+                for i, actor in enumerate(actors):
+                    dot += f'    subgraph cluster_{i} {{\n'
+                    dot += f'        label = "{actor.upper()}";\n'
+                    dot += f'        style=filled; color="#F1F5F9"; fontname="Arial-Bold"; fontsize="12";\n'
                     
-                    indices = df.index.tolist()
-                    for j in range(len(indices) - 1):
-                        dot += f'    "step_{indices[j]}" -> "step_{indices[j+1]}";\n'
-                    dot += "}"
-                    return dot
+                    # Étapes pour cet acteur spécifique
+                    steps = data[data['Customer'] == actor]
+                    for idx, row in steps.iterrows():
+                        dot += f'        "step_{idx}" [label="{row["Process"]}"];\n'
+                    dot += '    }\n'
+                
+                # Création des liens chronologiques (un après l'autre verticalement)
+                indices = data.index.tolist()
+                for j in range(len(indices) - 1):
+                    dot += f'    "step_{indices[j]}" -> "step_{indices[j+1]}";\n'
+                
+                dot += "}"
+                return dot
 
-                try:
-                    st.graphviz_chart(generate_viz(df_clean))
-                except Exception as e:
-                    st.error(f"Erreur graphique : {e}")
+            try:
+                chart_code = generate_swimlane_dot(df_clean)
+                st.graphviz_chart(chart_code)
+            except Exception as e:
+                st.error(f"Erreur de rendu du schéma : {e}")
+        else:
+            st.warning("⚠️ Veuillez remplir au moins les colonnes 'Process' et 'Customer' pour générer le schéma.")
+else:
+    st.warning("Veuillez sélectionner un projet pour afficher le SIPOC.")
             
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
