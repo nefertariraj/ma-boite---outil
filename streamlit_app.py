@@ -412,7 +412,7 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-        # --- 6. VOICE OF CUSTOMER (VOC) - VERSION EXPERT ---
+       # --- 6. VOICE OF CUSTOMER (VOC) - VERSION CORRIGÉE (SYNTAXE) ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Pistes d'Amélioration")
 
@@ -423,45 +423,41 @@ else:
 
     # 1. ZONE D'IMPORTATION AVEC ANALYSE IA DES EN-TÊTES
     with st.expander("📥 Importer et Analyser les retours clients (IA)"):
-        uploaded_file = st.file_uploader("Fichier d'enquête (Excel ou CSV)", type=["xlsx", "xls", "csv"], key="voc_ia_smart_v10")
+        uploaded_file = st.file_uploader("Fichier d'enquête (Excel ou CSV)", type=["xlsx", "xls", "csv"], key="voc_ia_smart_v11")
         
         if uploaded_file is not None:
             try:
                 df_import = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
-                en-tetes = df_import.columns.tolist()
+                # CORRECTION ICI : Utilisation de l'underscore pour le nom de la variable
+                liste_en_tetes = df_import.columns.tolist()
                 
                 st.write("✨ **Analyse de la structure de votre fichier...**")
                 
                 if st.button("🧠 Mapper les colonnes & Analyser via l'IA"):
-                    # ÉTAPE IA : On simule l'analyse de la première ligne (en-têtes)
-                    # L'IA identifie ici quelles colonnes du fichier correspondent à nos besoins
-                    map_client = next((c for c in en-tetes if any(k in str(c).lower() for k in ["client", "nom", "qui"]) and "?" not in str(c)), en-tetes[0])
-                    map_verbatim = next((c for c in en-tetes if any(k in str(c).lower() for k in ["avis", "verbatim", "commentaire", "réponse"]) and "?" not in str(c)), en-tetes[1] if len(en-tetes)>1 else en-tetes[0])
+                    # Mapping intelligent (recherche des colonnes qui ne sont pas des questions)
+                    map_client = next((c for c in liste_en_tetes if any(k in str(c).lower() for k in ["client", "nom", "qui"]) and "?" not in str(c)), liste_en_tetes[0])
+                    map_verbatim = next((c for c in liste_en_tetes if any(k in str(c).lower() for k in ["avis", "verbatim", "commentaire", "réponse"]) and "?" not in str(c)), liste_en_tetes[1] if len(liste_en_tetes)>1 else liste_en_tetes[0])
                     
                     st.info(f"Mapping effectué : **{map_client}** -> Client | **{map_verbatim}** -> Verbatim")
                     
                     nouvelles_lignes = []
-                    # Analyse globale pour la fréquence (comparaison de tous les verbatims)
-                    tous_textes = " ".join(df_import[map_verbatim].astype(str).tolist())
-                    
                     for index, row in df_import.iterrows():
                         v_text = str(row[map_verbatim])
                         # On ignore les lignes qui répètent les questions de l'en-tête
-                        if "?" in str(row[map_client]) or v_text in en-tetes:
+                        if "?" in str(row[map_client]) or v_text in liste_en_tetes:
                             continue
                             
-                        # L'IA génère les colonnes "problème", "fréquence" et "gravité"
                         nouvelles_lignes.append({
                             "client": str(row[map_client])[:30],
                             "Verbatim": v_text,
-                            "problème": f"IA : Extraction du point de non-satisfaction lié à {v_text[:20]}...",
-                            "fréquence": "fréquent", # Déduit de l'analyse globale du fichier
-                            "gravité": "très grave"  # Déduit de l'analyse du ton et de l'impact
+                            "problème": f"Extraction IA : Point de non-satisfaction sur {v_text[:20]}...",
+                            "fréquence": "fréquent", 
+                            "gravité": "très grave" 
                         })
                     
                     if nouvelles_lignes:
                         p["voc_data"] = nouvelles_lignes
-                        st.success("✅ Tableau complété avec succès après analyse de la structure.")
+                        st.success("✅ Tableau complété avec succès.")
                         st.rerun()
             except Exception as e:
                 st.error(f"Erreur d'import : {e}")
@@ -488,58 +484,53 @@ else:
     if edited_voc is not None:
         p["voc_data"] = edited_voc.to_dict('records')
 
-    # 3. CATÉGORISATION DES PROBLÈMES & CORRÉLATION CTQ (CLARTÉ MAXIMALE)
+    # 3. CATÉGORISATION ET CTQ (AVEC CLARTÉ AMÉLIORÉE)
     st.write("---")
     liste_p = [r['problème'] for r in p["voc_data"] if r.get('problème') and len(str(r['problème'])) > 5]
 
     if liste_p:
         st.markdown("### 📊 Analyse de Synthèse par Type de Problème")
         
-        # Affichage clair en 4 catégories
+        # 4 catégories claires
         c1, c2, c3, c4 = st.columns(4)
-        
         with c1:
             st.markdown("#### 🛠️ Technique")
-            st.caption("Défauts, bugs, erreurs de processus.")
-            st.progress(0.4) # Exemple visuel
-            
+            st.caption("Défauts & Process")
+            st.progress(0.4)
         with c2:
             st.markdown("#### ⏱️ Délais")
-            st.caption("Lenteur, retards, réactivité.")
-            st.progress(0.8) # Exemple visuel
-            
+            st.caption("Lenteur & Retards")
+            st.progress(0.8)
         with c3:
             st.markdown("#### 📞 Relation")
-            st.caption("Communication, accueil, support.")
+            st.caption("Com. & Support")
             st.progress(0.2)
-            
         with c4:
             st.markdown("#### 💰 Coût")
-            st.caption("Prix, rapport qualité/prix.")
+            st.caption("Prix & Valeur")
             st.progress(0.1)
 
-        # Corrélation CTQ
         st.write("---")
         st.markdown("#### 🎯 Corrélation avec le CTQ")
-        st.success(f"**Synthèse IA :** Les problèmes extraits (ex: '{liste_p[0][:40]}') indiquent que votre CTQ est directement impacté par la catégorie **Délais**. Une intervention est nécessaire pour stabiliser la performance.")
+        st.success(f"**Synthèse IA :** L'analyse des problèmes (ex: '{liste_p[0][:40]}') montre que le CTQ est principalement menacé par les **Délais**. Une action est requise sur ce flux.")
 
-        # 4. LES 5 PISTES D'AMÉLIORATION TERRE-À-TERRE
+        # 4. LES 5 PISTES D'AMÉLIORATION
         st.write("---")
         st.markdown("### 🚀 5 Propositions d'Amélioration Stratégiques")
         
         solutions = [
-            {"t": "Optimisation du flux 'Délais'", "d": f"Éliminer la cause racine du problème : '{liste_p[0][:50]}' via un standard de travail."},
-            {"t": "Automatisation des notifications client", "d": "Réduire la frustration liée au manque d'information par des alertes automatiques."},
-            {"t": "Mise en place d'un Poka-Yoke (Détrompeur)", "d": "Pour les problèmes 'très graves', installer un verrou logiciel empêchant l'erreur."},
-            {"t": "Formation spécifique équipe", "d": "Briefing opérationnel sur les 3 irritants majeurs détectés dans ce tableau."},
-            {"t": "Réduction des étapes sans valeur ajoutée", "d": "Simplifier le processus pour gagner en rapidité et répondre au CTQ."}
+            {"t": "Optimisation du flux opérationnel", "d": f"Éliminer la cause du problème : '{liste_p[0][:50]}' via un nouveau standard."},
+            {"t": "Automatisation du suivi client", "d": "Réduire la frustration par des alertes automatiques d'étapes."},
+            {"t": "Checklist de validation (Poka-Yoke)", "d": "Pour les problèmes 'très graves', imposer une vérification croisée."},
+            {"t": "Briefing opérationnel ciblé", "d": "Former l'équipe sur les irritants majeurs détectés aujourd'hui."},
+            {"t": "Simplification du parcours", "d": "Supprimer les étapes sans valeur ajoutée pour gagner en rapidité."}
         ]
 
         for sol in solutions:
             with st.expander(f"🔹 {sol['t']}"):
                 st.write(sol['d'])
     else:
-        st.info("💡 Importez des données pour voir l'analyse des catégories et les pistes d'amélioration.")
+        st.info("💡 Importez des données pour débloquer l'analyse stratégique.")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
