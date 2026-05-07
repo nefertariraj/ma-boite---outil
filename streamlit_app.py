@@ -328,7 +328,7 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & FLOWCHART (Version sans bug) ---
+       # --- 5. SIPOC & FLUX CROISÉ (Mode Colonnes) ---
     p_idx = st.session_state.get('current_project_idx')
 
     if p_idx is not None:
@@ -342,8 +342,8 @@ else:
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
 
-        with st.form(key=f"form_sipoc_final_{p_idx}"):
-            st.info("Saisissez vos étapes. Validez pour mettre à jour la vue ci-dessous.")
+        with st.form(key=f"form_sipoc_grid_{p_idx}"):
+            st.info("Remplissez le tableau. Le flux horizontal se génère après validation.")
             
             df_init = pd.DataFrame(p["sipoc_data"])
             for col in COLONNES_SIPOC:
@@ -354,42 +354,58 @@ else:
                 df_init[COLONNES_SIPOC],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_final_{p_idx}",
+                key=f"editor_sipoc_grid_{p_idx}",
                 column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
             )
             
-            submit_sipoc = st.form_submit_button("✅ Valider et mettre à jour le flux")
+            submit_sipoc = st.form_submit_button("✅ Valider et Générer le Flux Horizontal")
 
         if submit_sipoc:
             p["sipoc_data"] = edited_sipoc.to_dict('records')
             st.rerun()
 
-        # --- AFFICHAGE DU FLUX EN MODE "TIMELINE" ---
+        # --- AFFICHAGE DU FLUX HORIZONTAL (SWIMLANES) ---
         df_viz = pd.DataFrame(p["sipoc_data"])
+        # On nettoie les lignes vides
+        df_viz = df_viz[(df_viz["Process"].astype(str).str.strip() != "") & 
+                        (df_viz["Customer"].astype(str).str.strip() != "")]
+        
         if not df_viz.empty:
-            # On ne garde que les lignes où "Process" est rempli
-            df_viz = df_viz[df_viz["Process"].str.strip() != ""]
+            st.write("---")
+            st.write("### 📉 Flux par Acteur (Vue Horizontale)")
             
-            if not df_viz.empty:
-                st.write("---")
-                st.write("### 📉 Aperçu visuel du processus")
+            # 1. Identifier tous les acteurs uniques pour créer les colonnes
+            acteurs = df_viz["Customer"].unique().tolist()
+            nb_acteurs = len(acteurs)
+            
+            # 2. Créer les colonnes Streamlit (une par acteur)
+            cols = st.columns(nb_acteurs)
+            
+            # Afficher les noms des acteurs en haut de chaque colonne
+            for i, acteur in enumerate(acteurs):
+                cols[i].markdown(f"### 👤 {acteur.upper()}")
+                cols[i].divider()
+
+            # 3. Afficher les tâches ligne par ligne pour garder la chronologie
+            for idx, row in df_viz.iterrows():
+                # Trouver l'index de la colonne de l'acteur actuel
+                col_index = acteurs.index(row["Customer"])
                 
-                # On crée une belle liste visuelle à la place du schéma bloqué
-                for idx, row in df_viz.iterrows():
-                    # Création d'une petite boîte pour chaque étape
-                    with st.container():
-                        col1, col2 = st.columns([1, 8])
-                        with col1:
-                            st.markdown(f"### 🟢 {idx + 1}") # Numéro de l'étape
-                        with col2:
-                            st.markdown(f"**Action :** {row['Process']}")
-                            st.caption(f"👤 **Responsable :** {row['Customer']} | 📥 **Entrée :** {row['Input']}")
-                        
-                        # Petite flèche entre les étapes (sauf la dernière)
-                        if idx < len(df_viz) - 1:
-                            st.write("  ↓")
-            else:
-                st.info("💡 Le flux visuel apparaîtra ici dès que vous aurez rempli la colonne 'Process'.")
+                # Dans chaque colonne, on n'affiche que si c'est le tour de l'acteur
+                for i in range(nb_acteurs):
+                    if i == col_index:
+                        with cols[i]:
+                            # On crée un bloc visuel pour la tâche
+                            st.info(f"**Étape {idx + 1}**\n\n{row['Process']}")
+                            # On dessine une flèche vers le bas pour la suite
+                            st.markdown("<p style='text-align: center; margin:0;'>↓</p>", unsafe_allow_html=True)
+                    else:
+                        # On laisse un espace vide dans les autres colonnes pour garder la ligne
+                        with cols[i]:
+                            st.write("") 
+                            st.write("")
+        else:
+            st.info("💡 Le flux s'affichera ici dès que les colonnes 'Process' et 'Customer' seront remplies.")
 
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
