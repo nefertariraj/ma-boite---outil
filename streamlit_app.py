@@ -337,45 +337,44 @@ else:
         st.divider()
         st.subheader("5. SIPOC & Flux de processus")
 
-        # 1. INITIALISATION STRICTE : On force les colonnes demandées
         COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
         
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
 
-        # 2. FORMULAIRE ET TABLEAU
-        with st.form(key=f"form_sipoc_reset_{p_idx}"):
+        with st.form(key=f"form_sipoc_fixed_{p_idx}"):
             st.info("Saisissez vos étapes. Cliquez sur le bouton pour générer le flowchart.")
             
-            # On force le type de données via un DataFrame pour garantir les colonnes
             df_init = pd.DataFrame(p["sipoc_data"])
             for col in COLONNES_SIPOC:
                 if col not in df_init.columns:
                     df_init[col] = ""
             
             edited_sipoc = st.data_editor(
-                df_init[COLONNES_SIPOC], # Force l'ordre des colonnes
+                df_init[COLONNES_SIPOC],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_reset_{p_idx}", # Nouvelle clé de reset
+                key=f"editor_sipoc_fixed_{p_idx}",
                 column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
             )
             
             submit_sipoc = st.form_submit_button("✅ Valider et Générer le Schéma")
 
         if submit_sipoc:
+            # Mise à jour immédiate des données dans le projet
             p["sipoc_data"] = edited_sipoc.to_dict('records')
-            st.success("Données SIPOC enregistrées !")
-            st.rerun()
+            st.rerun() # Force le re-chargement pour que le schéma lise les nouvelles données
 
-        # 3. GÉNÉRATION DU SCHÉMA
+        # On dessine le schéma à l'extérieur du bloc 'if submit_sipoc' pour qu'il soit permanent
         df_viz = pd.DataFrame(p["sipoc_data"])
+        
         if not df_viz.empty and "Process" in df_viz.columns and "Customer" in df_viz.columns:
-            # On ignore les lignes où le process ou l'acteur est vide
-            df_viz = df_viz[(df_viz["Process"] != "") & (df_viz["Customer"] != "")]
+            # Nettoyage des lignes vides
+            df_viz = df_viz[(df_viz["Process"].str.strip() != "") & (df_viz["Customer"].str.strip() != "")]
             
             if not df_viz.empty:
-                st.write("### 📉 Cross-Functional Flowchart")
+                st.write("---")
+                st.write("### 📉 Aperçu du Flux (Cross-Functional)")
                 
                 def build_dot(data):
                     dot = "digraph G { rankdir=TB; newrank=true; "
@@ -396,6 +395,8 @@ else:
                     return dot
 
                 st.graphviz_chart(build_dot(df_viz))
+            else:
+                st.info("💡 Le schéma s'affichera ici dès que vous aurez rempli les colonnes 'Process' et 'Customer'.")
 
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
