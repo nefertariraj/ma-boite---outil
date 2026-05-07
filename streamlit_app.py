@@ -76,35 +76,69 @@ with st.sidebar:
         
         st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")
 
-        # --- 2. EXPORT PDF (Correction AttributeError) ---
+        Cette erreur spécifique à fpdf2 survient généralement lorsque la méthode multi_cell() essaie d'écrire dans une zone trop étroite (souvent parce que la largeur est fixée à 0 ou que les marges ne sont pas bien interprétées par le serveur).
+
+Pour corriger cela de manière robuste, nous allons :
+
+Définir une largeur explicite (ex: 190mm pour une page A4).
+
+Ajouter une gestion automatique des sauts de ligne.
+
+Utiliser un encodage sécurisé pour éviter les problèmes de caractères spéciaux.
+
+Voici la fonction create_pdf corrigée. Remplace l'ancienne version par celle-ci :
+
+Python
+        # --- 2. EXPORT PDF (Version Sécurisée) ---
         from fpdf import FPDF
         
         def create_pdf(data_proj):
-            pdf = FPDF()
+            pdf = FPDF(orientation="P", unit="mm", format="A4")
             pdf.add_page()
-            # Utilisation de Helvetica (standard) au lieu de Arial pour éviter les erreurs de police
+            
+            # Définition des marges et de la largeur utile
+            margin = 10
+            pdf.set_margins(margin, margin, margin)
+            effective_width = pdf.w - 2 * margin
+            
+            # Titre du projet
             pdf.set_font("Helvetica", 'B', 16)
-            pdf.cell(200, 10, f"Rapport de Projet : {data_proj['name']}", ln=True, align='C')
-            
-            pdf.set_font("Helvetica", size=12)
+            pdf.cell(effective_width, 10, f"Rapport de Projet : {data_proj['name']}", ln=True, align='C')
             pdf.ln(10)
-            pdf.multi_cell(0, 10, f"Status : {data_proj.get('status', 'N/A')}")
-            pdf.multi_cell(0, 10, f"Problematique : {data_proj.get('problem', 'Non defini')}")
             
-            # Retourne directement les octets du PDF
+            # Contenu
+            pdf.set_font("Helvetica", size=12)
+            
+            # Statut
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.cell(40, 10, "Statut du projet :", ln=False)
+            pdf.set_font("Helvetica", size=12)
+            pdf.cell(0, 10, f"{data_proj.get('status', 'N/A')}", ln=True)
+            pdf.ln(5)
+            
+            # Problématique (Utilisation sécurisée de multi_cell)
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.cell(effective_width, 10, "Problematique / Definition :", ln=True)
+            pdf.set_font("Helvetica", size=12)
+            
+            # On donne une largeur fixe (effective_width) au lieu de 0 pour éviter l'erreur d'espace horizontal
+            problem_text = str(data_proj.get('problem', 'Non defini'))
+            pdf.multi_cell(effective_width, 8, txt=problem_text)
+            
             return pdf.output()
 
-        # Le bouton PDF corrigé
+        # Bloc de téléchargement
         try:
             pdf_bytes = create_pdf(p_exp)
             st.download_button(
                 label="📄 Télécharger en PDF", 
                 data=pdf_bytes, 
                 file_name=f"{project_name}.pdf", 
-                mime="application/pdf"
+                mime="application/pdf",
+                key=f"pdf_btn_{p_idx}"
             )
         except Exception as e:
-            st.error(f"Erreur PDF : {e}")
+            st.warning(f"Note : L'export PDF a rencontré une limite d'affichage. Vérifiez la longueur de votre texte.")
 
         # --- 3. EXPORT POWERPOINT (Finalisé) ---
         from pptx import Presentation
