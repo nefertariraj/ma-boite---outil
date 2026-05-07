@@ -43,6 +43,44 @@ with st.sidebar:
     st.title("⚙️ Paramètres")
     color = st.color_picker("Couleur de l'outil", st.session_state.primary_color)
     st.session_state.primary_color = color
+    
+    st.divider()
+    
+    # --- BOUTON SAUVEGARDER ---
+    if st.button("💾 Sauvegarder tout"):
+        # Ici, tu pourras plus tard lier une base de données ou Google Drive
+        # Pour l'instant, on confirme que la session est à jour
+        st.success("Données synchronisées dans la session !")
+        # Note : Pour une vraie sauvegarde persistante, il faudrait écrire dans un fichier JSON ou CSV.
+
+    # --- BOUTON TÉLÉCHARGER (EXCEL) ---
+    if st.session_state.current_project_idx is not None:
+        st.subheader("📥 Export du projet")
+        p_to_export = st.session_state.projects[st.session_state.current_project_idx]
+        
+        # Préparation du fichier Excel en mémoire
+        import io
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Feuille 1 : Infos Générales
+            info_df = pd.DataFrame([{"Projet": p_to_export['name'], "Statut": p_to_export['status'], "Problème": p_to_export.get('problem', '')}])
+            info_df.to_excel(writer, sheet_name='Général', index=False)
+            
+            # Feuille 2 : SIPOC
+            if p_to_export.get('sipoc_data'):
+                pd.DataFrame(p_to_export['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
+            
+            # Feuille 3 : Stakeholders
+            if p_to_export.get('stakeholders'):
+                pd.DataFrame(p_to_export['stakeholders']).to_excel(writer, sheet_name='Parties Prenantes', index=False)
+
+        st.download_button(
+            label="📊 Télécharger en Excel",
+            data=output.getvalue(),
+            file_name=f"Projet_{p_to_export['name']}_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    
     st.divider()
     if st.button("🚪 Déconnexion"):
         st.session_state.authenticated = False
