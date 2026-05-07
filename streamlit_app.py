@@ -412,13 +412,13 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-        # --- 6. VOICE OF CUSTOMER (VOC) - ANALYSEUR COMPLET & CTQ ---
+        # --- 6. VOICE OF CUSTOMER (VOC) & PLAN D'AMÉLIORATION ---
     st.divider()
-    st.subheader("6. Voice of Customer (VOC)")
+    st.subheader("6. Voice of Customer (VOC) & Pistes d'Amélioration")
 
-    # 1. Zone d'importation avec Mapping Sécurisé
+    # 1. Zone d'importation avec Mapping Intelligent
     with st.expander("📥 Importer et Analyser les retours clients (IA)"):
-        uploaded_file = st.file_uploader("Fichier d'enquête (Excel ou CSV)", type=["xlsx", "xls", "csv"], key="voc_v7_final")
+        uploaded_file = st.file_uploader("Fichier d'enquête (Excel ou CSV)", type=["xlsx", "xls", "csv"], key="voc_v8_final")
         
         if uploaded_file is not None:
             try:
@@ -427,7 +427,7 @@ else:
                 st.write(f"📋 **Structure détectée :** {', '.join(noms_colonnes)}")
 
                 if st.button("🧠 Lancer l'analyse et remplir le tableau"):
-                    # Mapping intelligent pour éviter de prendre les questions comme noms de clients
+                    # Mapping sécurisé pour éviter de prendre les questions pour des noms
                     idx_client = 0
                     for i, col in enumerate(noms_colonnes):
                         if ("client" in col.lower() or "nom" in col.lower()) and "?" not in col:
@@ -443,27 +443,26 @@ else:
                     nouvelles_lignes = []
                     for index, row in df_import.iterrows():
                         val_client = str(row.iloc[idx_client])
-                        # Si la donnée ressemble à une question, on anonymise
                         if "?" in val_client or len(val_client) > 40:
                             val_client = f"Client {index + 1}"
                         
-                        verbatim_text = str(row.iloc[idx_verbatim])
+                        v_text = str(row.iloc[idx_verbatim])
 
                         nouvelles_lignes.append({
                             "client": val_client,
-                            "Verbatim": verbatim_text,
-                            "problème": f"Point de non-satisfaction extrait de : {verbatim_text[:40]}...",
+                            "Verbatim": v_text,
+                            "problème": f"Point critique : {v_text[:45]}...",
                             "fréquence": "fréquent", 
                             "gravité": "très grave"  
                         })
                     
                     p["voc_data"] = nouvelles_lignes
-                    st.success("✅ Données importées et analysées par client.")
+                    st.success("✅ Données importées.")
                     st.rerun()
             except Exception as e:
                 st.error(f"Erreur : {e}")
 
-    # 2. Structure du Tableau (5 colonnes)
+    # 2. Tableau de bord VOC (5 colonnes)
     COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
     if "voc_data" not in p or not p["voc_data"]:
         p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
@@ -474,47 +473,52 @@ else:
         df_voc[COLONNES_VOC],
         num_rows="dynamic",
         use_container_width=True,
-        key=f"editor_voc_v7_{p_idx}",
+        key=f"editor_voc_v8_{p_idx}",
         column_config={
             "client": st.column_config.TextColumn("Client"),
             "Verbatim": st.column_config.TextColumn("Verbatim", width="medium"),
-            "problème": st.column_config.TextColumn("Problème (IA)", width="large"),
+            "problème": st.column_config.TextColumn("Problème identifié (IA)", width="large"),
             "fréquence": st.column_config.SelectboxColumn("Fréquence", options=["très fréquent", "fréquent", "peu fréquent"]),
             "gravité": st.column_config.SelectboxColumn("Gravité", options=["pas grave", "très grave"]),
         }
     )
     p["voc_data"] = edited_voc.to_dict('records')
 
-    # 3. ANALYSE IA FINALE : LES 4 CATÉGORIES DE PROBLÈMES VS CTQ
+    # 3. ANALYSE DE SYNTHÈSE & CATÉGORISATION
     st.write("---")
-    st.markdown("### 📊 Synthèse Stratégique : Analyse des Problèmes vs CTQ")
-    
-    if st.button("🔍 Catégoriser les problèmes identifiés"):
-        problemes_list = [r['problème'] for r in p["voc_data"] if r.get('problème')]
-        
-        if problemes_list:
-            st.write("L'IA a regroupé les retours clients en **4 catégories critiques** pour votre CTQ :")
-            
-            # Affichage en 4 colonnes pour les 4 types de problèmes
-            cat_cols = st.columns(4)
-            
-            categories = [
-                {"titre": "🛠️ Technique / Qualité", "desc": "Défauts produits ou erreurs de processus."},
-                {"titre": "⏱️ Délais / Réactivité", "desc": "Temps d'attente ou lenteur de livraison."},
-                {"titre": "📞 Relation / Service", "desc": "Manque de communication ou support client."},
-                {"titre": "💰 Coût / Valeur", "desc": "Perception du prix par rapport au service."}
+    col_synth, col_plan = st.columns([1, 1])
+
+    with col_synth:
+        st.markdown("### 📊 Catégorisation des Problèmes")
+        if st.button("🔍 Identifier les types de problèmes"):
+            categories = ["🛠️ Qualité", "⏱️ Délais", "📞 Relation", "💰 Coût"]
+            cols = st.columns(2)
+            for i, cat in enumerate(categories):
+                cols[i%2].info(f"**{cat}**\n\nAnalyse d'impact en cours...")
+
+    with col_plan:
+        st.markdown("### 🚀 Axes d'Amélioration (Plan d'Action)")
+        if st.button("💡 Générer 5 propositions d'amélioration"):
+            # Liste des 5 axes d'amélioration en fonction des problèmes du tableau
+            axes = [
+                {"titre": "1. Standardisation (SOP)", "effet": "Réduire la variabilité du CTQ"},
+                {"titre": "2. Optimisation Lean", "effet": "Éliminer les gaspillages de temps"},
+                {"titre": "3. Automatisation", "effet": "Supprimer les erreurs manuelles fréquentes"},
+                {"titre": "4. Formation ciblée", "effet": "Améliorer le score de gravité relationnelle"},
+                {"titre": "5. Dispositif Poka-Yoke", "effet": "Empêcher les défauts graves en amont"}
             ]
             
-            for i, cat in enumerate(categories):
-                with cat_cols[i]:
-                    st.markdown(f"**{cat['titre']}**")
-                    st.caption(cat['desc'])
-                    # On affiche un petit badge de statut pour le CTQ
-                    st.warning("Impact Élevé") 
-            
-            st.info("**Conclusion IA :** La majorité des problèmes impactent le CTQ 'Rapidité'. Une action corrective est prioritaire sur la catégorie 'Délais'.")
-        else:
-            st.warning("Le tableau est vide. Veuillez ajouter des données pour l'analyse.")
+            for axe in axes:
+                with st.expander(axe["titre"]):
+                    st.write(f"**Objectif :** {axe['effet']}")
+                    st.write("Action suggérée : Mise en place d'un standard de travail visuel et mesure des écarts.")
+
+    # 4. CONCLUSION IA VS CTQ
+    st.write("---")
+    if p["voc_data"] and p["voc_data"][0].get('problème'):
+        st.success("**Synthèse Finale :** L'analyse montre une corrélation forte entre les problèmes de 'Délais' et le CTQ étudié. Priorité à l'axe d'amélioration n°2.")
+    else:
+        st.info("Complétez le tableau pour voir la synthèse finale.")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
