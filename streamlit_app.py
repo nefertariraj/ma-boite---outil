@@ -328,7 +328,7 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & FLUX CROISÉ ÉPURÉ ---
+       # --- 5. SIPOC & FLUX CROISÉ COMPACT ---
     p_idx = st.session_state.get('current_project_idx')
 
     if p_idx is not None:
@@ -342,7 +342,7 @@ else:
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
 
-        with st.form(key=f"form_sipoc_minimal_{p_idx}"):
+        with st.form(key=f"form_sipoc_compact_{p_idx}"):
             df_init = pd.DataFrame(p["sipoc_data"])
             for col in COLONNES_SIPOC:
                 if col not in df_init.columns:
@@ -352,7 +352,7 @@ else:
                 df_init[COLONNES_SIPOC],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_min_{p_idx}",
+                key=f"editor_sipoc_comp_{p_idx}",
                 column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
             )
             submit_sipoc = st.form_submit_button("✅ Actualiser le flux")
@@ -370,35 +370,49 @@ else:
             acteurs = df_viz["Customer"].unique().tolist()
             cols = st.columns(len(acteurs))
             
-            # En-têtes acteurs en petit
             for i, acteur in enumerate(acteurs):
-                cols[i].markdown(f"**{acteur.upper()}**")
+                cols[i].markdown(f"<p style='font-weight:bold; font-size:14px; margin-bottom:0;'>{acteur.upper()}</p>", unsafe_allow_html=True)
                 cols[i].divider()
 
-            # Construction du flux tâche par tâche
+            # Rendu des tâches
             for idx, row in df_viz.iterrows():
-                col_index = acteurs.index(row["Customer"])
+                current_col = acteurs.index(row["Customer"])
                 
-                for i in range(len(acteurs)):
-                    with cols[i]:
-                        if i == col_index:
-                            # Affichage de la tâche dans une boîte simple
-                            st.info(row["Process"])
-                            # Flèche de liaison verticale/diagonale symbolique
-                            if idx < len(df_viz) - 1:
-                                next_actor = df_viz.iloc[idx + 1]["Customer"]
-                                if next_actor == row["Customer"]:
-                                    st.markdown("<p style='text-align: center; margin:0;'>↓</p>", unsafe_allow_html=True)
-                                else:
-                                    st.markdown("<p style='text-align: right; margin:0;'>↘</p>", unsafe_allow_html=True)
-                        else:
-                            # Espace vide pour maintenir l'alignement chronologique
-                            st.write("") 
-                            st.write("")
-        else:
-            st.info("💡 Remplissez 'Process' et 'Customer' pour voir le flux.")
+                # Création d'une ligne de hauteur réduite
+                row_cols = st.columns(len(acteurs))
+                
+                # Vérification de l'action suivante pour la flèche
+                has_next = idx < len(df_viz) - 1
+                if has_next:
+                    next_actor = df_viz.iloc[idx + 1]["Customer"]
+                    next_col = acteurs.index(next_actor)
 
-    # --- 6. VOICE OF CUSTOMER (VOC) ---
+                for i in range(len(acteurs)):
+                    with row_cols[i]:
+                        if i == current_col:
+                            # Affichage de la tâche dans un bloc compact
+                            st.markdown(f"""
+                                <div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 10px; background-color: #f8f9fa; font-size: 14px;">
+                                    {row['Process']}
+                                </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Gestion des flèches de liaison
+                            if has_next:
+                                if next_col == current_col:
+                                    # Flèche vers le bas (même acteur)
+                                    st.markdown("<p style='text-align:center; margin:0; line-height:1;'>↓</p>", unsafe_allow_html=True)
+                                elif next_col > current_col:
+                                    # Flèche vers la droite
+                                    st.markdown("<p style='text-align:right; margin:0; line-height:1;'>➡</p>", unsafe_allow_html=True)
+                                else:
+                                    # Flèche vers la gauche
+                                    st.markdown("<p style='text-align:left; margin:0; line-height:1;'>⬅</p>", unsafe_allow_html=True)
+                        else:
+                            # Espace minimal pour les colonnes vides
+                            st.write("")
+
+        # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
         st.subheader("6. Voice of Customer (VOC)")
         
