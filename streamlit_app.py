@@ -328,7 +328,7 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & FLOWCHART ---
+       # --- 5. SIPOC & FLOWCHART (Version sans bug) ---
     p_idx = st.session_state.get('current_project_idx')
 
     if p_idx is not None:
@@ -342,8 +342,8 @@ else:
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
 
-        with st.form(key=f"form_sipoc_final_v5_{p_idx}"):
-            st.info("Saisissez vos étapes. Cliquez sur le bouton pour générer le flowchart.")
+        with st.form(key=f"form_sipoc_final_{p_idx}"):
+            st.info("Saisissez vos étapes. Validez pour mettre à jour la vue ci-dessous.")
             
             df_init = pd.DataFrame(p["sipoc_data"])
             for col in COLONNES_SIPOC:
@@ -354,59 +354,42 @@ else:
                 df_init[COLONNES_SIPOC],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_final_v5_{p_idx}",
+                key=f"editor_sipoc_final_{p_idx}",
                 column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
             )
             
-            submit_sipoc = st.form_submit_button("✅ Valider et Générer le Schéma")
+            submit_sipoc = st.form_submit_button("✅ Valider et mettre à jour le flux")
 
         if submit_sipoc:
             p["sipoc_data"] = edited_sipoc.to_dict('records')
             st.rerun()
 
+        # --- AFFICHAGE DU FLUX EN MODE "TIMELINE" ---
         df_viz = pd.DataFrame(p["sipoc_data"])
-        
-        if not df_viz.empty and "Process" in df_viz.columns and "Customer" in df_viz.columns:
-            # Filtrage des lignes valides
-            df_viz = df_viz[(df_viz["Process"].astype(str).str.strip() != "") & 
-                            (df_viz["Customer"].astype(str).str.strip() != "")]
+        if not df_viz.empty:
+            # On ne garde que les lignes où "Process" est rempli
+            df_viz = df_viz[df_viz["Process"].str.strip() != ""]
             
             if not df_viz.empty:
                 st.write("---")
-                st.write("### 📉 Aperçu du Flux (Cross-Functional)")
+                st.write("### 📉 Aperçu visuel du processus")
                 
-                def build_dot(data):
-                    dot = "digraph G { rankdir=TB; newrank=true; "
-                    dot += "node [shape=rect, style=filled, fillcolor='#F9F9F9', fontname='Arial', fontsize='10']; "
-                    dot += "edge [color='#2D3748', penwidth=1.5]; "
-                    
-                    # Groupement par Acteur (Swimlanes)
-                    for i, actor in enumerate(data['Customer'].unique()):
-                        sanitized_actor = str(actor).replace('"', "'")
-                        dot += f'subgraph cluster_{i} {{ label="{sanitized_actor.upper()}"; style=filled; color="#F1F5F9"; fontname="Arial-Bold"; '
-                        subset = data[data['Customer'] == actor]
-                        for idx, row in subset.iterrows():
-                            label = str(row["Process"]).replace('"', "'")
-                            dot += f'"step_{idx}" [label="{label}"]; '
-                        dot += '} '
-                    
-                    # Liens chronologiques
-                    indices = data.index.tolist()
-                    for j in range(len(indices) - 1):
-                        dot += f'"step_{indices[j]}" -> "step_{indices[j+1]}"; '
-                    dot += "}"
-                    return dot
-
-                try:
-                    dot_code = build_dot(df_viz)
-                    # Tentative d'affichage
-                    st.graphviz_chart(dot_code)
-                except Exception as e:
-                    st.error(f"Erreur technique de rendu : {e}")
-                    st.write("Le moteur Graphviz n'est peut-être pas installé sur votre système. Voici le code généré :")
-                    st.code(dot_code)
+                # On crée une belle liste visuelle à la place du schéma bloqué
+                for idx, row in df_viz.iterrows():
+                    # Création d'une petite boîte pour chaque étape
+                    with st.container():
+                        col1, col2 = st.columns([1, 8])
+                        with col1:
+                            st.markdown(f"### 🟢 {idx + 1}") # Numéro de l'étape
+                        with col2:
+                            st.markdown(f"**Action :** {row['Process']}")
+                            st.caption(f"👤 **Responsable :** {row['Customer']} | 📥 **Entrée :** {row['Input']}")
+                        
+                        # Petite flèche entre les étapes (sauf la dernière)
+                        if idx < len(df_viz) - 1:
+                            st.write("  ↓")
             else:
-                st.info("💡 Le schéma s'affichera ici dès que les colonnes 'Process' et 'Customer' seront remplies.")
+                st.info("💡 Le flux visuel apparaîtra ici dès que vous aurez rempli la colonne 'Process'.")
 
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
