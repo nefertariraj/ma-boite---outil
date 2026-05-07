@@ -328,33 +328,49 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & Flowchart Cross-Functional (Vertical Swimlanes) ---
-        st.divider()
-        st.subheader("5. SIPOC & Flux de processus")
+       # --- 5. SIPOC & Flowchart Cross-Functional ---
+st.divider()
+st.subheader("5. SIPOC & Flux de processus")
 
-        # 1. Initialisation des données
-        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
-            p["sipoc_data"] = [
-                {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
-            ]
+# 1. Initialisation ROBUSTE des données
+# On vérifie si la clé existe, sinon on crée une ligne vide avec les bonnes colonnes
+if "sipoc_data" not in p or not p["sipoc_data"]:
+    p["sipoc_data"] = [
+        {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
+    ]
 
-        # 2. Formulaire de saisie pour éviter les effacements intempestifs
-        with st.form(key=f"sipoc_form_v2_{p_idx}"):
-            st.info("Saisissez les étapes. Le schéma respectera l'ordre vertical du tableau (chronologie).")
-            
-            edited_sipoc = st.data_editor(
-                p["sipoc_data"],
-                num_rows="dynamic",
-                key=f"sipoc_editor_v2_{p_idx}",
-                use_container_width=True,
-                column_order=("Supplier", "Input", "Process", "Output", "Customer")
-            )
-            
-            submit_sipoc = st.form_submit_button("✅ Valider et Générer le Flux Chronologique")
+# 2. Formulaire de saisie
+# Utilisation d'une clé unique basée sur l'index du projet (p_idx)
+with st.form(key=f"sipoc_form_v2_{p_idx}"):
+    st.info("Saisissez les étapes. Le schéma respectera l'ordre vertical du tableau.")
+    
+    # Configuration des colonnes pour s'assurer qu'elles s'affichent toujours
+    column_config = {
+        "Supplier": st.column_config.TextColumn("Fournisseur (Supplier)"),
+        "Input": st.column_config.TextColumn("Entrée (Input)"),
+        "Process": st.column_config.TextColumn("Processus (Process)"),
+        "Output": st.column_config.TextColumn("Sortie (Output)"),
+        "Customer": st.column_config.TextColumn("Client (Customer)"),
+    }
 
-        if submit_sipoc:
-            p["sipoc_data"] = edited_sipoc
-            st.success("Données enregistrées !")
+    edited_sipoc = st.data_editor(
+        p["sipoc_data"],
+        num_rows="dynamic",
+        key=f"sipoc_editor_v2_{p_idx}",
+        use_container_width=True,
+        column_config=column_config, # On force la config des colonnes
+        column_order=("Supplier", "Input", "Process", "Output", "Customer")
+    )
+    
+    submit_sipoc = st.form_submit_button("✅ Valider et Générer le Flux")
+
+# 3. Traitement après validation
+if submit_sipoc:
+    # On met à jour les données dans la session
+    p["sipoc_data"] = edited_sipoc
+    st.success("Données SIPOC enregistrées !")
+    # Un petit rerun peut aider à forcer l'affichage du schéma en dessous
+    st.rerun()
 
         # 3. Génération du Schéma Cross-Functional Vertical
         if p["sipoc_data"]:
