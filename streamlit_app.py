@@ -337,67 +337,65 @@ else:
         st.divider()
         st.subheader("5. SIPOC & Flux de processus")
 
-        # Initialisation forcée d'un dictionnaire avec les 5 colonnes exactes
+        # 1. INITIALISATION STRICTE : On force les colonnes demandées
+        COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
+        
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
-            p["sipoc_data"] = [
-                {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
-            ]
+            p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
 
-        with st.form(key=f"sipoc_form_v_finale_{p_idx}"):
-            st.info("Saisissez vos données ci-dessous (5 colonnes). Validez pour générer le schéma.")
+        # 2. FORMULAIRE ET TABLEAU
+        with st.form(key=f"form_sipoc_reset_{p_idx}"):
+            st.info("Saisissez vos étapes. Cliquez sur le bouton pour générer le flowchart.")
             
-            # Définition stricte des colonnes demandées
+            # On force le type de données via un DataFrame pour garantir les colonnes
+            df_init = pd.DataFrame(p["sipoc_data"])
+            for col in COLONNES_SIPOC:
+                if col not in df_init.columns:
+                    df_init[col] = ""
+            
             edited_sipoc = st.data_editor(
-                p["sipoc_data"],
-                column_config={
-                    "Supplier": st.column_config.TextColumn("Supplier"),
-                    "Input": st.column_config.TextColumn("Input"),
-                    "Process": st.column_config.TextColumn("Process"),
-                    "Output": st.column_config.TextColumn("Output"),
-                    "Customer": st.column_config.TextColumn("Customer"),
-                },
+                df_init[COLONNES_SIPOC], # Force l'ordre des colonnes
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_v_finale_{p_idx}", 
-                column_order=("Supplier", "Input", "Process", "Output", "Customer")
+                key=f"editor_sipoc_reset_{p_idx}", # Nouvelle clé de reset
+                column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
             )
             
-            submit_sipoc = st.form_submit_button("✅ Enregistrer et Générer le Schéma")
+            submit_sipoc = st.form_submit_button("✅ Valider et Générer le Schéma")
 
         if submit_sipoc:
-            p["sipoc_data"] = edited_sipoc
+            p["sipoc_data"] = edited_sipoc.to_dict('records')
             st.success("Données SIPOC enregistrées !")
             st.rerun()
 
-        # --- Partie Schéma (Graphviz) ---
-        df_sipoc = pd.DataFrame(p["sipoc_data"])
-        
-        if not df_sipoc.empty and 'Process' in df_sipoc.columns and 'Customer' in df_sipoc.columns:
-            # Filtrer les lignes vides pour le dessin
-            df_viz = df_sipoc[(df_sipoc['Process'] != "") & (df_sipoc['Customer'] != "")]
-
+        # 3. GÉNÉRATION DU SCHÉMA
+        df_viz = pd.DataFrame(p["sipoc_data"])
+        if not df_viz.empty and "Process" in df_viz.columns and "Customer" in df_viz.columns:
+            # On ignore les lignes où le process ou l'acteur est vide
+            df_viz = df_viz[(df_viz["Process"] != "") & (df_viz["Customer"] != "")]
+            
             if not df_viz.empty:
                 st.write("### 📉 Cross-Functional Flowchart")
                 
-                def make_dot(data):
+                def build_dot(data):
                     dot = "digraph G { rankdir=TB; newrank=true; "
                     dot += "node [shape=rect, style=filled, fillcolor='#F9F9F9', fontname='Arial', fontsize='10']; "
                     dot += "edge [color='#2D3748', penwidth=1.5]; "
                     
                     for i, actor in enumerate(data['Customer'].unique()):
                         dot += f'subgraph cluster_{i} {{ label="{actor.upper()}"; style=filled; color="#F1F5F9"; fontname="Arial-Bold"; '
-                        steps = data[data['Customer'] == actor]
-                        for idx, row in steps.iterrows():
+                        subset = data[data['Customer'] == actor]
+                        for idx, row in subset.iterrows():
                             dot += f'"step_{idx}" [label="{row["Process"]}"]; '
                         dot += '} '
                     
-                    idx_list = data.index.tolist()
-                    for j in range(len(idx_list) - 1):
-                        dot += f'"step_{idx_list[j]}" -> "step_{idx_list[j+1]}"; '
+                    indices = data.index.tolist()
+                    for j in range(len(indices) - 1):
+                        dot += f'"step_{indices[j]}" -> "step_{indices[j+1]}"; '
                     dot += "}"
                     return dot
 
-                st.graphviz_chart(make_dot(df_viz))
+                st.graphviz_chart(build_dot(df_viz))
 
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
