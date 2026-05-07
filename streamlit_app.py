@@ -49,59 +49,54 @@ with st.sidebar:
     st.divider()
 
     # --- 2. EXPORTATION (SAUVEGARDER) ---
-st.subheader("💾 Sauvegarder mon travail")
-if st.session_state.projects:
-    import json
+    st.subheader("💾 Sauvegarder mon travail")
+    if st.session_state.get('projects'):
+        import json
 
-    # Fonction magique pour ignorer ce qui n'est pas du texte/nombre
-    def clean_for_json(obj):
-        if isinstance(obj, (dict, list, str, int, float, bool, type(None))):
-            if isinstance(obj, dict):
-                return {k: clean_for_json(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [clean_for_json(i) for i in obj]
-            return obj
-        # Si c'est un objet complexe (comme un graphique), on le transforme en texte
-        return str(obj)
+        # Fonction pour ignorer les objets complexes (comme les graphiques) qui font planter le JSON
+        def clean_for_json(obj):
+            if isinstance(obj, (dict, list, str, int, float, bool, type(None))):
+                if isinstance(obj, dict):
+                    return {k: clean_for_json(v) for k, v in obj.items()}
+                if isinstance(obj, list):
+                    return [clean_for_json(i) for i in obj]
+                return obj
+            return str(obj)
 
-    try:
-        # On nettoie les projets avant de les transformer en JSON
-        projects_cleaned = clean_for_json(st.session_state.projects)
-        data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False)
-        
-        st.download_button(
-            label="📤 Télécharger ma sauvegarde (.json)",
-            data=data_json,
-            file_name="sauvegarde_boite_outils.json",
-            mime="application/json",
-            help="Cliquez ici pour enregistrer vos projets sur votre ordinateur."
-        )
-    except Exception as e:
-        st.error(f"Erreur lors de la préparation du fichier : {e}")
+        try:
+            projects_cleaned = clean_for_json(st.session_state.projects)
+            data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False)
+            
+            st.download_button(
+                label="📤 Télécharger ma sauvegarde (.json)",
+                data=data_json,
+                file_name="sauvegarde_boite_outils.json",
+                mime="application/json",
+                help="Cliquez ici pour enregistrer vos projets sur votre ordinateur."
+            )
+        except Exception as e:
+            st.error(f"Erreur préparation : {e}")
+    else:
+        st.info("Aucun projet à sauvegarder.")
 
-    # 3. IMPORTATION (RECHARGER)
+    # --- 3. IMPORTATION (RECHARGER) ---
     st.subheader("📥 Reprendre mon travail")
     uploaded_file = st.file_uploader("Importer un fichier de sauvegarde", type="json")
     
     if uploaded_file is not None:
         try:
             import json
-            # Lecture du fichier
             restored_data = json.load(uploaded_file)
-            # Mise à jour de la session
             st.session_state.projects = restored_data
-            st.success("✅ Données chargées avec succès !")
-            
-            # Bouton pour rafraîchir l'interface
+            st.success("✅ Données chargées !")
             if st.button("🔄 Actualiser l'affichage"):
                 st.rerun()
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
 
-    st.divider()
-
-    # --- SECTION EXPORT DU PROJET COMPLET ---
-    if st.session_state.current_project_idx is not None:
+    # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
+    # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
+    if st.session_state.get('current_project_idx') is not None:
         st.divider()
         st.subheader("📥 Exporter le projet complet")
         
@@ -121,36 +116,25 @@ if st.session_state.projects:
             
             st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")
         except Exception as e:
-            st.error("Erreur Excel : Vérifiez openpyxl dans requirements.txt")
+            st.error("Erreur Excel : Vérifiez openpyxl")
 
         # --- 2. EXPORT POWERPOINT ---
-        from pptx import Presentation
-        
-        def create_pptx(data_proj):
-            prs = Presentation()
-            slide = prs.slides.add_slide(prs.slide_layouts[0])
-            slide.shapes.title.text = data_proj['name']
-            slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}"
-            
-            slide2 = prs.slides.add_slide(prs.slide_layouts[1])
-            slide2.shapes.title.text = "Définition du Problème"
-            slide2.placeholders[1].text = data_proj.get('problem', 'Non défini')
-            
-            buffer = io.BytesIO()
-            prs.save(buffer)
-            return buffer.getvalue()
-
         try:
+            from pptx import Presentation
+            def create_pptx(data_proj):
+                prs = Presentation()
+                slide = prs.slides.add_slide(prs.slide_layouts[0])
+                slide.shapes.title.text = data_proj['name']
+                slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}"
+                buffer = io.BytesIO()
+                prs.save(buffer)
+                return buffer.getvalue()
+
             pptx_bytes = create_pptx(p_exp)
             st.download_button(label="📽️ Télécharger en PowerPoint", data=pptx_bytes, file_name=f"{project_name}.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
         except Exception as e:
-            st.info("Erreur PPTX : Vérifiez python-pptx dans requirements.txt")
+            st.info("Erreur PPTX : Vérifiez python-pptx")
 
-        # --- 3. EXPORT CSV ---
-        if p_exp.get('sipoc_data'):
-            csv_data = pd.DataFrame(p_exp['sipoc_data']).to_csv(index=False).encode('utf-8')
-            st.download_button(label="📝 Télécharger SIPOC (CSV)", data=csv_data, file_name=f"{project_name}_sipoc.csv", mime="text/csv")
-    
     st.divider()
     if st.button("🚪 Déconnexion"):
         st.session_state.authenticated = False
