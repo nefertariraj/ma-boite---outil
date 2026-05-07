@@ -337,17 +337,16 @@ else:
         st.divider()
         st.subheader("5. SIPOC & Flux de processus")
 
-        # Initialisation forcée avec les 5 colonnes demandées
+        # Initialisation stricte avec les 5 colonnes demandées
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or len(p["sipoc_data"]) == 0:
             p["sipoc_data"] = [
                 {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
             ]
 
-        # Formulaire pour regrouper le tableau et le bouton
-        with st.form(key=f"sipoc_form_container_{p_idx}"):
-            st.info("Saisissez vos données. Cliquez sur le bouton pour mettre à jour le schéma.")
+        with st.form(key=f"sipoc_form_v4_{p_idx}"):
+            st.info("Saisissez les données. Le schéma se génère après validation.")
             
-            # Configuration stricte des colonnes
+            # Définition précise des 5 colonnes
             edited_sipoc = st.data_editor(
                 p["sipoc_data"],
                 column_config={
@@ -359,8 +358,7 @@ else:
                 },
                 num_rows="dynamic",
                 use_container_width=True,
-                # On utilise une clé "v3" pour forcer Streamlit à oublier l'ancien tableau buggé
-                key=f"editor_sipoc_v3_{p_idx}",
+                key=f"editor_sipoc_v4_{p_idx}", # Nouvelle clé pour forcer la mise à jour
                 column_order=("Supplier", "Input", "Process", "Output", "Customer")
             )
             
@@ -368,14 +366,13 @@ else:
 
         if submit_sipoc:
             p["sipoc_data"] = edited_sipoc
-            st.success("Tableau mis à jour !")
+            st.success("Données SIPOC enregistrées !")
             st.rerun()
 
-        # Rendu du schéma Graphviz
+        # --- Génération du Schéma ---
         df_sipoc = pd.DataFrame(p["sipoc_data"])
         
         if not df_sipoc.empty and 'Process' in df_sipoc.columns and 'Customer' in df_sipoc.columns:
-            # On ne garde que les lignes où l'utilisateur a écrit quelque chose
             df_viz = df_sipoc[(df_sipoc['Process'] != "") & (df_sipoc['Customer'] != "")]
 
             if not df_viz.empty:
@@ -386,7 +383,6 @@ else:
                     dot += "node [shape=rect, style=filled, fillcolor='#F9F9F9', fontname='Arial', fontsize='10']; "
                     dot += "edge [color='#2D3748', penwidth=1.5]; "
                     
-                    # Groupement par Acteur (Swimlanes)
                     for i, actor in enumerate(data['Customer'].unique()):
                         dot += f'subgraph cluster_{i} {{ label="{actor.upper()}"; style=filled; color="#F1F5F9"; fontname="Arial-Bold"; '
                         steps = data[data['Customer'] == actor]
@@ -394,7 +390,6 @@ else:
                             dot += f'"step_{idx}" [label="{row["Process"]}"]; '
                         dot += '} '
                     
-                    # Liens chronologiques verticaux
                     idx_list = data.index.tolist()
                     for j in range(len(idx_list) - 1):
                         dot += f'"step_{idx_list[j]}" -> "step_{idx_list[j+1]}"; '
