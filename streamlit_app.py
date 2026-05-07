@@ -338,16 +338,14 @@ if p_idx is not None:
     st.subheader("5. SIPOC & Flux de processus")
 
     # 1. Initialisation des colonnes SIPOC
-    if "sipoc_data" not in p or not p["sipoc_data"]:
-        # Création d'une structure vide avec les 5 colonnes demandées
+    if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or not p["sipoc_data"]:
         p["sipoc_data"] = [
             {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
         ]
 
-    # 2. Éditeur de tableau (Gère l'ajout/suppression de lignes)
-    st.info("💡 Utilisez le '+' en bas du tableau pour ajouter une ligne et 'Suppr' pour en retirer.")
+    # 2. Éditeur de tableau (Gère l'ajout/suppression de lignes nativement)
+    st.info("💡 Utilisez le '+' en bas du tableau pour ajouter une ligne.")
     
-    # Configuration des colonnes
     column_config = {
         "Supplier": st.column_config.TextColumn("Supplier (Fournisseur)"),
         "Input": st.column_config.TextColumn("Input (Entrée)"),
@@ -356,25 +354,25 @@ if p_idx is not None:
         "Customer": st.column_config.TextColumn("Customer (Acteur)"),
     }
 
-    # Le data_editor remplace le besoin de boutons manuels pour ajouter/supprimer
+    # Le data_editor permet d'ajouter/supprimer des lignes avec num_rows="dynamic"
     edited_df = st.data_editor(
         p["sipoc_data"],
         column_config=column_config,
-        num_rows="dynamic",  # Active l'ajout/suppression de lignes
+        num_rows="dynamic",
         use_container_width=True,
         key=f"sipoc_editor_{p_idx}",
         column_order=("Supplier", "Input", "Process", "Output", "Customer")
     )
 
-    # Sauvegarde automatique des modifications
+    # Sauvegarde immédiate
     p["sipoc_data"] = edited_df
 
     # 3. Génération du Cross-Functional Flowchart (Swimlane Verticale)
-    df = pd.DataFrame(p["sipoc_data"])
+    df_sipoc = pd.DataFrame(p["sipoc_data"])
     
-    # On ne génère le schéma que si la colonne Process et Customer sont remplies
-    if not df.empty and 'Process' in df.columns:
-        df_clean = df.dropna(subset=['Process', 'Customer'])
+    if not df_sipoc.empty and 'Process' in df_sipoc.columns:
+        # On filtre pour ne garder que les lignes où Process et Customer sont saisis
+        df_clean = df_sipoc.dropna(subset=['Process', 'Customer'])
         df_clean = df_clean[(df_clean['Process'] != "") & (df_clean['Customer'] != "")]
 
         if not df_clean.empty:
@@ -396,13 +394,12 @@ if p_idx is not None:
                     dot += f'        label = "{actor.upper()}";\n'
                     dot += f'        style=filled; color="#F1F5F9"; fontname="Arial-Bold"; fontsize="12";\n'
                     
-                    # Étapes pour cet acteur spécifique
                     steps = data[data['Customer'] == actor]
                     for idx, row in steps.iterrows():
                         dot += f'        "step_{idx}" [label="{row["Process"]}"];\n'
                     dot += '    }\n'
                 
-                # Création des liens chronologiques (un après l'autre verticalement)
+                # Création des liens chronologiques verticaux
                 indices = data.index.tolist()
                 for j in range(len(indices) - 1):
                     dot += f'    "step_{indices[j]}" -> "step_{indices[j+1]}";\n'
@@ -416,7 +413,8 @@ if p_idx is not None:
             except Exception as e:
                 st.error(f"Erreur de rendu du schéma : {e}")
         else:
-            st.warning("⚠️ Veuillez remplir au moins les colonnes 'Process' et 'Customer' pour générer le schéma.")
+            st.info("💡 Remplissez les colonnes 'Process' et 'Customer' pour voir apparaître le schéma.")
+
 else:
     st.warning("Veuillez sélectionner un projet pour afficher le SIPOC.")
             
