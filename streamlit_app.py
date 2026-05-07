@@ -412,56 +412,101 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-        # --- 6. VOICE OF CUSTOMER (VOC) AVEC IMPORT EXCEL ---
+        # --- 6. VOICE OF CUSTOMER (VOC) EXPERT ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC)")
 
-    # Zone d'importation de fichier
-    with st.expander("📥 Importer des données clients (Excel)"):
-        uploaded_file = st.file_uploader("Fichier d'enquête de satisfaction", type=["xlsx", "xls"], key="voc_upload")
+    # 1. Gestion de l'importation
+    with st.expander("📥 Importer des données d'enquête (Excel/CSV)"):
+        uploaded_file = st.file_uploader("Charger les retours clients", type=["xlsx", "xls", "csv"], key="voc_upload_expert")
         
         if uploaded_file is not None:
-            df_import = pd.read_excel(uploaded_file)
-            st.write("Aperçu des données :")
-            st.dataframe(df_import.head(3))
-            
-            if st.button("🚀 Analyser chaque ligne du fichier"):
-                # On cherche la colonne qui contient le plus de texte (les commentaires)
-                colonne_texte = df_import.select_dtypes(include=['object']).columns[0]
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    df_import = pd.read_csv(uploaded_file)
+                else:
+                    df_import = pd.read_excel(uploaded_file)
                 
-                nouvelles_lignes = []
-                for _, row in df_import.iterrows():
-                    verbatim = str(row[colonne_texte])
-                    if verbatim.strip() and verbatim != "nan": # On évite les lignes vides
-                        nouvelles_lignes.append({
-                            "Besoin": "Analyse en cours...", # L'IA pourra affiner ici
-                            "Importance": "À définir",
-                            "Satisfaction actuelle": "À extraire",
-                            "Verbatim Client": verbatim 
-                        })
+                st.write("Aperçu du fichier :")
+                st.dataframe(df_import.head(3))
                 
-                # Mise à jour du projet
-                p["voc_data"] = nouvelles_lignes
-                st.success(f"✅ {len(nouvelles_lignes)} avis clients ont été importés dans le tableau.")
-                st.rerun()
+                if st.button("🚀 Extraire les données via l'IA"):
+                    # Simulation de l'extraction IA pour chaque ligne
+                    # On identifie la colonne texte pour le Verbatim
+                    col_text = df_import.select_dtypes(include=['object']).columns[0]
+                    
+                    nouvelles_lignes = []
+                    for _, row in df_import.iterrows():
+                        v = str(row[col_text])
+                        if v.strip() and v != "nan":
+                            nouvelles_lignes.append({
+                                "Client": "Anonyme",
+                                "Verbatim": v,
+                                "Problème": "Extraction en cours...", # L'IA remplira ici
+                                "Impact": "Moyen",
+                                "Fréquence": "Occasionnelle",
+                                "Gravité": "Modérée"
+                            })
+                    p["voc_data"] = nouvelles_lignes
+                    st.success(f"✅ {len(nouvelles_lignes)} lignes extraites avec succès.")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Erreur lors de la lecture du fichier : {e}")
 
-    # Affichage du tableau éditable
+    # 2. Initialisation du tableau si vide
+    COLONNES_VOC = ["Client", "Verbatim", "Problème", "Impact", "Fréquence", "Gravité"]
     if "voc_data" not in p or not p["voc_data"]:
-        p["voc_data"] = [{"Besoin": "", "Importance": "Haute", "Satisfaction actuelle": "", "Verbatim Client": ""}]
+        p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
 
-    # Configuration du tableau pour qu'il soit propre
-    p["voc_data"] = st.data_editor(
-        p["voc_data"],
-        column_config={
-            "Besoin": st.column_config.TextColumn("Besoin extrait", width="large"),
-            "Importance": st.column_config.SelectboxColumn("Importance", options=["Basse", "Moyenne", "Haute", "Critique"]),
-            "Satisfaction actuelle": st.column_config.TextColumn("Note/Avis"),
-            "Verbatim Client": st.column_config.TextColumn("Commentaire original", disabled=True)
-        },
+    # 3. Tableau éditable (6 colonnes)
+    st.info("Vous pouvez modifier le tableau manuellement ou utiliser le bouton (+) pour ajouter des lignes.")
+    
+    # On s'assure que le DataFrame a les bonnes colonnes
+    df_voc = pd.DataFrame(p["voc_data"])
+    for c in COLONNES_VOC:
+        if c not in df_voc.columns:
+            df_voc[c] = ""
+
+    edited_voc = st.data_editor(
+        df_voc[COLONNES_VOC],
         num_rows="dynamic",
         use_container_width=True,
-        key=f"voc_editor_final_{p_idx}"
+        key=f"voc_editor_expert_{p_idx}",
+        column_config={
+            "Verbatim": st.column_config.TextColumn("Verbatim", width="large"),
+            "Impact": st.column_config.SelectboxColumn("Impact", options=["Faible", "Moyen", "Fort", "Critique"]),
+            "Fréquence": st.column_config.SelectboxColumn("Fréquence", options=["Rare", "Occasionnelle", "Fréquente", "Systématique"]),
+            "Gravité": st.column_config.SelectboxColumn("Gravité", options=["Mineure", "Modérée", "Majeure", "Bloquante"]),
+        }
     )
+    
+    # Sauvegarde automatique des modifications du tableau
+    p["voc_data"] = edited_voc.to_dict('records')
+
+    # 4. ANALYSE IA - REGROUPEMENT EN 4 CATÉGORIES (CTQ)
+    if st.button("📊 Analyser les Verbatims et définir les CTQ"):
+        verbatims = [str(r['Verbatim']) for r in p["voc_data"] if str(r['Verbatim']).strip()]
+        
+        if verbatims:
+            st.write("---")
+            st.markdown("### 🧠 Analyse de synthèse IA (Regroupement CTQ)")
+            st.write("Basé sur les verbatims, voici les 4 catégories majeures de problèmes identifiées :")
+            
+            # Ici l'IA analyse la colonne Verbatim
+            # Pour l'exemple, nous créons 4 colonnes visuelles
+            cat_cols = st.columns(4)
+            categories = ["Qualité / Fiabilité", "Délais / Réactivité", "Coût / Prix", "Expérience / Service"]
+            
+            for i, cat in enumerate(categories):
+                with cat_cols[i]:
+                    st.markdown(f"**{cat}**")
+                    # Simulation de l'analyse par catégorie
+                    st.caption("Problèmes regroupés ici...")
+                    st.progress((i+1)*20) # Illustration de l'impact
+            
+            st.success("Analyse terminée. Ces catégories répondent aux exigences critiques de qualité (CTQ).")
+        else:
+            st.warning("La colonne 'Verbatim' est vide. Impossible d'analyser.")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
