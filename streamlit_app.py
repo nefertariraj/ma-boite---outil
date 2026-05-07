@@ -53,22 +53,72 @@ with st.sidebar:
         st.success("Données synchronisées dans la session !")
         # Note : Pour une vraie sauvegarde persistante, il faudrait écrire dans un fichier JSON ou CSV.
 
-    # --- BOUTON TÉLÉCHARGER (FORMAT CSV - SÉCURISÉ) ---
+    # --- SECTION EXPORT DU PROJET COMPLET ---
     if st.session_state.current_project_idx is not None:
-        st.subheader("📥 Export du projet")
-        p_to_export = st.session_state.projects[st.session_state.current_project_idx]
+        st.divider()
+        st.subheader("📥 Exporter le projet complet")
         
-        # On transforme le SIPOC en CSV pour l'export
-        if p_to_export.get('sipoc_data'):
-            df_export = pd.DataFrame(p_to_export['sipoc_data'])
-            csv = df_export.to_csv(index=False).encode('utf-8')
+        p_exp = st.session_state.projects[st.session_state.current_project_idx]
+        project_name = p_exp['name']
+
+        # --- 1. EXPORT EXCEL (Multi-feuilles) ---
+        import io
+        buffer_xlsx = io.BytesIO()
+        with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
+            # Synthèse
+            pd.DataFrame([{"Projet": project_name, "Statut": p_exp['status'], "Définition": p_exp.get('problem', '')}]).to_excel(writer, sheet_name='Synthèse', index=False)
+            # SIPOC
+            if p_exp.get('sipoc_data'):
+                pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
+            # Stakeholders
+            if p_exp.get('stakeholders'):
+                pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
+        
+        st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")
+
+        # --- 2. EXPORT PDF ---
+        from fpdf import FPDF
+        def create_pdf(data_proj):
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", 'B', 16)
+            pdf.cell(200, 10, f"Rapport de Projet : {data_proj['name']}", ln=True, align='C')
+            pdf.set_font("Arial", size=12)
+            pdf.ln(10)
+            pdf.multi_cell(0, 10, f"Problématique : {data_proj.get('problem', 'Non défini')}")
+            return pdf.output(dest='S').encode('latin-1')
+
+        st.download_button(label="📄 Télécharger en PDF", data=create_pdf(p_exp), file_name=f"{project_name}.pdf", mime="application/pdf")
+
+        # --- 3. EXPORT POWERPOINT ---
+        from pptx import Presentation
+        def create_pptx(data_proj):
+            prs = Presentation()
+            # Slide de titre
+            slide = prs.slides.add_slide(prs.slide_layouts[0])
+            slide.shapes.title.text = data_proj['name']
+            slide.placeholders[1].text = "Rapport Lean Six Sigma - Phase Define"
             
-            st.download_button(
-                label="📄 Télécharger SIPOC (CSV)",
-                data=csv,
-                file_name=f"SIPOC_{p_to_export['name']}.csv",
-                mime="text/csv",
-            )
+            # Slide SIPOC
+            slide_sipoc = prs.slides.add_slide(prs.slide_layouts[1])
+            slide_sipoc.shapes.title.text = "SIPOC Analysis"
+            return io.BytesIO()
+
+        # Note : Le bouton PPTX nécessite que python-pptx soit installé
+        try:
+            buffer_pptx = io.BytesIO()
+            prs = Presentation()
+            slide = prs.slides.add_slide(prs.slide_layouts[0])
+            slide.shapes.title.text = project_name
+            prs.save(buffer_pptx)
+            st.download_button(label="📽️ Télécharger en PowerPoint", data=buffer_pptx.getvalue(), file_name=f"{project_name}.pptx")
+        except:
+            st.info("Export PowerPoint en attente de configuration serveur.")
+
+        # --- 4. EXPORT CSV (SIPOC uniquement) ---
+        if p_exp.get('sipoc_data'):
+            csv_data = pd.DataFrame(p_exp['sipoc_data']).to_csv(index=False).encode('utf-8')
+            st.download_button(label="📝 Télécharger SIPOC (CSV)", data=csv_data, file_name=f"{project_name}_sipoc.csv", mime="text/csv")
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
