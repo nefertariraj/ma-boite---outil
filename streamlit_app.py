@@ -412,74 +412,56 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-        # --- 6. VOICE OF CUSTOMER (VOC) ---
-        st.divider()
-        st.subheader("6. Voice of Customer (VOC)")
+        # --- 6. VOICE OF CUSTOMER (VOC) AVEC IMPORT EXCEL ---
+    st.divider()
+    st.subheader("6. Voice of Customer (VOC)")
+
+    # Zone d'importation de fichier
+    with st.expander("📥 Importer des données clients (Excel)"):
+        uploaded_file = st.file_uploader("Fichier d'enquête de satisfaction", type=["xlsx", "xls"], key="voc_upload")
         
-        p_idx = st.session_state.current_project_idx
-
-        # --- A. ZONE D'IMPORTATION ---
-        st.write("📤 **Importation intelligente (Excel ou PDF)**")
-        uploaded_file = st.file_uploader(
-            "Importez vos enquêtes :", 
-            type=["xlsx", "pdf", "csv"],
-            key=f"voc_uploader_{p_idx}" 
-        )
-
         if uploaded_file is not None:
-            if st.button("🪄 Extraire les données via IA", key=f"btn_extract_voc_{p_idx}"):
-                with st.spinner("Analyse en cours..."):
-                    extracted_data = [
-                        {"Client": "C-001", "Verbatim": "Les délais sont trop longs", "Problème": "Délai", "Impact": "Satisfaction", "Fréquence": "Fréquent", "Gravité": "Élevée"}
-                    ]
-                    p["voc_data"] = extracted_data
-                    st.rerun()
-
-        st.write("---")
-
-        # --- B. TABLEAU DE SAISIE VOC ---
-        if "voc_data" not in p:
-            p["voc_data"] = [{"Client": "", "Verbatim": "", "Problème": "", "Impact": "", "Fréquence": "Occasionnel", "Gravité": "Moyenne"}]
-
-        voc_editor_key = f"voc_table_editor_{p_idx}"
-        
-        # Correction ici : on simplifie le column_config pour éviter le TypeError
-        edited_voc = st.data_editor(
-            p["voc_data"],
-            num_rows="dynamic",
-            column_config={
-                "Fréquence": st.column_config.SelectboxColumn(
-                    "Fréquence", 
-                    options=["Rare", "Occasionnel", "Fréquent", "Critique"]
-                ),
-                "Gravité": st.column_config.SelectboxColumn(
-                    "Gravité", 
-                    options=["Faible", "Moyenne", "Élevée", "Critique"]
-                ),
-                "Verbatim": st.column_config.TextColumn(
-                    "Verbatim", 
-                    help="Citation directe du client"
-                )
-            },
-            use_container_width=True,
-            key=voc_editor_key
-        )
-        
-        if st.button("✅ Valider les données du tableau", key=f"btn_save_voc_final_{p_idx}"):
-            p["voc_data"] = edited_voc
-            st.success("Données VOC enregistrées !")
-            st.rerun()
-
-        # --- C. ANALYSE IA FINALE ---
-        st.write("---")
-        if st.button("🔍 Catégoriser les Verbatims", key=f"ai_voc_analysis_btn_{p_idx}"):
-            all_verbatims = " ".join([str(row.get("Verbatim", "")) for row in p["voc_data"] if row.get("Verbatim")])
-            if all_verbatims.strip():
-                st.session_state.voc_analysis = f"### 🎯 Analyse IA\nBasée sur : {all_verbatims[:50]}..."
+            df_import = pd.read_excel(uploaded_file)
+            st.write("Aperçu des données :")
+            st.dataframe(df_import.head(3))
+            
+            if st.button("🚀 Analyser chaque ligne du fichier"):
+                # On cherche la colonne qui contient le plus de texte (les commentaires)
+                colonne_texte = df_import.select_dtypes(include=['object']).columns[0]
+                
+                nouvelles_lignes = []
+                for _, row in df_import.iterrows():
+                    verbatim = str(row[colonne_texte])
+                    if verbatim.strip() and verbatim != "nan": # On évite les lignes vides
+                        nouvelles_lignes.append({
+                            "Besoin": "Analyse en cours...", # L'IA pourra affiner ici
+                            "Importance": "À définir",
+                            "Satisfaction actuelle": "À extraire",
+                            "Verbatim Client": verbatim 
+                        })
+                
+                # Mise à jour du projet
+                p["voc_data"] = nouvelles_lignes
+                st.success(f"✅ {len(nouvelles_lignes)} avis clients ont été importés dans le tableau.")
                 st.rerun()
 
-        if "voc_analysis" in st.session_state:
-            st.markdown(st.session_state.voc_analysis)
+    # Affichage du tableau éditable
+    if "voc_data" not in p or not p["voc_data"]:
+        p["voc_data"] = [{"Besoin": "", "Importance": "Haute", "Satisfaction actuelle": "", "Verbatim Client": ""}]
+
+    # Configuration du tableau pour qu'il soit propre
+    p["voc_data"] = st.data_editor(
+        p["voc_data"],
+        column_config={
+            "Besoin": st.column_config.TextColumn("Besoin extrait", width="large"),
+            "Importance": st.column_config.SelectboxColumn("Importance", options=["Basse", "Moyenne", "Haute", "Critique"]),
+            "Satisfaction actuelle": st.column_config.TextColumn("Note/Avis"),
+            "Verbatim Client": st.column_config.TextColumn("Commentaire original", disabled=True)
+        },
+        num_rows="dynamic",
+        use_container_width=True,
+        key=f"voc_editor_final_{p_idx}"
+    )
             
     # --- PHASE MEASURE ---
     with tabs[1]:
