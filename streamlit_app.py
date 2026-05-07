@@ -40,16 +40,53 @@ if not st.session_state.authenticated:
 
 # --- BARRE LATÉRALE ---
 with st.sidebar:
-    st.title("⚙️ Paramètres")
-    color = st.color_picker("Couleur de l'outil", st.session_state.primary_color)
+    st.title("⚙️ Paramètres & Sauvegarde")
+    
+    # 1. PERSONNALISATION
+    color = st.color_picker("Couleur de l'outil", st.session_state.get('primary_color', '#007BFF'))
     st.session_state.primary_color = color
     
     st.divider()
+
+    # 2. EXPORTATION (SAUVEGARDER)
+    st.subheader("💾 Sauvegarder mon travail")
+    if st.session_state.projects:
+        # Transformation de la liste des projets en texte JSON
+        import json
+        data_json = json.dumps(st.session_state.projects, indent=4)
+        
+        st.download_button(
+            label="📤 Télécharger ma sauvegarde (.json)",
+            data=data_json,
+            file_name="sauvegarde_boite_outils.json",
+            mime="application/json",
+            help="Cliquez ici à la fin de votre session pour enregistrer vos projets sur votre ordinateur."
+        )
+    else:
+        st.info("Créez un projet pour pouvoir l'exporter.")
+
+    st.divider()
+
+    # 3. IMPORTATION (RECHARGER)
+    st.subheader("📥 Reprendre mon travail")
+    uploaded_file = st.file_uploader("Importer un fichier de sauvegarde", type="json")
     
-    # --- BOUTON SAUVEGARDER ---
-    if st.button("💾 Sauvegarder tout"):
-        # Note : Pour une sauvegarde persistante, il faudra lier une base de données.
-        st.success("Données synchronisées dans la session !")
+    if uploaded_file is not None:
+        try:
+            import json
+            # Lecture du fichier
+            restored_data = json.load(uploaded_file)
+            # Mise à jour de la session
+            st.session_state.projects = restored_data
+            st.success("✅ Données chargées avec succès !")
+            
+            # Bouton pour rafraîchir l'interface
+            if st.button("🔄 Actualiser l'affichage"):
+                st.rerun()
+        except Exception as e:
+            st.error(f"Erreur lors de l'import : {e}")
+
+    st.divider()
 
     # --- SECTION EXPORT DU PROJET COMPLET ---
     if st.session_state.current_project_idx is not None:
