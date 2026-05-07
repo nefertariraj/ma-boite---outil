@@ -74,39 +74,34 @@ with st.sidebar:
         except Exception as e:
             st.error("Erreur Excel : Vérifiez openpyxl dans requirements.txt")
 
-        # --- 2. EXPORT PDF ---
-        from fpdf import FPDF
-        
-        def create_pdf(data_proj):
-            pdf = FPDF(orientation="P", unit="mm", format="A4")
-            pdf.add_page()
-            margin = 10
-            pdf.set_margins(margin, margin, margin)
-            effective_width = pdf.w - 2 * margin
-            
-            pdf.set_font("Helvetica", 'B', 16)
-            pdf.cell(effective_width, 10, f"Rapport de Projet : {data_proj['name']}", ln=True, align='C')
-            pdf.ln(10)
-            
-            pdf.set_font("Helvetica", size=12)
-            pdf.set_font("Helvetica", 'B', 12)
-            pdf.cell(40, 10, "Statut du projet :", ln=False)
-            pdf.set_font("Helvetica", size=12)
-            pdf.cell(0, 10, str(data_proj.get('status', 'N/A')), ln=True)
-            pdf.ln(5)
-            
-            pdf.set_font("Helvetica", 'B', 12)
-            pdf.cell(effective_width, 10, "Problematique / Definition :", ln=True)
-            pdf.set_font("Helvetica", size=12)
-            text_to_print = str(data_proj.get('problem', 'Non defini'))
-            pdf.multi_cell(effective_width, 8, txt=text_to_print)
-            return pdf.output()
-
+        # --- 2. EXPORT PDF (Version de Diagnostic) ---
         try:
+            from fpdf import FPDF
+            
+            def create_pdf(data_proj):
+                # Utilisation de paramètres très simples pour tester
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", 'B', 16)
+                pdf.cell(190, 10, f"Projet : {data_proj['name']}", ln=True, align='C')
+                pdf.ln(10)
+                pdf.set_font("Arial", size=12)
+                pdf.multi_cell(190, 10, txt=str(data_proj.get('problem', 'Pas de description')))
+                return pdf.output()
+
             pdf_bytes = create_pdf(p_exp)
-            st.download_button(label="📄 Télécharger en PDF", data=pdf_bytes, file_name=f"{project_name}.pdf", mime="application/pdf")
+            st.download_button(
+                label="📄 Télécharger en PDF", 
+                data=pdf_bytes, 
+                file_name=f"{project_name}.pdf", 
+                mime="application/pdf",
+                key=f"pdf_final_{p_idx}"
+            )
+        except ImportError:
+            st.error("Le module fpdf2 n'est toujours pas détecté par le serveur.")
         except Exception as e:
-            st.warning("Erreur PDF : Vérifiez fpdf2 dans requirements.txt")
+            # Ce message affichera la VRAIE erreur technique
+            st.error(f"Erreur technique lors de la création du PDF : {e}")
 
         # --- 3. EXPORT POWERPOINT ---
         from pptx import Presentation
