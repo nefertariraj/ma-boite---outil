@@ -89,19 +89,21 @@ Utiliser un encodage sécurisé pour éviter les problèmes de caractères spéc
 Voici la fonction create_pdf corrigée. Remplace l'ancienne version par celle-ci :
 
 Python
-        # --- 2. EXPORT PDF (Version Sécurisée) ---
+        # --- 2. EXPORT PDF (Code Corrigé) ---
         from fpdf import FPDF
         
         def create_pdf(data_proj):
+            # Initialisation avec paramètres explicites
             pdf = FPDF(orientation="P", unit="mm", format="A4")
             pdf.add_page()
             
-            # Définition des marges et de la largeur utile
+            # Marges de 10mm
             margin = 10
             pdf.set_margins(margin, margin, margin)
+            # Calcul de la largeur disponible (210mm - 20mm = 190mm)
             effective_width = pdf.w - 2 * margin
             
-            # Titre du projet
+            # Titre
             pdf.set_font("Helvetica", 'B', 16)
             pdf.cell(effective_width, 10, f"Rapport de Projet : {data_proj['name']}", ln=True, align='C')
             pdf.ln(10)
@@ -113,21 +115,21 @@ Python
             pdf.set_font("Helvetica", 'B', 12)
             pdf.cell(40, 10, "Statut du projet :", ln=False)
             pdf.set_font("Helvetica", size=12)
-            pdf.cell(0, 10, f"{data_proj.get('status', 'N/A')}", ln=True)
+            pdf.cell(0, 10, str(data_proj.get('status', 'N/A')), ln=True)
             pdf.ln(5)
             
-            # Problématique (Utilisation sécurisée de multi_cell)
+            # Problématique
             pdf.set_font("Helvetica", 'B', 12)
             pdf.cell(effective_width, 10, "Problematique / Definition :", ln=True)
             pdf.set_font("Helvetica", size=12)
             
-            # On donne une largeur fixe (effective_width) au lieu de 0 pour éviter l'erreur d'espace horizontal
-            problem_text = str(data_proj.get('problem', 'Non defini'))
-            pdf.multi_cell(effective_width, 8, txt=problem_text)
+            # multi_cell avec largeur explicite pour éviter l'AttributeError
+            text_to_print = str(data_proj.get('problem', 'Non defini'))
+            pdf.multi_cell(effective_width, 8, txt=text_to_print)
             
             return pdf.output()
 
-        # Bloc de téléchargement
+        # Bloc d'affichage du bouton
         try:
             pdf_bytes = create_pdf(p_exp)
             st.download_button(
@@ -138,7 +140,7 @@ Python
                 key=f"pdf_btn_{p_idx}"
             )
         except Exception as e:
-            st.warning(f"Note : L'export PDF a rencontré une limite d'affichage. Vérifiez la longueur de votre texte.")
+            st.warning("Complétez les informations du projet pour l'export PDF.")
 
         # --- 3. EXPORT POWERPOINT (Finalisé) ---
         from pptx import Presentation
