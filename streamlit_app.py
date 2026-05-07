@@ -328,104 +328,88 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & Flowchart ---
-    p_idx = st.session_state.get('current_project_idx')
+        # --- 5. SIPOC & Flowchart ---
+        p_idx = st.session_state.get('current_project_idx')
 
-    if p_idx is not None:
-    # CETTE LIGNE EST LA PLUS IMPORTANTE : elle définit 'p'
-    p = st.session_state.projects[p_idx]
-    
-    st.divider()
-    st.subheader("5. SIPOC & Flux de processus")
-
-    # Maintenant Python sait ce qu'est 'p', donc cette ligne ne plantera plus :
-    if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or not p["sipoc_data"]:
-        p["sipoc_data"] = [
-            {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
-        ]
-
-    # Le reste du formulaire
-    with st.form(key=f"sipoc_form_final_{p_idx}"):
-        st.info("Saisissez les étapes ci-dessous.")
+        if p_idx is not None:
+        # Définition de 'p' pour tout le bloc projet
+        p = st.session_state.projects[p_idx]
         
-        column_config = {
-            "Supplier": st.column_config.TextColumn("Fournisseur"),
-            "Input": st.column_config.TextColumn("Entrée"),
-            "Process": st.column_config.TextColumn("Processus"),
-            "Output": st.column_config.TextColumn("Sortie"),
-            "Customer": st.column_config.TextColumn("Client"),
-        }
+        st.divider()
+        st.subheader("5. SIPOC & Flux de processus")
 
-        edited_sipoc = st.data_editor(
-            p["sipoc_data"],
-            num_rows="dynamic",
-            key=f"sipoc_editor_final_{p_idx}",
-            use_container_width=True,
-            column_config=column_config,
-            column_order=("Supplier", "Input", "Process", "Output", "Customer")
-        )
-        
-        submit_sipoc = st.form_submit_button("✅ Enregistrer et Générer le Schéma")
+        # 1. Initialisation des données SIPOC
+        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or not p["sipoc_data"]:
+            p["sipoc_data"] = [
+                {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
+            ]
 
-    if submit_sipoc:
-        p["sipoc_data"] = edited_sipoc
-        st.success("Données SIPOC mises à jour !")
-        st.rerun()
-
-    # 3. Traitement de la validation
-    if submit_sipoc:
-        p["sipoc_data"] = edited_sipoc
-        st.success("Données SIPOC mises à jour !")
-        st.rerun()
-
-    # 4. Génération du Schéma Graphviz
-    # On vérifie qu'il y a des données exploitables (au moins un Process et un Customer)
-    df_chart = pd.DataFrame(p["sipoc_data"])
-    
-    # On nettoie les lignes vides pour le graphique
-    if not df_chart.empty and 'Process' in df_chart.columns:
-        df_clean = df_chart.dropna(subset=['Process', 'Customer'])
-        df_clean = df_clean[(df_clean['Process'] != "") & (df_clean['Customer'] != "")]
-
-        if not df_clean.empty:
-            st.write("### 📉 Aperçu du Flux (Swimlanes)")
+        # 2. Formulaire de saisie
+        with st.form(key=f"sipoc_form_final_{p_idx}"):
+            st.info("Saisissez les étapes ci-dessous. Le schéma se générera après validation.")
             
-            def generate_viz(df):
-                dot = """
-                digraph G {
-                    rankdir=TB;
-                    newrank=true; 
-                    node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
-                    edge [color="#2D3748", penwidth=1.5];
-                """
-                # Groupement par Customer (Swimlanes)
-                actors = df['Customer'].unique()
-                for i, actor in enumerate(actors):
-                    dot += f'    subgraph cluster_{i} {{\n'
-                    dot += f'        label = "{actor.upper()}";\n'
-                    dot += f'        style=filled; color="#F1F5F9"; fontname="Arial-Bold";\n'
-                    
-                    steps = df[df['Customer'] == actor]
-                    for idx, row in steps.iterrows():
-                        dot += f'        "step_{idx}" [label="{row["Process"]}"];\n'
-                    dot += '    }\n'
-                
-                # Liens chronologiques
-                indices = df.index.tolist()
-                for j in range(len(indices) - 1):
-                    dot += f'    "step_{indices[j]}" -> "step_{indices[j+1]}";\n'
-                
-                dot += "}"
-                return dot
+            column_config = {
+                "Supplier": st.column_config.TextColumn("Fournisseur"),
+                "Input": st.column_config.TextColumn("Entrée"),
+                "Process": st.column_config.TextColumn("Processus"),
+                "Output": st.column_config.TextColumn("Sortie"),
+                "Customer": st.column_config.TextColumn("Client"),
+            }
 
-            try:
-                st.graphviz_chart(generate_viz(df_clean))
-            except Exception as e:
-                st.error(f"Erreur de rendu graphique : {e}")
-        else:
-            st.info("Remplissez les colonnes 'Processus' et 'Client' pour voir le schéma.")
-        else:
-        st.warning("Sélectionnez un projet pour voir le SIPOC.")
+            edited_sipoc = st.data_editor(
+                p["sipoc_data"],
+                num_rows="dynamic",
+                key=f"sipoc_editor_final_{p_idx}",
+                use_container_width=True,
+                column_config=column_config,
+                column_order=("Supplier", "Input", "Process", "Output", "Customer")
+            )
+            
+            submit_sipoc = st.form_submit_button("✅ Enregistrer et Générer le Schéma")
+
+        # 3. Traitement de la validation
+        if submit_sipoc:
+            p["sipoc_data"] = edited_sipoc
+            st.success("Données SIPOC mises à jour !")
+            st.rerun()
+
+        # 4. Affichage du Schéma (si données présentes)
+        df_chart = pd.DataFrame(p["sipoc_data"])
+        if not df_chart.empty and 'Process' in df_chart.columns:
+            df_clean = df_chart.dropna(subset=['Process', 'Customer'])
+            df_clean = df_clean[(df_clean['Process'] != "") & (df_clean['Customer'] != "")]
+
+            if not df_clean.empty:
+                st.write("### 📉 Aperçu du Flux (Swimlanes)")
+                
+                def generate_viz(df):
+                    dot = """
+                    digraph G {
+                        rankdir=TB;
+                        newrank=true; 
+                        node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
+                        edge [color="#2D3748", penwidth=1.5];
+                    """
+                    actors = df['Customer'].unique()
+                    for i, actor in enumerate(actors):
+                        dot += f'    subgraph cluster_{i} {{\n'
+                        dot += f'        label = "{actor.upper()}";\n'
+                        dot += f'        style=filled; color="#F1F5F9"; fontname="Arial-Bold";\n'
+                        steps = df[df['Customer'] == actor]
+                        for idx, row in steps.iterrows():
+                            dot += f'        "step_{idx}" [label="{row["Process"]}"];\n'
+                        dot += '    }\n'
+                    
+                    indices = df.index.tolist()
+                    for j in range(len(indices) - 1):
+                        dot += f'    "step_{indices[j]}" -> "step_{indices[j+1]}";\n'
+                    dot += "}"
+                    return dot
+
+                try:
+                    st.graphviz_chart(generate_viz(df_clean))
+                except Exception as e:
+                    st.error(f"Erreur graphique : {e}")
             
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
