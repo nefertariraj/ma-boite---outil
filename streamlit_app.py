@@ -328,10 +328,10 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-        # --- 5. SIPOC & Flowchart ---
-        p_idx = st.session_state.get('current_project_idx')
+       # --- 5. SIPOC & Flowchart ---
+    p_idx = st.session_state.get('current_project_idx')
 
-        if p_idx is not None:
+    if p_idx is not None:
         # Définition de 'p' pour tout le bloc projet
         p = st.session_state.projects[p_idx]
         
