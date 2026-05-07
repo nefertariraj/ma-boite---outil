@@ -74,47 +74,7 @@ with st.sidebar:
         except Exception as e:
             st.error("Erreur Excel : Vérifiez openpyxl dans requirements.txt")
 
-        # --- 2. EXPORT PDF (Corrigé sans p_idx) ---
-        try:
-            from fpdf import FPDF
-            
-            def create_pdf(data_proj):
-                pdf = FPDF()
-                pdf.add_page()
-                # On utilise Helvetica pour éviter les erreurs de police standard
-                pdf.set_font("Helvetica", 'B', 16)
-                pdf.cell(190, 10, f"Projet : {data_proj['name']}", ln=True, align='C')
-                pdf.ln(10)
-                
-                pdf.set_font("Helvetica", size=12)
-                pdf.set_font("Helvetica", 'B', 12)
-                pdf.cell(40, 10, "Statut : ", ln=False)
-                pdf.set_font("Helvetica", size=12)
-                pdf.cell(0, 10, str(data_proj.get('status', 'N/A')), ln=True)
-                
-                pdf.ln(5)
-                pdf.set_font("Helvetica", 'B', 12)
-                pdf.cell(190, 10, "Description / Problematique :", ln=True)
-                pdf.set_font("Helvetica", size=12)
-                
-                txt = str(data_proj.get('problem', 'Non défini'))
-                pdf.multi_cell(190, 10, txt=txt)
-                return pdf.output()
-
-            pdf_bytes = create_pdf(p_exp)
-            st.download_button(
-                label="📄 Télécharger en PDF", 
-                data=pdf_bytes, 
-                file_name=f"{project_name}.pdf", 
-                mime="application/pdf",
-                key=f"pdf_btn_{project_name.replace(' ', '_')}" # Utilise le nom du projet comme clé
-            )
-        except ImportError:
-            st.error("Le module fpdf2 n'est pas encore installé. Vérifiez requirements.txt et faites un Reboot.")
-        except Exception as e:
-            st.error(f"Erreur technique lors de la création du PDF : {e}")
-
-        # --- 3. EXPORT POWERPOINT ---
+        # --- 2. EXPORT POWERPOINT ---
         from pptx import Presentation
         
         def create_pptx(data_proj):
@@ -137,7 +97,7 @@ with st.sidebar:
         except Exception as e:
             st.info("Erreur PPTX : Vérifiez python-pptx dans requirements.txt")
 
-        # --- 4. EXPORT CSV ---
+        # --- 3. EXPORT CSV ---
         if p_exp.get('sipoc_data'):
             csv_data = pd.DataFrame(p_exp['sipoc_data']).to_csv(index=False).encode('utf-8')
             st.download_button(label="📝 Télécharger SIPOC (CSV)", data=csv_data, file_name=f"{project_name}_sipoc.csv", mime="text/csv")
