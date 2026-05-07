@@ -337,12 +337,17 @@ else:
         st.divider()
         st.subheader("5. SIPOC & Flux de processus")
 
-        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
-            p["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}]
+        # Initialisation forcée avec les 5 colonnes demandées
+        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or len(p["sipoc_data"]) == 0:
+            p["sipoc_data"] = [
+                {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
+            ]
 
-        with st.form(key=f"form_sipoc_{p_idx}"):
-            st.info("💡 Remplissez le tableau puis validez pour générer le schéma.")
+        # Formulaire pour regrouper le tableau et le bouton
+        with st.form(key=f"sipoc_form_container_{p_idx}"):
+            st.info("Saisissez vos données. Cliquez sur le bouton pour mettre à jour le schéma.")
             
+            # Configuration stricte des colonnes
             edited_sipoc = st.data_editor(
                 p["sipoc_data"],
                 column_config={
@@ -354,32 +359,34 @@ else:
                 },
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_{p_idx}",
+                # On utilise une clé "v3" pour forcer Streamlit à oublier l'ancien tableau buggé
+                key=f"editor_sipoc_v3_{p_idx}",
                 column_order=("Supplier", "Input", "Process", "Output", "Customer")
             )
             
-            submit_button = st.form_submit_button(label="✅ Valider et Générer le Schéma")
+            submit_sipoc = st.form_submit_button("✅ Enregistrer et Générer le Schéma")
 
-        if submit_button:
+        if submit_sipoc:
             p["sipoc_data"] = edited_sipoc
-            st.success("Données enregistrées !")
+            st.success("Tableau mis à jour !")
             st.rerun()
 
+        # Rendu du schéma Graphviz
         df_sipoc = pd.DataFrame(p["sipoc_data"])
         
-        if not df_sipoc.empty and 'Process' in df_sipoc.columns:
-            df_clean = df_sipoc.dropna(subset=['Process', 'Customer'])
-            df_clean = df_clean[(df_clean['Process'] != "") & (df_clean['Customer'] != "")]
+        if not df_sipoc.empty and 'Process' in df_sipoc.columns and 'Customer' in df_sipoc.columns:
+            # On ne garde que les lignes où l'utilisateur a écrit quelque chose
+            df_viz = df_sipoc[(df_sipoc['Process'] != "") & (df_sipoc['Customer'] != "")]
 
-            if not df_clean.empty:
-                st.write("---")
-                st.write("### 📉 Cross-Functional Flowchart")
+            if not df_viz.empty:
+                st.write("### 📉 Aperçu du Flux (Cross-Functional)")
                 
-                def generate_dot(data):
+                def make_dot(data):
                     dot = "digraph G { rankdir=TB; newrank=true; "
                     dot += "node [shape=rect, style=filled, fillcolor='#F9F9F9', fontname='Arial', fontsize='10']; "
                     dot += "edge [color='#2D3748', penwidth=1.5]; "
                     
+                    # Groupement par Acteur (Swimlanes)
                     for i, actor in enumerate(data['Customer'].unique()):
                         dot += f'subgraph cluster_{i} {{ label="{actor.upper()}"; style=filled; color="#F1F5F9"; fontname="Arial-Bold"; '
                         steps = data[data['Customer'] == actor]
@@ -387,16 +394,14 @@ else:
                             dot += f'"step_{idx}" [label="{row["Process"]}"]; '
                         dot += '} '
                     
+                    # Liens chronologiques verticaux
                     idx_list = data.index.tolist()
                     for j in range(len(idx_list) - 1):
                         dot += f'"step_{idx_list[j]}" -> "step_{idx_list[j+1]}"; '
                     dot += "}"
                     return dot
 
-                try:
-                    st.graphviz_chart(generate_dot(df_clean))
-                except Exception as e:
-                    st.error(f"Erreur : {e}")
+                st.graphviz_chart(make_dot(df_viz))
 
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
