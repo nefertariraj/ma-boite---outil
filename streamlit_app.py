@@ -48,24 +48,36 @@ with st.sidebar:
     
     st.divider()
 
-    # 2. EXPORTATION (SAUVEGARDER)
-    st.subheader("💾 Sauvegarder mon travail")
-    if st.session_state.projects:
-        # Transformation de la liste des projets en texte JSON
-        import json
-        data_json = json.dumps(st.session_state.projects, indent=4)
+    # --- 2. EXPORTATION (SAUVEGARDER) ---
+st.subheader("💾 Sauvegarder mon travail")
+if st.session_state.projects:
+    import json
+
+    # Fonction magique pour ignorer ce qui n'est pas du texte/nombre
+    def clean_for_json(obj):
+        if isinstance(obj, (dict, list, str, int, float, bool, type(None))):
+            if isinstance(obj, dict):
+                return {k: clean_for_json(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [clean_for_json(i) for i in obj]
+            return obj
+        # Si c'est un objet complexe (comme un graphique), on le transforme en texte
+        return str(obj)
+
+    try:
+        # On nettoie les projets avant de les transformer en JSON
+        projects_cleaned = clean_for_json(st.session_state.projects)
+        data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False)
         
         st.download_button(
             label="📤 Télécharger ma sauvegarde (.json)",
             data=data_json,
             file_name="sauvegarde_boite_outils.json",
             mime="application/json",
-            help="Cliquez ici à la fin de votre session pour enregistrer vos projets sur votre ordinateur."
+            help="Cliquez ici pour enregistrer vos projets sur votre ordinateur."
         )
-    else:
-        st.info("Créez un projet pour pouvoir l'exporter.")
-
-    st.divider()
+    except Exception as e:
+        st.error(f"Erreur lors de la préparation du fichier : {e}")
 
     # 3. IMPORTATION (RECHARGER)
     st.subheader("📥 Reprendre mon travail")
