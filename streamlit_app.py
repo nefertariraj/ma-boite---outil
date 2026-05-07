@@ -328,7 +328,7 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & FLUX CROISÉ (Mode Colonnes) ---
+       # --- 5. SIPOC & FLUX CROISÉ ÉPURÉ ---
     p_idx = st.session_state.get('current_project_idx')
 
     if p_idx is not None:
@@ -342,9 +342,7 @@ else:
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
 
-        with st.form(key=f"form_sipoc_grid_{p_idx}"):
-            st.info("Remplissez le tableau. Le flux horizontal se génère après validation.")
-            
+        with st.form(key=f"form_sipoc_minimal_{p_idx}"):
             df_init = pd.DataFrame(p["sipoc_data"])
             for col in COLONNES_SIPOC:
                 if col not in df_init.columns:
@@ -354,60 +352,53 @@ else:
                 df_init[COLONNES_SIPOC],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_grid_{p_idx}",
+                key=f"editor_sipoc_min_{p_idx}",
                 column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
             )
-            
-            submit_sipoc = st.form_submit_button("✅ Valider et Générer le Flux Horizontal")
+            submit_sipoc = st.form_submit_button("✅ Actualiser le flux")
 
         if submit_sipoc:
             p["sipoc_data"] = edited_sipoc.to_dict('records')
             st.rerun()
 
-        # --- AFFICHAGE DU FLUX HORIZONTAL (SWIMLANES) ---
         df_viz = pd.DataFrame(p["sipoc_data"])
-        # On nettoie les lignes vides
         df_viz = df_viz[(df_viz["Process"].astype(str).str.strip() != "") & 
                         (df_viz["Customer"].astype(str).str.strip() != "")]
         
         if not df_viz.empty:
             st.write("---")
-            st.write("### 📉 Flux par Acteur (Vue Horizontale)")
-            
-            # 1. Identifier tous les acteurs uniques pour créer les colonnes
             acteurs = df_viz["Customer"].unique().tolist()
-            nb_acteurs = len(acteurs)
+            cols = st.columns(len(acteurs))
             
-            # 2. Créer les colonnes Streamlit (une par acteur)
-            cols = st.columns(nb_acteurs)
-            
-            # Afficher les noms des acteurs en haut de chaque colonne
+            # En-têtes acteurs en petit
             for i, acteur in enumerate(acteurs):
-                cols[i].markdown(f"### 👤 {acteur.upper()}")
+                cols[i].markdown(f"**{acteur.upper()}**")
                 cols[i].divider()
 
-            # 3. Afficher les tâches ligne par ligne pour garder la chronologie
+            # Construction du flux tâche par tâche
             for idx, row in df_viz.iterrows():
-                # Trouver l'index de la colonne de l'acteur actuel
                 col_index = acteurs.index(row["Customer"])
                 
-                # Dans chaque colonne, on n'affiche que si c'est le tour de l'acteur
-                for i in range(nb_acteurs):
-                    if i == col_index:
-                        with cols[i]:
-                            # On crée un bloc visuel pour la tâche
-                            st.info(f"**Étape {idx + 1}**\n\n{row['Process']}")
-                            # On dessine une flèche vers le bas pour la suite
-                            st.markdown("<p style='text-align: center; margin:0;'>↓</p>", unsafe_allow_html=True)
-                    else:
-                        # On laisse un espace vide dans les autres colonnes pour garder la ligne
-                        with cols[i]:
+                for i in range(len(acteurs)):
+                    with cols[i]:
+                        if i == col_index:
+                            # Affichage de la tâche dans une boîte simple
+                            st.info(row["Process"])
+                            # Flèche de liaison verticale/diagonale symbolique
+                            if idx < len(df_viz) - 1:
+                                next_actor = df_viz.iloc[idx + 1]["Customer"]
+                                if next_actor == row["Customer"]:
+                                    st.markdown("<p style='text-align: center; margin:0;'>↓</p>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown("<p style='text-align: right; margin:0;'>↘</p>", unsafe_allow_html=True)
+                        else:
+                            # Espace vide pour maintenir l'alignement chronologique
                             st.write("") 
                             st.write("")
         else:
-            st.info("💡 Le flux s'affichera ici dès que les colonnes 'Process' et 'Customer' seront remplies.")
+            st.info("💡 Remplissez 'Process' et 'Customer' pour voir le flux.")
 
-        # --- 6. VOICE OF CUSTOMER (VOC) ---
+    # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
         st.subheader("6. Voice of Customer (VOC)")
         
