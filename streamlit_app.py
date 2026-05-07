@@ -333,18 +333,15 @@ st.divider()
 st.subheader("5. SIPOC & Flux de processus")
 
 # 1. Initialisation ROBUSTE des données
-# On vérifie si la clé existe, sinon on crée une ligne vide avec les bonnes colonnes
-if "sipoc_data" not in p or not p["sipoc_data"]:
+if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or not p["sipoc_data"]:
     p["sipoc_data"] = [
         {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
     ]
 
 # 2. Formulaire de saisie
-# Utilisation d'une clé unique basée sur l'index du projet (p_idx)
 with st.form(key=f"sipoc_form_v2_{p_idx}"):
     st.info("Saisissez les étapes. Le schéma respectera l'ordre vertical du tableau.")
     
-    # Configuration des colonnes pour s'assurer qu'elles s'affichent toujours
     column_config = {
         "Supplier": st.column_config.TextColumn("Fournisseur (Supplier)"),
         "Input": st.column_config.TextColumn("Entrée (Input)"),
@@ -358,69 +355,68 @@ with st.form(key=f"sipoc_form_v2_{p_idx}"):
         num_rows="dynamic",
         key=f"sipoc_editor_v2_{p_idx}",
         use_container_width=True,
-        column_config=column_config, # On force la config des colonnes
+        column_config=column_config,
         column_order=("Supplier", "Input", "Process", "Output", "Customer")
     )
     
     submit_sipoc = st.form_submit_button("✅ Valider et Générer le Flux")
 
-# 3. Traitement après validation
+# --- TRAITEMENT DE LA VALIDATION ---
 if submit_sipoc:
-    # On met à jour les données dans la session
     p["sipoc_data"] = edited_sipoc
     st.success("Données SIPOC enregistrées !")
-    # Un petit rerun peut aider à forcer l'affichage du schéma en dessous
-    st.rerun()
+    st.rerun() # On relance pour que le schéma en dessous se mette à jour
 
-        # 3. Génération du Schéma Cross-Functional Vertical
-        if p["sipoc_data"]:
-            def generate_vertical_swimlane(data):
-                # Configuration pour un flux vertical strict (Top-Bottom)
-                dot_code = """
-                digraph G {
-                    rankdir=TB;
-                    newrank=true; 
-                    nodesep=0.5;
-                    ranksep=0.4;
-                    node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
-                    edge [color="#2D3748", penwidth=1.5];
-                """
+# --- 3. GÉNÉRATION DU SCHÉMA (En dehors du bloc 'if submit') ---
+# Cela permet au schéma de rester affiché en permanence
+if p.get("sipoc_data"):
+    def generate_vertical_swimlane(data):
+        dot_code = """
+        digraph G {
+            rankdir=TB;
+            newrank=true; 
+            nodesep=0.5;
+            ranksep=0.4;
+            node [shape=rect, style=filled, fillcolor="#F9F9F9", fontname="Arial", fontsize="10"];
+            edge [color="#2D3748", penwidth=1.5];
+        """
+        
+        df = pd.DataFrame(data)
+        # On nettoie pour ne pas planter si des lignes sont vides
+        if not df.empty:
+            df = df.dropna(subset=['Process', 'Customer'])
+            df = df[(df['Process'] != "") & (df['Customer'] != "")]
+
+        if not df.empty:
+            actors = df['Customer'].unique()
+            
+            for i, actor in enumerate(actors):
+                dot_code += f'    subgraph cluster_{i} {{\n'
+                dot_code += f'        label = "{actor.upper()}";\n'
+                dot_code += f'        style=filled; color="#F1F5F9";\n'
+                dot_code += '        fontname="Arial-Bold"; fontsize="11";\n'
                 
-                df = pd.DataFrame(data)
-                df = df.dropna(subset=['Process', 'Customer'])
-                df = df[(df['Process'] != "") & (df['Customer'] != "")]
+                actor_steps = df[df['Customer'] == actor]
+                for idx, row in actor_steps.iterrows():
+                    dot_code += f'        "step_{idx}" [label="{row["Process"]}"];\n'
+                dot_code += '    }\n'
+            
+            indices = df.index.tolist()
+            for j in range(len(indices) - 1):
+                dot_code += f'    "step_{indices[j]}" -> "step_{indices[j+1]}";\n'
+        
+        dot_code += "}"
+        return dot_code
 
-                if not df.empty:
-                    actors = df['Customer'].unique()
-                    
-                    # Création des colonnes (Swimlanes)
-                    for i, actor in enumerate(actors):
-                        dot_code += f'    subgraph cluster_{i} {{\n'
-                        dot_code += f'        label = "{actor.upper()}";\n'
-                        dot_code += f'        style=filled; color="#F1F5F9";\n'
-                        dot_code += '        fontname="Arial-Bold"; fontsize="11";\n'
-                        
-                        actor_steps = df[df['Customer'] == actor]
-                        for idx, row in actor_steps.iterrows():
-                            # Chaque étape est un nœud
-                            dot_code += f'        "step_{idx}" [label="{row["Process"]}"];\n'
-                        dot_code += '    }\n'
-                    
-                    # Création des liens chronologiques verticaux
-                    # On relie l'étape N à l'étape N+1 selon l'ordre du tableau
-                    indices = df.index.tolist()
-                    for j in range(len(indices) - 1):
-                        dot_code += f'    "step_{indices[j]}" -> "step_{indices[j+1]}";\n'
-                
-                dot_code += "}"
-                return dot_code
-
-            try:
-                st.write("### Cross-Functional Flowchart")
-                chart_dot = generate_vertical_swimlane(p["sipoc_data"])
-                st.graphviz_chart(chart_dot)
-            except Exception:
-                st.info("Veuillez remplir au moins 'Process' et 'Customer' pour afficher le flux.")
+    try:
+        # Vérification qu'il y a du contenu avant de dessiner
+        df_check = pd.DataFrame(p["sipoc_data"])
+        if not df_check.empty and 'Process' in df_check.columns and not df_check['Process'].isna().all():
+            st.write("### Cross-Functional Flowchart")
+            chart_dot = generate_vertical_swimlane(p["sipoc_data"])
+            st.graphviz_chart(chart_dot)
+    except Exception as e:
+        st.info("Remplissez les colonnes 'Process' et 'Customer' pour générer le diagramme.")
             
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
