@@ -328,35 +328,32 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & Flowchart Cross-Functional ---
-# On récupère l'index du projet actuel pour éviter les erreurs NameError
+       # --- 5. SIPOC & Flowchart ---
 p_idx = st.session_state.get('current_project_idx')
 
 if p_idx is not None:
-    # On définit explicitement 'p' pour ce bloc
+    # CETTE LIGNE EST LA PLUS IMPORTANTE : elle définit 'p'
     p = st.session_state.projects[p_idx]
     
     st.divider()
     st.subheader("5. SIPOC & Flux de processus")
 
-    # 1. Initialisation ROBUSTE des données
-    # On crée la structure si elle n'existe pas ou si elle est vide
+    # Maintenant Python sait ce qu'est 'p', donc cette ligne ne plantera plus :
     if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or not p["sipoc_data"]:
         p["sipoc_data"] = [
             {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
         ]
 
-    # 2. Formulaire de saisie (Tableau)
+    # Le reste du formulaire
     with st.form(key=f"sipoc_form_final_{p_idx}"):
-        st.info("Saisissez les étapes ci-dessous. Le schéma se générera automatiquement après validation.")
+        st.info("Saisissez les étapes ci-dessous.")
         
-        # Configuration forcée des colonnes
         column_config = {
-            "Supplier": st.column_config.TextColumn("Fournisseur (Supplier)"),
-            "Input": st.column_config.TextColumn("Entrée (Input)"),
-            "Process": st.column_config.TextColumn("Processus (Process)"),
-            "Output": st.column_config.TextColumn("Sortie (Output)"),
-            "Customer": st.column_config.TextColumn("Client (Customer)"),
+            "Supplier": st.column_config.TextColumn("Fournisseur"),
+            "Input": st.column_config.TextColumn("Entrée"),
+            "Process": st.column_config.TextColumn("Processus"),
+            "Output": st.column_config.TextColumn("Sortie"),
+            "Customer": st.column_config.TextColumn("Client"),
         }
 
         edited_sipoc = st.data_editor(
@@ -369,6 +366,11 @@ if p_idx is not None:
         )
         
         submit_sipoc = st.form_submit_button("✅ Enregistrer et Générer le Schéma")
+
+    if submit_sipoc:
+        p["sipoc_data"] = edited_sipoc
+        st.success("Données SIPOC mises à jour !")
+        st.rerun()
 
     # 3. Traitement de la validation
     if submit_sipoc:
