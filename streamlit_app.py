@@ -53,39 +53,22 @@ with st.sidebar:
         st.success("Données synchronisées dans la session !")
         # Note : Pour une vraie sauvegarde persistante, il faudrait écrire dans un fichier JSON ou CSV.
 
-    # --- BOUTON TÉLÉCHARGER (EXCEL) ---
+    # --- BOUTON TÉLÉCHARGER (FORMAT CSV - SÉCURISÉ) ---
     if st.session_state.current_project_idx is not None:
         st.subheader("📥 Export du projet")
         p_to_export = st.session_state.projects[st.session_state.current_project_idx]
         
-        # Préparation du fichier Excel en mémoire
-        import io
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Feuille 1 : Infos Générales
-            info_df = pd.DataFrame([{"Projet": p_to_export['name'], "Statut": p_to_export['status'], "Problème": p_to_export.get('problem', '')}])
-            info_df.to_excel(writer, sheet_name='Général', index=False)
+        # On transforme le SIPOC en CSV pour l'export
+        if p_to_export.get('sipoc_data'):
+            df_export = pd.DataFrame(p_to_export['sipoc_data'])
+            csv = df_export.to_csv(index=False).encode('utf-8')
             
-            # Feuille 2 : SIPOC
-            if p_to_export.get('sipoc_data'):
-                pd.DataFrame(p_to_export['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
-            
-            # Feuille 3 : Stakeholders
-            if p_to_export.get('stakeholders'):
-                pd.DataFrame(p_to_export['stakeholders']).to_excel(writer, sheet_name='Parties Prenantes', index=False)
-
-        st.download_button(
-            label="📊 Télécharger en Excel",
-            data=output.getvalue(),
-            file_name=f"Projet_{p_to_export['name']}_{datetime.now().strftime('%d-%m-%Y')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    
-    st.divider()
-    if st.button("🚪 Déconnexion"):
-        st.session_state.authenticated = False
-        st.session_state.current_project_idx = None
-        st.rerun()
+            st.download_button(
+                label="📄 Télécharger SIPOC (CSV)",
+                data=csv,
+                file_name=f"SIPOC_{p_to_export['name']}.csv",
+                mime="text/csv",
+            )
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
