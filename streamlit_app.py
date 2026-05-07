@@ -337,16 +337,16 @@ else:
         st.divider()
         st.subheader("5. SIPOC & Flux de processus")
 
-        # Initialisation stricte avec les 5 colonnes demandées
-        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list) or len(p["sipoc_data"]) == 0:
+        # Initialisation forcée d'un dictionnaire avec les 5 colonnes exactes
+        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [
                 {"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}
             ]
 
-        with st.form(key=f"sipoc_form_v4_{p_idx}"):
-            st.info("Saisissez les données. Le schéma se génère après validation.")
+        with st.form(key=f"sipoc_form_v_finale_{p_idx}"):
+            st.info("Saisissez vos données ci-dessous (5 colonnes). Validez pour générer le schéma.")
             
-            # Définition précise des 5 colonnes
+            # Définition stricte des colonnes demandées
             edited_sipoc = st.data_editor(
                 p["sipoc_data"],
                 column_config={
@@ -358,7 +358,7 @@ else:
                 },
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_v4_{p_idx}", # Nouvelle clé pour forcer la mise à jour
+                key=f"editor_sipoc_v_finale_{p_idx}", 
                 column_order=("Supplier", "Input", "Process", "Output", "Customer")
             )
             
@@ -369,14 +369,15 @@ else:
             st.success("Données SIPOC enregistrées !")
             st.rerun()
 
-        # --- Génération du Schéma ---
+        # --- Partie Schéma (Graphviz) ---
         df_sipoc = pd.DataFrame(p["sipoc_data"])
         
         if not df_sipoc.empty and 'Process' in df_sipoc.columns and 'Customer' in df_sipoc.columns:
+            # Filtrer les lignes vides pour le dessin
             df_viz = df_sipoc[(df_sipoc['Process'] != "") & (df_sipoc['Customer'] != "")]
 
             if not df_viz.empty:
-                st.write("### 📉 Aperçu du Flux (Cross-Functional)")
+                st.write("### 📉 Cross-Functional Flowchart")
                 
                 def make_dot(data):
                     dot = "digraph G { rankdir=TB; newrank=true; "
