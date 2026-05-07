@@ -422,8 +422,8 @@ if p_idx is not None:
                 st.error(f"Erreur de rendu graphique : {e}")
         else:
             st.info("Remplissez les colonnes 'Processus' et 'Client' pour voir le schéma.")
-else:
-    st.warning("Sélectionnez un projet pour voir le SIPOC.")
+        else:
+        st.warning("Sélectionnez un projet pour voir le SIPOC.")
             
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
