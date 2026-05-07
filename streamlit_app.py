@@ -329,9 +329,9 @@ else:
             st.success("Analyse sauvegardée !")
 
        # --- 5. SIPOC & Flowchart ---
-p_idx = st.session_state.get('current_project_idx')
+    p_idx = st.session_state.get('current_project_idx')
 
-if p_idx is not None:
+    if p_idx is not None:
     # CETTE LIGNE EST LA PLUS IMPORTANTE : elle définit 'p'
     p = st.session_state.projects[p_idx]
     
