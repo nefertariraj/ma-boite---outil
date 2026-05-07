@@ -342,7 +342,7 @@ else:
         if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
             p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
 
-        with st.form(key=f"form_sipoc_fixed_{p_idx}"):
+        with st.form(key=f"form_sipoc_final_v5_{p_idx}"):
             st.info("Saisissez vos étapes. Cliquez sur le bouton pour générer le flowchart.")
             
             df_init = pd.DataFrame(p["sipoc_data"])
@@ -354,23 +354,22 @@ else:
                 df_init[COLONNES_SIPOC],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_sipoc_fixed_{p_idx}",
+                key=f"editor_sipoc_final_v5_{p_idx}",
                 column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
             )
             
             submit_sipoc = st.form_submit_button("✅ Valider et Générer le Schéma")
 
         if submit_sipoc:
-            # Mise à jour immédiate des données dans le projet
             p["sipoc_data"] = edited_sipoc.to_dict('records')
-            st.rerun() # Force le re-chargement pour que le schéma lise les nouvelles données
+            st.rerun()
 
-        # On dessine le schéma à l'extérieur du bloc 'if submit_sipoc' pour qu'il soit permanent
         df_viz = pd.DataFrame(p["sipoc_data"])
         
         if not df_viz.empty and "Process" in df_viz.columns and "Customer" in df_viz.columns:
-            # Nettoyage des lignes vides
-            df_viz = df_viz[(df_viz["Process"].str.strip() != "") & (df_viz["Customer"].str.strip() != "")]
+            # Filtrage des lignes valides
+            df_viz = df_viz[(df_viz["Process"].astype(str).str.strip() != "") & 
+                            (df_viz["Customer"].astype(str).str.strip() != "")]
             
             if not df_viz.empty:
                 st.write("---")
@@ -381,22 +380,33 @@ else:
                     dot += "node [shape=rect, style=filled, fillcolor='#F9F9F9', fontname='Arial', fontsize='10']; "
                     dot += "edge [color='#2D3748', penwidth=1.5]; "
                     
+                    # Groupement par Acteur (Swimlanes)
                     for i, actor in enumerate(data['Customer'].unique()):
-                        dot += f'subgraph cluster_{i} {{ label="{actor.upper()}"; style=filled; color="#F1F5F9"; fontname="Arial-Bold"; '
+                        sanitized_actor = str(actor).replace('"', "'")
+                        dot += f'subgraph cluster_{i} {{ label="{sanitized_actor.upper()}"; style=filled; color="#F1F5F9"; fontname="Arial-Bold"; '
                         subset = data[data['Customer'] == actor]
                         for idx, row in subset.iterrows():
-                            dot += f'"step_{idx}" [label="{row["Process"]}"]; '
+                            label = str(row["Process"]).replace('"', "'")
+                            dot += f'"step_{idx}" [label="{label}"]; '
                         dot += '} '
                     
+                    # Liens chronologiques
                     indices = data.index.tolist()
                     for j in range(len(indices) - 1):
                         dot += f'"step_{indices[j]}" -> "step_{indices[j+1]}"; '
                     dot += "}"
                     return dot
 
-                st.graphviz_chart(build_dot(df_viz))
+                try:
+                    dot_code = build_dot(df_viz)
+                    # Tentative d'affichage
+                    st.graphviz_chart(dot_code)
+                except Exception as e:
+                    st.error(f"Erreur technique de rendu : {e}")
+                    st.write("Le moteur Graphviz n'est peut-être pas installé sur votre système. Voici le code généré :")
+                    st.code(dot_code)
             else:
-                st.info("💡 Le schéma s'affichera ici dès que vous aurez rempli les colonnes 'Process' et 'Customer'.")
+                st.info("💡 Le schéma s'affichera ici dès que les colonnes 'Process' et 'Customer' seront remplies.")
 
         # --- 6. VOICE OF CUSTOMER (VOC) ---
         st.divider()
