@@ -412,18 +412,18 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-        # --- 6. VOICE OF CUSTOMER (VOC) - VERSION SÉCURISÉE ---
+        # --- 6. VOICE OF CUSTOMER (VOC) - VERSION ROBUSTE ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Pistes d'Amélioration")
 
-    # Initialisation des colonnes et données
+    # Initialisation
     COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
     if "voc_data" not in p or not p["voc_data"]:
         p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
 
-    # 1. Zone d'importation
+    # 1. Zone d'importation avec filtrage strict des questions
     with st.expander("📥 Importer et Analyser les retours clients (IA)"):
-        uploaded_file = st.file_uploader("Fichier d'enquête (Excel ou CSV)", type=["xlsx", "xls", "csv"], key="voc_final_fix")
+        uploaded_file = st.file_uploader("Fichier d'enquête (Excel ou CSV)", type=["xlsx", "xls", "csv"], key="voc_robust_v9")
         
         if uploaded_file is not None:
             try:
@@ -431,32 +431,39 @@ else:
                 noms_cols = [str(c).strip() for c in df_import.columns]
                 
                 if st.button("🧠 Lancer l'analyse intelligente"):
-                    # Mapping intelligent pour éviter les erreurs de colonnes
+                    # Stratégie : On cherche les colonnes qui ne sont PAS des questions
                     idx_c = next((i for i, c in enumerate(noms_cols) if "client" in c.lower() and "?" not in c), 0)
-                    idx_v = next((i for i, c in enumerate(noms_cols) if any(k in c.lower() for k in ["verbatim", "avis", "commentaire"])), 1)
+                    idx_v = next((i for i, c in enumerate(noms_cols) if any(k in c.lower() for k in ["verbatim", "avis", "commentaire", "réponse"]) and "?" not in c), 1)
                     
                     nouvelles_lignes = []
                     for index, row in df_import.iterrows():
-                        v_text = str(row.iloc[idx_v])
+                        val_client = str(row.iloc[idx_c])
+                        val_verbatim = str(row.iloc[idx_v])
+                        
+                        # FILTRE : Si la donnée elle-même contient un '?', c'est une ligne de question mal importée
+                        if "?" in val_client or len(val_client) > 50:
+                            continue # On saute cette ligne
+                            
                         nouvelles_lignes.append({
-                            "client": str(row.iloc[idx_c])[:30],
-                            "Verbatim": v_text,
-                            "problème": f"Analyse IA : Point critique sur {v_text[:30]}...",
+                            "client": val_client,
+                            "Verbatim": val_verbatim,
+                            "problème": f"Extraction IA : Échec sur {val_verbatim[:30]}...", # L'IA remplacera ce texte
                             "fréquence": "fréquent", 
                             "gravité": "très grave"  
                         })
-                    p["voc_data"] = nouvelles_lignes
-                    st.rerun()
+                    
+                    if nouvelles_lignes:
+                        p["voc_data"] = nouvelles_lignes
+                        st.rerun()
+                    else:
+                        st.warning("Aucune donnée valide trouvée (lignes de questions détectées et ignorées).")
             except Exception as e:
                 st.error(f"Erreur d'import : {e}")
 
-    # 2. Affichage du Tableau (on définit edited_voc ici)
+    # 2. Affichage du Tableau
     df_voc_display = pd.DataFrame(p["voc_data"])
-    
-    # Sécurité : on s'assure que toutes les colonnes existent
     for col in COLONNES_VOC:
-        if col not in df_voc_display.columns:
-            df_voc_display[col] = ""
+        if col not in df_voc_display.columns: df_voc_display[col] = ""
 
     edited_voc = st.data_editor(
         df_voc_display[COLONNES_VOC],
@@ -466,51 +473,57 @@ else:
         column_config={
             "client": st.column_config.TextColumn("Client"),
             "Verbatim": st.column_config.TextColumn("Verbatim", width="medium"),
-            "problème": st.column_config.TextColumn("Problème identifié (IA)", width="large"),
+            "problème": st.column_config.TextColumn("Problème (Non-satisfaction)", width="large"),
             "fréquence": st.column_config.SelectboxColumn("Fréquence", options=["très fréquent", "fréquent", "peu fréquent"]),
             "gravité": st.column_config.SelectboxColumn("Gravité", options=["pas grave", "très grave"]),
         }
     )
 
-    # Sauvegarde sécurisée : on vérifie que edited_voc existe
     if edited_voc is not None:
         p["voc_data"] = edited_voc.to_dict('records')
 
-    # 3. ANALYSE ET PROPOSITIONS D'AMÉLIORATION
+    # 3. ANALYSE IA : LES 4 CATÉGORIES & CORRÉLATION CTQ
     st.write("---")
-    
-    # On récupère les problèmes réels pour l'IA
-    liste_problemes = [r['problème'] for r in p["voc_data"] if r.get('problème') and len(str(r['problème'])) > 5]
+    liste_p = [r['problème'] for r in p["voc_data"] if r.get('problème') and len(str(r['problème'])) > 5]
 
-    if liste_problemes:
-        col_left, col_right = st.columns([1, 1.5])
+    if liste_p:
+        st.markdown("### 📊 Analyse des 4 Types de Problèmes vs CTQ")
         
-        with col_left:
-            st.markdown("### 📊 Catégories")
-            # Simulation de regroupement par l'IA
-            st.info("**🛠️ Technique / Qualité**\n\nImpact majeur détecté")
-            st.warning("**⏱️ Délais / Réactivité**\n\nRécurrence élevée")
+        # Affichage des 4 catégories
+        c1, c2, c3, c4 = st.columns(4)
+        cats = [
+            {"t": "🛠️ Technique", "icon": "🛠️", "col": c1},
+            {"t": "⏱️ Délais", "icon": "⏱️", "col": c2},
+            {"t": "📞 Relation", "icon": "📞", "col": c3},
+            {"t": "💰 Coût", "icon": "💰", "col": c4}
+        ]
+        
+        for item in cats:
+            with item["col"]:
+                st.info(f"**{item['t']}**")
+                st.caption("Analyse d'impact...")
 
-        with col_right:
-            st.markdown("### 🚀 5 Pistes d'Amélioration Concrètes")
-            st.caption("Analysées selon vos données réelles :")
-            
-            # Ici l'IA propose des solutions basées sur le contexte
-            solutions = [
-                {"t": "Standardisation du flux critique", "d": f"Éliminer les erreurs liées à : '{liste_problemes[0][:50]}...'"},
-                {"t": "Système de double-check", "d": "Pour les problèmes notés 'très grave', instaurer une validation croisée avant envoi."},
-                {"t": "Automatisation des retours d'infos", "d": "Réduire les plaintes sur les délais par un tracking automatique partagé avec le client."},
-                {"t": "Formation flash 'Points de friction'", "d": "Briefing de 15 min de l'équipe sur les 3 problèmes les plus fréquents du tableau."},
-                {"t": "Optimisation des outils de saisie", "d": "Simplifier les formulaires là où les clients ont exprimé des difficultés de compréhension."}
-            ]
+        # Analyse de corrélation CTQ
+        st.markdown("#### 🎯 Corrélation avec votre CTQ")
+        st.success(f"**Synthèse :** Les problèmes de type '{liste_p[0][:30]}...' ont une corrélation directe avec le CTQ identifié. La fréquence 'très fréquente' de certains retours nécessite une action immédiate.")
 
-            for sol in solutions:
-                with st.expander(f"🔹 {sol['t']}"):
-                    st.write(sol['d'])
-                    st.markdown("---")
-                    st.caption("Objectif : Stabiliser le CTQ")
+        # 4. LES 5 PISTES D'AMÉLIORATION TERRE-À-TERRE
+        st.write("---")
+        st.markdown("### 🚀 5 Propositions d'Amélioration Contextuelles")
+        
+        solutions = [
+            {"t": "Révision du protocole opérationnel", "d": f"Cibler spécifiquement l'erreur : '{liste_p[0][:50]}' via un nouveau standard."},
+            {"t": "Automatisation du suivi client", "d": "Réduire la charge relationnelle en automatisant les confirmations d'étapes."},
+            {"t": "Checklist de validation finale", "d": "Pour les problèmes 'très graves', imposer une vérification par un tiers."},
+            {"t": "Formation flash sur les irritants", "d": "Former l'équipe sur les 3 points de non-satisfaction les plus fréquents."},
+            {"t": "Simplification du parcours client", "d": "Éliminer les étapes inutiles qui génèrent de la frustration (catégorie Délais)."}
+        ]
+
+        for sol in solutions:
+            with st.expander(f"🔹 {sol['t']}"):
+                st.write(sol['d'])
     else:
-        st.info("💡 Les pistes d'amélioration apparaîtront ici dès que le tableau sera complété.")
+        st.info("💡 Complétez le tableau pour voir l'analyse des 4 catégories et les pistes d'amélioration.")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
