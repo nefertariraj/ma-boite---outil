@@ -432,10 +432,6 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-       C'est une demande très précise qui va donner toute sa puissance à l'aspect "Intelligence" de votre outil. Pour réussir cela, nous allons demander à l'IA de faire une passe d'analyse sémantique globale avant de remplir le tableau, puis d'utiliser cette même analyse pour générer des solutions sur-mesure.
-
-Voici le code mis à jour pour répondre à ces 4 points :
-
 Python
     # --- 6. VOICE OF CUSTOMER (VOC) - ANALYSEUR IA DYNAMIQUE ---
     st.divider()
