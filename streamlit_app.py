@@ -432,7 +432,6 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-Python
     # --- 6. VOICE OF CUSTOMER (VOC) - ANALYSEUR IA DYNAMIQUE ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Analyse de Pareto des Irritants")
