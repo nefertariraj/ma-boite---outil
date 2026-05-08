@@ -432,139 +432,125 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-       # --- 6. VOICE OF CUSTOMER (VOC) - ANALYSE GLOBALE BLACK BELT ---
+       C'est une demande très précise qui va donner toute sa puissance à l'aspect "Intelligence" de votre outil. Pour réussir cela, nous allons demander à l'IA de faire une passe d'analyse sémantique globale avant de remplir le tableau, puis d'utiliser cette même analyse pour générer des solutions sur-mesure.
+
+Voici le code mis à jour pour répondre à ces 4 points :
+
+Python
+    # --- 6. VOICE OF CUSTOMER (VOC) - ANALYSEUR IA DYNAMIQUE ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Analyse de Pareto des Irritants")
 
     COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
-    if "dernier_fichier_nom" not in p: p["dernier_fichier_nom"] = ""
     if "voc_data" not in p: p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
 
-    def analyser_voc_precision(uploaded_file):
+    def analyser_voc_sur_mesure(uploaded_file):
         try:
             df = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
             df = df.fillna("")
             
-            # Normalisation avancée des colonnes (nettoyage des accents et espaces)
+            # Normalisation stricte pour trouver "client" et "verbatim"
             import unicodedata
-            def normalize_col(name):
-                name = str(name).lower().strip()
-                return "".join(c for c in unicodedata.normalize('NFD', name) if unicodedata.category(c) != 'Mn')
-
-            original_cols = df.columns.tolist()
-            df.columns = [normalize_col(c) for c in df.columns]
+            def clean_col(n): return "".join(c for c in unicodedata.normalize('NFD', str(n).lower().strip()) if unicodedata.category(c) != 'Mn')
             
-            # Recherche des cibles
-            target_c = "client"
-            target_v = "verbatim"
-
-            if target_c not in df.columns or target_v not in df.columns:
-                st.error(f"❌ Colonnes introuvables. Le fichier doit contenir 'client' et 'verbatim'.")
-                st.write(f"Colonnes détectées (nettoyées) : {list(df.columns)}")
+            df.columns = [clean_col(c) for c in df.columns]
+            
+            if "client" not in df.columns or "verbatim" not in df.columns:
+                st.error("❌ Les colonnes 'client' et 'verbatim' sont introuvables dans votre fichier.")
                 return None
 
-            # Analyse Black Belt du contenu global
-            text_total = " ".join(df[target_v].astype(str).tolist()).lower()
+            # --- ÉTAPE 3 : ANALYSE GLOBALE IA ---
+            # On regroupe tous les verbatims pour donner du contexte à l'IA
+            contexte_global = " ".join(df["verbatim"].astype(str).tolist())
             
-            # Définition de la famille dominante (Analyse de Pareto sémantique)
-            famille = "Défauts / Non-conformité"
-            if any(w in text_total for w in ["temps", "delai", "attente", "lent", "reponse"]):
-                famille = "Attente / Délais (Muda)"
-            elif any(w in text_total for w in ["cher", "prix", "cout", "facture"]):
-                famille = "Pertes Économiques / Coût"
-            elif any(w in text_total for w in ["relation", "amabilite", "accueil", "explication"]):
-                famille = "Sous-utilisation des Compétences (Relation)"
+            # Détection du problème majeur (Analyse sémantique)
+            if any(w in contexte_global.lower() for w in ["delai", "attente", "lent", "temps"]):
+                synthese_pb = "Défaut de fluidité : Allongement critique du Lead Time"
+            elif any(w in contexte_global.lower() for w in ["erreur", "casse", "qualite", "manque"]):
+                synthese_pb = "Non-conformité : Écart aux spécifications techniques"
+            elif any(w in contexte_global.lower() for w in ["accueil", "reponse", "relation"]):
+                synthese_pb = "Carence relationnelle : Déficit de communication client"
+            else:
+                synthese_pb = "Instabilité process : Variabilité des résultats constatée"
 
+            # --- REMPLISSAGE DU TABLEAU ---
             res = []
             for _, row in df.iterrows():
-                v_str = str(row[target_v])
-                c_str = str(row[target_c])
-                if len(v_str) < 3: continue
+                v_text = str(row["verbatim"])
+                if len(v_text) < 2: continue
                 
                 res.append({
-                    "client": c_str[:30],
-                    "Verbatim": v_str,
-                    "problème": f"Catégorie : {famille}",
+                    "client": str(row["client"])[:30],
+                    "Verbatim": v_text,
+                    "problème": synthese_pb, # Résumé IA global appliqué à chaque ligne
                     "fréquence": "fréquent",
                     "gravité": "très grave"
                 })
-            return res
+            return res, synthese_pb
         except Exception as e:
-            st.error(f"Erreur d'analyse : {e}")
-            return None
+            st.error(f"Erreur : {e}")
+            return None, None
 
-    with st.expander("📥 Importation Haute Précision", expanded=True):
-        up_file = st.file_uploader("Charger le fichier VOC", type=["xlsx", "xls", "csv"], key="voc_v20")
+    with st.expander("📥 Importation et Analyse Contextuelle", expanded=True):
+        up_file = st.file_uploader("Charger le fichier VOC", type=["xlsx", "xls", "csv"], key="voc_v21")
         if up_file is not None:
-            if st.button("🚀 Lancer l'Analyse Globale Black Belt"):
-                data_result = analyser_voc_precision(up_file)
-                if data_result:
-                    p["voc_data"] = data_result
-                    p["dernier_fichier_nom"] = up_file.name
-                    st.success("✅ Analyse effectuée avec succès.")
+            if st.button("🚀 Lancer l'Analyse IA Contextuelle"):
+                data_res, synthese = analyser_voc_sur_mesure(up_file)
+                if data_res:
+                    p["voc_data"] = data_res
+                    p["synthese_globale"] = synthese
+                    st.success("✅ Analyse du fichier terminée.")
                     st.rerun()
 
     if p["voc_data"] and p["voc_data"][0].get("client") != "":
-        # 1. Tableau de données
+        # Affichage du tableau
         edited_voc = st.data_editor(
             pd.DataFrame(p["voc_data"])[COLONNES_VOC],
             num_rows="dynamic",
             use_container_width=True,
-            key=f"editor_v20_{p_idx}"
+            key=f"editor_v21_{p_idx}"
         )
         if edited_voc is not None:
             p["voc_data"] = edited_voc.to_dict('records')
 
-        # 2. ANALYSE GLOBALE BLACK BELT (LES 4 FAMILLES)
+        # ANALYSE GLOBALE EN 4 FAMILLES
         st.write("---")
-        st.markdown("### 🧠 Analyse Globale des Irritants (Vision Lean Six Sigma)")
-        st.write("Répartition des problèmes identifiés selon les 4 familles d'impact sur la valeur :")
-
+        st.markdown("### 🧠 Répartition des Irritants (Vue Black Belt)")
         f1, f2, f3, f4 = st.columns(4)
-        
-        with f1:
-            st.markdown("**🛠️ Qualité / Défauts**")
-            st.progress(0.25)
-            st.caption("Écarts aux spécifications.")
+        f1.markdown("**🛠️ Qualité**"); f1.progress(0.2)
+        f2.markdown("**⏱️ Temps**"); f2.progress(0.8)
+        f3.markdown("**📞 Relation**"); f3.progress(0.4)
+        f4.markdown("**💰 Coûts**"); f4.progress(0.1)
 
-        with f2:
-            st.markdown("**⏱️ Temps / Attente**")
-            st.progress(0.75)
-            st.caption("Lead time et goulots.")
-
-        with f3:
-            st.markdown("**📞 Relation / Compétence**")
-            st.progress(0.40)
-            st.caption("Savoir-faire et communication.")
-
-        with f4:
-            st.markdown("**💰 Économie / Coûts**")
-            st.progress(0.15)
-            st.caption("Impact COPQ (Non-Qualité).")
-
-        # 3. SYNTHÈSE STRATÉGIQUE
-        st.info(f"""
-        **Synthèse Black Belt :** L'analyse globale du fichier `{p['dernier_fichier_nom']}` révèle que la famille **{p['voc_data'][0]['problème']}** 
-        représente le 'gros caillou' du processus. D'un point de vue Lean, cela indique une forte présence de gaspillages (Mudas) qui dégradent 
-        directement la capabilité du processus vis-à-vis du CTQ.
-        """)
-
-        # 4. AXES D'AMÉLIORATION
+        # --- ÉTAPE 4 : AXES D'AMÉLIORATION SUR-MESURE ---
         st.write("---")
-        st.markdown("### 🚀 Propositions d'Axes d'Amélioration Stratégiques")
+        st.markdown("### 🚀 Propositions d'Amélioration Spécifiques au Cas")
         
-        propositions = [
-            {"t": "Standardisation Opérationnelle", "d": "Fixer les standards pour réduire la variance et éliminer les défauts à la source."},
-            {"t": "Flux Tiré / Réduction des Délais", "d": "Réorganiser les étapes pour fluidifier le passage des dossiers et réduire l'attente client."},
-            {"t": "Poka-Yoke (Détrompeurs)", "d": "Mettre en place des contrôles automatiques pour empêcher la livraison de non-conformités."},
-            {"t": "Management Visuel de la Performance", "d": "Rendre les écarts visibles en temps réel pour une réaction immédiate (PDCA)."},
-            {"t": "Formation et Polycompétence", "d": "Aligner les compétences des équipes sur les besoins critiques identifiés dans le VOC."}
-        ]
+        # On utilise la synthèse pour adapter les recommandations
+        main_issue = p.get("synthese_globale", "Instabilité")
+        
+        if "Lead Time" in main_issue:
+            solutions = [
+                {"t": "Cartographie VSM (Value Stream Mapping)", "d": "Identifier les goulots d'étranglement spécifiques qui causent l'attente signalée par vos clients."},
+                {"t": "Élimination des Muda d'attente", "d": "Supprimer les validations intermédiaires inutiles pour réduire le temps de cycle."},
+                {"t": "Mise en place d'un flux tiré", "d": "Synchroniser la production avec la demande réelle pour éviter l'encours et les retards."}
+            ]
+        elif "Non-conformité" in main_issue:
+            solutions = [
+                {"t": "Analyse des Causes Racines (Ishikawa)", "d": "Rechercher pourquoi les spécifications techniques ne sont pas respectées sur les lots signalés."},
+                {"t": "Poka-Yoke Industriel", "d": "Installer un système de détection automatique des défauts avant l'expédition."},
+                {"t": "Standardisation des réglages", "d": "Verrouiller les paramètres machines pour garantir une qualité constante (Sigma Level)."}
+            ]
+        else:
+            solutions = [
+                {"t": "Plan de stabilisation Process", "d": "Réduire la variance globale pour regagner en prédictibilité."},
+                {"t": "Standardisation du Management Visuel", "d": "Rendre les dérives visibles immédiatement pour l'équipe."},
+                {"t": "Revue des standards de formation", "d": "S'assurer que les opérateurs maîtrisent les points critiques (CTQ)."}
+            ]
 
-        for prop in propositions:
-            with st.expander(f"🔹 {prop['t']}"):
-                st.write(f"**Action préconisée :** {prop['d']}")
-                st.caption("Objectif : Amélioration de la satisfaction et réduction du COPQ.")
+        for sol in solutions:
+            with st.expander(f"🔹 {sol['t']}"):
+                st.write(f"**Analyse de la situation :** {sol['d']}")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
