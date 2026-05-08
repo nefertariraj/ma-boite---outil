@@ -432,145 +432,132 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-    # --- 6. VOICE OF CUSTOMER (VOC) - MOTEUR D'ANALYSE BLACK BELT ---
+    # --- 6. VOICE OF CUSTOMER (VOC) : ANALYSEUR EXPERT BLACK BELT ---
     st.divider()
-    st.subheader("6. Voice of Customer (VOC) : Analyse de la Variabilité & CTQ")
+    st.subheader("6. Voice of Customer (VOC) & Analyse des Sources de Variabilité")
 
-    # Initialisation de la structure de données Lean
+    # Initialisation des états
     if "voc_data" not in p: 
         p["voc_data"] = []
-    if "stats_qcd" not in p:
-        p["stats_qcd"] = {"Qualité": 0, "Délais": 0, "Coûts": 0, "Relation": 0}
+    if "top_issue" not in p:
+        p["top_issue"] = "Stabilité"
 
-    def moteur_analyse_lean(uploaded_file):
+    def moteur_analyse_expert(uploaded_file):
         try:
-            # Importation robuste
+            # Chargement
             df = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
             df = df.fillna("")
             
-            # Normalisation stricte des colonnes
-            df.columns = [str(c).lower().strip() for c in df.columns]
-            col_v = next((c for c in df.columns if any(k in c for k in ["verbatim", "avis", "commentaire", "texte"])), None)
-            col_c = next((c for c in df.columns if "client" in c), None)
+            # Détection des colonnes clés
+            cols = [str(c).lower() for c in df.columns]
+            idx_v = next((i for i, c in enumerate(cols) if any(k in c for k in ["verbatim", "avis", "commentaire", "texte"])), None)
+            idx_c = next((i for i, c in enumerate(cols) if "client" in c), None)
 
-            if not col_v:
-                st.error("❌ Erreur de structure : Je ne trouve pas de colonne 'Verbatim' ou 'Avis'.")
-                return None, None
+            if idx_v is None:
+                st.error("❌ Impossible de trouver la colonne 'Verbatim'.")
+                return None
 
             resultats = []
-            qcd_scores = {"Qualité": 0, "Délais": 0, "Coûts": 0, "Relation": 0}
+            stats = {"QUALITÉ": 0, "DÉLAIS": 0, "COÛTS": 0, "RELATION": 0}
 
             for _, row in df.iterrows():
-                v = str(row[col_v]).lower()
-                client = str(row[col_c]) if col_c else "Client Inconnu"
+                v = str(row.iloc[idx_v]).lower()
+                client = str(row.iloc[idx_c]) if idx_c is not None else "Anonyme"
                 
-                # --- LOGIQUE DE CATÉGORISATION LEAN (Moteur de Règles) ---
-                if any(w in v for w in ["lent", "attente", "reçu", "long", "delai", "retard", "planning", "pas encore"]):
-                    cat = "DÉLAIS (Lead Time)"
-                    qcd_scores["Délais"] += 1
-                    source = "Muda (Gaspillage de temps)"
-                elif any(w in v for w in ["erreur", "casse", "trompé", "manque", "mauvais", "qualite", "panne", "defectueux"]):
-                    cat = "QUALITÉ (Non-Conformité)"
-                    qcd_scores["Qualité"] += 1
-                    source = "Mura (Variabilité Process)"
-                elif any(w in v for w in ["cher", "prix", "rembourse", "facture", "argent", "cout", "budget"]):
-                    cat = "COÛTS (Efficience)"
-                    qcd_scores["Coûts"] += 1
-                    source = "Non-Valeur Ajoutée"
+                # --- LOGIQUE DE CATÉGORISATION BLACK BELT ---
+                # On définit la catégorie, la source de non-valeur (Muda) et l'action corrective associée
+                if any(w in v for w in ["lent", "attente", "long", "delai", "retard", "planning"]):
+                    cat, muda, action = "DÉLAIS", "Attente / Lead Time", "Réduction du cycle (VSM)"
+                    stats["DÉLAIS"] += 1
+                elif any(w in v for w in ["erreur", "casse", "trompe", "mauvais", "qualite", "panne", "defectueux"]):
+                    cat, muda, action = "QUALITÉ", "Défauts / Retouches", "Poka-Yoke / Ishikawa"
+                    stats["QUALITÉ"] += 1
+                elif any(w in v for w in ["cher", "prix", "facture", "argent", "cout"]):
+                    cat, muda, action = "COÛTS", "Sur-Qualité / Perte", "Analyse de la Valeur"
+                    stats["COÛTS"] += 1
                 else:
-                    cat = "RELATION (Expérience)"
-                    qcd_scores["Relation"] += 1
-                    source = "Attentes Soft-Skills"
+                    cat, muda, action = "RELATION", "Sous-utilisation compétences", "Standardisation Service"
+                    stats["RELATION"] += 1
 
-                # --- ANALYSE DE L'IMPACT CTQ (Critical To Quality) ---
-                if any(w in v for w in ["partir", "resilier", "jamais", "honte", "scandale", "rembourse", "dgccrf"]):
-                    impact = "5 - CRITIQUE (Risque Business)"
-                elif any(w in v for w in ["difficile", "dommage", "déçu", "mieux", "problème"]):
-                    impact = "3 - MAJEUR (Signal Faible)"
-                else:
-                    impact = "1 - MINEUR (Confort)"
+                # Calcul de la sévérité CTQ (Critical To Quality)
+                sev = "Critique" if any(w in v for w in ["jamais", "honte", "scandale", "resilier", "rembourse"]) else "Majeur"
 
                 resultats.append({
                     "Client": client,
-                    "Verbatim Original": str(row[col_v]),
+                    "Verbatim Client": str(row.iloc[idx_v])[:100],
                     "Catégorie QCD": cat,
-                    "Impact CTQ": impact,
-                    "Source de Variabilité": source
+                    "Type de Muda": muda,
+                    "Impact CTQ": sev,
+                    "Levier Correctif": action
                 })
             
-            return resultats, qcd_scores
+            top_problem = max(stats, key=stats.get)
+            return resultats, top_problem, stats
         except Exception as e:
-            st.error(f"Erreur lors du traitement du fichier : {e}")
-            return None, None
+            st.error(f"Erreur d'analyse : {e}")
+            return None, None, None
 
-    # Interface Utilisateur
-    with st.expander("📥 Importation des données brutes (Excel/CSV)", expanded=True):
-        up_file = st.file_uploader("Fichier VOC", type=["xlsx", "xls", "csv"], key="voc_expert_upload")
-        if up_file and st.button("📊 Lancer l'Analyse Black Belt"):
-            res, scores = moteur_analyse_lean(up_file)
-            if res:
-                p["voc_data"] = res
-                p["stats_qcd"] = scores
-                st.success("✅ Analyse terminée. Les données ont été catégorisées par axe de performance.")
+    # UI : IMPORTATION
+    with st.expander("📥 Importation des données VOC", expanded=True):
+        up_file = st.file_uploader("Fichier Excel/CSV", type=["xlsx", "xls", "csv"], key="voc_final_v3")
+        if up_file and st.button("🚀 Lancer l'Analyse Lean Six Sigma"):
+            data, top, s = moteur_analyse_expert(up_file)
+            if data:
+                p["voc_data"] = data
+                p["top_issue"] = top
+                p["stats_qcd"] = s
+                st.success(f"✅ Analyse terminée. Problème dominant détecté : {top}")
                 st.rerun()
 
-    # Affichage du Dashboard de Pilotage
+    # AFFICHAGE DES RÉSULTATS
     if p["voc_data"]:
-        st.markdown("### 🎯 Dashboard de Performance Process")
-        
-        # Calcul des ratios pour les jauges
-        sc = p["stats_qcd"]
+        # 1. Dashboard de Pilotage
+        st.markdown("### 📊 Répartition des Irritants (Vue Pareto)")
+        sc = p.get("stats_qcd", {"QUALITÉ": 0, "DÉLAIS": 0, "COÛTS": 0, "RELATION": 0})
         total = sum(sc.values()) or 1
         
         c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.metric("🎯 Qualité", f"{int(sc['Qualité']/total*100)}%", delta=f"{sc['Qualité']} cas")
-            st.progress(sc['Qualité']/total)
-        with c2:
-            st.metric("⏱️ Délais", f"{int(sc['Délais']/total*100)}%", delta=f"{sc['Délais']} cas")
-            st.progress(sc['Délais']/total)
-        with c3:
-            st.metric("🤝 Relation", f"{int(sc['Relation']/total*100)}%", delta=f"{sc['Relation']} cas")
-            st.progress(sc['Relation']/total)
-        with c4:
-            st.metric("💰 Efficience", f"{int(sc['Coûts']/total*100)}%", delta=f"{sc['Coûts']} cas")
-            st.progress(sc['Coûts']/total)
+        c1.metric("🛠️ Qualité", f"{int(sc['QUALITÉ']/total*100)}%", delta="Non-conformités")
+        c2.metric("⏱️ Délais", f"{int(sc['DÉLAIS']/total*100)}%", delta="Lead Time")
+        c3.metric("📞 Relation", f"{int(sc['RELATION']/total*100)}%", delta="Expérience")
+        c4.metric("💰 Coûts", f"{int(sc['COÛTS']/total*100)}%", delta="Efficience")
 
+        # 2. Le Tableau Catégorisé
         st.write("---")
-        st.subheader("📋 Matrice de Catégorisation VOC")
-        
-        # Tableau éditable pour permettre au Black Belt de corriger manuellement l'IA
-        df_editor = pd.DataFrame(p["voc_data"])
-        edited_df = st.data_editor(
-            df_editor,
-            use_container_width=True,
-            num_rows="dynamic",
-            column_config={
-                "Impact CTQ": st.column_config.SelectboxColumn(
-                    options=["5 - CRITIQUE (Risque Business)", "3 - MAJEUR (Signal Faible)", "1 - MINEUR (Confort)"]
-                ),
-                "Catégorie QCD": st.column_config.SelectboxColumn(
-                    options=["QUALITÉ (Non-Conformité)", "DÉLAIS (Lead Time)", "COÛTS (Efficience)", "RELATION (Expérience)"]
-                )
-            }
-        )
-        if edited_df is not None:
-            p["voc_data"] = edited_df.to_dict('records')
+        st.subheader("📋 Matrice d'Analyse des Irritants")
+        df_final = pd.DataFrame(p["voc_data"])
+        st.data_editor(df_final, use_container_width=True, num_rows="dynamic")
 
-        # Plan d'action automatique basé sur l'irritant majeur
+        # 3. AXES D'AMÉLIORATION BLACK BELT (Le "So What?")
         st.write("---")
-        top_irritant = max(sc, key=sc.get)
-        st.markdown(f"### 🚀 Recommandation Stratégique : Focus sur la **{top_irritant}**")
+        st.markdown("### 🚀 Axes d'Amélioration Stratégiques")
         
-        if top_irritant == "Délais":
-            st.warning("⚠️ **Axe prioritaire : Réduction du Lead Time.** Lancez une VSM pour identifier les temps d'attente (Muda) entre les étapes.")
-        elif top_irritant == "Qualité":
-            st.error("⚠️ **Axe prioritaire : Fiabilisation.** Lancez un groupe de résolution de problèmes (8D ou Ishikawa) pour stabiliser le process.")
-        elif top_irritant == "Coûts":
-            st.info("⚠️ **Axe prioritaire : Optimisation.** Analysez la chaîne de valeur pour supprimer les étapes sans valeur ajoutée.")
+        issue = p["top_issue"]
+        
+        if issue == "DÉLAIS":
+            colA, colB = st.columns(2)
+            with colA:
+                st.info("**Action 1 : Cartographie VSM**\n\nAnalyser les temps de traversée pour identifier les 'Wait Times' entre les services.")
+            with colB:
+                st.info("**Action 2 : Équilibrage de charge**\n\nCalculer le Takt Time pour aligner la capacité sur la demande réelle.")
+        
+        elif issue == "QUALITÉ":
+            colA, colB = st.columns(2)
+            with colA:
+                st.error("**Action 1 : Chantier Ishikawa**\n\nIdentifier les causes racines (5M) des défauts répétitifs constatés.")
+            with colB:
+                st.error("**Action 2 : Standardisation**\n\nDéployer des Poka-Yoke pour bloquer l'erreur à la source.")
+        
+        elif issue == "COÛTS":
+            colA, colB = st.columns(2)
+            with colA:
+                st.warning("**Action 1 : Analyse de la Valeur**\n\nÉliminer les fonctions ou étapes coûteuses non perçues par le client.")
+            with colB:
+                st.warning("**Action 2 : Réduction des Mudas**\n\nCibler les gaspillages de surproduction ou de stock.")
+        
         else:
-            st.success("⚠️ **Axe prioritaire : Relationnel.** Standardisez les scripts de réponse et formez les équipes aux points de contact clients.")
-            
+            st.success("**Axe Relationnel : Standardisation du Service**\n\nDéfinition d'un SLA (Service Level Agreement) clair et formation aux soft-skills.")         
+    
     # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
