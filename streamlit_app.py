@@ -495,26 +495,23 @@ else:
     st.write("---")
     st.subheader("3. Analyse Thématique & CTQ")
     
-    # On s'assure que p["voc_results"] existe dans la session pour l'affichage
+    # On s'assure que les résultats existent dans la session pour l'affichage persistant
     if "voc_results" not in p:
         p["voc_results"] = None
 
-    if st.button("🧠 Lancer l'Analyse", key="btn_v11"):
-        # 1. Récupération sécurisée des données
-        df_analysis = pd.DataFrame(p["voc_raw_data"])
+    # LIEN DIRECT : On force la synchronisation du tableau de l'étape 2 avant l'analyse
+    if st.button("🧠 Lancer l'Analyse", key="btn_v12"):
+        # On récupère les données actuelles de l'éditeur (Etape 2)
+        df_src = pd.DataFrame(p["voc_raw_data"])
         
-        if not df_analysis.empty:
-            # Sécurité : on prend la dernière colonne si "réponse brute" est introuvable
-            if "réponse brute" in df_analysis.columns:
-                col_data = df_analysis["réponse brute"]
-            else:
-                col_data = df_analysis.iloc[:, -1] # Prend la dernière colonne par défaut
+        if not df_src.empty:
+            # Sécurité sur la colonne : on cherche "réponse brute" ou on prend la dernière colonne
+            col_target = "réponse brute" if "réponse brute" in df_src.columns else df_src.columns[-1]
             
-            # Conversion en liste de textes propres
-            verbatims = col_data.astype(str).str.lower().tolist()
+            # Préparation des données pour le calcul
+            verbatims = df_src[col_target].astype(str).str.lower().tolist()
             total = len(verbatims)
 
-            # 2. Algorithme de tri sémantique
             mapping = [
                 {"th": "Délais (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "retard"], "ex": "Muda d'attente", "ctq": "Lead Time < 24h"},
                 {"th": "Qualité (Défauts)", "kw": ["refaire", "erreur", "trompé", "faute", "qualité", "mauvais"], "ex": "Non-conformités", "ctq": "Zéro défaut (FPY)"},
@@ -525,7 +522,6 @@ else:
 
             res_list = []
             for m in mapping:
-                # Calcul des occurrences
                 count = sum(1 for r in verbatims if any(k in r for k in m["kw"]))
                 res_list.append({
                     "thème des irritants": m["th"],
@@ -533,71 +529,73 @@ else:
                     "nombre d'occurrence": count,
                     "pourcentage": f"{(count/total)*100:.1f}%" if total > 0 else "0%",
                     "CTQ": m["ctq"],
-                    "score_interne": count
+                    "score_tri": count
                 })
             
-            # 3. Stockage et Tri Pareto
-            p["voc_results"] = pd.DataFrame(res_list).sort_values("score_interne", ascending=False).drop(columns=["score_interne"])
-            st.rerun() # Crucial pour afficher le bloc 4 immédiatement
+            # Sauvegarde du résultat dans la session (Lien vers l'étape 4)
+            p["voc_results"] = pd.DataFrame(res_list).sort_values("score_tri", ascending=False).drop(columns=["score_tri"])
+            st.rerun() # Relance pour valider l'affichage des propositions
         else:
-            st.warning("⚠️ Le tableau de collecte est vide. Importez ou saisissez des données.")
+            st.error("⚠️ Le tableau de l'étape 2 est vide. L'analyse ne peut pas démarrer.")
 
-    # --- ÉTAPE 4 : AFFICHAGE PERSISTANT ---
-    # On sort de la condition du bouton pour que l'affichage reste fixe
+    # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION (LIÉES À L'ANALYSE) ---
+    # Cette section s'affiche UNIQUEMENT si voc_results contient des données
     if p["voc_results"] is not None:
-        st.write("### Résultat de l'Analyse Thématique")
+        st.write("### Résultat de l'Analyse")
         st.table(p["voc_results"])
 
         st.write("---")
         st.subheader("4. Propositions d'Amélioration Black Belt")
         
-        # Identification du problème majeur (1ère ligne du tableau trié)
-        top_issue = p["voc_results"].iloc[0]["thème des irritants"]
-        st.info(f"🎯 **Axe prioritaire identifié : {top_issue}**")
+        # On tire la priorité directement du 1er résultat de l'analyse (Lien direct 3 -> 4)
+        top_row = p["voc_results"].iloc[0]
+        top_theme = top_row["thème des irritants"]
+        
+        st.info(f"🎯 **Axe prioritaire basé sur l'analyse : {top_theme}**")
 
-        stratégies = {
+        catalogue_solutions = {
             "Délais (Lead Time)": [
                 "**VSM** : Cartographier le flux pour supprimer les goulots d'étranglement.",
-                "**Kanban** : Mettre en place un flux tiré pour réguler les encours.",
-                "**Takt Time** : Aligner la cadence de production sur la demande réelle.",
-                "**RPA** : Automatiser les transferts de données entre services."
+                "**Kanban** : Mettre en place un flux tiré pour réguler les travaux en cours.",
+                "**Takt Time** : Aligner la cadence de traitement sur la demande client.",
+                "**RPA** : Automatiser les saisies de données pour accélérer le flux."
             ],
             "Qualité (Défauts)": [
-                "**Poka-Yoke** : Installer des détrompeurs sur les champs de saisie.",
-                "**SOP** : Créer des standards de travail visuels pour chaque tâche.",
+                "**Poka-Yoke** : Installer des détrompeurs numériques sur les formulaires.",
+                "**Standardisation (SOP)** : Créer des guides visuels pour stabiliser la qualité.",
                 "**5 Pourquoi** : Analyser la cause racine du défaut le plus fréquent.",
-                "**Autocontrôle** : Validation systématique à chaque étape du flux."
+                "**Autocontrôle** : Validation systématique par l'opérateur avant envoi."
             ],
             "Pénibilité": [
-                "**5S Digital** : Épurer les interfaces et organiser les fichiers.",
-                "**Suppression NVA** : Éliminer les étapes de double-validation.",
-                "**Ergonomie** : Optimiser le nombre de clics et les accès rapides.",
-                "**Polyvalence** : Répartir la charge de travail entre plusieurs acteurs."
+                "**5S Digital** : Épurer les interfaces et organiser les dossiers partagés.",
+                "**Simplification** : Éliminer les étapes de double-validation inutiles.",
+                "**Ergonomie** : Réduire le nombre de clics et optimiser les raccourcis.",
+                "**Management Visuel** : Rendre les priorités visibles pour réduire la charge mentale."
             ],
             "Outils": [
-                "**Audit IT** : Identifier les causes d'instabilité logicielle.",
-                "**Maintenance préventive** : Mettre à jour les outils avant la panne.",
-                "**Simplification UI** : Épurer l'interface pour ne garder que l'essentiel.",
-                "**Support direct** : Créer une ligne d'assistance prioritaire pour les outils critiques."
+                "**Audit IT** : Identifier et traiter les causes de ralentissement logiciel.",
+                "**Maintenance préventive** : Mettre à jour les outils hors heures de production.",
+                "**Interface Simplifiée** : Masquer les fonctions inutilisées pour gagner en clarté.",
+                "**Plan de secours** : Définir une procédure dégradée en cas de panne système."
             ],
             "Information": [
-                "**Standardisation** : Définir un format de données univoque.",
-                "**Management Visuel** : Afficher les indicateurs de flux en temps réel.",
-                "**AIC** : Instaurer des points de communication quotidiens de 5 min.",
-                "**Digitalisation** : Centraliser l'info sur une source de vérité unique."
+                "**Standard Unique** : Imposer un format de données identique pour tous.",
+                "**Source de vérité** : Centraliser l'information sur un outil partagé unique.",
+                "**AIC** : Instaurer un point de communication quotidien de 5 minutes.",
+                "**Glossaire métier** : Clarifier les termes pour éviter les erreurs de compréhension."
             ]
         }
 
-        # Sélection des idées
-        ideas = stratégies.get(top_issue, ["Action Kaizen", "Standardisation", "Audit", "Formation"])
+        # Récupération des solutions correspondantes
+        solutions = catalogue_solutions.get(top_theme, ["Plan Kaizen", "Standardisation", "Audit", "Formation"])
 
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.success(f"💡 {ideas[0]}")
-            st.success(f"💡 {ideas[1]}")
-        with col_b:
-            st.success(f"💡 {ideas[2]}")
-            st.success(f"💡 {ideas[3]}")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.success(f"💡 {solutions[0]}")
+            st.success(f"💡 {solutions[1]}")
+        with col2:
+            st.success(f"💡 {solutions[2]}")
+            st.success(f"💡 {solutions[3]}"))
   
     # --- PHASE MEASURE ---
     with tabs[1]:
