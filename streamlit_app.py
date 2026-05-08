@@ -491,115 +491,110 @@ else:
     if edited_df is not None:
         p["voc_raw_data"] = edited_df
 
-    # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ ---
+    # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ (LE MOTEUR) ---
     st.write("---")
     st.subheader("3. Analyse Thématique & CTQ")
     
-    # 1. Vérification de la source de données (Lien direct avec la clé de l'éditeur v8)
-    # On regarde d'abord dans l'éditeur, sinon dans la mémoire brute
-    if "editor_v8" in st.session_state:
-        # L'éditeur de l'étape 2 stocke les modifs dans 'edited_rows', 'added_rows', etc.
-        # Mais le plus simple est de lire le DataFrame synchronisé
-        df_actuel = st.session_state.voc_raw_data
-    else:
-        df_actuel = p.get("voc_raw_data", pd.DataFrame())
+    # Initialisation sécurisée dans la session
+    if "voc_results" not in st.session_state:
+        st.session_state.voc_results = None
 
-    if st.button("🧠 Lancer l'Analyse", key="btn_v_final_fix"):
-        # On vérifie si le DataFrame contient bien des lignes
-        if not df_actuel.empty:
-            # On extrait les textes (dernière colonne par défaut pour éviter l'AttributeError)
-            verbatims = df_actuel.iloc[:, -1].astype(str).str.lower().tolist()
+    # On récupère les données de l'étape 2
+    df_source = st.session_state.get("voc_raw_data", pd.DataFrame())
+
+    if st.button("🧠 Lancer l'Analyse Thématique", key="btn_v_final_ultra"):
+        if not df_source.empty:
+            # Extraction sécurisée du texte (dernière colonne)
+            verbatims = df_source.iloc[:, -1].astype(str).str.lower().tolist()
             total = len(verbatims)
             
+            # Matrice sémantique Lean Six Sigma
             mapping = [
-                {"th": "Délais (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "retard"], "ex": "Muda d'attente", "ctq": "Lead Time < 24h"},
-                {"th": "Qualité (Défauts)", "kw": ["refaire", "erreur", "trompé", "faute", "qualité", "mauvais"], "ex": "Non-conformités", "ctq": "Zéro défaut (FPY)"},
-                {"th": "Pénibilité", "kw": ["pénible", "lourd", "difficile", "fatigue", "compliqué"], "ex": "Muri (Surcharge)", "ctq": "Score d'effort < 3/10"},
-                {"th": "Outils", "kw": ["bug", "système", "outil", "logiciel", "ordinateur"], "ex": "Instabilité IT", "ctq": "Disponibilité > 99%"},
-                {"th": "Information", "kw": ["info", "manque", "flou", "comprendre", "échange"], "ex": "Mura (Variabilité)", "ctq": "Standardisation"}
+                {"th": "Délais (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "retard", "planning"], "ex": "Muda d'attente (Gaspillage)", "ctq": "Lead Time < 24h"},
+                {"th": "Qualité (Défauts)", "kw": ["refaire", "erreur", "trompé", "faute", "qualité", "mauvais", "non-conforme"], "ex": "Non-conformités (COPQ)", "ctq": "First Pass Yield 100%"},
+                {"th": "Pénibilité", "kw": ["pénible", "lourd", "difficile", "fatigue", "compliqué", "stress"], "ex": "Muri (Surcharge)", "ctq": "Ergonomie & Standard Work"},
+                {"th": "Outils", "kw": ["bug", "système", "outil", "logiciel", "ordinateur", "panne"], "ex": "Capabilité des moyens", "ctq": "Disponibilité IT > 99.9%"},
+                {"th": "Information", "kw": ["info", "manque", "flou", "comprendre", "échange", "communication"], "ex": "Mura (Variabilité du flux)", "ctq": "Standardisation de l'info"}
             ]
 
-            res_list = []
+            res_data = []
             for m in mapping:
                 count = sum(1 for r in verbatims if any(k in r for k in m["kw"]))
-                res_list.append({
+                res_data.append({
                     "thème des irritants": m["th"],
                     "explication": m["ex"],
                     "nombre d'occurrence": count,
                     "pourcentage": f"{(count/total)*100:.1f}%" if total > 0 else "0%",
                     "CTQ": m["ctq"],
-                    "score": count
+                    "score_tri": count
                 })
             
-            # Sauvegarde dans la session
-            st.session_state.voc_results = pd.DataFrame(res_list).sort_values("score", ascending=False).drop(columns=["score"])
+            # Stockage permanent et tri Pareto
+            st.session_state.voc_results = pd.DataFrame(res_data).sort_values("score_tri", ascending=False).drop(columns=["score_tri"])
             st.rerun()
         else:
-            # Ce message ne s'affichera que si le DataFrame est réellement vide de chez vide
-            st.error("⚠️ Le tableau ne contient aucune donnée. Vérifiez l'étape 2.")
+            st.error("⚠️ Le tableau de collecte est vide. Impossible de générer l'analyse.")
 
-    # --- ÉTAPE 4 : DIAGNOSTIC & STRATÉGIE D'AMÉLIORATION (REGARD BLACK BELT) ---
-    if st.session_state.get("voc_results") is not None:
+    # --- ÉTAPE 4 : DIAGNOSTIC & STRATÉGIE (REGARD BLACK BELT) ---
+    if st.session_state.voc_results is not None:
+        st.write("### 📊 Résultat de l'Analyse Thématique")
+        st.table(st.session_state.voc_results)
+
         st.write("---")
         st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
         
-        # Récupération du top irritant et des données associées
+        # Identification du problème racine
         top_row = st.session_state.voc_results.iloc[0]
         top_theme = top_row["thème des irritants"]
         occurrence = top_row["nombre d'occurrence"]
         ctq_cible = top_row["CTQ"]
         
-        # 1. Le Diagnostic Structurel
         st.markdown(f"### 🎯 Focus Prioritaire : {top_theme}")
         
-        # Génération d'une réflexion dynamique selon le thème
+        # Réflexions dynamiques basées sur l'expertise LSS
         reflexions = {
             "Délais (Lead Time)": {
-                "analyse": f"L'analyse montre {occurrence} remontées critiques sur le temps de traversée. En tant que Black Belt, cela indique un **Muda d'attente** massif ou des goulots d'étranglement non maîtrisés. Le flux n'est pas 'Tirée' par la demande.",
-                "strategie": "Prioriser une **VSM (Value Stream Mapping)** pour identifier le ratio VA/NVA. L'objectif est de réduire le Lead Time en supprimant les files d'attente entre les processus.",
-                "outils": ["Chantier Kaizen Flash", "Équilibrage de poste (Yamazumi)", "Calcul du Takt Time"]
+                "analyse": f"Avec {occurrence} signalements, nous identifions un **Muda d'attente** majeur. Le temps de cycle actuel est supérieur au Takt Time, créant des goulots d'étranglement.",
+                "strategie": "Engager une **VSM (Value Stream Mapping)** pour isoler les étapes à Non-Valeur Ajoutée (NVA).",
+                "outils": ["Calcul de l'Efficacité du Cycle", "Chantier Kaizen", "Kanban de régulation"]
             },
             "Qualité (Défauts)": {
-                "analyse": f"Avec {occurrence} occurrences, la **non-qualité** est le premier levier de coût caché (COPQ). Nous faisons face à une instabilité du processus qui génère des retouches et de la frustration client.",
-                "strategie": "Passer d'une culture de contrôle à une culture de 'Bon du premier coup'. Il faut isoler la cause racine (5 Pourquoi) et stabiliser la variance (Standardisation).",
-                "outils": ["Poka-Yoke (Détrompeurs)", "Matrice de capabilité (Cp/Cpk)", "Plan d'autocontrôle"]
+                "analyse": f"La non-qualité ({occurrence} occurrences) est ici votre principal levier de profit. C'est un coût caché (**COPQ**) qui dégrade la satisfaction.",
+                "strategie": "Passer à une approche **Zero Defect**. Analyser la variance du processus et stabiliser les standards.",
+                "outils": ["Poka-Yoke", "Analyse de Capabilité", "Standard Operating Procedures"]
             },
             "Pénibilité": {
-                "analyse": f"Le poids de la pénibilité ({occurrence} verbatims) révèle un risque sur la **durabilité du flux** (Muri). La surcharge cognitive ou physique dégrade la performance à long terme.",
-                "strategie": "Appliquer l'ergonomie Lean. Simplifier le poste de travail pour que l'opérateur se concentre uniquement sur la création de valeur sans effort parasite.",
-                "outils": ["Analyse de déroulement", "5S ergonomique", "Standard Work"]
+                "analyse": f"L'indice de pénibilité est élevé. Cela génère du **Muri (Surcharge)**, source directe d'erreurs humaines et de démotivation.",
+                "strategie": "Simplifier le flux de travail. L'objectif est d'éliminer tout mouvement ou effort parasite pour l'opérateur.",
+                "outils": ["Analyse ergonomique", "5S de poste", "Standard Work"]
             },
             "Outils": {
-                "analyse": f"L'infrastructure est ici le frein majeur. Si l'outil faillit, le processus le plus robuste devient inefficace. C'est un problème de **capabilité des moyens**.",
-                "strategie": "Engager une refonte de l'interface ou une automatisation (RPA) pour supprimer les tâches à faible valeur ajoutée qui causent ces bugs.",
-                "outils": ["Analyse de la valeur IT", "Maintenance préventive", "User Experience Lean"]
+                "analyse": f"Les moyens de production (IT/Logiciel) ne sont plus **capables**. Le processus est freiné par des outils inadaptés.",
+                "strategie": "Optimiser la disponibilité et l'ergonomie des outils. Automatiser les tâches répétitives via RPA.",
+                "outils": ["AMDEC Moyens", "Simplification d'interface", "RPA / Macros"]
             },
             "Information": {
-                "analyse": f"Le manque de clarté ({occurrence} signaux) indique un problème de **Mura (Variabilité)** dans la transmission. L'information est l'essence du flux ; si elle est floue, le flux s'arrête.",
-                "strategie": "Standardiser les flux d'information. Passer d'une communication réactive à un **Management Visuel** proactif où l'anomalie saute aux yeux.",
-                "outils": ["Standard d'échange", "Obeya / Management Visuel", "AIC (Animation Courte)"]
+                "analyse": f"Le flux d'information souffre de **Mura (Variabilité)**. L'ambiguïté des données force les acteurs à l'interprétation, ce qui tue la vitesse.",
+                "strategie": "Instaurer une 'Source Unique de Vérité'. Rendre l'information visuelle et incontestable.",
+                "outils": ["Management Visuel", "Obeya", "Standards de communication"]
             }
         }
 
         diag = reflexions.get(top_theme, {"analyse": "Analyse transverse requise.", "strategie": "Standardisation globale.", "outils": ["Audit", "Kaizen"]})
 
-        # Affichage du diagnostic type "Rapport de mission"
-        with st.expander("🔍 Analyse de la situation (Deep Dive)", expanded=True):
+        with st.expander("🔍 Deep Dive : Analyse Structurelle", expanded=True):
             st.write(diag["analyse"])
-            st.write(f"**Indicateur CTQ à surveiller :** `{ctq_cible}`")
+            st.write(f"**Indicateur CTQ critique à piloter :** `{ctq_cible}`")
 
-        st.markdown("#### 🚀 Recommandations Stratégiques")
-        st.info(f"**Vision Black Belt :** {diag['strategie']}")
+        st.info(f"🚀 **Orientation Stratégique :** {diag['strategie']}")
 
-        # Affichage des outils recommandés sous forme de badges
+        # Affichage des leviers actionnables
         cols = st.columns(len(diag["outils"]))
         for i, tool in enumerate(diag["outils"]):
             cols[i].success(f"🛠️ {tool}")
 
-        # 2. Lien avec le DMAIC
-        st.write("---")
-        st.caption(f"Prochaine étape suggérée (Phase IMPROVE) : Lancer un groupe de travail ciblé sur les {occurrence} points de douleur pour définir les solutions futures.")
-    
+        st.caption(f"Phase DMAIC actuelle : **ANALYSE**. Préparez le passage en phase **IMPROVE** sur la base de ces {occurrence} points de douleur.")
+        
     # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
