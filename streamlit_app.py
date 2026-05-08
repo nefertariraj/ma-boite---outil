@@ -441,39 +441,41 @@ Python
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Analyse de Pareto des Irritants")
 
+    # Initialisation des colonnes et de la structure de données
     COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
-    if "voc_data" not in p: p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
+    if "voc_data" not in p: 
+        p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
 
     def analyser_voc_sur_mesure(uploaded_file):
         try:
+            # Chargement du fichier
             df = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
             df = df.fillna("")
             
-            # Normalisation stricte pour trouver "client" et "verbatim"
+            # Normalisation des colonnes pour trouver "client" et "verbatim"
             import unicodedata
-            def clean_col(n): return "".join(c for c in unicodedata.normalize('NFD', str(n).lower().strip()) if unicodedata.category(c) != 'Mn')
+            def clean_col(n): 
+                return "".join(c for c in unicodedata.normalize('NFD', str(n).lower().strip()) if unicodedata.category(c) != 'Mn')
             
             df.columns = [clean_col(c) for c in df.columns]
             
             if "client" not in df.columns or "verbatim" not in df.columns:
-                st.error("❌ Les colonnes 'client' et 'verbatim' sont introuvables dans votre fichier.")
-                return None
+                st.error("❌ Les colonnes 'client' et 'verbatim' sont introuvables.")
+                return None, None
 
-            # --- ÉTAPE 3 : ANALYSE GLOBALE IA ---
-            # On regroupe tous les verbatims pour donner du contexte à l'IA
-            contexte_global = " ".join(df["verbatim"].astype(str).tolist())
+            # 1. ANALYSE GLOBALE IA (Sémantique)
+            contexte_global = " ".join(df["verbatim"].astype(str).tolist()).lower()
             
-            # Détection du problème majeur (Analyse sémantique)
-            if any(w in contexte_global.lower() for w in ["delai", "attente", "lent", "temps"]):
+            if any(w in contexte_global for w in ["delai", "attente", "lent", "temps"]):
                 synthese_pb = "Défaut de fluidité : Allongement critique du Lead Time"
-            elif any(w in contexte_global.lower() for w in ["erreur", "casse", "qualite", "manque"]):
+            elif any(w in contexte_global for w in ["erreur", "casse", "qualite", "manque", "defectueux"]):
                 synthese_pb = "Non-conformité : Écart aux spécifications techniques"
-            elif any(w in contexte_global.lower() for w in ["accueil", "reponse", "relation"]):
+            elif any(w in contexte_global for w in ["accueil", "reponse", "relation", "aimable"]):
                 synthese_pb = "Carence relationnelle : Déficit de communication client"
             else:
                 synthese_pb = "Instabilité process : Variabilité des résultats constatée"
 
-            # --- REMPLISSAGE DU TABLEAU ---
+            # 2. REMPLISSAGE DU TABLEAU
             res = []
             for _, row in df.iterrows():
                 v_text = str(row["verbatim"])
@@ -482,17 +484,18 @@ Python
                 res.append({
                     "client": str(row["client"])[:30],
                     "Verbatim": v_text,
-                    "problème": synthese_pb, # Résumé IA global appliqué à chaque ligne
+                    "problème": synthese_pb,
                     "fréquence": "fréquent",
                     "gravité": "très grave"
                 })
             return res, synthese_pb
         except Exception as e:
-            st.error(f"Erreur : {e}")
+            st.error(f"Erreur lors de l'analyse : {e}")
             return None, None
 
+    # Interface d'importation
     with st.expander("📥 Importation et Analyse Contextuelle", expanded=True):
-        up_file = st.file_uploader("Charger le fichier VOC", type=["xlsx", "xls", "csv"], key="voc_v21")
+        up_file = st.file_uploader("Charger le fichier VOC", type=["xlsx", "xls", "csv"], key="voc_v21_final")
         if up_file is not None:
             if st.button("🚀 Lancer l'Analyse IA Contextuelle"):
                 data_res, synthese = analyser_voc_sur_mesure(up_file)
@@ -502,18 +505,19 @@ Python
                     st.success("✅ Analyse du fichier terminée.")
                     st.rerun()
 
+    # Affichage des résultats si des données existent
     if p["voc_data"] and p["voc_data"][0].get("client") != "":
-        # Affichage du tableau
+        # Tableau éditable
         edited_voc = st.data_editor(
             pd.DataFrame(p["voc_data"])[COLONNES_VOC],
             num_rows="dynamic",
             use_container_width=True,
-            key=f"editor_v21_{p_idx}"
+            key=f"editor_v21_final_{p_idx}"
         )
         if edited_voc is not None:
             p["voc_data"] = edited_voc.to_dict('records')
 
-        # ANALYSE GLOBALE EN 4 FAMILLES
+        # Indicateurs visuels
         st.write("---")
         st.markdown("### 🧠 Répartition des Irritants (Vue Black Belt)")
         f1, f2, f3, f4 = st.columns(4)
@@ -522,30 +526,30 @@ Python
         f3.markdown("**📞 Relation**"); f3.progress(0.4)
         f4.markdown("**💰 Coûts**"); f4.progress(0.1)
 
-        # --- ÉTAPE 4 : AXES D'AMÉLIORATION SUR-MESURE ---
+        # 3. PROPOSITIONS D'AMÉLIORATION SUR-MESURE
         st.write("---")
-        st.markdown("### 🚀 Propositions d'Amélioration Spécifiques au Cas")
+        st.markdown("### 🚀 Propositions d'Amélioration Spécifiques")
         
-        # On utilise la synthèse pour adapter les recommandations
         main_issue = p.get("synthese_globale", "Instabilité")
         
+        # Logique de décision pour les solutions
         if "Lead Time" in main_issue:
             solutions = [
-                {"t": "Cartographie VSM (Value Stream Mapping)", "d": "Identifier les goulots d'étranglement spécifiques qui causent l'attente signalée par vos clients."},
-                {"t": "Élimination des Muda d'attente", "d": "Supprimer les validations intermédiaires inutiles pour réduire le temps de cycle."},
-                {"t": "Mise en place d'un flux tiré", "d": "Synchroniser la production avec la demande réelle pour éviter l'encours et les retards."}
+                {"t": "Cartographie VSM (Value Stream Mapping)", "d": "Analyser les goulots d'étranglement pour fluidifier le flux de valeur."},
+                {"t": "Standardisation du Takt Time", "d": "Aligner la cadence de production sur la demande client réelle."},
+                {"t": "Réduction des Mudas d'attente", "d": "Éliminer les temps morts entre les étapes de validation."}
             ]
         elif "Non-conformité" in main_issue:
             solutions = [
-                {"t": "Analyse des Causes Racines (Ishikawa)", "d": "Rechercher pourquoi les spécifications techniques ne sont pas respectées sur les lots signalés."},
-                {"t": "Poka-Yoke Industriel", "d": "Installer un système de détection automatique des défauts avant l'expédition."},
-                {"t": "Standardisation des réglages", "d": "Verrouiller les paramètres machines pour garantir une qualité constante (Sigma Level)."}
+                {"t": "Méthode Ishikawa / 5 Pourquoi", "d": "Identifier la cause racine technique de la non-qualité signalée."},
+                {"t": "Déploiement de Poka-Yoke", "d": "Installer des systèmes anti-erreur pour bloquer les défauts en amont."},
+                {"t": "Maitrise Statistique des Procédés (MSP)", "d": "Surveiller la stabilité de la qualité via des cartes de contrôle."}
             ]
         else:
             solutions = [
-                {"t": "Plan de stabilisation Process", "d": "Réduire la variance globale pour regagner en prédictibilité."},
-                {"t": "Standardisation du Management Visuel", "d": "Rendre les dérives visibles immédiatement pour l'équipe."},
-                {"t": "Revue des standards de formation", "d": "S'assurer que les opérateurs maîtrisent les points critiques (CTQ)."}
+                {"t": "Standardisation des Compétences", "d": "Assurer un niveau de service homogène via des fiches de postes claires."},
+                {"t": "Management Visuel (Obeya)", "d": "Rendre les indicateurs de performance visibles pour réagir en temps réel."},
+                {"t": "Audit de Poste", "d": "Vérifier l'application des standards là où la variabilité est la plus forte."}
             ]
 
         for sol in solutions:
