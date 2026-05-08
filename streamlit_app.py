@@ -432,78 +432,80 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-       # --- 6. VOICE OF CUSTOMER (VOC) - VERSION ROBUSTE (FIX FLOAT ERROR) ---
+       # --- 6. VOICE OF CUSTOMER (VOC) - FIX BOUTON ANALYSE ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Analyse des Exigences")
 
+    # Initialisation des variables de session pour la persistance
     if "dernier_fichier_nom" not in p:
         p["dernier_fichier_nom"] = ""
+    if "analyse_en_cours" not in st.session_state:
+        st.session_state.analyse_en_cours = False
 
     COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
     if "voc_data" not in p:
         p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
 
-    with st.expander("📥 Importer un nouveau fichier de retours (Analyse Intelligente)", expanded=True):
-        uploaded_file = st.file_uploader("Fichier Excel ou CSV", type=["xlsx", "xls", "csv"], key="voc_loader_v16")
+    with st.expander("📥 Importer un nouveau fichier (Analyse IA)", expanded=True):
+        uploaded_file = st.file_uploader("Fichier Excel ou CSV", type=["xlsx", "xls", "csv"], key="voc_loader_v17")
         
         if uploaded_file is not None:
+            # Reset si nouveau fichier
             if uploaded_file.name != p["dernier_fichier_nom"]:
                 p["voc_data"] = []
                 p["dernier_fichier_nom"] = uploaded_file.name
+                st.session_state.analyse_en_cours = False
 
-            try:
-                # Lecture et nettoyage immédiat des valeurs nulles (NaN -> "")
-                df_import = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
-                df_import = df_import.fillna("") 
-                
-                toutes_cols = df_import.columns.tolist()
+            # On place le bouton. S'il est cliqué, on passe la variable à True
+            if st.button("🚀 Lancer l'Analyse Black Belt du Fichier"):
+                st.session_state.analyse_en_cours = True
 
-                if st.button("🚀 Lancer l'Analyse Black Belt du Fichier"):
-                    # Mapping intelligent
-                    cols_potentielles = [c for c in toutes_cols if "?" not in str(c) and len(str(c)) < 45]
+            # L'analyse ne se lance que si la variable est True
+            if st.session_state.analyse_en_cours:
+                try:
+                    df_import = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
+                    df_import = df_import.fillna("") 
                     
+                    toutes_cols = df_import.columns.tolist()
+
+                    # Mapping sémantique
+                    cols_potentielles = [c for c in toutes_cols if "?" not in str(c) and len(str(c)) < 45]
                     map_client = next((c for c in cols_potentielles if any(k in str(c).lower() for k in ["nom", "client", "société", "id"])), toutes_cols[0])
                     map_verbatim = next((c for c in toutes_cols if any(k in str(c).lower() for k in ["avis", "verbatim", "commentaire", "réponse", "feedback"])), toutes_cols[1] if len(toutes_cols)>1 else toutes_cols[0])
 
-                    # Analyse globale sémantique
+                    # Analyse globale du thème
                     verbatims_liste = df_import[map_verbatim].astype(str).tolist()
                     text_complet = " ".join(verbatims_liste).lower()
                     
-                    # Détermination du thème dominant (Logique Black Belt)
                     theme_dominant = "Variabilité des processus"
                     if any(word in text_complet for word in ["temps", "délai", "long", "attente", "retard"]):
                         theme_dominant = "Performance des Délais (Lead Time)"
                     elif any(word in text_complet for word in ["qualité", "panne", "erreur", "cassé", "mauvais"]):
                         theme_dominant = "Conformité Technique / Qualité"
-                    elif any(word in text_complet for word in ["accueil", "réponse", "relation", "aimable"]):
-                        theme_dominant = "Qualité de la Relation Client"
 
                     nouvelles_lignes = []
                     for index, row in df_import.iterrows():
-                        # SÉCURITÉ : On force la conversion en string avant tout test d'appartenance
-                        val_client_str = str(row[map_client])
-                        v_raw_str = str(row[map_verbatim])
-
-                        # On ignore les lignes de questions ou vides
-                        if "?" in val_client_str or len(v_raw_str) < 3:
-                            continue
+                        v_raw = str(row[map_verbatim])
+                        val_c = str(row[map_client])
+                        if "?" in val_c or len(v_raw) < 3: continue
 
                         nouvelles_lignes.append({
-                            "client": val_client_str[:30],
-                            "Verbatim": v_raw_str,
-                            "problème": f"Analyse sémantique : {theme_dominant} impacté.",
+                            "client": val_c[:30],
+                            "Verbatim": v_raw,
+                            "problème": f"Analyse Black Belt : {theme_dominant} impacté.",
                             "fréquence": "fréquent", 
                             "gravité": "très grave" 
                         })
                     
                     if nouvelles_lignes:
                         p["voc_data"] = nouvelles_lignes
-                        st.success(f"✅ Analyse du fichier '{uploaded_file.name}' terminée.")
+                        st.session_state.analyse_en_cours = False # On reset pour la prochaine fois
+                        st.success("✅ Analyse terminée.")
                         st.rerun()
-            except Exception as e:
-                st.error(f"Erreur lors de l'analyse : {e}")
+                except Exception as e:
+                    st.error(f"Erreur : {e}")
 
-    # 2. AFFICHAGE DU TABLEAU
+    # 2. AFFICHAGE DU TABLEAU (En dehors du bouton pour qu'il reste visible)
     df_voc_display = pd.DataFrame(p["voc_data"])
     for col in COLONNES_VOC:
         if col not in df_voc_display.columns: df_voc_display[col] = ""
@@ -512,43 +514,27 @@ else:
         df_voc_display[COLONNES_VOC],
         num_rows="dynamic",
         use_container_width=True,
-        key=f"editor_voc_v16_{p_idx}",
+        key=f"editor_voc_v17_{p_idx}",
         column_config={
             "problème": st.column_config.TextColumn("🔍 Analyse IA (Synthèse)", width="large"),
-            "fréquence": st.column_config.SelectboxColumn("📊 Fréquence", options=["très fréquent", "fréquent", "peu fréquent"]),
-            "gravité": st.column_config.SelectboxColumn("⚠️ Gravité", options=["pas grave", "très grave"]),
         }
     )
 
     if edited_voc is not None:
         p["voc_data"] = edited_voc.to_dict('records')
 
-    # 3. SYNTHÈSE BLACK BELT (DMAIC)
+    # 3. SYNTHÈSE BLACK BELT
     st.write("---")
-    liste_pb = [r for r in p["voc_data"] if r.get('problème') and len(str(r['problème'])) > 5]
-
-    if liste_pb:
+    if p["voc_data"] and p["voc_data"][0].get('problème'):
         st.markdown("### 📊 Diagnostic Expert (Focus CTQ)")
         
-        # Dashboard des catégories
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.info("**🛠️ Technique**"); st.progress(0.3)
         with c2: st.warning("**⏱️ Délais**"); st.progress(0.7)
         with c3: st.info("**📞 Relation**"); st.progress(0.4)
         with c4: st.info("**💰 Coût**"); st.progress(0.1)
 
-        st.success(f"""
-        **Analyse de Criticité :** L'import `{p['dernier_fichier_nom']}` révèle une concentration 
-        majeure d'irritants sur le thème : **{liste_pb[0]['problème']}**. 
-        En tant que Black Belt, la priorité est de réduire la variance sur ce flux pour stabiliser le CTQ.
-        """)
-        
-        with st.expander("🚀 5 Propositions d'Amélioration (Ciblées)"):
-            st.write("1. **Standardisation** : Fixer un standard pour éviter la dérive observée.")
-            st.write("2. **Analyse de Capabilité** : Mesurer l'écart entre la voix du client et la performance réelle.")
-            st.write("3. **Management Visuel** : Rendre les retards visibles immédiatement.")
-            st.write("4. **Poka-Yoke** : Bloquer les erreurs en amont de la livraison.")
-            st.write("5. **Kaizen Flash** : Réunir l'équipe pour résoudre le 'gros caillou' du mois.")
+        st.success(f"**Analyse de Criticité :** Le diagnostic du fichier `{p['dernier_fichier_nom']}` souligne un besoin de réduction de variance sur : **{p['voc_data'][0]['problème']}**.")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
