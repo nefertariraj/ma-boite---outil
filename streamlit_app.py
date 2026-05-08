@@ -432,13 +432,14 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-  # --- 6. VOICE OF CUSTOMER (VOC) : VERSION FIXÉE (PERSISTENCE DES DONNÉES) ---
+  # --- 6. VOICE OF CUSTOMER (VOC) : VERSION BLACK BELT SÉCURISÉE ---
     st.divider()
     st.header("🎯 Voice of Customer (VOC) - Flux Black Belt")
 
+    # Initialisation robuste du dictionnaire de session
     if 'p' not in locals(): p = st.session_state
 
-    # --- ÉTAPE 1 : ÉLABORATION DU QUESTIONNAIRE ---
+    # --- 1. ÉLABORATION DU QUESTIONNAIRE ---
     st.subheader("1. Élaboration du Questionnaire")
     if "voc_questions" not in p:
         p["voc_questions"] = [
@@ -449,131 +450,125 @@ else:
             "Si vous pouviez changer une seule chose ?"
         ]
 
-    with st.expander("📝 Configurer les questions cibles"):
+    with st.expander("📝 Configurer les questions", expanded=False):
         for i in range(5):
-            p["voc_questions"][i] = st.text_input(f"Question {i+1}", value=p["voc_questions"][i], key=f"q_edit_v6_{i}")
+            p["voc_questions"][i] = st.text_input(f"Question {i+1}", value=p["voc_questions"][i], key=f"q_final_{i}")
 
-    # --- ÉTAPE 2 : COLLECTE DES DONNÉES ---
+    # --- 2. COLLECTE DES DONNÉES ---
     st.write("---")
     st.subheader("2. Collecte des Données")
     
     if "voc_raw_data" not in p:
         p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute"])
 
-    uploaded_file = st.file_uploader("Importer des réponses (Excel)", type=["xlsx", "xls"], key="uploader_v6")
+    uploaded_file = st.file_uploader("Importer un fichier Excel", type=["xlsx", "xls"], key="voc_uploader")
     
+    # Traitement immédiat de l'importation (évite le bug du bouton)
     if uploaded_file:
-        if st.button("🚀 Valider l'importation", key="btn_import"):
-            try:
-                df_imp = pd.read_excel(uploaded_file).fillna("")
-                df_imp.columns = [c.lower().strip() for c in df_imp.columns]
-                
-                c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
-                q_col = next((c for c in df_imp.columns if "quest" in c), None)
-                r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
-                
-                new_rows = pd.DataFrame({
-                    "client": df_imp[c_col].astype(str),
-                    "question": df_imp[q_col].astype(str) if q_col else "Saisie importée",
-                    "réponse brute": df_imp[r_col].astype(str)
-                })
-                # Fusion et suppression des doublons pour éviter de vider le tableau
+        try:
+            df_imp = pd.read_excel(uploaded_file).fillna("")
+            df_imp.columns = [c.lower().strip() for c in df_imp.columns]
+            
+            # Mapping automatique
+            c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
+            q_col = next((c for c in df_imp.columns if "quest" in c), None)
+            r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
+            
+            new_rows = pd.DataFrame({
+                "client": df_imp[c_col].astype(str),
+                "question": df_imp[q_col].astype(str) if q_col else "Import",
+                "réponse brute": df_imp[r_col].astype(str)
+            })
+            
+            # On n'ajoute que si ce n'est pas déjà fait pour ce fichier
+            if st.button("Confirmer l'ajout au tableau"):
                 p["voc_raw_data"] = pd.concat([p["voc_raw_data"], new_rows], ignore_index=True)
+                st.success(f"✅ {len(new_rows)} lignes ajoutées.")
                 st.rerun()
-            except Exception as e:
-                st.error(f"Erreur d'import : {e}")
+        except Exception as e:
+            st.error(f"Erreur : {e}")
 
-    # Utilisation d'un container pour stabiliser le data_editor
-    # On assigne directement le résultat à p["voc_raw_data"]
-    edited_df = st.data_editor(
+    # Édition en direct et sauvegarde automatique
+    p["voc_raw_data"] = st.data_editor(
         p["voc_raw_data"],
         num_rows="dynamic",
         use_container_width=True,
-        key="editor_v6_final"
+        key="main_editor"
     )
-    
-    # CRUCIAL : On sauvegarde immédiatement les modifications du tableau
-    if edited_df is not None:
-        p["voc_raw_data"] = edited_df
 
-    # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ ---
+    # --- 3. ANALYSE THÉMATIQUE & CTQ ---
     st.write("---")
     st.subheader("3. Analyse Thématique (Affinity Diagram) & CTQ")
     
-    # On vérifie si le tableau contient des données AVANT d'afficher le bouton
-    if st.button("🧠 Lancer l'analyse thématique des données", key="btn_analyse"):
-        # On utilise p["voc_raw_data"] qui a été mis à jour par l'editor
+    if st.button("🧠 Générer l'analyse thématique"):
         df_src = p["voc_raw_data"]
-        
-        if not df_src.empty and len(df_src.index) > 0:
+        if not df_src.empty:
             total = len(df_src)
             mapping_lean = [
-                {"th": "Délais (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "planning", "retard"], "ex": "Gaspillage d'attente / Muda", "ctq": "Lead Time < 24h"},
-                {"th": "Qualité (Non-Conformité)", "kw": ["refaire", "erreur", "trompé", "fautes", "recommencer", "qualité", "mauvais"], "ex": "Retouches et défauts", "ctq": "First Pass Yield 100%"},
-                {"th": "Complexité (Pénibilité)", "kw": ["pénible", "lourd", "difficile", "compliqué", "clics", "fatigue", "pression"], "ex": "Processus complexe ou Muri", "ctq": "Nombre d'étapes < 3"},
-                {"th": "Moyens (Outils/Systèmes)", "kw": ["énerve", "logiciel", "bug", "système", "outil", "ordinateur", "panne"], "ex": "Instabilité des outils", "ctq": "Disponibilité IT > 99%"},
-                {"th": "Flux d'information", "kw": ["info", "manque", "comprendre", "flou", "changé", "sais pas", "échanges"], "ex": "Variabilité (Mura)", "ctq": "Standard d'info univoque"}
+                {"th": "Délais (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "retard"], "ex": "Muda d'attente", "ctq": "Lead Time < 24h"},
+                {"th": "Qualité (Défauts)", "kw": ["refaire", "erreur", "trompé", "faute", "qualité", "mauvais"], "ex": "Retouches / Non-conformités", "ctq": "First Pass Yield 100%"},
+                {"th": "Pénibilité (Muri)", "kw": ["pénible", "lourd", "difficile", "fatigue", "pression"], "ex": "Processus complexe", "ctq": "Max 3 étapes clés"},
+                {"th": "Outils (Systèmes)", "kw": ["énerve", "bug", "système", "outil", "logiciel"], "ex": "Instabilité technique", "ctq": "Disponibilité IT > 99%"},
+                {"th": "Flux (Information)", "kw": ["info", "manque", "comprendre", "flou", "échange"], "ex": "Mura (Variabilité info)", "ctq": "Standard univoque"}
             ]
 
-            final_analysis = []
+            analysis = []
             for m in mapping_lean:
                 count = sum(1 for r in df_src["réponse brute"].astype(str).lower() if any(k in r for k in m["kw"]))
-                final_analysis.append({
+                analysis.append({
                     "thème des irritants": m["th"],
                     "explication": m["ex"],
                     "nombre d'occurrence": count,
                     "pourcentage": f"{(count/total)*100:.1f}%" if total > 0 else "0%",
                     "CTQ": m["ctq"],
-                    "score": count
+                    "sort": count
                 })
 
-            p["voc_analysis_result"] = pd.DataFrame(final_analysis).sort_values("score", ascending=False).drop(columns=["score"])
+            p["voc_analysis"] = pd.DataFrame(analysis).sort_values("sort", ascending=False).drop(columns=["sort"])
         else:
-            st.error("Le tableau de collecte semble vide ou non validé.")
+            st.warning("⚠️ Ajoutez des données à l'étape 2 d'abord.")
 
-    # Affichage persistant des résultats et des propositions
-    if "voc_analysis_result" in p:
-        st.table(p["voc_analysis_result"])
+    # Affichage du tableau d'analyse
+    if "voc_analysis" in p:
+        st.table(p["voc_analysis"])
 
         # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION ---
         st.write("---")
-        st.subheader("4. Propositions d'Amélioration (Axe Black Belt)")
+        st.subheader("4. Propositions d'Amélioration Black Belt")
         
-        top_row = p["voc_analysis_result"].iloc[0]
-        top_irritant = top_row["thème des irritants"]
-        
-        st.info(f"🎯 **Axe prioritaire : {top_irritant}**")
+        top_theme = p["voc_analysis"].iloc[0]["thème des irritants"]
+        st.info(f"🚀 **Priorité Pareto : {top_theme}**")
 
-        stratégies = {
+        solutions = {
             "Délais (Lead Time)": [
-                "Chantier VSM : Identifier les goulots d'étranglement.",
-                "Flux Tiré : Installer un système Kanban.",
-                "Takt Time : Aligner la cadence sur le besoin client.",
-                "RPA : Automatiser les transferts de données lents."
+                "**VSM (Value Stream Mapping)** : Analyser les temps de cycle pour supprimer les attentes inutiles.",
+                "**Kanban** : Installer un flux tiré pour éviter la saturation du processus.",
+                "**Takt Time** : Réaligner les capacités de l'équipe sur la demande client réelle.",
+                "**SMED Administratif** : Simplifier les étapes de préparation pour accélérer le lancement."
             ],
-            "Qualité (Non-Conformité)": [
-                "Poka-Yoke : Système anti-erreur sur les formulaires.",
-                "SOP : Standardiser les modes opératoires visuels.",
-                "8D : Analyse de cause racine (5 Pourquoi).",
-                "Autocontrôle : Validation par l'opérateur à la source."
+            "Qualité (Défauts)": [
+                "**Poka-Yoke** : Mettre en place des gardes-fous numériques pour empêcher les erreurs de saisie.",
+                "**Standardisation (SOP)** : Créer des standards visuels clairs pour stabiliser la qualité.",
+                "**Analyse 5 Pourquoi** : Identifier la cause racine du défaut dominant dans vos verbatims.",
+                "**Autocontrôle** : Intégrer une étape de validation à la source par l'opérateur."
             ],
-            "Complexité (Pénibilité)": [
-                "5S Digital : Épurer les outils et fichiers.",
-                "Simplification : Supprimer 20% des étapes sans valeur ajoutée.",
-                "Automatisation : Déléguer les tâches pénibles aux scripts.",
-                "Ergonomie : Réduire le nombre de validations manuelles."
+            "Pénibilité (Muri)": [
+                "**Analyse ergonomique** : Réduire la charge cognitive en simplifiant l'accès à l'information.",
+                "**Réduction des Mudas** : Supprimer les validations en double et les étapes sans valeur ajoutée.",
+                "**Management Visuel** : Utiliser des codes couleurs pour identifier l'état d'avancement sans effort.",
+                "**Automatisation RPA** : Déléguer les tâches répétitives à faible valeur à des scripts."
             ]
         }
 
-        ideas = stratégies.get(top_irritant, ["Plan Kaizen", "Standardisation", "Audit", "Formation"])
+        ideas = solutions.get(top_theme, ["Plan Kaizen Flash", "Standardisation", "Audit 5S", "Formation Standard"])
 
         c1, c2 = st.columns(2)
         with c1:
-            st.success(f"💡 **Idée 1 :** {ideas[0]}")
-            st.success(f"💡 **Idée 2 :** {ideas[1]}")
+            st.success(f"💡 {ideas[0]}")
+            st.success(f"💡 {ideas[1]}")
         with c2:
-            st.success(f"💡 **Idée 3 :** {ideas[2]}")
-            st.success(f"💡 **Idée 4 :** {ideas[3]}")
+            st.success(f"💡 {ideas[2]}")
+            st.success(f"💡 {ideas[3]}")
   
     # --- PHASE MEASURE ---
     with tabs[1]:
