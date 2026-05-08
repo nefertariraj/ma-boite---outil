@@ -440,69 +440,87 @@ else:
     COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
     if "voc_data" not in p: 
         p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
+    if "stats_voc" not in p:
+        p["stats_voc"] = {"Qualité": 0.1, "Temps": 0.1, "Relation": 0.1, "Coûts": 0.1}
 
     def analyser_voc_sur_mesure(uploaded_file):
         try:
-            # Chargement du fichier
+            # Chargement propre
             df = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
             df = df.fillna("")
             
-            # Normalisation des colonnes pour trouver "client" et "verbatim"
+            # Nettoyage des noms de colonnes pour éviter les erreurs de mapping
             import unicodedata
             def clean_col(n): 
                 return "".join(c for c in unicodedata.normalize('NFD', str(n).lower().strip()) if unicodedata.category(c) != 'Mn')
             
+            original_cols = df.columns.tolist()
             df.columns = [clean_col(c) for c in df.columns]
             
-            if "client" not in df.columns or "verbatim" not in df.columns:
-                st.error("❌ Les colonnes 'client' et 'verbatim' sont introuvables.")
-                return None, None
-
-            # 1. ANALYSE GLOBALE IA (Sémantique)
-            contexte_global = " ".join(df["verbatim"].astype(str).tolist()).lower()
+            # Détection dynamique des colonnes
+            col_c = next((c for c in df.columns if "client" in c), None)
+            col_v = next((c for c in df.columns if "verbatim" in c or "commentaire" in c or "avis" in c), None)
             
-            if any(w in contexte_global for w in ["delai", "attente", "lent", "temps"]):
-                synthese_pb = "Défaut de fluidité : Allongement critique du Lead Time"
-            elif any(w in contexte_global for w in ["erreur", "casse", "qualite", "manque", "defectueux"]):
-                synthese_pb = "Non-conformité : Écart aux spécifications techniques"
-            elif any(w in contexte_global for w in ["accueil", "reponse", "relation", "aimable"]):
-                synthese_pb = "Carence relationnelle : Déficit de communication client"
-            else:
-                synthese_pb = "Instabilité process : Variabilité des résultats constatée"
+            if not col_c or not col_v:
+                st.error(f"❌ Colonnes introuvables. Colonnes détectées : {original_cols}. Assurez-vous d'avoir 'client' et 'verbatim'.")
+                return None, None, None
 
-            # 2. REMPLISSAGE DU TABLEAU
+            # 1. ANALYSE SÉMANTIQUE POUR LA RÉPARTITION (PARETO)
+            text_total = " ".join(df[col_v].astype(str).tolist()).lower()
+            
+            counts = {
+                "Qualité": text_total.count("qualite") + text_total.count("erreur") + text_total.count("casse") + text_total.count("panne") + text_total.count("defectue"),
+                "Temps": text_total.count("delai") + text_total.count("attente") + text_total.count("lent") + text_total.count("retard") + text_total.count("long"),
+                "Relation": text_total.count("accueil") + text_total.count("reponse") + text_total.count("aimable") + text_total.count("ecoute") + text_total.count("service"),
+                "Coûts": text_total.count("cher") + text_total.count("prix") + text_total.count("facture") + text_total.count("cout") + text_total.count("rembourse")
+            }
+            
+            # Calcul des pourcentages pour les jauges (normalisation)
+            total_matches = sum(counts.values()) or 1
+            stats = {k: min(max(v / (len(df)/2), 0.05), 1.0) for k, v in counts.items()}
+
+            # 2. DÉTERMINATION DU PROBLÈME GLOBAL (Le plus fréquent)
+            top_issue = max(counts, key=counts.get)
+            dict_labels = {
+                "Qualité": "Non-conformité : Écart aux spécifications techniques",
+                "Temps": "Défaut de fluidité : Allongement critique du Lead Time",
+                "Relation": "Carence relationnelle : Déficit de communication client",
+                "Coûts": "Écart économique : Problématique de valeur perçue / prix"
+            }
+            synthese_pb = dict_labels.get(top_issue, "Instabilité process")
+
+            # 3. REMPLISSAGE DU TABLEAU
             res = []
             for _, row in df.iterrows():
-                v_text = str(row["verbatim"])
+                v_text = str(row[col_v])
                 if len(v_text) < 2: continue
-                
                 res.append({
-                    "client": str(row["client"])[:30],
+                    "client": str(row[col_c])[:30],
                     "Verbatim": v_text,
                     "problème": synthese_pb,
-                    "fréquence": "fréquent",
-                    "gravité": "très grave"
+                    "fréquence": "Fréquent",
+                    "gravité": "Critique" if any(w in v_text.lower() for w in ["honte", "jamais", "rembourse", "scandale", "nul"]) else "Majeur"
                 })
-            return res, synthese_pb
+            return res, synthese_pb, stats
         except Exception as e:
-            st.error(f"Erreur lors de l'analyse : {e}")
-            return None, None
+            st.error(f"Erreur d'analyse : {e}")
+            return None, None, None
 
-    # Interface d'importation
     with st.expander("📥 Importation et Analyse Contextuelle", expanded=True):
         up_file = st.file_uploader("Charger le fichier VOC", type=["xlsx", "xls", "csv"], key="voc_v21_final")
         if up_file is not None:
             if st.button("🚀 Lancer l'Analyse IA Contextuelle"):
-                data_res, synthese = analyser_voc_sur_mesure(up_file)
+                data_res, synthese, stats_res = analyser_voc_sur_mesure(up_file)
                 if data_res:
                     p["voc_data"] = data_res
                     p["synthese_globale"] = synthese
-                    st.success("✅ Analyse du fichier terminée.")
+                    p["stats_voc"] = stats_res
+                    st.success("✅ Analyse contextuelle terminée.")
                     st.rerun()
 
-    # Affichage des résultats si des données existent
     if p["voc_data"] and p["voc_data"][0].get("client") != "":
-        # Tableau éditable
+        # Tableau éditable avec le problème IA
+        st.info(f"💡 **Analyse IA :** Le problème majeur identifié est : **{p.get('synthese_globale', 'Non défini')}**")
         edited_voc = st.data_editor(
             pd.DataFrame(p["voc_data"])[COLONNES_VOC],
             num_rows="dynamic",
@@ -512,39 +530,51 @@ else:
         if edited_voc is not None:
             p["voc_data"] = edited_voc.to_dict('records')
 
-        # Indicateurs visuels
+        # RÉPARTITION DES IRRITANTS (Dynamique)
         st.write("---")
-        st.markdown("### 🧠 Répartition des Irritants (Vue Black Belt)")
-        f1, f2, f3, f4 = st.columns(4)
-        f1.markdown("**🛠️ Qualité**"); f1.progress(0.2)
-        f2.markdown("**⏱️ Temps**"); f2.progress(0.8)
-        f3.markdown("**📞 Relation**"); f3.progress(0.4)
-        f4.markdown("**💰 Coûts**"); f4.progress(0.1)
+        st.markdown("### 🧠 Répartition des Irritants (Analyse de Fréquence)")
+        s = p["stats_voc"]
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.metric("🛠️ Qualité", f"{int(s['Qualité']*100)}%")
+            st.progress(s['Qualité'])
+        with c2:
+            st.metric("⏱️ Temps", f"{int(s['Temps']*100)}%")
+            st.progress(s['Temps'])
+        with c3:
+            st.metric("📞 Relation", f"{int(s['Relation']*100)}%")
+            st.progress(s['Relation'])
+        with c4:
+            st.metric("💰 Coûts", f"{int(s['Coûts']*100)}%")
+            st.progress(s['Coûts'])
 
-        # 3. PROPOSITIONS D'AMÉLIORATION SUR-MESURE
+        # AXES D'AMÉLIORATION SUR-MESURE
         st.write("---")
-        st.markdown("### 🚀 Propositions d'Amélioration Spécifiques")
+        st.markdown("### 🚀 Propositions d'Amélioration Spécifiques au Cas")
+        main_issue = p.get("synthese_globale", "")
         
-        main_issue = p.get("synthese_globale", "Instabilité")
-        
-        # Logique de décision pour les solutions
         if "Lead Time" in main_issue:
             solutions = [
-                {"t": "Cartographie VSM (Value Stream Mapping)", "d": "Analyser les goulots d'étranglement pour fluidifier le flux de valeur."},
-                {"t": "Standardisation du Takt Time", "d": "Aligner la cadence de production sur la demande client réelle."},
-                {"t": "Réduction des Mudas d'attente", "d": "Éliminer les temps morts entre les étapes de validation."}
+                {"t": "Cartographie VSM (Value Stream Mapping)", "d": "Le temps est votre irritant n°1. Il faut cartographier le flux pour identifier où le dossier stagne."},
+                {"t": "Standardisation du Takt Time", "d": "Aligner la vitesse de traitement sur le rythme des demandes clients pour éviter l'encours."},
+                {"t": "SMED Administratif", "d": "Réduire les temps de changement de tâche ou de préparation des dossiers."}
             ]
         elif "Non-conformité" in main_issue:
             solutions = [
-                {"t": "Méthode Ishikawa / 5 Pourquoi", "d": "Identifier la cause racine technique de la non-qualité signalée."},
-                {"t": "Déploiement de Poka-Yoke", "d": "Installer des systèmes anti-erreur pour bloquer les défauts en amont."},
-                {"t": "Maitrise Statistique des Procédés (MSP)", "d": "Surveiller la stabilité de la qualité via des cartes de contrôle."}
+                {"t": "Analyse Ishikawa / 5 Pourquoi", "d": "La qualité fait défaut. Une recherche de cause racine est impérative sur les défauts signalés."},
+                {"t": "Poka-Yoke (Anti-erreur)", "d": "Mettre en place des verrous numériques ou physiques pour empêcher l'erreur d'arriver au client."},
+                {"t": "Autocontrôle au poste", "d": "Responsabiliser les acteurs sur la conformité de leur propre travail."}
+            ]
+        elif "Relation" in main_issue:
+            solutions = [
+                {"t": "Standardisation du discours (Scripting)", "d": "Homogénéiser les réponses pour garantir une écoute client constante."},
+                {"t": "Mise en place d'un CRM / Suivi", "d": "Centraliser les échanges pour éviter que le client n'ait à se répéter."},
+                {"t": "Formation Communication Non-Violente", "d": "Donner des outils aux équipes pour gérer les verbatims agressifs."}
             ]
         else:
             solutions = [
-                {"t": "Standardisation des Compétences", "d": "Assurer un niveau de service homogène via des fiches de postes claires."},
-                {"t": "Management Visuel (Obeya)", "d": "Rendre les indicateurs de performance visibles pour réagir en temps réel."},
-                {"t": "Audit de Poste", "d": "Vérifier l'application des standards là où la variabilité est la plus forte."}
+                {"t": "Revue de la Proposition de Valeur", "d": "Le coût est perçu comme trop élevé face à la prestation. Il faut analyser le rapport Qualité/Prix."},
+                {"t": "Analyse de la Valeur (Lean Design)", "d": "Supprimer les options coûteuses dont le client n'a pas fait mention dans ses verbatims."}
             ]
 
         for sol in solutions:
