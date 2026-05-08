@@ -433,131 +433,164 @@ else:
                             st.write("")
 
     # --- 6. VOICE OF CUSTOMER (VOC) : ANALYSEUR EXPERT BLACK BELT ---
+    import streamlit as st
+import pandas as pd
+import io
+
+# --- CONFIGURATION & STYLE ---
+def app():
+    # p est supposé être votre dictionnaire de session pour le projet actuel
+    # Si vous testez ce code isolément, remplacez 'p' par 'st.session_state'
+    p = st.session_state 
+    p_idx = 0 # Index pour les clés uniques
+
     st.divider()
-    st.subheader("6. Voice of Customer (VOC) & Analyse des Sources de Variabilité")
+    st.header("🎯 Voice of Customer (VOC) - Méthode Black Belt")
 
-    # Initialisation des états
-    if "voc_data" not in p: 
-        p["voc_data"] = []
-    if "top_issue" not in p:
-        p["top_issue"] = "Stabilité"
-
-    def moteur_analyse_expert(uploaded_file):
-        try:
-            # Chargement
-            df = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
-            df = df.fillna("")
-            
-            # Détection des colonnes clés
-            cols = [str(c).lower() for c in df.columns]
-            idx_v = next((i for i, c in enumerate(cols) if any(k in c for k in ["verbatim", "avis", "commentaire", "texte"])), None)
-            idx_c = next((i for i, c in enumerate(cols) if "client" in c), None)
-
-            if idx_v is None:
-                st.error("❌ Impossible de trouver la colonne 'Verbatim'.")
-                return None
-
-            resultats = []
-            stats = {"QUALITÉ": 0, "DÉLAIS": 0, "COÛTS": 0, "RELATION": 0}
-
-            for _, row in df.iterrows():
-                v = str(row.iloc[idx_v]).lower()
-                client = str(row.iloc[idx_c]) if idx_c is not None else "Anonyme"
-                
-                # --- LOGIQUE DE CATÉGORISATION BLACK BELT ---
-                # On définit la catégorie, la source de non-valeur (Muda) et l'action corrective associée
-                if any(w in v for w in ["lent", "attente", "long", "delai", "retard", "planning"]):
-                    cat, muda, action = "DÉLAIS", "Attente / Lead Time", "Réduction du cycle (VSM)"
-                    stats["DÉLAIS"] += 1
-                elif any(w in v for w in ["erreur", "casse", "trompe", "mauvais", "qualite", "panne", "defectueux"]):
-                    cat, muda, action = "QUALITÉ", "Défauts / Retouches", "Poka-Yoke / Ishikawa"
-                    stats["QUALITÉ"] += 1
-                elif any(w in v for w in ["cher", "prix", "facture", "argent", "cout"]):
-                    cat, muda, action = "COÛTS", "Sur-Qualité / Perte", "Analyse de la Valeur"
-                    stats["COÛTS"] += 1
-                else:
-                    cat, muda, action = "RELATION", "Sous-utilisation compétences", "Standardisation Service"
-                    stats["RELATION"] += 1
-
-                # Calcul de la sévérité CTQ (Critical To Quality)
-                sev = "Critique" if any(w in v for w in ["jamais", "honte", "scandale", "resilier", "rembourse"]) else "Majeur"
-
-                resultats.append({
-                    "Client": client,
-                    "Verbatim Client": str(row.iloc[idx_v])[:100],
-                    "Catégorie QCD": cat,
-                    "Type de Muda": muda,
-                    "Impact CTQ": sev,
-                    "Levier Correctif": action
-                })
-            
-            top_problem = max(stats, key=stats.get)
-            return resultats, top_problem, stats
-        except Exception as e:
-            st.error(f"Erreur d'analyse : {e}")
-            return None, None, None
-
-    # UI : IMPORTATION
-    with st.expander("📥 Importation des données VOC", expanded=True):
-        up_file = st.file_uploader("Fichier Excel/CSV", type=["xlsx", "xls", "csv"], key="voc_final_v3")
-        if up_file and st.button("🚀 Lancer l'Analyse Lean Six Sigma"):
-            data, top, s = moteur_analyse_expert(up_file)
-            if data:
-                p["voc_data"] = data
-                p["top_issue"] = top
-                p["stats_qcd"] = s
-                st.success(f"✅ Analyse terminée. Problème dominant détecté : {top}")
-                st.rerun()
-
-    # AFFICHAGE DES RÉSULTATS
-    if p["voc_data"]:
-        # 1. Dashboard de Pilotage
-        st.markdown("### 📊 Répartition des Irritants (Vue Pareto)")
-        sc = p.get("stats_qcd", {"QUALITÉ": 0, "DÉLAIS": 0, "COÛTS": 0, "RELATION": 0})
-        total = sum(sc.values()) or 1
-        
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("🛠️ Qualité", f"{int(sc['QUALITÉ']/total*100)}%", delta="Non-conformités")
-        c2.metric("⏱️ Délais", f"{int(sc['DÉLAIS']/total*100)}%", delta="Lead Time")
-        c3.metric("📞 Relation", f"{int(sc['RELATION']/total*100)}%", delta="Expérience")
-        c4.metric("💰 Coûts", f"{int(sc['COÛTS']/total*100)}%", delta="Efficience")
-
-        # 2. Le Tableau Catégorisé
-        st.write("---")
-        st.subheader("📋 Matrice d'Analyse des Irritants")
-        df_final = pd.DataFrame(p["voc_data"])
-        st.data_editor(df_final, use_container_width=True, num_rows="dynamic")
-
-        # 3. AXES D'AMÉLIORATION BLACK BELT (Le "So What?")
-        st.write("---")
-        st.markdown("### 🚀 Axes d'Amélioration Stratégiques")
-        
-        issue = p["top_issue"]
-        
-        if issue == "DÉLAIS":
-            colA, colB = st.columns(2)
-            with colA:
-                st.info("**Action 1 : Cartographie VSM**\n\nAnalyser les temps de traversée pour identifier les 'Wait Times' entre les services.")
-            with colB:
-                st.info("**Action 2 : Équilibrage de charge**\n\nCalculer le Takt Time pour aligner la capacité sur la demande réelle.")
-        
-        elif issue == "QUALITÉ":
-            colA, colB = st.columns(2)
-            with colA:
-                st.error("**Action 1 : Chantier Ishikawa**\n\nIdentifier les causes racines (5M) des défauts répétitifs constatés.")
-            with colB:
-                st.error("**Action 2 : Standardisation**\n\nDéployer des Poka-Yoke pour bloquer l'erreur à la source.")
-        
-        elif issue == "COÛTS":
-            colA, colB = st.columns(2)
-            with colA:
-                st.warning("**Action 1 : Analyse de la Valeur**\n\nÉliminer les fonctions ou étapes coûteuses non perçues par le client.")
-            with colB:
-                st.warning("**Action 2 : Réduction des Mudas**\n\nCibler les gaspillages de surproduction ou de stock.")
-        
-        else:
-            st.success("**Axe Relationnel : Standardisation du Service**\n\nDéfinition d'un SLA (Service Level Agreement) clair et formation aux soft-skills.")         
+    # --- 1. ÉLABORATION DU QUESTIONNAIRE ---
+    st.subheader("1. Élaboration du Questionnaire")
+    questions_par_defaut = [
+        "Qu’est ce qui vous fait perdre du temps ?",
+        "Qu’est ce qui vous oblige à refaire une tâche ?",
+        "A quel moment le processus devient pénible ?",
+        "Qu’est ce qui vous énerve le plus ?",
+        "Si vous pouviez changer une seule chose ?"
+    ]
     
+    if "voc_questions" not in p:
+        p["voc_questions"] = questions_par_defaut
+
+    # Interface pour modifier les questions
+    with st.expander("📝 Configurer les questions du sondage"):
+        new_q = []
+        for i, q in enumerate(p["voc_questions"]):
+            updated_q = st.text_input(f"Question {i+1}", value=q, key=f"q_input_{i}")
+            new_q.append(updated_q)
+        p["voc_questions"] = new_q
+
+    # --- 2. COLLECTE DES DONNÉES ---
+    st.write("---")
+    st.subheader("2. Collecte des Données")
+
+    if "voc_raw_data" not in p:
+        p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute", "catégorie_ia", "gravité", "note"])
+
+    col_up1, col_up2 = st.columns([2, 1])
+    with col_up1:
+        uploaded_file = st.file_uploader("Importer un fichier Excel pour remplissage automatique", type=["xlsx", "xls"])
+    with col_up2:
+        st.write("##")
+        if uploaded_file:
+            if st.button("🚀 Analyser & Importer"):
+                df_import = pd.read_excel(uploaded_file)
+                # Simulation d'IA : Mapping intelligent des colonnes
+                df_import.columns = [c.lower().strip() for c in df_import.columns]
+                # On cherche les colonnes correspondantes ou on les crée
+                mapping = {
+                    "client": next((c for c in df_import.columns if "client" in c or "nom" in c), "Inconnu"),
+                    "question": next((c for c in df_import.columns if "quest" in c), "Non spécifiée"),
+                    "réponse brute": next((c for c in df_import.columns if "rép" in c or "verbatim" in c or "avis" in c), ""),
+                }
+                new_data = pd.DataFrame({
+                    "client": df_import[mapping["client"]] if mapping["client"] in df_import else "Client",
+                    "question": df_import[mapping["question"]] if mapping["question"] in df_import else "N/A",
+                    "réponse brute": df_import[mapping["réponse brute"]] if mapping["réponse brute"] in df_import else ""
+                })
+                p["voc_raw_data"] = pd.concat([p["voc_raw_data"], new_data], ignore_index=True)
+                st.success("Importation réussie avec alignement intelligent.")
+
+    # Tableau interactif
+    p["voc_raw_data"] = st.data_editor(
+        p["voc_raw_data"],
+        num_rows="dynamic",
+        use_container_width=True,
+        key=f"raw_editor_{p_idx}"
+    )
+
+    # --- 3. ANALYSE DES DONNÉES (AFFINITY DIAGRAM & CTQ) ---
+    st.write("---")
+    st.subheader("3. Analyse Thématique (Affinity Diagram) & CTQ")
+
+    if st.button("🧠 Générer l'Analyse Thématique Black Belt"):
+        if not p["voc_raw_data"].empty and p["voc_raw_data"]["réponse brute"].str.len().sum() > 5:
+            verbatims = " ".join(p["voc_raw_data"]["réponse brute"].astype(str)).lower()
+            total_n = len(p["voc_raw_data"])
+
+            # Logique d'analyse sémantique pour les 5 thèmes d'irritants
+            themes_logic = [
+                {"th": "Délais & Attentes", "kw": ["temps", "long", "attente", "lent", "délai"], "ctq": "Lead Time < X min"},
+                {"th": "Non-Qualité / Retouches", "kw": ["refaire", "erreur", "trompé", "recommencer", "faute"], "ctq": "First Pass Yield > 98%"},
+                {"th": "Complexité / Pénibilité", "kw": ["pénible", "lourd", "difficile", "compliqué", "clics"], "ctq": "Nombre d'étapes < Y"},
+                {"th": "Ergonomie & Outils", "kw": ["énerve", "outil", "logiciel", "bug", "clavier"], "ctq": "Disponibilité système 100%"},
+                {"th": "Communication / Flux", "kw": ["changer", "info", "manque", "comprendre", "flou"], "ctq": "Zéro manque d'information au poste"}
+            ]
+
+            analysis_res = []
+            for t in themes_logic:
+                occ = sum(1 for v in p["voc_raw_data"]["réponse brute"].astype(str).lower() if any(k in v for k in t["kw"]))
+                if occ > 0 or True: # On garde les 5 lignes
+                    analysis_res.append({
+                        "thème des irritants": t["th"],
+                        "explication": f"Gaspillage lié à : {t['kw'][0]}",
+                        "nombre d'occurrence": occ,
+                        "pourcentage": f"{(occ/total_n)*100:.1f}%" if total_n > 0 else "0%",
+                        "CTQ": t["ctq"],
+                        "raw_occ": occ # pour le tri
+                    })
+            
+            # Tri décroissant
+            p["voc_analysis"] = pd.DataFrame(analysis_res).sort_values(by="raw_occ", ascending=False).drop(columns=["raw_occ"])
+        else:
+            st.warning("Veuillez remplir le tableau de collecte pour lancer l'analyse.")
+
+    if "voc_analysis" in p:
+        st.table(p["voc_analysis"])
+
+    # --- 4. PROPOSITION D'AMÉLIORATION ---
+    st.write("---")
+    st.subheader("4. Propositions d'Amélioration (Expertise Black Belt)")
+
+    if "voc_analysis" in p:
+        top_issue = p["voc_analysis"].iloc[0]["thème des irritants"]
+        
+        # Mapping des solutions Lean Six Sigma
+        solutions_map = {
+            "Délais & Attentes": [
+                "Implémentation d'un flux tiré (Kanban) pour supprimer les files d'attente.",
+                "Chantier SMED pour réduire les temps de préparation de 50%.",
+                "Rééquilibrage des postes via le calcul du Takt Time.",
+                "Automatisation RPA des tâches administratives à faible valeur ajoutée."
+            ],
+            "Non-Qualité / Retouches": [
+                "Déploiement de Poka-Yoke (systèmes anti-erreur) physiques ou logiciels.",
+                "Mise en place d'un contrôle statistique des procédés (MSP/SPC).",
+                "Standardisation des modes opératoires (SOP) via management visuel.",
+                "Formation 'Do it right first time' et matrice de polycompétence."
+            ],
+            "Complexité / Pénibilité": [
+                "Analyse VSM (Value Stream Mapping) pour supprimer 30% des étapes de non-valeur ajoutée.",
+                "Application des 5S pour optimiser l'ergonomie du poste de travail.",
+                "Réduction de la charge cognitive par la simplification des interfaces.",
+                "Cellularisation du processus pour limiter les transferts inutiles."
+            ]
+        }
+        
+        # Sélection des idées basées sur le thème dominant (ou défaut par défaut)
+        idees = solutions_map.get(top_issue, [
+            "Digitalisation du flux d'information.",
+            "Mise en place d'un management visuel de la performance.",
+            "Réalisation d'un Kaizen Flash sur le goulot d'étranglement.",
+            "Audit de conformité des standards actuels."
+        ])
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.success(f"💡 **Idée 1 :** {idees[0]}")
+            st.success(f"💡 **Idée 2 :** {idees[1]}")
+        with c2:
+            st.success(f"💡 **Idée 3 :** {idees[2]}")
+            st.success(f"💡 **Idée 4 :** {idees[3]}")
+  
     # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
