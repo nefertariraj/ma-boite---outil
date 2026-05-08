@@ -491,12 +491,19 @@ else:
     if edited_df is not None:
         p["voc_raw_data"] = edited_df
 
-    # --- ÉTAPE 3 : ANALYSE ---
+    # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ ---
     st.write("---")
     st.subheader("3. Analyse Thématique & CTQ")
     
-    if st.button("🧠 Lancer l'Analyse", key="btn_v9"):
-        df_src = p["voc_raw_data"]
+    if st.button("🧠 Lancer l'Analyse", key="btn_v10"):
+        # On récupère les données fraîches de l'éditeur
+        df_src = p["voc_raw_data"].copy()
+        
+        # Sécurité : On vérifie si la colonne existe, sinon on prend la dernière colonne du tableau
+        target_col = "réponse brute"
+        if target_col not in df_src.columns:
+            target_col = df_src.columns[-1]
+
         if not df_src.empty:
             total = len(df_src)
             mapping = [
@@ -508,8 +515,11 @@ else:
             ]
 
             res = []
+            # On convertit la colonne en liste pour éviter les erreurs d'attribut Pandas
+            verbatims = df_src[target_col].astype(str).str.lower().tolist()
+            
             for m in mapping:
-                count = sum(1 for r in df_src["réponse brute"].astype(str).lower() if any(k in r for k in m["kw"]))
+                count = sum(1 for r in verbatims if any(k in r for k in m["kw"]))
                 res.append({
                     "thème des irritants": m["th"],
                     "explication": m["ex"],
@@ -519,24 +529,27 @@ else:
                     "sort": count
                 })
             
+            # Sauvegarde dans la session pour que ça reste affiché
             p["voc_results"] = pd.DataFrame(res).sort_values("sort", ascending=False).drop(columns=["sort"])
+            st.rerun() # Force l'affichage immédiat du bloc 4
         else:
             st.warning("Tableau vide.")
 
-    # AFFICHAGE PERSISTANT DES RÉSULTATS ET SOLUTIONS
+    # --- ÉTAPE 4 : AFFICHAGE PERSISTANT ---
     if "voc_results" in p:
         st.table(p["voc_results"])
 
         st.write("---")
         st.subheader("4. Propositions d'Amélioration Black Belt")
         
+        # Extraction du thème gagnant
         top_irritant = p["voc_results"].iloc[0]["thème des irritants"]
         st.info(f"🎯 **Priorité Pareto : {top_irritant}**")
 
         stratégies = {
             "Délais (Lead Time)": ["VSM pour supprimer les attentes", "Kanban pour réguler le flux", "Takt Time", "RPA"],
             "Qualité (Défauts)": ["Poka-Yoke (Anti-erreur)", "SOP (Standards visuels)", "5 Pourquoi", "Check-list"],
-            "Pénibilité": ["5S Digital", "Suppression de la Non-Valeur Ajoutée", "Ergonomie", "Polyvalence"],
+            "Pénibilité": ["5S Digital", "Suppression de la NVA", "Ergonomie", "Polyvalence"],
             "Outils": ["Audit IT", "Simplification d'interface", "Automatisation", "Maintenance préventive"],
             "Information": ["Standardisation des données", "Management Visuel", "AIC (Animation Courte)", "Digitalisation"]
         }
