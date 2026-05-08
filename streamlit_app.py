@@ -599,7 +599,7 @@ else:
         # 2. Lien avec le DMAIC
         st.write("---")
         st.caption(f"Prochaine étape suggérée (Phase IMPROVE) : Lancer un groupe de travail ciblé sur les {occurrence} points de douleur pour définir les solutions futures.")
-  
+    
     # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
