@@ -432,7 +432,66 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-  # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ ---
+  # --- 6. VOICE OF CUSTOMER (VOC) : VERSION BLACK BELT OPTIMISÉE ---
+    st.divider()
+    st.header("🎯 Voice of Customer (VOC) - Flux Black Belt")
+
+    if 'p' not in locals(): p = st.session_state
+
+    # 1. INITIALISATION DES VARIABLES
+    if "voc_questions" not in p:
+        p["voc_questions"] = ["Temps perdu ?", "Retouches ?", "Pénibilité ?", "Irritants ?", "Changement unique ?"]
+    if "voc_raw_data" not in p:
+        p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute"])
+
+    # --- ÉTAPE 1 : ÉLABORATION ---
+    st.subheader("1. Élaboration du Questionnaire")
+    with st.expander("📝 Configurer les questions"):
+        for i, q in enumerate(p["voc_questions"]):
+            p["voc_questions"][i] = st.text_input(f"Question {i+1}", value=q, key=f"q_v9_{i}")
+
+    # --- ÉTAPE 2 : COLLECTE (IMPORT RAPIDE) ---
+    st.write("---")
+    st.subheader("2. Collecte des Données")
+    
+    up_file = st.file_uploader("Importer Excel (Rapide)", type=["xlsx", "xls"], key="up_v9")
+    
+    if up_file is not None:
+        # On utilise une clé basée sur le nom et la taille pour ne charger qu'une fois
+        file_id = f"{up_file.name}_{up_file.size}"
+        if p.get("last_uploaded_file") != file_id:
+            try:
+                df_imp = pd.read_excel(up_file).fillna("")
+                df_imp.columns = [c.lower().strip() for c in df_imp.columns]
+                
+                # Mapping intelligent
+                c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
+                q_col = next((c for c in df_imp.columns if "quest" in c), None)
+                r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
+                
+                new_rows = pd.DataFrame({
+                    "client": df_imp[c_col].astype(str),
+                    "question": df_imp[q_col].astype(str) if q_col else "Import",
+                    "réponse brute": df_imp[r_col].astype(str)
+                })
+                
+                p["voc_raw_data"] = pd.concat([p["voc_raw_data"], new_rows], ignore_index=True)
+                p["last_uploaded_file"] = file_id # Marque le fichier comme traité
+                st.success("✅ Données chargées.")
+            except Exception as e:
+                st.error(f"Erreur : {e}")
+
+    # Tableau éditable avec sauvegarde forcée
+    edited_df = st.data_editor(
+        p["voc_raw_data"],
+        num_rows="dynamic",
+        use_container_width=True,
+        key="editor_v9"
+    )
+    if edited_df is not None:
+        p["voc_raw_data"] = edited_df
+
+    # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ ---
     st.write("---")
     st.subheader("3. Analyse Thématique & CTQ")
     
