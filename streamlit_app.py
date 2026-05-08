@@ -450,62 +450,67 @@ else:
         for i, q in enumerate(p["voc_questions"]):
             p["voc_questions"][i] = st.text_input(f"Question {i+1}", value=q, key=f"q_v9_{i}")
 
-    # --- ÉTAPE 2 : COLLECTE (IMPORT RAPIDE) ---
+    # --- ÉTAPE 2 : COLLECTE DES DONNÉES (FLUX DYNAMIQUE) ---
     st.write("---")
     st.subheader("2. Collecte des Données")
     
-    up_file = st.file_uploader("Importer Excel (Rapide)", type=["xlsx", "xls"], key="up_v9")
+    # Importation sécurisée
+    up_file = st.file_uploader("Importer un fichier Excel", type=["xlsx", "xls"], key="up_v_final")
     
     if up_file is not None:
-        # On utilise une clé basée sur le nom et la taille pour ne charger qu'une fois
         file_id = f"{up_file.name}_{up_file.size}"
-        if p.get("last_uploaded_file") != file_id:
+        # Si c'est un nouveau fichier, on vide l'ancienne analyse
+        if st.session_state.get("last_file") != file_id:
             try:
                 df_imp = pd.read_excel(up_file).fillna("")
                 df_imp.columns = [c.lower().strip() for c in df_imp.columns]
                 
-                # Mapping intelligent
+                # Mapping intelligent des colonnes
                 c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
-                q_col = next((c for c in df_imp.columns if "quest" in c), None)
                 r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
                 
                 new_rows = pd.DataFrame({
                     "client": df_imp[c_col].astype(str),
-                    "question": df_imp[q_col].astype(str) if q_col else "Import",
+                    "question": "Import Excel",
                     "réponse brute": df_imp[r_col].astype(str)
                 })
                 
-                p["voc_raw_data"] = pd.concat([p["voc_raw_data"], new_rows], ignore_index=True)
-                p["last_uploaded_file"] = file_id # Marque le fichier comme traité
-                st.success("✅ Données chargées.")
+                # Mise à jour de la session et RESET de l'analyse
+                st.session_state.voc_raw_data = new_rows
+                st.session_state.voc_results = None  
+                st.session_state.last_file = file_id
+                st.success("✅ Nouveau fichier détecté : Analyse réinitialisée.")
+                st.rerun()
             except Exception as e:
-                st.error(f"Erreur : {e}")
+                st.error(f"Erreur lors de l'import : {e}")
 
-    # Tableau éditable avec sauvegarde forcée
+    # Initialisation du tableau si vide
+    if "voc_raw_data" not in st.session_state:
+        st.session_state.voc_raw_data = pd.DataFrame(columns=["client", "question", "réponse brute"])
+
+    # ÉDITEUR : La source de vérité visuelle
     edited_df = st.data_editor(
-        p["voc_raw_data"],
+        st.session_state.voc_raw_data,
         num_rows="dynamic",
         use_container_width=True,
-        key="editor_v9"
+        key="editor_sync_v10"
     )
+    
+    # Synchronisation immédiate en cas de modification manuelle
     if edited_df is not None:
-        p["voc_raw_data"] = edited_df
+        st.session_state.voc_raw_data = edited_df
 
     # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ (LE MOTEUR) ---
     st.write("---")
     st.subheader("3. Analyse Thématique & CTQ")
     
-    # Initialisation sécurisée dans la session
-    if "voc_results" not in st.session_state:
-        st.session_state.voc_results = None
-
-    # On récupère les données de l'étape 2
-    df_source = st.session_state.get("voc_raw_data", pd.DataFrame())
-
-    if st.button("🧠 Lancer l'Analyse Thématique", key="btn_v_final_ultra"):
-        if not df_source.empty:
-            # Extraction sécurisée du texte (dernière colonne)
-            verbatims = df_source.iloc[:, -1].astype(str).str.lower().tolist()
+    if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key="btn_run_analysis_v10"):
+        # On travaille sur les données exactes du tableau
+        df_to_analyze = st.session_state.voc_raw_data
+        
+        if not df_to_analyze.empty:
+            # Extraction des verbatims (dernière colonne)
+            verbatims = df_to_analyze.iloc[:, -1].astype(str).str.lower().tolist()
             total = len(verbatims)
             
             # Matrice sémantique Lean Six Sigma
@@ -526,75 +531,75 @@ else:
                     "nombre d'occurrence": count,
                     "pourcentage": f"{(count/total)*100:.1f}%" if total > 0 else "0%",
                     "CTQ": m["ctq"],
-                    "score_tri": count
+                    "score": count
                 })
             
-            # Stockage permanent et tri Pareto
-            st.session_state.voc_results = pd.DataFrame(res_data).sort_values("score_tri", ascending=False).drop(columns=["score_tri"])
+            # Stockage du résultat trié par Pareto (score décroissant)
+            st.session_state.voc_results = pd.DataFrame(res_data).sort_values("score", ascending=False).drop(columns=["score"])
             st.rerun()
         else:
-            st.error("⚠️ Le tableau de collecte est vide. Impossible de générer l'analyse.")
+            st.warning("⚠️ Le tableau est vide. Veuillez ajouter des données.")
 
-    # --- ÉTAPE 4 : DIAGNOSTIC & STRATÉGIE (REGARD BLACK BELT) ---
-    if st.session_state.voc_results is not None:
+    # --- ÉTAPE 4 : DIAGNOSTIC & STRATÉGIE (EXPERTISE BLACK BELT) ---
+    if st.session_state.get("voc_results") is not None:
         st.write("### 📊 Résultat de l'Analyse Thématique")
         st.table(st.session_state.voc_results)
 
         st.write("---")
         st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
         
-        # Identification du problème racine
-        top_row = st.session_state.voc_results.iloc[0]
-        top_theme = top_row["thème des irritants"]
-        occurrence = top_row["nombre d'occurrence"]
-        ctq_cible = top_row["CTQ"]
+        # Récupération de l'irritant majeur (Pareto)
+        res = st.session_state.voc_results
+        top_theme = res.iloc[0]["thème des irritants"]
+        occurrence = res.iloc[0]["nombre d'occurrence"]
+        ctq_cible = res.iloc[0]["CTQ"]
         
         st.markdown(f"### 🎯 Focus Prioritaire : {top_theme}")
         
-        # Réflexions dynamiques basées sur l'expertise LSS
+        # Réflexions stratégiques Lean Six Sigma
         reflexions = {
             "Délais (Lead Time)": {
-                "analyse": f"Avec {occurrence} signalements, nous identifions un **Muda d'attente** majeur. Le temps de cycle actuel est supérieur au Takt Time, créant des goulots d'étranglement.",
-                "strategie": "Engager une **VSM (Value Stream Mapping)** pour isoler les étapes à Non-Valeur Ajoutée (NVA).",
-                "outils": ["Calcul de l'Efficacité du Cycle", "Chantier Kaizen", "Kanban de régulation"]
+                "analyse": f"Le diagnostic révèle {occurrence} frictions temporelles. En Black Belt, cela traduit un **Lead Time** supérieur au Takt Time, générant des encours inutiles (WIP).",
+                "strategie": "Prioriser une **VSM (Value Stream Mapping)** pour quantifier la Valeur Ajoutée et passer d'un flux poussé à un flux tiré.",
+                "outils": ["Kanban", "Chantier Kaizen", "Calcul du Takt Time"]
             },
             "Qualité (Défauts)": {
-                "analyse": f"La non-qualité ({occurrence} occurrences) est ici votre principal levier de profit. C'est un coût caché (**COPQ**) qui dégrade la satisfaction.",
-                "strategie": "Passer à une approche **Zero Defect**. Analyser la variance du processus et stabiliser les standards.",
-                "outils": ["Poka-Yoke", "Analyse de Capabilité", "Standard Operating Procedures"]
+                "analyse": f"La non-qualité ({occurrence} cas) indique une instabilité du processus. Chaque défaut est un **COPQ** (Coût de non-qualité) qui détruit la valeur.",
+                "strategie": "Utiliser le cycle **DMAIC** pour stabiliser la variance. L'objectif est le 'Bon du premier coup' (FTQ).",
+                "outils": ["5 Pourquoi (Root Cause)", "Poka-Yoke", "Standard Operating Procedures"]
             },
             "Pénibilité": {
-                "analyse": f"L'indice de pénibilité est élevé. Cela génère du **Muri (Surcharge)**, source directe d'erreurs humaines et de démotivation.",
-                "strategie": "Simplifier le flux de travail. L'objectif est d'éliminer tout mouvement ou effort parasite pour l'opérateur.",
-                "outils": ["Analyse ergonomique", "5S de poste", "Standard Work"]
+                "analyse": f"La pénibilité signalée ({occurrence} fois) est un symptôme de **Muri** (Surcharge). Cela dégrade la capabilité humaine du processus.",
+                "strategie": "Réduire la charge cognitive et physique via l'ergonomie Lean et le **Standard Work**.",
+                "outils": ["5S Digital & Physique", "Analyse de déroulement", "Yamazumi (Equilibrage)"]
             },
             "Outils": {
-                "analyse": f"Les moyens de production (IT/Logiciel) ne sont plus **capables**. Le processus est freiné par des outils inadaptés.",
-                "strategie": "Optimiser la disponibilité et l'ergonomie des outils. Automatiser les tâches répétitives via RPA.",
-                "outils": ["AMDEC Moyens", "Simplification d'interface", "RPA / Macros"]
+                "analyse": f"L'outil actuel n'est plus **capable** par rapport aux exigences du processus. C'est un frein technique à l'excellence opérationnelle.",
+                "strategie": "Investir dans la capabilité des moyens. Automatiser (RPA) ce qui peut l'être pour recentrer l'humain sur la VA.",
+                "outils": ["AMDEC Moyens", "RPA / Low-Code", "Simplification UI"]
             },
             "Information": {
-                "analyse": f"Le flux d'information souffre de **Mura (Variabilité)**. L'ambiguïté des données force les acteurs à l'interprétation, ce qui tue la vitesse.",
-                "strategie": "Instaurer une 'Source Unique de Vérité'. Rendre l'information visuelle et incontestable.",
-                "outils": ["Management Visuel", "Obeya", "Standards de communication"]
+                "analyse": f"Le flux d'information souffre de **Mura**. L'ambiguïté oblige les équipes à naviguer à vue, créant du stress et de la lenteur.",
+                "strategie": "Instaurer le **Management Visuel** (Obeya) pour rendre l'anomalie visible instantanément.",
+                "outils": ["Management Visuel", "Rituels AIC", "Source Unique de Vérité"]
             }
         }
 
-        diag = reflexions.get(top_theme, {"analyse": "Analyse transverse requise.", "strategie": "Standardisation globale.", "outils": ["Audit", "Kaizen"]})
+        diag = reflexions.get(top_theme, {"analyse": "Analyse transverse requise.", "strategie": "Standardisation globale.", "outils": ["Audit"]})
 
-        with st.expander("🔍 Deep Dive : Analyse Structurelle", expanded=True):
+        with st.expander("🔍 Deep Dive Black Belt : Diagnostic", expanded=True):
             st.write(diag["analyse"])
-            st.write(f"**Indicateur CTQ critique à piloter :** `{ctq_cible}`")
+            st.write(f"**Indicateur CTQ cible :** `{ctq_cible}`")
 
-        st.info(f"🚀 **Orientation Stratégique :** {diag['strategie']}")
+        st.info(f"🚀 **Recommandation Stratégique :** {diag['strategie']}")
 
-        # Affichage des leviers actionnables
+        # Leviers opérationnels
         cols = st.columns(len(diag["outils"]))
         for i, tool in enumerate(diag["outils"]):
             cols[i].success(f"🛠️ {tool}")
 
-        st.caption(f"Phase DMAIC actuelle : **ANALYSE**. Préparez le passage en phase **IMPROVE** sur la base de ces {occurrence} points de douleur.")
-        
+        st.caption(f"Statut : Phase **ANALYSE** complétée pour {len(df_to_analyze)} verbatims.")   
+   
     # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
