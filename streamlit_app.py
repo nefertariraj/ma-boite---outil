@@ -432,109 +432,92 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-       # --- 6. VOICE OF CUSTOMER (VOC) - FIX BOUTON ANALYSE ---
+       # --- 6. VOICE OF CUSTOMER (VOC) - FIX FINAL BOUTON ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Analyse des Exigences")
 
-    # Initialisation des variables de session pour la persistance
-    if "dernier_fichier_nom" not in p:
-        p["dernier_fichier_nom"] = ""
-    if "analyse_en_cours" not in st.session_state:
-        st.session_state.analyse_en_cours = False
+    # Initialisation des clés de session
+    if "dernier_fichier_nom" not in p: p["dernier_fichier_nom"] = ""
+    if "voc_data" not in p: p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
 
-    COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
-    if "voc_data" not in p:
-        p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
+    # Définition de la fonction d'analyse (callback)
+    def analyser_voc_file(uploaded_file):
+        try:
+            df = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
+            df = df.fillna("")
+            cols = df.columns.tolist()
+
+            # Mapping sémantique
+            cols_clean = [c for c in cols if "?" not in str(c) and len(str(c)) < 45]
+            m_client = next((c for c in cols_clean if any(k in str(c).lower() for k in ["nom", "client", "société", "id"])), cols[0])
+            m_verb = next((c for c in cols if any(k in str(c).lower() for k in ["avis", "verbatim", "commentaire", "réponse", "feedback"])), cols[1] if len(cols)>1 else cols[0])
+
+            # Détection du thème dominant
+            text_total = " ".join(df[m_verb].astype(str).tolist()).lower()
+            theme = "Variabilité des processus"
+            if any(w in text_total for w in ["temps", "délai", "long", "attente"]): theme = "Performance des Délais"
+            elif any(w in text_total for w in ["qualité", "erreur", "cassé"]): theme = "Conformité Qualité"
+
+            res = []
+            for _, row in df.iterrows():
+                v_str = str(row[m_verb])
+                c_str = str(row[m_client])
+                if "?" in c_str or len(v_str) < 3: continue
+                res.append({
+                    "client": c_str[:30],
+                    "Verbatim": v_str,
+                    "problème": f"Analyse Black Belt : {theme} impacté.",
+                    "fréquence": "fréquent",
+                    "gravité": "très grave"
+                })
+            return res
+        except Exception as e:
+            st.error(f"Erreur interne : {e}")
+            return []
 
     with st.expander("📥 Importer un nouveau fichier (Analyse IA)", expanded=True):
-        uploaded_file = st.file_uploader("Fichier Excel ou CSV", type=["xlsx", "xls", "csv"], key="voc_loader_v17")
+        up_file = st.file_uploader("Fichier Excel ou CSV", type=["xlsx", "xls", "csv"], key="voc_loader_v18")
         
-        if uploaded_file is not None:
-            # Reset si nouveau fichier
-            if uploaded_file.name != p["dernier_fichier_nom"]:
-                p["voc_data"] = []
-                p["dernier_fichier_nom"] = uploaded_file.name
-                st.session_state.analyse_en_cours = False
+        if up_file is not None:
+            # Si nouveau fichier, on propose le bouton
+            if st.button("🚀 Exécuter l'Analyse Black Belt"):
+                data_analyse = analyser_voc_file(up_file)
+                if data_analyse:
+                    p["voc_data"] = data_analyse
+                    p["dernier_fichier_nom"] = up_file.name
+                    st.success("✅ Analyse terminée avec succès !")
+                    st.rerun()
 
-            # On place le bouton. S'il est cliqué, on passe la variable à True
-            if st.button("🚀 Lancer l'Analyse Black Belt du Fichier"):
-                st.session_state.analyse_en_cours = True
-
-            # L'analyse ne se lance que si la variable est True
-            if st.session_state.analyse_en_cours:
-                try:
-                    df_import = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
-                    df_import = df_import.fillna("") 
-                    
-                    toutes_cols = df_import.columns.tolist()
-
-                    # Mapping sémantique
-                    cols_potentielles = [c for c in toutes_cols if "?" not in str(c) and len(str(c)) < 45]
-                    map_client = next((c for c in cols_potentielles if any(k in str(c).lower() for k in ["nom", "client", "société", "id"])), toutes_cols[0])
-                    map_verbatim = next((c for c in toutes_cols if any(k in str(c).lower() for k in ["avis", "verbatim", "commentaire", "réponse", "feedback"])), toutes_cols[1] if len(toutes_cols)>1 else toutes_cols[0])
-
-                    # Analyse globale du thème
-                    verbatims_liste = df_import[map_verbatim].astype(str).tolist()
-                    text_complet = " ".join(verbatims_liste).lower()
-                    
-                    theme_dominant = "Variabilité des processus"
-                    if any(word in text_complet for word in ["temps", "délai", "long", "attente", "retard"]):
-                        theme_dominant = "Performance des Délais (Lead Time)"
-                    elif any(word in text_complet for word in ["qualité", "panne", "erreur", "cassé", "mauvais"]):
-                        theme_dominant = "Conformité Technique / Qualité"
-
-                    nouvelles_lignes = []
-                    for index, row in df_import.iterrows():
-                        v_raw = str(row[map_verbatim])
-                        val_c = str(row[map_client])
-                        if "?" in val_c or len(v_raw) < 3: continue
-
-                        nouvelles_lignes.append({
-                            "client": val_c[:30],
-                            "Verbatim": v_raw,
-                            "problème": f"Analyse Black Belt : {theme_dominant} impacté.",
-                            "fréquence": "fréquent", 
-                            "gravité": "très grave" 
-                        })
-                    
-                    if nouvelles_lignes:
-                        p["voc_data"] = nouvelles_lignes
-                        st.session_state.analyse_en_cours = False # On reset pour la prochaine fois
-                        st.success("✅ Analyse terminée.")
-                        st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur : {e}")
-
-    # 2. AFFICHAGE DU TABLEAU (En dehors du bouton pour qu'il reste visible)
-    df_voc_display = pd.DataFrame(p["voc_data"])
-    for col in COLONNES_VOC:
-        if col not in df_voc_display.columns: df_voc_display[col] = ""
-
-    edited_voc = st.data_editor(
-        df_voc_display[COLONNES_VOC],
-        num_rows="dynamic",
-        use_container_width=True,
-        key=f"editor_voc_v17_{p_idx}",
-        column_config={
-            "problème": st.column_config.TextColumn("🔍 Analyse IA (Synthèse)", width="large"),
-        }
-    )
-
-    if edited_voc is not None:
-        p["voc_data"] = edited_voc.to_dict('records')
-
-    # 3. SYNTHÈSE BLACK BELT
-    st.write("---")
-    if p["voc_data"] and p["voc_data"][0].get('problème'):
-        st.markdown("### 📊 Diagnostic Expert (Focus CTQ)")
+    # --- AFFICHAGE DES RÉSULTATS ---
+    if p["voc_data"] and p["voc_data"][0].get("client") != "":
+        df_display = pd.DataFrame(p["voc_data"])
         
+        # On s'assure que toutes les colonnes sont présentes
+        for col in ["client", "Verbatim", "problème", "fréquence", "gravité"]:
+            if col not in df_display.columns: df_display[col] = ""
+
+        edited_voc = st.data_editor(
+            df_display[["client", "Verbatim", "problème", "fréquence", "gravité"]],
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"editor_voc_v18_{p_idx}"
+        )
+
+        if edited_voc is not None:
+            p["voc_data"] = edited_voc.to_dict('records')
+
+        # Synthèse visuelle
+        st.write("---")
+        st.markdown("### 📊 Diagnostic Expert")
         c1, c2, c3, c4 = st.columns(4)
-        with c1: st.info("**🛠️ Technique**"); st.progress(0.3)
-        with c2: st.warning("**⏱️ Délais**"); st.progress(0.7)
-        with c3: st.info("**📞 Relation**"); st.progress(0.4)
-        with c4: st.info("**💰 Coût**"); st.progress(0.1)
-
-        st.success(f"**Analyse de Criticité :** Le diagnostic du fichier `{p['dernier_fichier_nom']}` souligne un besoin de réduction de variance sur : **{p['voc_data'][0]['problème']}**.")
+        c1.info("**🛠️ Technique**"); c1.progress(0.3)
+        c2.warning("**⏱️ Délais**"); c2.progress(0.7)
+        c3.info("**📞 Relation**"); c3.progress(0.4)
+        c4.info("**💰 Coût**"); c4.progress(0.1)
+        
+        st.success(f"**Focus Black Belt :** L'analyse du fichier `{p['dernier_fichier_nom']}` cible une priorité sur : **{p['voc_data'][0]['problème']}**.")
+    else:
+        st.info("💡 En attente d'importation de données pour l'analyse.")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
