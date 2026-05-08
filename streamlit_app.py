@@ -433,9 +433,6 @@ else:
                             st.write("")
 
     # --- 6. VOICE OF CUSTOMER (VOC) : ANALYSEUR EXPERT BLACK BELT ---
-    import streamlit as st
-import pandas as pd
-import io
 
 # --- CONFIGURATION & STYLE ---
 def app():
