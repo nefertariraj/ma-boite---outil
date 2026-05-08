@@ -538,59 +538,67 @@ else:
             # Ce message ne s'affichera que si le DataFrame est réellement vide de chez vide
             st.error("⚠️ Le tableau ne contient aucune donnée. Vérifiez l'étape 2.")
 
-    # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION ---
+    # --- ÉTAPE 4 : DIAGNOSTIC & STRATÉGIE D'AMÉLIORATION (REGARD BLACK BELT) ---
     if st.session_state.get("voc_results") is not None:
-        st.write("### 📊 Résultat de l'Analyse Thématique")
-        st.table(st.session_state.voc_results)
-
         st.write("---")
-        st.subheader("4. Propositions d'Amélioration Black Belt")
+        st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
         
-        top_theme = st.session_state.voc_results.iloc[0]["thème des irritants"]
-        st.info(f"🎯 **Axe prioritaire identifié : {top_theme}**")
-
-        catalogue_solutions = {
-            "Délais (Lead Time)": [
-                "**VSM** : Cartographier le flux pour supprimer les goulots d'étranglement.",
-                "**Kanban** : Mettre en place un flux tiré pour réguler les travaux.",
-                "**Takt Time** : Aligner la cadence sur la demande réelle.",
-                "**RPA** : Automatiser les saisies pour accélérer le flux."
-            ],
-            "Qualité (Défauts)": [
-                "**Poka-Yoke** : Installer des détrompeurs sur les formulaires.",
-                "**Standardisation** : Créer des SOP visuelles pour stabiliser la qualité.",
-                "**5 Pourquoi** : Analyser la cause racine du défaut majeur.",
-                "**Autocontrôle** : Validation systématique à la source."
-            ],
-            "Pénibilité": [
-                "**5S Digital** : Épurer les interfaces et organiser les dossiers.",
-                "**Simplification** : Éliminer les étapes de double-validation.",
-                "**Ergonomie** : Réduire le nombre de clics et optimiser les accès.",
-                "**Management Visuel** : Rendre les priorités visibles."
-            ],
-            "Outils": [
-                "**Audit IT** : Identifier les causes de ralentissement logiciel.",
-                "**Maintenance préventive** : Mettre à jour les outils hors production.",
-                "**Interface Simplifiée** : Masquer les fonctions inutilisées.",
-                "**Plan de secours** : Définir une procédure dégradée."
-            ],
-            "Information": [
-                "**Standard Unique** : Imposer un format de données identique.",
-                "**Source de vérité** : Centraliser l'info sur un outil unique.",
-                "**AIC** : Instaurer un point de communication de 5 minutes.",
-                "**Glossaire métier** : Clarifier les termes techniques."
-            ]
+        # Récupération du top irritant et des données associées
+        top_row = st.session_state.voc_results.iloc[0]
+        top_theme = top_row["thème des irritants"]
+        occurrence = top_row["nombre d'occurrence"]
+        ctq_cible = top_row["CTQ"]
+        
+        # 1. Le Diagnostic Structurel
+        st.markdown(f"### 🎯 Focus Prioritaire : {top_theme}")
+        
+        # Génération d'une réflexion dynamique selon le thème
+        reflexions = {
+            "Délais (Lead Time)": {
+                "analyse": f"L'analyse montre {occurrence} remontées critiques sur le temps de traversée. En tant que Black Belt, cela indique un **Muda d'attente** massif ou des goulots d'étranglement non maîtrisés. Le flux n'est pas 'Tirée' par la demande.",
+                "strategie": "Prioriser une **VSM (Value Stream Mapping)** pour identifier le ratio VA/NVA. L'objectif est de réduire le Lead Time en supprimant les files d'attente entre les processus.",
+                "outils": ["Chantier Kaizen Flash", "Équilibrage de poste (Yamazumi)", "Calcul du Takt Time"]
+            },
+            "Qualité (Défauts)": {
+                "analyse": f"Avec {occurrence} occurrences, la **non-qualité** est le premier levier de coût caché (COPQ). Nous faisons face à une instabilité du processus qui génère des retouches et de la frustration client.",
+                "strategie": "Passer d'une culture de contrôle à une culture de 'Bon du premier coup'. Il faut isoler la cause racine (5 Pourquoi) et stabiliser la variance (Standardisation).",
+                "outils": ["Poka-Yoke (Détrompeurs)", "Matrice de capabilité (Cp/Cpk)", "Plan d'autocontrôle"]
+            },
+            "Pénibilité": {
+                "analyse": f"Le poids de la pénibilité ({occurrence} verbatims) révèle un risque sur la **durabilité du flux** (Muri). La surcharge cognitive ou physique dégrade la performance à long terme.",
+                "strategie": "Appliquer l'ergonomie Lean. Simplifier le poste de travail pour que l'opérateur se concentre uniquement sur la création de valeur sans effort parasite.",
+                "outils": ["Analyse de déroulement", "5S ergonomique", "Standard Work"]
+            },
+            "Outils": {
+                "analyse": f"L'infrastructure est ici le frein majeur. Si l'outil faillit, le processus le plus robuste devient inefficace. C'est un problème de **capabilité des moyens**.",
+                "strategie": "Engager une refonte de l'interface ou une automatisation (RPA) pour supprimer les tâches à faible valeur ajoutée qui causent ces bugs.",
+                "outils": ["Analyse de la valeur IT", "Maintenance préventive", "User Experience Lean"]
+            },
+            "Information": {
+                "analyse": f"Le manque de clarté ({occurrence} signaux) indique un problème de **Mura (Variabilité)** dans la transmission. L'information est l'essence du flux ; si elle est floue, le flux s'arrête.",
+                "strategie": "Standardiser les flux d'information. Passer d'une communication réactive à un **Management Visuel** proactif où l'anomalie saute aux yeux.",
+                "outils": ["Standard d'échange", "Obeya / Management Visuel", "AIC (Animation Courte)"]
+            }
         }
 
-        solutions = catalogue_solutions.get(top_theme, ["Plan Kaizen", "Standardisation", "Audit", "Formation"])
+        diag = reflexions.get(top_theme, {"analyse": "Analyse transverse requise.", "strategie": "Standardisation globale.", "outils": ["Audit", "Kaizen"]})
 
-        c1, c2 = st.columns(2)
-        with c1:
-            st.success(f"💡 {solutions[0]}")
-            st.success(f"💡 {solutions[1]}")
-        with c2:
-            st.success(f"💡 {solutions[2]}")
-            st.success(f"💡 {solutions[3]}")
+        # Affichage du diagnostic type "Rapport de mission"
+        with st.expander("🔍 Analyse de la situation (Deep Dive)", expanded=True):
+            st.write(diag["analyse"])
+            st.write(f"**Indicateur CTQ à surveiller :** `{ctq_cible}`")
+
+        st.markdown("#### 🚀 Recommandations Stratégiques")
+        st.info(f"**Vision Black Belt :** {diag['strategie']}")
+
+        # Affichage des outils recommandés sous forme de badges
+        cols = st.columns(len(diag["outils"]))
+        for i, tool in enumerate(diag["outils"]):
+            cols[i].success(f"🛠️ {tool}")
+
+        # 2. Lien avec le DMAIC
+        st.write("---")
+        st.caption(f"Prochaine étape suggérée (Phase IMPROVE) : Lancer un groupe de travail ciblé sur les {occurrence} points de douleur pour définir les solutions futures.")
   
     # --- PHASE MEASURE ---
     with tabs[1]:
