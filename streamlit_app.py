@@ -548,7 +548,7 @@ else:
         st.write("---")
         st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
         
-        # Récupération de l'irritant majeur (Pareto)
+        # Récupération sécurisée de l'irritant majeur (Pareto)
         res = st.session_state.voc_results
         top_theme = res.iloc[0]["thème des irritants"]
         occurrence = res.iloc[0]["nombre d'occurrence"]
@@ -598,7 +598,9 @@ else:
         for i, tool in enumerate(diag["outils"]):
             cols[i].success(f"🛠️ {tool}")
 
-        st.caption(f"Statut : Phase **ANALYSE** complétée pour {len(df_to_analyze)} verbatims.")   
+        # Correction de la ligne finale pour éviter le NameError
+        count_data = len(st.session_state.voc_raw_data) if "voc_raw_data" in st.session_state else 0
+        st.caption(f"Statut : Phase **ANALYSE** complétée pour {count_data} verbatims.")   
    
     # --- PHASE MEASURE ---
     with tabs[1]:
