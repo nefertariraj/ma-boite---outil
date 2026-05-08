@@ -538,16 +538,16 @@ else:
         else:
             st.error("⚠️ Le tableau de l'étape 2 est vide. L'analyse ne peut pas démarrer.")
 
-    # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION (LIÉES À L'ANALYSE) ---
-    # Cette section s'affiche UNIQUEMENT si voc_results contient des données
+    # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION (AFFICHAGE ET SOLUTIONS) ---
+    # Ce bloc s'affiche uniquement si une analyse a été générée à l'étape 3
     if p["voc_results"] is not None:
-        st.write("### Résultat de l'Analyse")
+        st.write("### 📊 Résultat de l'Analyse Thématique")
         st.table(p["voc_results"])
 
         st.write("---")
         st.subheader("4. Propositions d'Amélioration Black Belt")
         
-        # On tire la priorité directement du 1er résultat de l'analyse (Lien direct 3 -> 4)
+        # On extrait la priorité n°1 (première ligne du tableau trié)
         top_row = p["voc_results"].iloc[0]
         top_theme = top_row["thème des irritants"]
         
@@ -586,16 +586,17 @@ else:
             ]
         }
 
-        # Récupération des solutions correspondantes
+        # Récupération sécurisée des idées (ou liste par défaut si thème inconnu)
         solutions = catalogue_solutions.get(top_theme, ["Plan Kaizen", "Standardisation", "Audit", "Formation"])
 
-        col1, col2 = st.columns(2)
-        with col1:
+        # Affichage en deux colonnes pour une lecture aérée
+        col_final_1, col_final_2 = st.columns(2)
+        with col_final_1:
             st.success(f"💡 {solutions[0]}")
             st.success(f"💡 {solutions[1]}")
-        with col2:
+        with col_final_2:
             st.success(f"💡 {solutions[2]}")
-            st.success(f"💡 {solutions[3]}"))
+            st.success(f"💡 {solutions[3]}")
   
     # --- PHASE MEASURE ---
     with tabs[1]:
