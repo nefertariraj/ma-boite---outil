@@ -495,27 +495,22 @@ else:
     st.write("---")
     st.subheader("3. Analyse Thématique & CTQ")
     
-    # On initialise le conteneur de résultats s'il n'existe pas
-    if "voc_results" not in st.session_state:
-        st.session_state.voc_results = None
+    # 1. Vérification de la source de données (Lien direct avec la clé de l'éditeur v8)
+    # On regarde d'abord dans l'éditeur, sinon dans la mémoire brute
+    if "editor_v8" in st.session_state:
+        # L'éditeur de l'étape 2 stocke les modifs dans 'edited_rows', 'added_rows', etc.
+        # Mais le plus simple est de lire le DataFrame synchronisé
+        df_actuel = st.session_state.voc_raw_data
+    else:
+        df_actuel = p.get("voc_raw_data", pd.DataFrame())
 
-    # BOUTON D'ANALYSE : On force la lecture du Session State
-    if st.button("🧠 Lancer l'Analyse", key="btn_v_final"):
-        # On récupère les données de collecte (Lien avec l'étape 2)
-        # On vérifie l'éditeur de l'étape 2 (v7_data_editor) ou le stockage brut
-        data_to_analyze = st.session_state.get("voc_raw_data", pd.DataFrame())
-
-        if not data_to_analyze.empty:
-            # Identification sécurisée de la colonne de texte
-            # On cherche "réponse brute" ou on prend la dernière colonne remplie
-            if "réponse brute" in data_to_analyze.columns:
-                verbatims = data_to_analyze["réponse brute"].astype(str).str.lower().tolist()
-            else:
-                verbatims = data_to_analyze.iloc[:, -1].astype(str).str.lower().tolist()
-            
+    if st.button("🧠 Lancer l'Analyse", key="btn_v_final_fix"):
+        # On vérifie si le DataFrame contient bien des lignes
+        if not df_actuel.empty:
+            # On extrait les textes (dernière colonne par défaut pour éviter l'AttributeError)
+            verbatims = df_actuel.iloc[:, -1].astype(str).str.lower().tolist()
             total = len(verbatims)
             
-            # Matrice de correspondance Lean Six Sigma
             mapping = [
                 {"th": "Délais (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "retard"], "ex": "Muda d'attente", "ctq": "Lead Time < 24h"},
                 {"th": "Qualité (Défauts)", "kw": ["refaire", "erreur", "trompé", "faute", "qualité", "mauvais"], "ex": "Non-conformités", "ctq": "Zéro défaut (FPY)"},
@@ -536,21 +531,21 @@ else:
                     "score": count
                 })
             
-            # Sauvegarde et tri Pareto (Lien avec l'étape 4)
+            # Sauvegarde dans la session
             st.session_state.voc_results = pd.DataFrame(res_list).sort_values("score", ascending=False).drop(columns=["score"])
-            st.rerun() # On force le rafraîchissement pour que l'étape 4 apparaisse
+            st.rerun()
         else:
-            st.error("⚠️ Le lien est rompu : le tableau de l'étape 2 est vide. Importez des données d'abord.")
+            # Ce message ne s'affichera que si le DataFrame est réellement vide de chez vide
+            st.error("⚠️ Le tableau ne contient aucune donnée. Vérifiez l'étape 2.")
 
-    # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION (LIEE A L'ANALYSE) ---
-    if st.session_state.voc_results is not None:
+    # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION ---
+    if st.session_state.get("voc_results") is not None:
         st.write("### 📊 Résultat de l'Analyse Thématique")
         st.table(st.session_state.voc_results)
 
         st.write("---")
         st.subheader("4. Propositions d'Amélioration Black Belt")
         
-        # Récupération du thème prioritaire (Lien direct avec le résultat du bouton)
         top_theme = st.session_state.voc_results.iloc[0]["thème des irritants"]
         st.info(f"🎯 **Axe prioritaire identifié : {top_theme}**")
 
