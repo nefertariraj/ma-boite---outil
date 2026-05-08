@@ -432,92 +432,115 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-       # --- 6. VOICE OF CUSTOMER (VOC) - FIX FINAL BOUTON ---
+       # --- 6. VOICE OF CUSTOMER (VOC) - IDENTIFICATION STRICTE & AMÉLIORATIONS ---
     st.divider()
     st.subheader("6. Voice of Customer (VOC) & Analyse des Exigences")
 
-    # Initialisation des clés de session
+    # Initialisation des variables de structure
+    COLONNES_VOC = ["client", "Verbatim", "problème", "fréquence", "gravité"]
     if "dernier_fichier_nom" not in p: p["dernier_fichier_nom"] = ""
     if "voc_data" not in p: p["voc_data"] = [dict.fromkeys(COLONNES_VOC, "")]
 
-    # Définition de la fonction d'analyse (callback)
-    def analyser_voc_file(uploaded_file):
+    # Fonction d'analyse avec mapping strict
+    def analyser_voc_strict(uploaded_file):
         try:
             df = pd.read_excel(uploaded_file) if not uploaded_file.name.endswith('.csv') else pd.read_csv(uploaded_file)
             df = df.fillna("")
-            cols = df.columns.tolist()
+            
+            # Normalisation des noms de colonnes pour éviter les erreurs de casse (Client vs client)
+            df.columns = [str(c).strip().lower() for c in df.columns]
+            
+            # Cibles strictes demandées
+            target_c = "client"
+            target_v = "verbatim"
 
-            # Mapping sémantique
-            cols_clean = [c for c in cols if "?" not in str(c) and len(str(c)) < 45]
-            m_client = next((c for c in cols_clean if any(k in str(c).lower() for k in ["nom", "client", "société", "id"])), cols[0])
-            m_verb = next((c for c in cols if any(k in str(c).lower() for k in ["avis", "verbatim", "commentaire", "réponse", "feedback"])), cols[1] if len(cols)>1 else cols[0])
+            if target_c not in df.columns or target_v not in df.columns:
+                st.error(f"❌ Colonnes manquantes. Le fichier doit contenir : '{target_c}' et '{target_v}'.")
+                st.write(f"Colonnes détectées : {list(df.columns)}")
+                return None
 
-            # Détection du thème dominant
-            text_total = " ".join(df[m_verb].astype(str).tolist()).lower()
-            theme = "Variabilité des processus"
-            if any(w in text_total for w in ["temps", "délai", "long", "attente"]): theme = "Performance des Délais"
-            elif any(w in text_total for w in ["qualité", "erreur", "cassé"]): theme = "Conformité Qualité"
+            # Analyse globale du thème pour la colonne "problème"
+            text_total = " ".join(df[target_v].astype(str).tolist()).lower()
+            theme = "Variabilité Processus"
+            if any(w in text_total for w in ["temps", "délai", "long", "attente"]): theme = "Délais (Lead Time)"
+            elif any(w in text_total for w in ["qualité", "erreur", "cassé", "mauvais"]): theme = "Qualité / Non-Conformité"
 
             res = []
             for _, row in df.iterrows():
-                v_str = str(row[m_verb])
-                c_str = str(row[m_client])
-                if "?" in c_str or len(v_str) < 3: continue
+                v_str = str(row[target_v])
+                c_str = str(row[target_c])
+                
+                # Exclusion des lignes vides
+                if len(v_str) < 2: continue
+                
                 res.append({
                     "client": c_str[:30],
                     "Verbatim": v_str,
-                    "problème": f"Analyse Black Belt : {theme} impacté.",
+                    "problème": f"Analyse Black Belt : {theme} à stabiliser.",
                     "fréquence": "fréquent",
                     "gravité": "très grave"
                 })
             return res
         except Exception as e:
-            st.error(f"Erreur interne : {e}")
-            return []
+            st.error(f"Erreur technique : {e}")
+            return None
 
-    with st.expander("📥 Importer un nouveau fichier (Analyse IA)", expanded=True):
-        up_file = st.file_uploader("Fichier Excel ou CSV", type=["xlsx", "xls", "csv"], key="voc_loader_v18")
+    with st.expander("📥 Importation avec colonnes 'client' et 'verbatim'", expanded=True):
+        up_file = st.file_uploader("Fichier Excel ou CSV", type=["xlsx", "xls", "csv"], key="voc_strict_v19")
         
         if up_file is not None:
-            # Si nouveau fichier, on propose le bouton
-            if st.button("🚀 Exécuter l'Analyse Black Belt"):
-                data_analyse = analyser_voc_file(up_file)
-                if data_analyse:
-                    p["voc_data"] = data_analyse
+            if st.button("🚀 Lancer l'Analyse Black Belt"):
+                data_result = analyser_voc_strict(up_file)
+                if data_result:
+                    p["voc_data"] = data_result
                     p["dernier_fichier_nom"] = up_file.name
-                    st.success("✅ Analyse terminée avec succès !")
+                    st.success(f"✅ Analyse du fichier '{up_file.name}' réussie.")
                     st.rerun()
 
-    # --- AFFICHAGE DES RÉSULTATS ---
+    # --- AFFICHAGE ET ACTIONS ---
     if p["voc_data"] and p["voc_data"][0].get("client") != "":
         df_display = pd.DataFrame(p["voc_data"])
         
-        # On s'assure que toutes les colonnes sont présentes
-        for col in ["client", "Verbatim", "problème", "fréquence", "gravité"]:
-            if col not in df_display.columns: df_display[col] = ""
-
+        # Édition du tableau
         edited_voc = st.data_editor(
-            df_display[["client", "Verbatim", "problème", "fréquence", "gravité"]],
+            df_display[COLONNES_VOC],
             num_rows="dynamic",
             use_container_width=True,
-            key=f"editor_voc_v18_{p_idx}"
+            key=f"editor_strict_v19_{p_idx}"
         )
-
         if edited_voc is not None:
             p["voc_data"] = edited_voc.to_dict('records')
 
-        # Synthèse visuelle
+        # 1. Diagnostic Expert
         st.write("---")
-        st.markdown("### 📊 Diagnostic Expert")
+        st.markdown("### 📊 Diagnostic Expert (DMAIC)")
         c1, c2, c3, c4 = st.columns(4)
-        c1.info("**🛠️ Technique**"); c1.progress(0.3)
-        c2.warning("**⏱️ Délais**"); c2.progress(0.7)
+        c1.info("**🛠️ Technique**"); c1.progress(0.2)
+        c2.warning("**⏱️ Délais**"); c2.progress(0.8)
         c3.info("**📞 Relation**"); c3.progress(0.4)
         c4.info("**💰 Coût**"); c4.progress(0.1)
+
+        # 2. Corrélation CTQ
+        st.success(f"**Focus Black Belt :** L'analyse cible une priorité majeure sur la thématique identifiée : **{p['voc_data'][0]['problème']}**.")
+
+        # 3. PROPOSITIONS D'AXES D'AMÉLIORATION (Réintroduit)
+        st.write("---")
+        st.markdown("### 🚀 5 Axes d'Amélioration Stratégiques")
         
-        st.success(f"**Focus Black Belt :** L'analyse du fichier `{p['dernier_fichier_nom']}` cible une priorité sur : **{p['voc_data'][0]['problème']}**.")
+        propositions = [
+            {"t": "Standardisation du Processus", "d": "Réduire la variance en imposant un mode opératoire unique pour les étapes critiques."},
+            {"t": "Management Visuel (Andon)", "d": "Mettre en place des alertes visuelles dès qu'un délai dépasse le seuil acceptable (CTQ)."},
+            {"t": "Poka-Yoke (Anti-Erreur)", "d": "Installer des verrous système pour empêcher la validation d'une étape si les critères qualité ne sont pas remplis."},
+            {"t": "Analyse de Capabilité (Cp/Cpk)", "d": "Mesurer statistiquement l'aptitude du processus à répondre aux exigences du client sans défaut."},
+            {"t": "Optimisation du Flux (Lean)", "d": "Supprimer les étapes sans valeur ajoutée identifiées dans les verbatims (Mudas)."}
+        ]
+
+        for prop in propositions:
+            with st.expander(f"🔹 {prop['t']}"):
+                st.write(f"**Action préconisée :** {prop['d']}")
+                st.caption(f"Objectif : Alignement direct sur le CTQ.")
     else:
-        st.info("💡 En attente d'importation de données pour l'analyse.")
+        st.info("💡 En attente d'un fichier contenant les colonnes 'client' et 'verbatim'.")
             
     # --- PHASE MEASURE ---
     with tabs[1]:
