@@ -432,18 +432,15 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-   # --- 6. VOICE OF CUSTOMER (VOC) : MÉTHODE PROACTIVE BLACK BELT ---
+   # --- 6. VOICE OF CUSTOMER (VOC) : SYSTÈME INTÉGRÉ BLACK BELT ---
     st.divider()
-    st.header("🎯 Voice of Customer (VOC) - Méthode Black Belt")
+    st.header("🎯 Voice of Customer (VOC) - Flux Intégré")
 
-    # Utilisation de st.session_state si 'p' n'est pas défini dans votre scope
-    if 'p' not in locals():
-        p = st.session_state
+    # Sécurisation du dictionnaire de session
+    if 'p' not in locals(): p = st.session_state
 
-    # --- 1. ÉLABORATION DU QUESTIONNAIRE ---
+    # --- ÉTAPE 1 : ÉLABORATION DU QUESTIONNAIRE ---
     st.subheader("1. Élaboration du Questionnaire")
-    
-    # Initialisation sécurisée des questions
     if "voc_questions" not in p:
         p["voc_questions"] = [
             "Qu’est ce qui vous fait perdre du temps ?",
@@ -453,135 +450,130 @@ else:
             "Si vous pouviez changer une seule chose ?"
         ]
 
-    with st.expander("📝 Configurer/Modifier les 5 questions du sondage", expanded=False):
-        updated_questions = []
-        for i, q_text in enumerate(p["voc_questions"]):
-            q_val = st.text_input(f"Question {i+1}", value=q_text, key=f"q_edit_{i}")
-            updated_questions.append(q_val)
-        p["voc_questions"] = updated_questions
+    with st.expander("📝 Modifier les questions cibles"):
+        for i in range(5):
+            p["voc_questions"][i] = st.text_input(f"Question {i+1}", value=p["voc_questions"][i], key=f"q_v4_{i}")
 
-    # --- 2. COLLECTE DES DONNÉES ---
+    # --- ÉTAPE 2 : COLLECTE DES DONNÉES (Source de l'analyse) ---
     st.write("---")
     st.subheader("2. Collecte des Données")
-
-    # Initialisation du tableau à 6 colonnes (mais on en affiche 3 principales pour la saisie)
+    
     if "voc_raw_data" not in p:
-        p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute", "thème", "gravité", "note"])
+        p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute", "note"])
 
-    # Zone d'importation
-    uploaded_file = st.file_uploader("Importer un fichier Excel pour remplissage automatique", type=["xlsx", "xls"])
-    if uploaded_file:
-        if st.button("🚀 Analyser & Importer le fichier"):
-            try:
-                df_import = pd.read_excel(uploaded_file)
-                # IA de mapping : on cherche les colonnes par mots-clés
-                df_import.columns = [c.lower().strip() for c in df_import.columns]
-                
-                c_col = next((c for c in df_import.columns if "client" in c or "nom" in c), None)
-                q_col = next((c for c in df_import.columns if "quest" in c), None)
-                r_col = next((c for c in df_import.columns if "rép" in c or "verbatim" in c or "avis" in c), None)
-                
-                temp_df = pd.DataFrame({
-                    "client": df_import[c_col] if c_col else "Inconnu",
-                    "question": df_import[q_col] if q_col else "N/A",
-                    "réponse brute": df_import[r_col] if r_col else ""
-                })
-                p["voc_raw_data"] = pd.concat([p["voc_raw_data"], temp_df], ignore_index=True)
-                st.success("✅ Données importées et alignées par l'IA.")
-            except Exception as e:
-                st.error(f"Erreur d'importation : {e}")
+    # Import Excel avec Mapping IA
+    uploaded_file = st.file_uploader("Importer des réponses (Excel)", type=["xlsx", "xls"])
+    if uploaded_file and st.button("🚀 Mapper les données importées"):
+        df_imp = pd.read_excel(uploaded_file).fillna("")
+        df_imp.columns = [c.lower().strip() for c in df_imp.columns]
+        
+        # Logique de détection de colonnes
+        c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
+        q_col = next((c for c in df_imp.columns if "quest" in c), None)
+        r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
+        
+        new_rows = pd.DataFrame({
+            "client": df_imp[c_col],
+            "question": df_imp[q_col] if q_col else "Saisie importée",
+            "réponse brute": df_imp[r_col]
+        })
+        p["voc_raw_data"] = pd.concat([p["voc_raw_data"], new_rows], ignore_index=True)
+        st.rerun()
 
-    # Tableau éditable (Ajout/Suppression de lignes autorisé)
+    # Tableau maître (La source de vérité pour les étapes suivantes)
     p["voc_raw_data"] = st.data_editor(
         p["voc_raw_data"],
         num_rows="dynamic",
         use_container_width=True,
-        key="voc_editor_final"
+        key="editor_integrated_v4"
     )
 
-    # --- 3. ANALYSE DES DONNÉES (AFFINITY DIAGRAM & CTQ) ---
+    # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ (Reliée à l'étape 2) ---
     st.write("---")
     st.subheader("3. Analyse Thématique (Affinity Diagram) & CTQ")
+    
+    # Bouton pour déclencher l'analyse du tableau ci-dessus
+    if st.button("🧠 Analyser les données de collecte"):
+        df_src = p["voc_raw_data"]
+        if not df_src.empty and df_src["réponse brute"].astype(str).str.strip().any():
+            total = len(df_src)
+            text_corpus = " ".join(df_src["réponse brute"].astype(str)).lower()
 
-    if st.button("🧠 Générer l'Analyse Thématique (Tri Pareto)"):
-        if not p["voc_raw_data"].empty:
-            df_collecte = p["voc_raw_data"]
-            total_reponses = len(df_collecte)
-
-            # Logique de regroupement sémantique (Affinity Diagram)
-            themes = [
-                {"th": "Délais & Lenteurs", "ex": "Attentes et gaspillages de temps (Muda)", "kw": ["temps", "long", "attente", "lent", "délai", "tard"], "ctq": "Lead Time < 24h"},
-                {"th": "Non-Qualité / Erreurs", "ex": "Retouches et corrections de fautes", "kw": ["refaire", "erreur", "trompé", "recommencer", "faute", "casse"], "ctq": "Taux de retouche < 2%"},
-                {"th": "Pénibilité Processus", "kw": ["pénible", "lourd", "difficile", "compliqué", "clics", "fatigue"], "ex": "Processus non fluide (Muri)", "ctq": "Score d'effort (CES) < 3/10"},
-                {"th": "Frustrations Outils", "kw": ["énerve", "outil", "logiciel", "bug", "clavier", "système"], "ex": "Outils inadaptés ou instables", "ctq": "Disponibilité IT > 99.5%"},
-                {"th": "Manque d'Information", "kw": ["changer", "info", "manque", "comprendre", "flou", "sais pas"], "ex": "Défaut de communication (Mura)", "ctq": "Zéro défaut d'info au poste"}
+            # Matrice Black Belt : Thèmes / Mots-clés / CTQ
+            mapping_lean = [
+                {"th": "Temps de Cycle (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "planning"], "ex": "Gaspillage d'attente (Muda)", "ctq": "Délai de traitement < 4h"},
+                {"th": "Qualité & Conformité", "kw": ["refaire", "erreur", "trompé", "fautes", "recommencer", "qualité"], "ex": "Non-conformités et retouches", "ctq": "Taux de First Pass Yield > 95%"},
+                {"th": "Fluidité & Effort", "kw": ["pénible", "lourd", "difficile", "compliqué", "clics", "fatigue"], "ex": "Processus complexe ou pénible", "ctq": "Nombre d'étapes réduit à 5"},
+                {"th": "Outils & Systèmes", "kw": ["énerve", "logiciel", "bug", "système", "outil", "ordinateur"], "ex": "Instabilité des moyens de travail", "ctq": "Taux de disponibilité IT > 99%"},
+                {"th": "Information & Communication", "kw": ["info", "manque", "comprendre", "flou", "changé", "sais pas"], "ex": "Variabilité de l'information (Mura)", "ctq": "100% des données critiques saisies"}
             ]
 
-            results = []
-            for t in themes:
-                # On compte les occurrences réelles dans les verbatims
-                count = sum(1 for r in df_collecte["réponse brute"].astype(str).lower() if any(k in r for k in t["kw"]))
-                results.append({
-                    "thème des irritants": t["th"],
-                    "explication": t["ex"],
+            final_analysis = []
+            for m in mapping_lean:
+                # On compte les lignes du tableau de l'étape 2 correspondant à ce thème
+                count = sum(1 for r in df_src["réponse brute"].astype(str).lower() if any(k in r for k in m["kw"]))
+                final_analysis.append({
+                    "thème des irritants": m["th"],
+                    "explication": m["ex"],
                     "nombre d'occurrence": count,
-                    "pourcentage": f"{(count/total_reponses)*100:.1f}%" if total_reponses > 0 else "0%",
-                    "CTQ": t["ctq"],
-                    "tri": count
+                    "pourcentage": f"{(count/total)*100:.1f}%" if total > 0 else "0%",
+                    "CTQ": m["ctq"],
+                    "score": count
                 })
 
-            # Création du tableau trié par ordre décroissant
-            p["voc_analysis_table"] = pd.DataFrame(results).sort_values(by="tri", ascending=False).drop(columns=["tri"])
+            # Tri décroissant (Pareto) et sauvegarde
+            p["voc_final_table"] = pd.DataFrame(final_analysis).sort_values("score", ascending=False).drop(columns=["score"])
         else:
-            st.warning("Veuillez saisir des données dans l'étape 2.")
+            st.warning("⚠️ Le tableau de collecte est vide. Ajoutez des données à l'étape 2.")
 
-    if "voc_analysis_table" in p:
-        st.table(p["voc_analysis_table"])
+    if "voc_final_table" in p:
+        st.table(p["voc_final_table"])
 
-    # --- 4. PROPOSITIONS D'AMÉLIORATION (BLACK BELT) ---
-    st.write("---")
-    st.subheader("4. Propositions d'Amélioration (Expertise Black Belt)")
-
-    if "voc_analysis_table" in p:
-        # On base les solutions sur le thème n°1 (Pareto)
-        major_issue = p["voc_analysis_table"].iloc[0]["thème des irritants"]
+        # --- ÉTAPE 4 : PROPOSITIONS D'AMÉLIORATION (Reliée à l'étape 3) ---
+        st.write("---")
+        st.subheader("4. Propositions d'Amélioration Black Belt")
         
-        solutions_expert = {
-            "Délais & Lenteurs": [
-                "Chantier Kaizen SMED pour réduire les temps de changement de série.",
-                "Mise en place d'un flux tiré (Kanban) pour réguler les encours.",
-                "Automatisation (RPA) des transferts de données entre services.",
-                "Analyse de la valeur pour supprimer les étapes d'approbation inutiles."
+        # On extrait le thème n°1 issu de l'analyse thématique
+        top_irritant = p["voc_final_table"].iloc[0]["thème des irritants"]
+        st.markdown(f"**Analyse du problème dominant :** `{top_irritant}`")
+
+        stratégies = {
+            "Temps de Cycle (Lead Time)": [
+                "**Chantier Kaizen / VSM** : Cartographier le flux pour identifier et supprimer les goulots d'étranglement.",
+                "**Mise en place d'un Kanban** : Réguler le flux pour éviter la saturation des postes.",
+                "**SMED Administratif** : Simplifier les procédures de lancement pour gagner en réactivité.",
+                "**Takt Time Alignment** : Aligner la cadence de travail sur la demande réelle du client."
             ],
-            "Non-Qualité / Erreurs": [
-                "Déploiement de Poka-Yoke (anti-erreur) sur les champs critiques.",
-                "Mise en place d'un Autocontrôle avec check-list standardisée.",
-                "Analyse 5 Pourquoi sur le défaut majeur pour éradiquer la cause racine.",
-                "Révision du Standard de travail (SOP) avec management visuel."
+            "Qualité & Conformité": [
+                "**Poka-Yoke (Anti-erreur)** : Installer des contrôles automatiques dans l'outil de saisie.",
+                "**Standardisation (SOP)** : Réécrire les modes opératoires avec les opérateurs pour garantir le 'Bon du premier coup'.",
+                "**Analyse 8D / 5 Pourquoi** : Traiter la cause racine du défaut le plus fréquent du tableau.",
+                "**MSP (Contrôle Statistique)** : Suivre la stabilité du processus via des cartes de contrôle."
             ],
-            "Pénibilité Processus": [
-                "Ergonomie cognitive : Simplification de l'interface utilisateur (UI).",
-                "Suppression des doubles saisies par intégration API.",
-                "Réorganisation des flux physiques pour limiter les déplacements.",
-                "Formation de montée en compétences (Matrice de polyvalence)."
+            "Fluidité & Effort": [
+                "**Réorganisation 5S** : Optimiser l'environnement de travail (physique ou numérique) pour réduire l'effort.",
+                "**Suppression de la Non-Valeur Ajoutée** : Éliminer les étapes de double-validation.",
+                "**Design Thinking** : Refondre l'interface ou le formulaire pour le rendre intuitif.",
+                "**Polyvalence** : Former les équipes pour lisser la pénibilité lors des pics d'activité."
             ]
         }
-        
-        idees = solutions_expert.get(major_issue, [
-            "Mise en place d'un Management Visuel de la performance.",
-            "Standardisation des entrées d'informations.",
-            "Audit de poste pour identifier les micro-variabilités.",
-            "Projet de digitalisation du flux documentaire."
+
+        # Récupération des solutions liées au thème dominant ou solutions générales
+        ideas = stratégies.get(top_irritant, [
+            "Management Visuel : Rendre les problèmes visibles en temps réel.",
+            "Standardisation des entrées de données.",
+            "Automatisation des tâches répétitives sans valeur ajoutée.",
+            "Audit de conformité des standards de travail."
         ])
 
-        # Affichage élégant
+        # Affichage des 4 idées
         c1, c2 = st.columns(2)
         with c1:
-            st.info(f"💡 **Action A :** {idees[0]}")
-            st.info(f"💡 **Action B :** {idees[1]}")
+            st.success(f"💡 **Idée 1 :** {ideas[0]}")
+            st.success(f"💡 **Idée 2 :** {ideas[1]}")
         with c2:
-            st.info(f"💡 **Action C :** {idees[2]}")
-            st.info(f"💡 **Action D :** {idees[3]}")
+            st.success(f"💡 **Idée 3 :** {ideas[2]}")
+            st.success(f"💡 **Idée 4 :** {ideas[3]}")
   
     # --- PHASE MEASURE ---
     with tabs[1]:
