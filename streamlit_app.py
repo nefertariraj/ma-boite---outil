@@ -603,88 +603,79 @@ else:
         st.caption(f"Statut : Phase **ANALYSE** complétée pour {count_data} verbatims.")   
 
 
-# --- SECTION 7 : PROJECT MILESTONE & TIMING ---
-import datetime
-import pandas as pd
-import plotly.express as px
+# --- SECTION : PROJECT MILESTONE & TIMING ---
+    st.write("---")
+    st.header("📅 Project Milestone & Timing")
+    st.subheader("Planification des phases du projet")
 
-# 1. PROTECTION : On n'exécute le code QUE si on est dans l'outil "Projet" 
-# et QUE si les onglets 'tabs' ont été créés plus haut dans votre code.
-if st.session_state.get('choix_page') != "Accueil" and 'tabs' in locals():
+    # 1. Initialisation des données de planification (Structure DMAIC par défaut)
+    if "gantt_data" not in st.session_state:
+        st.session_state.gantt_data = pd.DataFrame([
+            {"Etape": "Define", "Début": "2026-05-01", "Fin": "2026-05-15", "Responsable": "Black Belt"},
+            {"Etape": "Measure", "Début": "2026-05-16", "Fin": "2026-06-15", "Responsable": "Green Belt"},
+            {"Etape": "Analyze", "Début": "2026-06-16", "Fin": "2026-07-15", "Responsable": "Black Belt"},
+            {"Etape": "Improve", "Début": "2026-07-16", "Fin": "2026-09-15", "Responsable": "Team"},
+            {"Etape": "Control", "Début": "2026-09-16", "Fin": "2026-10-31", "Responsable": "Process Owner"}
+        ])
+
+    # 2. Éditeur de planning
+    st.info("💡 Modifiez les dates et les étapes ci-dessous pour mettre à jour le Gantt en temps réel.")
     
-    with tabs[1]: # On cible l'onglet n°2 (index 1)
-        st.write("---")
-        st.header("7. 📅 Project Milestone & Timing")
-        st.subheader("Planification des phases du projet")
-
-        # 2. Initialisation ou conversion forcée (Poka-Yoke)
-        if "gantt_data" not in st.session_state:
-            st.session_state.gantt_data = pd.DataFrame([
-                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-            ])
-        else:
-            # Sécurité types
-            st.session_state.gantt_data["Début"] = pd.to_datetime(st.session_state.gantt_data["Début"]).dt.date
-            st.session_state.gantt_data["Fin"] = pd.to_datetime(st.session_state.gantt_data["Fin"]).dt.date
-
-        # 3. Configuration du calendrier
-        column_configuration = {
-            "Début": st.column_config.DateColumn("Début", format="DD/MM/YYYY"),
-            "Fin": st.column_config.DateColumn("Fin", format="DD/MM/YYYY"),
-        }
-
-        # 4. Éditeur de planning (Clé v19)
-        st.info("💡 Modifiez les dates, puis validez pour mettre à jour le graphique Plotly.")
-        
+    with st.expander("📝 Editer le calendrier du projet", expanded=False):
         edited_gantt = st.data_editor(
             st.session_state.gantt_data,
-            column_config=column_configuration,
             num_rows="dynamic",
             use_container_width=True,
-            key="gantt_editor_v19" 
+            key="gantt_editor"
         )
-        
-        # Validation manuelle pour éviter le rafraîchissement pendant la saisie
-        if st.button("💾 Valider les dates et actualiser le Gantt"):
+        if edited_gantt is not None:
             st.session_state.gantt_data = edited_gantt
-            st.rerun()
 
-        # 5. Rendu visuel du Gantt
-        try:
-            df_plot = st.session_state.gantt_data.copy()
-            df_plot["Début"] = pd.to_datetime(df_plot["Début"])
-            df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
+    # 3. Génération du graphique de Gantt avec Plotly
+    try:
+        import plotly.express as px
 
-            fig = px.timeline(
-                df_plot, 
-                x_start="Début", 
-                x_end="Fin", 
-                y="Etape", 
-                color="Responsable",
-                labels={"Etape": "Phase"},
-                color_discrete_sequence=px.colors.qualitative.Pastel
-            )
+        df_gantt = st.session_state.gantt_data.copy()
+        df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
+        df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
 
-            fig.update_yaxes(autorange="reversed")
-            fig.update_layout(
-                height=400,
-                xaxis_title="Chronologie",
-                yaxis_title="",
-                plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=0, r=10, t=10, b=0)
-            )
+        fig = px.timeline(
+            df_gantt, 
+            x_start="Début", 
+            x_end="Fin", 
+            y="Etape", 
+            color="Responsable",
+            title="Planning du Projet LSS",
+            labels={"Etape": "Phase du Projet"},
+            color_discrete_sequence=px.colors.qualitative.Prism
+        )
 
-            st.plotly_chart(fig, use_container_width=True)
+        # Inversion de l'axe Y pour avoir l'ordre chronologique de haut en bas
+        fig.update_yaxes(autorange="reversed")
+        
+        # Mise en forme Black Belt (fond blanc, grille légère)
+        fig.update_layout(
+            height=400,
+            xaxis_title="Timeline",
+            plot_bgcolor="rgba(0,0,0,0)",
+            hovermode="closest"
+        )
 
-        except Exception as e:
-            st.warning("Ajustez les dates pour afficher le graphique.")
+        st.plotly_chart(fig, use_container_width=True)
 
-# Si l'erreur persistait, vérifiez que vous avez bien une ligne plus haut qui crée les onglets :
-# tabs = st.tabs(["VOC", "Planning", "Analyse", ...])
+    except Exception as e:
+        st.error(f"Erreur lors de la génération du Gantt : {e}")
+        st.info("Assurez-vous que les dates sont au format AAAA-MM-JJ.")
+
+    # 4. Note Méthodologique
+    with st.expander("🎓 Rappel méthodologique : Le Timing en LSS"):
+        st.write("""
+        Un projet Six Sigma dure généralement entre **4 et 6 mois**. 
+        - **Define/Measure** : 25% du temps.
+        - **Analyze** : 20% du temps.
+        - **Improve** : 35% du temps (phase la plus longue, incluant les tests/pilotes).
+        - **Control** : 20% du temps (pérennisation).
+        """)
     
     # --- PHASE MEASURE ---
     with tabs[1]:
