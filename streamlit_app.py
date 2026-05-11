@@ -612,7 +612,7 @@ st.write("---")
 st.header("7. 📅 Project Milestone & Timing")
 st.subheader("Planification des phases du projet")
 
-# 1. Initialisation propre des données (objets date natifs pour éviter les erreurs de type)
+# 1. Initialisation ou conversion forcée (Le Poka-Yoke)
 if "gantt_data" not in st.session_state:
     st.session_state.gantt_data = pd.DataFrame([
         {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
@@ -621,8 +621,12 @@ if "gantt_data" not in st.session_state:
         {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
         {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
     ])
+else:
+    # PROTECTION : On force la conversion en vraies dates au cas où du texte traîne en mémoire
+    st.session_state.gantt_data["Début"] = pd.to_datetime(st.session_state.gantt_data["Début"]).dt.date
+    st.session_state.gantt_data["Fin"] = pd.to_datetime(st.session_state.gantt_data["Fin"]).dt.date
 
-# 2. Configuration du calendrier interactif (Poka-Yoke)
+# 2. Configuration du calendrier
 column_configuration = {
     "Début": st.column_config.DateColumn(
         "Date de Début",
@@ -640,23 +644,21 @@ column_configuration = {
 
 st.info("💡 Cliquez sur une cellule de date pour ouvrir le calendrier interactif.")
 
-# 3. Éditeur de planning (Clé v15 pour garantir la compatibilité avec les nouveaux formats)
+# 3. Éditeur de planning (Clé v16 pour un reset total)
 with st.expander("📝 Éditer le calendrier du projet", expanded=False):
     edited_gantt = st.data_editor(
         st.session_state.gantt_data,
         column_config=column_configuration,
         num_rows="dynamic",
         use_container_width=True,
-        key="gantt_editor_v15" 
+        key="gantt_editor_v16" 
     )
     if edited_gantt is not None:
         st.session_state.gantt_data = edited_gantt
 
-# 4. Rendu visuel du Gantt Plotly
+# 4. Rendu visuel du Gantt
 try:
     df_plot = st.session_state.gantt_data.copy()
-    
-    # Conversion de sécurité pour assurer le bon rendu par Plotly
     df_plot["Début"] = pd.to_datetime(df_plot["Début"])
     df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
 
@@ -670,9 +672,7 @@ try:
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
 
-    # Inversion de l'axe Y pour l'ordre chronologique DMAIC (du haut vers le bas)
     fig.update_yaxes(autorange="reversed")
-    
     fig.update_layout(
         height=400,
         xaxis_title="Chronologie du Projet",
