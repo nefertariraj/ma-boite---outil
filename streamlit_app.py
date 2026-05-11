@@ -602,16 +602,17 @@ else:
         count_data = len(st.session_state.voc_raw_data) if "voc_raw_data" in st.session_state else 0
         st.caption(f"Statut : Phase **ANALYSE** complétée pour {count_data} verbatims.")   
 
+
+# --- SECTION 7 : PROJECT MILESTONE & TIMING ---
 import datetime
 import pandas as pd
 import plotly.express as px
 
-# --- SECTION 7 : PROJECT MILESTONE & TIMING ---
 st.write("---")
 st.header("7. 📅 Project Milestone & Timing")
 st.subheader("Planification des phases du projet")
 
-# 1. Initialisation propre des données (objets date natifs)
+# 1. Initialisation propre des données (objets date natifs pour éviter les erreurs de type)
 if "gantt_data" not in st.session_state:
     st.session_state.gantt_data = pd.DataFrame([
         {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
@@ -637,25 +638,25 @@ column_configuration = {
     ),
 }
 
-st.info("💡 Cliquez sur une cellule de date pour ouvrir le calendrier.")
+st.info("💡 Cliquez sur une cellule de date pour ouvrir le calendrier interactif.")
 
-# 3. Éditeur de planning (clé v14 pour éviter l'erreur de compatibilité)
+# 3. Éditeur de planning (Clé v15 pour garantir la compatibilité avec les nouveaux formats)
 with st.expander("📝 Éditer le calendrier du projet", expanded=False):
     edited_gantt = st.data_editor(
         st.session_state.gantt_data,
         column_config=column_configuration,
         num_rows="dynamic",
         use_container_width=True,
-        key="gantt_editor_v14" 
+        key="gantt_editor_v15" 
     )
     if edited_gantt is not None:
         st.session_state.gantt_data = edited_gantt
 
-# 4. Rendu visuel du Gantt
+# 4. Rendu visuel du Gantt Plotly
 try:
     df_plot = st.session_state.gantt_data.copy()
     
-    # Conversion de sécurité pour assurer le bon affichage Plotly
+    # Conversion de sécurité pour assurer le bon rendu par Plotly
     df_plot["Début"] = pd.to_datetime(df_plot["Début"])
     df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
 
@@ -669,7 +670,7 @@ try:
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
 
-    # Inversion de l'axe Y pour l'ordre chronologique DMAIC
+    # Inversion de l'axe Y pour l'ordre chronologique DMAIC (du haut vers le bas)
     fig.update_yaxes(autorange="reversed")
     
     fig.update_layout(
