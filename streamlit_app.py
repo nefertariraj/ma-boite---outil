@@ -612,7 +612,7 @@ else:
     st.header("📅 Project Milestone & Timing")
     st.subheader("Planification des phases du projet")
 
-    # 1. Initialisation des données avec conversion en objets Date (essentiel pour le calendrier)
+    # 1. Initialisation des données
     if "gantt_data" not in st.session_state:
         default_data = [
             {"Etape": "Define", "Début": "2026-05-01", "Fin": "2026-05-15", "Responsable": "Black Belt"},
@@ -622,48 +622,35 @@ else:
             {"Etape": "Control", "Début": "2026-09-16", "Fin": "2026-10-31", "Responsable": "Process Owner"}
         ]
         df_init = pd.DataFrame(default_data)
-        # On force la conversion en date pour que l'éditeur reconnaisse le type
         df_init["Début"] = pd.to_datetime(df_init["Début"]).dt.date
         df_init["Fin"] = pd.to_datetime(df_init["Fin"]).dt.date
         st.session_state.gantt_data = df_init
 
-    # 2. Configuration de l'éditeur (Poka-Yoke : Calendrier forcé)
-    st.info("💡 Modifiez les étapes ou les dates ci-dessous. Cliquez sur 'Générer le planning' pour mettre à jour le graphique.")
+    # 2. Éditeur avec Calendrier
+    st.info("💡 Modifiez les dates via le calendrier, puis cliquez sur 'Générer le planning'.")
     
     with st.expander("📝 Editer le calendrier du projet", expanded=True):
-        # On définit la configuration des colonnes pour afficher le calendrier
         config_calendrier = {
-            "Début": st.column_config.DateColumn(
-                "Date de Début",
-                format="DD/MM/YYYY",
-                required=True
-            ),
-            "Fin": st.column_config.DateColumn(
-                "Date de Fin",
-                format="DD/MM/YYYY",
-                required=True
-            ),
+            "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"),
+            "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
         }
 
-        # L'éditeur (on utilise une clé différente pour éviter les conflits de session)
         edited_df = st.data_editor(
             st.session_state.gantt_data,
             column_config=config_calendrier,
             num_rows="dynamic",
             use_container_width=True,
-            key="gantt_editor_v2"
+            key="gantt_editor_v3"
         )
 
-        # BOUTON DE VALIDATION : Pour ne mettre à jour que sur demande
         if st.button("🚀 Générer le planning"):
             st.session_state.gantt_data = edited_df
-            st.success("Planning mis à jour !")
+            st.success("Planning actualisé selon l'ordre du tableau.")
             st.rerun()
 
     # 3. Génération du graphique de Gantt
     try:
         df_gantt = st.session_state.gantt_data.copy()
-        # Conversion pour Plotly
         df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
         df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
 
@@ -677,11 +664,18 @@ else:
             color_discrete_sequence=px.colors.qualitative.Prism
         )
 
-        fig.update_yaxes(autorange="reversed") # Ordre chronologique
+        # --- CORRECTION DE L'ORDRE DE L'AXE Y ---
+        # categoryarray force l'ordre en fonction de la colonne 'Etape' du dataframe
+        fig.update_yaxes(
+            categoryorder="array", 
+            categoryarray=df_gantt["Etape"].unique()[::-1], # On inverse pour que la 1ère ligne soit en haut
+            autorange=True 
+        )
         
         fig.update_layout(
             height=400,
-            xaxis_title="Timeline",
+            xaxis_title="Timeline du Projet",
+            yaxis_title="",
             plot_bgcolor="rgba(0,0,0,0)",
             margin=dict(l=0, r=10, t=10, b=0)
         )
@@ -689,17 +683,7 @@ else:
         st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.warning("Ajustez les dates dans le tableau pour afficher le graphique.")
-
-    # 4. Note Méthodologique
-    with st.expander("🎓 Rappel méthodologique : Le Timing en LSS"):
-        st.write("""
-        Un projet Six Sigma dure généralement entre **4 et 6 mois**. 
-        - **Define/Measure** : 25% du temps.
-        - **Analyze** : 20% du temps.
-        - **Improve** : 35% du temps (phase la plus longue).
-        - **Control** : 20% du temps.
-        """)
+        st.warning("Vérifiez la saisie des dates pour afficher le graphique.")
     
     # --- PHASE MEASURE ---
     with tabs[1]:
