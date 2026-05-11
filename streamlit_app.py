@@ -606,12 +606,12 @@ import datetime
 import pandas as pd
 import plotly.express as px
 
-# --- 7 : PROJECT MILESTONE & TIMING ---
+# --- SECTION 7 : PROJECT MILESTONE & TIMING ---
 st.write("---")
-st.header("📅 Project Milestone & Timing")
+st.header("7. 📅 Project Milestone & Timing")
 st.subheader("Planification des phases du projet")
 
-# 1. Initialisation des données de planification dans le session_state
+# 1. Initialisation propre des données (objets date natifs)
 if "gantt_data" not in st.session_state:
     st.session_state.gantt_data = pd.DataFrame([
         {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
@@ -621,7 +621,7 @@ if "gantt_data" not in st.session_state:
         {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
     ])
 
-# 2. Configuration des colonnes (Le Poka-Yoke pour le calendrier)
+# 2. Configuration du calendrier interactif (Poka-Yoke)
 column_configuration = {
     "Début": st.column_config.DateColumn(
         "Date de Début",
@@ -637,25 +637,25 @@ column_configuration = {
     ),
 }
 
-st.info("💡 Cliquez sur une date pour ouvrir le calendrier interactif.")
+st.info("💡 Cliquez sur une cellule de date pour ouvrir le calendrier.")
 
-# 3. Éditeur de planning synchronisé
+# 3. Éditeur de planning (clé v14 pour éviter l'erreur de compatibilité)
 with st.expander("📝 Éditer le calendrier du projet", expanded=False):
     edited_gantt = st.data_editor(
         st.session_state.gantt_data,
         column_config=column_configuration,
         num_rows="dynamic",
         use_container_width=True,
-        key="gantt_editor_v12"
+        key="gantt_editor_v14" 
     )
     if edited_gantt is not None:
         st.session_state.gantt_data = edited_gantt
 
-# 4. Génération du graphique de Gantt dynamique
+# 4. Rendu visuel du Gantt
 try:
     df_plot = st.session_state.gantt_data.copy()
     
-    # Conversion forcée pour Plotly
+    # Conversion de sécurité pour assurer le bon affichage Plotly
     df_plot["Début"] = pd.to_datetime(df_plot["Début"])
     df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
 
@@ -669,12 +669,12 @@ try:
         color_discrete_sequence=px.colors.qualitative.Pastel
     )
 
-    # Inversion de l'axe pour respecter l'ordre DMAIC
+    # Inversion de l'axe Y pour l'ordre chronologique DMAIC
     fig.update_yaxes(autorange="reversed")
     
     fig.update_layout(
         height=400,
-        xaxis_title="Timeline du Projet",
+        xaxis_title="Chronologie du Projet",
         yaxis_title="",
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=0, r=10, t=10, b=0)
@@ -683,7 +683,7 @@ try:
     st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
-    st.error(f"Erreur lors de la mise à jour du graphique : {e}")
+    st.error(f"Erreur de mise à jour du graphique : {e}")
     
     # --- PHASE MEASURE ---
     with tabs[1]:
