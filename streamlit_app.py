@@ -608,79 +608,83 @@ import datetime
 import pandas as pd
 import plotly.express as px
 
-# On vérifie que l'on est dans la bonne section pour éviter l'affichage sur l'accueil
-# Remplacez 'Choix de l'outil' par le nom de votre variable de navigation si nécessaire
-if st.session_state.get('choix_page') != "Accueil":
+# 1. PROTECTION : On n'exécute le code QUE si on est dans l'outil "Projet" 
+# et QUE si les onglets 'tabs' ont été créés plus haut dans votre code.
+if st.session_state.get('choix_page') != "Accueil" and 'tabs' in locals():
     
-    st.write("---")
-    st.header("7. 📅 Project Milestone & Timing")
-    st.subheader("Planification des phases du projet")
+    with tabs[1]: # On cible l'onglet n°2 (index 1)
+        st.write("---")
+        st.header("7. 📅 Project Milestone & Timing")
+        st.subheader("Planification des phases du projet")
 
-    # 1. Initialisation ou conversion forcée (Poka-Yoke)
-    if "gantt_data" not in st.session_state:
-        st.session_state.gantt_data = pd.DataFrame([
-            {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-            {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-            {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-            {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-            {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-        ])
-    else:
-        # On s'assure que les données restent au format 'date' pour le calendrier
-        st.session_state.gantt_data["Début"] = pd.to_datetime(st.session_state.gantt_data["Début"]).dt.date
-        st.session_state.gantt_data["Fin"] = pd.to_datetime(st.session_state.gantt_data["Fin"]).dt.date
+        # 2. Initialisation ou conversion forcée (Poka-Yoke)
+        if "gantt_data" not in st.session_state:
+            st.session_state.gantt_data = pd.DataFrame([
+                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+            ])
+        else:
+            # Sécurité types
+            st.session_state.gantt_data["Début"] = pd.to_datetime(st.session_state.gantt_data["Début"]).dt.date
+            st.session_state.gantt_data["Fin"] = pd.to_datetime(st.session_state.gantt_data["Fin"]).dt.date
 
-    # 2. Configuration du calendrier
-    column_configuration = {
-        "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"),
-        "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
-    }
+        # 3. Configuration du calendrier
+        column_configuration = {
+            "Début": st.column_config.DateColumn("Début", format="DD/MM/YYYY"),
+            "Fin": st.column_config.DateColumn("Fin", format="DD/MM/YYYY"),
+        }
 
-    # 3. Éditeur de planning (Clé v18 pour reset)
-    st.info("💡 Modifiez vos dates ci-dessous, puis cliquez sur le bouton pour mettre à jour le graphique.")
-    
-    edited_gantt = st.data_editor(
-        st.session_state.gantt_data,
-        column_config=column_configuration,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="gantt_editor_v18" 
-    )
-    
-    # Bouton de validation pour éviter le rafraîchissement intempestif
-    if st.button("💾 Enregistrer et Actualiser le Gantt"):
-        st.session_state.gantt_data = edited_gantt
-        st.rerun()
-
-    # 4. Rendu visuel du Gantt
-    try:
-        df_plot = st.session_state.gantt_data.copy()
-        df_plot["Début"] = pd.to_datetime(df_plot["Début"])
-        df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
-
-        fig = px.timeline(
-            df_plot, 
-            x_start="Début", 
-            x_end="Fin", 
-            y="Etape", 
-            color="Responsable",
-            labels={"Etape": "Phase"},
-            color_discrete_sequence=px.colors.qualitative.Pastel
+        # 4. Éditeur de planning (Clé v19)
+        st.info("💡 Modifiez les dates, puis validez pour mettre à jour le graphique Plotly.")
+        
+        edited_gantt = st.data_editor(
+            st.session_state.gantt_data,
+            column_config=column_configuration,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="gantt_editor_v19" 
         )
+        
+        # Validation manuelle pour éviter le rafraîchissement pendant la saisie
+        if st.button("💾 Valider les dates et actualiser le Gantt"):
+            st.session_state.gantt_data = edited_gantt
+            st.rerun()
 
-        fig.update_yaxes(autorange="reversed")
-        fig.update_layout(
-            height=400,
-            xaxis_title="Timeline",
-            yaxis_title="",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=10, t=10, b=0)
-        )
+        # 5. Rendu visuel du Gantt
+        try:
+            df_plot = st.session_state.gantt_data.copy()
+            df_plot["Début"] = pd.to_datetime(df_plot["Début"])
+            df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
 
-        st.plotly_chart(fig, use_container_width=True)
+            fig = px.timeline(
+                df_plot, 
+                x_start="Début", 
+                x_end="Fin", 
+                y="Etape", 
+                color="Responsable",
+                labels={"Etape": "Phase"},
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
 
-    except Exception as e:
-        st.warning("Ajustez les dates pour générer le visuel.")
+            fig.update_yaxes(autorange="reversed")
+            fig.update_layout(
+                height=400,
+                xaxis_title="Chronologie",
+                yaxis_title="",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=0, r=10, t=10, b=0)
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
+        except Exception as e:
+            st.warning("Ajustez les dates pour afficher le graphique.")
+
+# Si l'erreur persistait, vérifiez que vous avez bien une ligne plus haut qui crée les onglets :
+# tabs = st.tabs(["VOC", "Planning", "Analyse", ...])
     
     # --- PHASE MEASURE ---
     with tabs[1]:
