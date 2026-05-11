@@ -242,7 +242,7 @@ else:
             st.success("Équipe enregistrée !")
             st.rerun()
 
-        # --- 4. BÉNÉFICES ATTENDUS & MATRICE D'OPPORTUNITÉ ---
+        # --- 3. BÉNÉFICES ATTENDUS & MATRICE D'OPPORTUNITÉ ---
     st.divider()
     st.subheader("4. Bénéfices Attendus & Matrice d'Opportunité")
 
