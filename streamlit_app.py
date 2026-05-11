@@ -242,7 +242,7 @@ else:
             st.success("Équipe enregistrée !")
             st.rerun()
 
-        # --- 3. BÉNÉFICES ATTENDUS & MATRICE D'OPPORTUNITÉ ---
+        # 3. BÉNÉFICES ATTENDUS & MATRICE D'OPPORTUNITÉ ---
     st.divider()
     st.subheader("4. Bénéfices Attendus & Matrice d'Opportunité")
 
@@ -348,7 +348,7 @@ else:
             p["stakeholders"] = edited_stakeholders
             st.success("Analyse sauvegardée !")
 
-       # --- 5. SIPOC & FLUX CROISÉ COMPACT ---
+       # 5. SIPOC & FLUX CROISÉ COMPACT ---
     p_idx = st.session_state.get('current_project_idx')
 
     if p_idx is not None:
@@ -432,7 +432,7 @@ else:
                             # Espace minimal pour les colonnes vides
                             st.write("")
 
-  # --- 6. VOICE OF CUSTOMER (VOC) : VERSION BLACK BELT OPTIMISÉE ---
+      # 6. VOICE OF CUSTOMER (VOC) : VERSION BLACK BELT OPTIMISÉE ---
     st.divider()
     st.header("🎯 Voice of Customer (VOC) - Flux Black Belt")
 
@@ -603,7 +603,7 @@ else:
         st.caption(f"Statut : Phase **ANALYSE** complétée pour {count_data} verbatims.")   
 
 
-# --- SECTION : PROJECT MILESTONE & TIMING ---
+    # 7. : PROJECT MILESTONE & TIMING ---
     st.write("---")
     st.header("📅 Project Milestone & Timing")
     st.subheader("Planification des phases du projet")
