@@ -608,83 +608,79 @@ import datetime
 import pandas as pd
 import plotly.express as px
 
-st.write("---")
-st.header("7. 📅 Project Milestone & Timing")
-st.subheader("Planification des phases du projet")
+# 1. PROTECTION : On n'affiche QUE si on n'est PAS sur l'accueil
+# Adaptez 'st.session_state.menu' selon le nom de votre variable de navigation
+if st.session_state.get('menu') != "Accueil": 
+    
+    st.write("---")
+    st.header("7. 📅 Project Milestone & Timing")
+    st.subheader("Planification des phases du projet")
 
-# 1. Initialisation ou conversion forcée (Le Poka-Yoke)
-if "gantt_data" not in st.session_state:
-    st.session_state.gantt_data = pd.DataFrame([
-        {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-        {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-        {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-        {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-        {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-    ])
-else:
-    # PROTECTION : On force la conversion en vraies dates au cas où du texte traîne en mémoire
-    st.session_state.gantt_data["Début"] = pd.to_datetime(st.session_state.gantt_data["Début"]).dt.date
-    st.session_state.gantt_data["Fin"] = pd.to_datetime(st.session_state.gantt_data["Fin"]).dt.date
+    # 2. Initialisation ou conversion forcée (Poka-Yoke)
+    if "gantt_data" not in st.session_state:
+        st.session_state.gantt_data = pd.DataFrame([
+            {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+            {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+            {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+            {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+            {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+        ])
+    else:
+        # On s'assure que les données restent au format date
+        st.session_state.gantt_data["Début"] = pd.to_datetime(st.session_state.gantt_data["Début"]).dt.date
+        st.session_state.gantt_data["Fin"] = pd.to_datetime(st.session_state.gantt_data["Fin"]).dt.date
 
-# 2. Configuration du calendrier
-column_configuration = {
-    "Début": st.column_config.DateColumn(
-        "Date de Début",
-        min_value=datetime.date(2025, 1, 1),
-        max_value=datetime.date(2030, 12, 31),
-        format="DD/MM/YYYY",
-    ),
-    "Fin": st.column_config.DateColumn(
-        "Date de Fin",
-        min_value=datetime.date(2025, 1, 1),
-        max_value=datetime.date(2030, 12, 31),
-        format="DD/MM/YYYY",
-    ),
-}
+    # 3. Configuration du calendrier
+    column_configuration = {
+        "Début": st.column_config.DateColumn("Début", format="DD/MM/YYYY"),
+        "Fin": st.column_config.DateColumn("Fin", format="DD/MM/YYYY"),
+    }
 
-st.info("💡 Cliquez sur une cellule de date pour ouvrir le calendrier interactif.")
+    # 4. Éditeur de planning (Clé v17)
+    with st.expander("📝 Éditer le planning (Saisie)", expanded=True):
+        edited_gantt = st.data_editor(
+            st.session_state.gantt_data,
+            column_config=column_configuration,
+            num_rows="dynamic",
+            use_container_width=True,
+            key="gantt_editor_v17" 
+        )
+        
+        # Le bouton de sauvegarde pour figer la saisie
+        if st.button("💾 Valider et mettre à jour le graphique"):
+            st.session_state.gantt_data = edited_gantt
+            st.success("Planning enregistré !")
+            st.rerun()
 
-# 3. Éditeur de planning (Clé v16 pour un reset total)
-with st.expander("📝 Éditer le calendrier du projet", expanded=False):
-    edited_gantt = st.data_editor(
-        st.session_state.gantt_data,
-        column_config=column_configuration,
-        num_rows="dynamic",
-        use_container_width=True,
-        key="gantt_editor_v16" 
-    )
-    if edited_gantt is not None:
-        st.session_state.gantt_data = edited_gantt
+    # 5. Rendu visuel du Gantt (uniquement si les données existent)
+    try:
+        df_plot = st.session_state.gantt_data.copy()
+        df_plot["Début"] = pd.to_datetime(df_plot["Début"])
+        df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
 
-# 4. Rendu visuel du Gantt
-try:
-    df_plot = st.session_state.gantt_data.copy()
-    df_plot["Début"] = pd.to_datetime(df_plot["Début"])
-    df_plot["Fin"] = pd.to_datetime(df_plot["Fin"])
+        fig = px.timeline(
+            df_plot, 
+            x_start="Début", 
+            x_end="Fin", 
+            y="Etape", 
+            color="Responsable",
+            labels={"Etape": "Phase"},
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
 
-    fig = px.timeline(
-        df_plot, 
-        x_start="Début", 
-        x_end="Fin", 
-        y="Etape", 
-        color="Responsable",
-        labels={"Etape": "Phase"},
-        color_discrete_sequence=px.colors.qualitative.Pastel
-    )
+        fig.update_yaxes(autorange="reversed")
+        fig.update_layout(
+            height=400,
+            xaxis_title="Chronologie",
+            yaxis_title="",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=0, r=10, t=10, b=0)
+        )
 
-    fig.update_yaxes(autorange="reversed")
-    fig.update_layout(
-        height=400,
-        xaxis_title="Chronologie du Projet",
-        yaxis_title="",
-        plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=0, r=10, t=10, b=0)
-    )
+        st.plotly_chart(fig, use_container_width=True)
 
-    st.plotly_chart(fig, use_container_width=True)
-
-except Exception as e:
-    st.error(f"Erreur de mise à jour du graphique : {e}")
+    except Exception as e:
+        st.info("Modifiez les dates ci-dessus et cliquez sur 'Valider' pour afficher le graphique.")
     
     # --- PHASE MEASURE ---
     with tabs[1]:
