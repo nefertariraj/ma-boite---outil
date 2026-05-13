@@ -172,19 +172,21 @@ if st.session_state.current_project_idx is None:
 
 else:
     # --- VUE PROJET (DMAIC) ---
-p_idx = st.session_state.current_project_idx
-p = st.session_state.projects[p_idx]
+    # Ces lignes doivent être indentées (4 espaces ou 1 Tab)
+    p_idx = st.session_state.current_project_idx
+    p = st.session_state.projects[p_idx]
 
-col_back, col_title = st.columns([1, 8])
-with col_back:
-    if st.button("⬅️"):
-        st.session_state.current_project_idx = None
-        st.rerun()
-with col_title:
-    st.title(f"Projet : {p['name']}")
+    col_back, col_title = st.columns([1, 8])
+    with col_back:
+        if st.button("⬅️"):
+            st.session_state.current_project_idx = None
+            st.rerun()
+            
+    with col_title:
+        st.title(f"Projet : {p['name']}")
 
-# Définition des onglets
-tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
+    # Définition des onglets
+    tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # --- PHASE DEFINE ---
 with tabs[0]:
