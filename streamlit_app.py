@@ -567,7 +567,6 @@ st.divider()
 st.header("📅 7. Project Milestone & Timing")
 
 # 1. Initialisation de la donnée dans le dictionnaire du projet 'p'
-# On vérifie si la clé existe déjà pour ne pas écraser les saisies de l'utilisateur
 if "gantt_data" not in p:
     p["gantt_data"] = pd.DataFrame([
         {"Etape": "Define", "Début": date(2026, 5, 1), "Fin": date(2026, 5, 15), "Responsable": "Black Belt"},
@@ -580,14 +579,12 @@ if "gantt_data" not in p:
 st.info("💡 Modifiez les dates dans le tableau, puis cliquez sur le bouton pour mettre à jour le graphique.")
 
 with st.expander("📝 Editer le calendrier du projet", expanded=True):
-    # Configuration des colonnes pour le calendrier
     config_cal = {
         "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), 
         "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
         "Responsable": st.column_config.SelectboxColumn("Responsable", options=["Black Belt", "Green Belt", "Team", "Process Owner"])
     }
     
-    # Édition des données
     edited_gantt = st.data_editor(
         p["gantt_data"], 
         column_config=config_cal, 
@@ -596,7 +593,6 @@ with st.expander("📝 Editer le calendrier du projet", expanded=True):
         key=f"gantt_editor_{p_idx}"
     )
     
-    # Bouton de validation
     if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
         p["gantt_data"] = edited_gantt
         st.success("Planning mis à jour avec succès !")
@@ -604,14 +600,16 @@ with st.expander("📝 Editer le calendrier du projet", expanded=True):
 
 # 2. Affichage du graphique de Gantt
 try:
-    # On travaille sur une copie pour la visualisation
     df_viz = p["gantt_data"].copy()
     
-    # Conversion obligatoire pour Plotly Express
+    # Conversion impérative pour Plotly
     df_viz["Début"] = pd.to_datetime(df_viz["Début"])
     df_viz["Fin"] = pd.to_datetime(df_viz["Fin"])
     
-    # Création du graphique
+    # CRUCIAL : On définit l'ordre de l'axe Y selon l'ordre actuel du tableau
+    # On inverse la liste car Plotly trace de bas en haut par défaut
+    ordre_etapes = df_viz["Etape"].tolist()[::-1]
+
     fig_gantt = px.timeline(
         df_viz, 
         x_start="Début", 
@@ -619,24 +617,26 @@ try:
         y="Etape", 
         color="Responsable", 
         color_discrete_sequence=px.colors.qualitative.Prism,
-        template="plotly_white"
+        template="plotly_white",
+        # On force l'ordre des catégories ici
+        category_orders={"Etape": df_viz["Etape"].tolist()}
     )
     
-    # Inverser l'axe Y pour avoir l'ordre chronologique de haut en bas
+    # On s'assure que Define est bien en haut
     fig_gantt.update_yaxes(autorange="reversed")
     
-    # Mise en forme
     fig_gantt.update_layout(
         height=400, 
         margin=dict(l=0, r=10, t=10, b=0),
-        xaxis_title="Timeline du Projet",
-        yaxis_title=""
+        xaxis_title="Chronologie du Projet",
+        yaxis_title="",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
     
     st.plotly_chart(fig_gantt, use_container_width=True)
     
 except Exception as e:
-    st.warning("Complétez les dates dans le tableau pour afficher le graphique Gantt.")
+    st.warning("Assurez-vous que toutes les étapes et dates sont remplies.")
     
     # --- PHASE MEASURE ---
     with tabs[1]:
