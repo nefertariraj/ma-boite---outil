@@ -189,7 +189,7 @@ else:
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # --- PHASE DEFINE ---
-with tabs[0]:
+    with tabs[0]:
     st.header("Phase Define")
     
     # Récupération de l'index et du projet pour l'ensemble de l'onglet
