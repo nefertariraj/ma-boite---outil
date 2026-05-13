@@ -188,16 +188,16 @@ else:
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # --- PHASE DEFINE ---
-with tabs[0]:
-    st.header("Phase Define")
+    with tabs[0]:
+        st.header("Phase Define")
     
-    # Récupération de l'index et du projet pour l'ensemble de l'onglet
-    p_idx = st.session_state.get('current_project_idx', 0)
-    p = st.session_state.projects[p_idx]
+        # Récupération de l'index et du projet pour l'ensemble de l'onglet
+        p_idx = st.session_state.get('current_project_idx', 0)
+        p = st.session_state.projects[p_idx]
     
-    # 1. Problème & CTQ
-    st.subheader("1. Énoncé du Problème & CTQ")
-    col1, col2 = st.columns(2)
+        # 1. Problème & CTQ
+        st.subheader("1. Énoncé du Problème & CTQ")
+        col1, col2 = st.columns(2)
     
     with col1:
         st.markdown('<p title="X correspond aux causes">Décrivez le problème en détail :</p>', unsafe_allow_html=True)
