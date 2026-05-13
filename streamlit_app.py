@@ -509,26 +509,58 @@ else:
         st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
         res_voc = st.session_state.voc_results
         top_theme = res_voc.iloc[0]["thème des irritants"]
-        occurrence = res_voc.iloc[0]["nombre d'occurrence"]
         ctq_cible = res_voc.iloc[0]["CTQ"]
         
-        st.markdown(f"### 🎯 Focus Prioritaire : {top_theme}")
-        
-        reflexions = {
-            "Délais (Lead Time)": {"analyse": f"Le diagnostic révèle {occurrence} frictions temporelles.", "strategie": "Prioriser une VSM.", "outils": ["Kanban", "Chantier Kaizen"]},
-            "Qualité (Défauts)": {"analyse": f"La non-qualité ({occurrence} cas) indique une instabilité.", "strategie": "Utiliser le cycle DMAIC.", "outils": ["5 Pourquoi", "Poka-Yoke"]},
-            "Pénibilité": {"analyse": f"La pénibilité signalée ({occurrence} fois) est un symptôme de Muri.", "strategie": "Réduire la charge via le Standard Work.", "outils": ["5S", "Analyse de déroulement"]},
-            "Outils": {"analyse": f"L'outil n'est plus capable.", "strategie": "Investir dans la capabilité.", "outils": ["AMDEC", "RPA"]},
-            "Information": {"analyse": f"Le flux souffre de Mura.", "strategie": "Instaurer le Management Visuel.", "outils": ["Obeya", "Rituels AIC"]}
+        st.markdown(f"### 🎯 Focus Prioritaire : **{top_theme}**")
+        st.write(f"Sur la base de l'analyse des verbatims, voici les 4 axes stratégiques pour impacter le CTQ : `{ctq_cible}`")
+
+        # Configuration des 4 propositions selon le thème dominant
+        plans_action = {
+            "Délais (Lead Time)": [
+                "**Standardisation des flux (Takt Time)** : Aligner la cadence de production sur la demande client pour éliminer les stocks tampons.",
+                "**Mise en place d'un système Pull (Kanban)** : Réduire les en-cours en ne déclenchant le travail que sur signal de l'étape suivante.",
+                "**Chantier SMED / Setup** : Réduire les temps de changement de série pour gagner en flexibilité et réduire les attentes.",
+                "**Visual Management (Andon)** : Installer des indicateurs visuels pour détecter instantanément tout arrêt de flux."
+            ],
+            "Qualité (Défauts)": [
+                "**Analyse Poka-Yoke (Détrompeurs)** : Concevoir des systèmes physiques ou numériques empêchant l'erreur de se produire.",
+                "**Standard Work & Formation** : Réviser les modes opératoires et certifier les opérateurs sur les 'Points Clés de Qualité'.",
+                "**Mise en place du Jidoka** : Arrêt automatique du processus dès l'apparition d'un défaut pour éviter la propagation.",
+                "**Contrôle Statistique des Procédés (MSP)** : Suivre la variabilité en temps réel pour anticiper les dérives hors tolérance."
+            ],
+            "Pénibilité": [
+                "**Réingénierie Ergonomique** : Modifier l'implantation du poste (5S) pour réduire les déplacements et gestes inutiles (Muda).",
+                "**Équilibrage de ligne (Heijunka)** : Lisser la charge de travail pour éviter les pics de stress et la surcharge (Muri).",
+                "**Automatisation des tâches à faible valeur** : Déléguer les tâches répétitives à des solutions RPA ou mécaniques.",
+                "**Rotation de postes** : Planifier la polyvalence pour réduire l'exposition prolongée aux contraintes physiques/mentales."
+            ],
+            "Outils": [
+                "**Maintenance Préventive (TPM)** : Passer d'une logique curative à une maintenance planifiée pour garantir la capabilité machine.",
+                "**Mise à niveau technologique** : Investir dans des outils dont la précision est 10x supérieure à la tolérance du CTQ.",
+                "**Digitalisation du feedback** : Intégrer la saisie de données à la source pour éliminer les doubles saisies et erreurs outils.",
+                "**Audit de Capabilité (Cp/Cpk)** : Vérifier mathématiquement si l'outil actuel peut techniquement tenir les objectifs."
+            ],
+            "Information": [
+                "**Standardisation des échanges (SBAR)** : Imposer un format de communication structuré pour éliminer les ambiguïtés.",
+                "**Mise en place d'une 'Single Source of Truth'** : Centraliser les données pour éviter les versions de documents contradictoires.",
+                "**Rituels AIC (Animation à Intervalle Court)** : Créer des boucles de feedback rapides (5-10 min) pour fluidifier l'info.",
+                "**Management Visuel Numérique** : Rendre les informations critiques accessibles en un coup d'œil via des Dashboards partagés."
+            ]
         }
-        diag = reflexions.get(top_theme, {"analyse": "Analyse requise.", "strategie": "Standardisation.", "outils": ["Audit"]})
-        with st.expander("🔍 Deep Dive Black Belt : Diagnostic", expanded=True):
-            st.write(diag["analyse"])
-            st.write(f"**Indicateur CTQ cible :** `{ctq_cible}`")
-        st.info(f"🚀 **Recommandation Stratégique :** {diag['strategie']}")
-        cols_tools = st.columns(len(diag["outils"]))
-        for i, tool in enumerate(diag["outils"]):
-            cols_tools[i].success(f"🛠️ {tool}")
+
+        # Récupération des propositions (ou par défaut si thème inconnu)
+        propositions = plans_action.get(top_theme, [
+            "Audit approfondi des processus.", "Standardisation des tâches.", "Formation des équipes.", "Suivi des indicateurs."
+        ])
+
+        # Affichage en colonnes pour un rendu "Dashboard"
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.info(f"💡 **Proposition 1**\n\n{propositions[0]}")
+            st.info(f"🚀 **Proposition 2**\n\n{propositions[1]}")
+        with col_b:
+            st.info(f"🛠️ **Proposition 3**\n\n{propositions[2]}")
+            st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
 
     # 7. PROJECT MILESTONE AND TIMING (GANTT)
     st.write("---")
