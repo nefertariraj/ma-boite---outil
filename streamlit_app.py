@@ -172,7 +172,6 @@ if st.session_state.current_project_idx is None:
 
 else:
     # --- VUE PROJET (DMAIC) ---
-    # Ces lignes doivent être indentées (4 espaces ou 1 Tab)
     p_idx = st.session_state.current_project_idx
     p = st.session_state.projects[p_idx]
 
@@ -189,7 +188,7 @@ else:
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # --- PHASE DEFINE ---
-    with tabs[0]:
+with tabs[0]:
     st.header("Phase Define")
     
     # Récupération de l'index et du projet pour l'ensemble de l'onglet
