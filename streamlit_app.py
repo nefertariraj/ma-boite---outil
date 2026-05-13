@@ -562,40 +562,73 @@ else:
             st.info(f"🛠️ **Proposition 3**\n\n{propositions[2]}")
             st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
 
-    # 7. PROJECT MILESTONE AND TIMING (GANTT)
-    st.write("---")
+    # --- 7. PROJECT MILESTONE & TIMING ---
+    st.divider()
     st.header("📅 7. Project Milestone & Timing")
-    st.subheader("Planification des phases du projet")
 
-    if "gantt_data" not in st.session_state:
-        df_init_gantt = pd.DataFrame([
+    # 1. Initialisation UNIQUE (seulement si la donnée n'existe pas déjà pour ce projet)
+    if "gantt_data" not in p:
+        p["gantt_data"] = pd.DataFrame([
             {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
             {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
             {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
             {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
             {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
         ])
-        st.session_state.gantt_data = df_init_gantt
 
     st.info("💡 Modifiez les dates via le calendrier, puis cliquez sur 'Générer le planning'.")
+
     with st.expander("📝 Editer le calendrier du projet", expanded=True):
-        config_cal = {"Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY")}
-        edited_gantt = st.data_editor(st.session_state.gantt_data, column_config=config_cal, num_rows="dynamic", use_container_width=True, key=f"gantt_editor_{p_idx}")
+        config_cal = {
+            "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), 
+            "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY")
+        }
+        
+        # On affiche les données actuelles de p["gantt_data"]
+        edited_gantt = st.data_editor(
+            p["gantt_data"], 
+            column_config=config_cal, 
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key=f"gantt_editor_{p_idx}"
+        )
+        
         if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
-            st.session_state.gantt_data = edited_gantt
+            # On enregistre les modifications dans l'objet projet
+            p["gantt_data"] = edited_gantt
             st.success("Planning actualisé.")
             st.rerun()
 
+    # 2. Affichage du graphique
     try:
-        df_gantt_viz = st.session_state.gantt_data.copy()
+        df_gantt_viz = p["gantt_data"].copy()
+        
+        # Conversion sécurisée en datetime pour Plotly
         df_gantt_viz["Début"] = pd.to_datetime(df_gantt_viz["Début"])
         df_gantt_viz["Fin"] = pd.to_datetime(df_gantt_viz["Fin"])
-        fig_gantt = px.timeline(df_gantt_viz, x_start="Début", x_end="Fin", y="Etape", color="Responsable", color_discrete_sequence=px.colors.qualitative.Prism)
-        fig_gantt.update_yaxes(categoryorder="array", categoryarray=df_gantt_viz["Etape"].unique()[::-1])
-        fig_gantt.update_layout(height=400, plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=0, r=10, t=10, b=0))
+        
+        fig_gantt = px.timeline(
+            df_gantt_viz, 
+            x_start="Début", 
+            x_end="Fin", 
+            y="Etape", 
+            color="Responsable", 
+            color_discrete_sequence=px.colors.qualitative.Prism
+        )
+        
+        # Inverser l'axe Y pour avoir "Define" en haut
+        fig_gantt.update_yaxes(autorange="reversed")
+        
+        fig_gantt.update_layout(
+            height=400, 
+            plot_bgcolor="rgba(0,0,0,0)", 
+            margin=dict(l=0, r=10, t=10, b=0)
+        )
+        
         st.plotly_chart(fig_gantt, use_container_width=True)
-    except:
-        st.warning("Vérifiez la saisie des dates.")
+        
+    except Exception as e:
+        st.warning("Complétez les dates dans le tableau pour afficher le Gantt.")
     
     # --- PHASE MEASURE ---
     with tabs[1]:
