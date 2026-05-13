@@ -186,65 +186,69 @@ else:
     tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
 
     # --- PHASE DEFINE ---
-    with tabs[0]:
-        st.header("Phase Define")
+with tabs[0]:
+    st.header("Phase Define")
+    
+    # Récupération de l'index et du projet pour l'ensemble de l'onglet
+    p_idx = st.session_state.get('current_project_idx', 0)
+    p = st.session_state.projects[p_idx]
+    
+    # 1. Problème & CTQ
+    st.subheader("1. Énoncé du Problème & CTQ")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown('<p title="X correspond aux causes">Décrivez le problème en détail :</p>', unsafe_allow_html=True)
+        # Utilisation de .get pour éviter le KeyError si le projet est ancien
+        p_input = st.text_area("Saisie libre", value=p.get("problem", ""), height=150, key=f"prob_in_{p_idx}")
         
-        # 1. Problème & CTQ
-        st.subheader("1. Énoncé du Problème & CTQ")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown('<p title="X correspond aux causes">Décrivez le problème en détail :</p>', unsafe_allow_html=True)
-            # Utilisation de .get pour éviter le KeyError si le projet est ancien
-            p_input = st.text_area("Saisie libre", value=p.get("problem", ""), height=150, key=f"prob_in_{st.session_state.current_project_idx}")
-            
-            if st.button("🪄 Retranscrire via IA"):
-                p["problem"] = p_input
-                st.session_state.ai_suggest_ctq = [
-                    "⏱️ Temps : Réduire le Lead Time global",
-                    "🎯 Qualité : Augmenter le taux de conformité (%C&A)",
-                    "💰 Coût : Réduire les coûts opérationnels",
-                    f"✨ Spécifique : {p_input[:30]}..."
-                ]
-                st.rerun() 
+        if st.button("🪄 Retranscrire via IA"):
+            p["problem"] = p_input
+            st.session_state.ai_suggest_ctq = [
+                "⏱️ Temps : Réduire le Lead Time global",
+                "🎯 Qualité : Augmenter le taux de conformité (%C&A)",
+                "💰 Coût : Réduire les coûts opérationnels",
+                f"✨ Spécifique : {p_input[:30]}..."
+            ]
+            st.rerun() 
 
-        with col2:
-            st.write("Propositions de l'IA (CTQ) :")
-            if 'ai_suggest_ctq' in st.session_state:
-                for ctq in st.session_state.ai_suggest_ctq:
-                    if st.button(ctq, key=f"btn_{ctq}"):
-                        p["selected_ctq"] = ctq
-                        st.rerun()
-            
-            st.divider()
-            
-            if "selected_ctq" in p and p["selected_ctq"]:
-                st.write("✍️ **Ajustez votre CTQ final :**")
-                new_val = st.text_input("Libellé du CTQ", value=p["selected_ctq"], key=f"edit_ctq_{st.session_state.current_project_idx}")
-                
-                if new_val != p["selected_ctq"]:
-                    p["selected_ctq"] = new_val
+    with col2:
+        st.write("Propositions de l'IA (CTQ) :")
+        if 'ai_suggest_ctq' in st.session_state:
+            for ctq in st.session_state.ai_suggest_ctq:
+                if st.button(ctq, key=f"btn_{ctq}"):
+                    p["selected_ctq"] = ctq
                     st.rerun()
-                st.info(f"**CTQ validé :** {p['selected_ctq']}")
-
-        # 2. Équipe Projet
+        
         st.divider()
-        st.subheader("2. Équipe Projet")
-        team_key = f"editor_team_{st.session_state.current_project_idx}"
-        edited_team = st.data_editor(
-            p.get("team_data", [{"Poste": "", "Nom": ""}]), 
-            num_rows="dynamic",
-            use_container_width=True,
-            key=team_key
-        )
-        if st.button("✅ Valider l'équipe", key=f"save_team_{st.session_state.current_project_idx}"):
-            p["team_data"] = edited_team
-            st.success("Équipe enregistrée !")
-            st.rerun()
+        
+        if "selected_ctq" in p and p["selected_ctq"]:
+            st.write("✍️ **Ajustez votre CTQ final :**")
+            new_val = st.text_input("Libellé du CTQ", value=p["selected_ctq"], key=f"edit_ctq_{p_idx}")
+            
+            if new_val != p["selected_ctq"]:
+                p["selected_ctq"] = new_val
+                st.rerun()
+            st.info(f"**CTQ validé :** {p['selected_ctq']}")
 
-        # 3. BÉNÉFICES ATTENDUS & MATRICE D'OPPORTUNITÉ ---
+    # 2. Équipe Projet
     st.divider()
-    st.subheader("4. Bénéfices Attendus & Matrice d'Opportunité")
+    st.subheader("2. Équipe Projet")
+    team_key = f"editor_team_{p_idx}"
+    edited_team = st.data_editor(
+        p.get("team_data", [{"Poste": "", "Nom": ""}]), 
+        num_rows="dynamic",
+        use_container_width=True,
+        key=team_key
+    )
+    if st.button("✅ Valider l'équipe", key=f"save_team_{p_idx}"):
+        p["team_data"] = edited_team
+        st.success("Équipe enregistrée !")
+        st.rerun()
+
+    # 3. BÉNÉFICES ATTENDUS & MATRICE D'OPPORTUNITÉ ---
+    st.divider()
+    st.subheader("3. Bénéfices Attendus & Matrice d'Opportunité")
 
     # Initialisation sécurisée pour l'import/export
     if "benefices_saisie" not in p:
@@ -304,168 +308,143 @@ else:
                     disabled=True
                 )
                 st.caption("L'IA préconise le passage en phase 'Measure'.")
-
     else:
         st.info("💡 Décrivez vos bénéfices pour activer le diagnostic d'opportunité Black Belt.")
 
-       # 4. Stakeholder Analysis
-        st.divider()
-        st.subheader("7. Stakeholder Analysis (Matrice d'adhésion)")
-
-        # Initialisation des données si elles n'existent pas
-        if "stakeholders" not in p:
-            # On décale vers la droite ici
-            p["stakeholders"] = [
-                {
-                    "Name": "Sponsor",
-                    "Strongly Against": False,
-                    "Moderately Against": False,
-                    "Neutral": True,
-                    "Moderately Supportive": False,
-                    "Strongly Supportive": False
-                }
-            ]
-
-        st.info("Cochez le niveau d'adhésion actuel pour chaque partie prenante. Vous pouvez ajouter/supprimer des lignes via les icônes du tableau.")
-
-        # Utilisation du data_editor
-        edited_stakeholders = st.data_editor(
-            p["stakeholders"],
-            num_rows="dynamic", 
-            key=f"stake_edit_{p_idx}",
-            use_container_width=True,
-            column_config={
-                "Strongly Against": st.column_config.CheckboxColumn(default=False),
-                "Moderately Against": st.column_config.CheckboxColumn(default=False),
-                "Neutral": st.column_config.CheckboxColumn(default=False),
-                "Moderately Supportive": st.column_config.CheckboxColumn(default=False),
-                "Strongly Supportive": st.column_config.CheckboxColumn(default=False),
-            }
-        )
-
-        if st.button("✅ Sauvegarder l'analyse des parties prenantes", key=f"save_stake_{p_idx}"):
-            # On décale aussi vers la droite ici
-            p["stakeholders"] = edited_stakeholders
-            st.success("Analyse sauvegardée !")
-
-       # 5. SIPOC & FLUX CROISÉ COMPACT ---
-    p_idx = st.session_state.get('current_project_idx')
-
-    if p_idx is not None:
-        p = st.session_state.projects[p_idx]
-        
-        st.divider()
-        st.subheader("5. SIPOC & Flux de processus")
-
-        COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
-        
-        if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
-            p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
-
-        with st.form(key=f"form_sipoc_compact_{p_idx}"):
-            df_init = pd.DataFrame(p["sipoc_data"])
-            for col in COLONNES_SIPOC:
-                if col not in df_init.columns:
-                    df_init[col] = ""
-            
-            edited_sipoc = st.data_editor(
-                df_init[COLONNES_SIPOC],
-                num_rows="dynamic",
-                use_container_width=True,
-                key=f"editor_sipoc_comp_{p_idx}",
-                column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
-            )
-            submit_sipoc = st.form_submit_button("✅ Actualiser le flux")
-
-        if submit_sipoc:
-            p["sipoc_data"] = edited_sipoc.to_dict('records')
-            st.rerun()
-
-        df_viz = pd.DataFrame(p["sipoc_data"])
-        df_viz = df_viz[(df_viz["Process"].astype(str).str.strip() != "") & 
-                        (df_viz["Customer"].astype(str).str.strip() != "")]
-        
-        if not df_viz.empty:
-            st.write("---")
-            acteurs = df_viz["Customer"].unique().tolist()
-            cols = st.columns(len(acteurs))
-            
-            for i, acteur in enumerate(acteurs):
-                cols[i].markdown(f"<p style='font-weight:bold; font-size:14px; margin-bottom:0;'>{acteur.upper()}</p>", unsafe_allow_html=True)
-                cols[i].divider()
-
-            # Rendu des tâches
-            for idx, row in df_viz.iterrows():
-                current_col = acteurs.index(row["Customer"])
-                
-                # Création d'une ligne de hauteur réduite
-                row_cols = st.columns(len(acteurs))
-                
-                # Vérification de l'action suivante pour la flèche
-                has_next = idx < len(df_viz) - 1
-                if has_next:
-                    next_actor = df_viz.iloc[idx + 1]["Customer"]
-                    next_col = acteurs.index(next_actor)
-
-                for i in range(len(acteurs)):
-                    with row_cols[i]:
-                        if i == current_col:
-                            # Affichage de la tâche dans un bloc compact
-                            st.markdown(f"""
-                                <div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 10px; background-color: #f8f9fa; font-size: 14px;">
-                                    {row['Process']}
-                                </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # Gestion des flèches de liaison
-                            if has_next:
-                                if next_col == current_col:
-                                    # Flèche vers le bas (même acteur)
-                                    st.markdown("<p style='text-align:center; margin:0; line-height:1;'>↓</p>", unsafe_allow_html=True)
-                                elif next_col > current_col:
-                                    # Flèche vers la droite
-                                    st.markdown("<p style='text-align:right; margin:0; line-height:1;'>➡</p>", unsafe_allow_html=True)
-                                else:
-                                    # Flèche vers la gauche
-                                    st.markdown("<p style='text-align:left; margin:0; line-height:1;'>⬅</p>", unsafe_allow_html=True)
-                        else:
-                            # Espace minimal pour les colonnes vides
-                            st.write("")
-
-      # 6. VOICE OF CUSTOMER (VOC) : VERSION BLACK BELT OPTIMISÉE ---
+    # 4. Stakeholder Analysis
     st.divider()
-    st.header("🎯 Voice of Customer (VOC) - Flux Black Belt")
+    st.subheader("4. Stakeholder Analysis (Matrice d'adhésion)")
 
-    if 'p' not in locals(): p = st.session_state
+    # Initialisation des données si elles n'existent pas
+    if "stakeholders" not in p:
+        p["stakeholders"] = [
+            {
+                "Name": "Sponsor",
+                "Strongly Against": False,
+                "Moderately Against": False,
+                "Neutral": True,
+                "Moderately Supportive": False,
+                "Strongly Supportive": False
+            }
+        ]
 
-    # 1. INITIALISATION DES VARIABLES
+    st.info("Cochez le niveau d'adhésion actuel pour chaque partie prenante. Vous pouvez ajouter/supprimer des lignes via les icônes du tableau.")
+
+    # Utilisation du data_editor
+    edited_stakeholders = st.data_editor(
+        p["stakeholders"],
+        num_rows="dynamic", 
+        key=f"stake_edit_{p_idx}",
+        use_container_width=True,
+        column_config={
+            "Strongly Against": st.column_config.CheckboxColumn(default=False),
+            "Moderately Against": st.column_config.CheckboxColumn(default=False),
+            "Neutral": st.column_config.CheckboxColumn(default=False),
+            "Moderately Supportive": st.column_config.CheckboxColumn(default=False),
+            "Strongly Supportive": st.column_config.CheckboxColumn(default=False),
+        }
+    )
+
+    if st.button("✅ Sauvegarder l'analyse des parties prenantes", key=f"save_stake_{p_idx}"):
+        p["stakeholders"] = edited_stakeholders
+        st.success("Analyse sauvegardée !")
+
+    # 5. SIPOC & FLUX CROISÉ COMPACT ---
+    st.divider()
+    st.subheader("5. SIPOC & Flux de processus")
+
+    COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
+    
+    if "sipoc_data" not in p or not isinstance(p["sipoc_data"], list):
+        p["sipoc_data"] = [dict.fromkeys(COLONNES_SIPOC, "")]
+
+    with st.form(key=f"form_sipoc_compact_{p_idx}"):
+        df_init_sipoc = pd.DataFrame(p["sipoc_data"])
+        for col in COLONNES_SIPOC:
+            if col not in df_init_sipoc.columns:
+                df_init_sipoc[col] = ""
+        
+        edited_sipoc = st.data_editor(
+            df_init_sipoc[COLONNES_SIPOC],
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"editor_sipoc_comp_{p_idx}",
+            column_config={c: st.column_config.TextColumn(c) for c in COLONNES_SIPOC}
+        )
+        submit_sipoc = st.form_submit_button("✅ Actualiser le flux")
+
+    if submit_sipoc:
+        p["sipoc_data"] = edited_sipoc.to_dict('records')
+        st.rerun()
+
+    df_viz_sipoc = pd.DataFrame(p["sipoc_data"])
+    df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
+                                (df_viz_sipoc["Customer"].astype(str).str.strip() != "")]
+    
+    if not df_viz_sipoc.empty:
+        st.write("---")
+        acteurs = df_viz_sipoc["Customer"].unique().tolist()
+        cols_act = st.columns(len(acteurs))
+        
+        for i, acteur in enumerate(acteurs):
+            cols_act[i].markdown(f"<p style='font-weight:bold; font-size:14px; margin-bottom:0;'>{acteur.upper()}</p>", unsafe_allow_html=True)
+            cols_act[i].divider()
+
+        # Rendu des tâches
+        for idx, row in df_viz_sipoc.iterrows():
+            current_col = acteurs.index(row["Customer"])
+            row_cols = st.columns(len(acteurs))
+            
+            has_next = idx < len(df_viz_sipoc) - 1
+            if has_next:
+                next_actor = df_viz_sipoc.iloc[idx + 1]["Customer"]
+                next_col = acteurs.index(next_actor)
+
+            for i in range(len(acteurs)):
+                with row_cols[i]:
+                    if i == current_col:
+                        st.markdown(f"""
+                            <div style="border: 1px solid #e0e0e0; border-radius: 5px; padding: 5px 10px; background-color: #f8f9fa; font-size: 14px;">
+                                {row['Process']}
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if has_next:
+                            if next_col == current_col:
+                                st.markdown("<p style='text-align:center; margin:0; line-height:1;'>↓</p>", unsafe_allow_html=True)
+                            elif next_col > current_col:
+                                st.markdown("<p style='text-align:right; margin:0; line-height:1;'>➡</p>", unsafe_allow_html=True)
+                            else:
+                                st.markdown("<p style='text-align:left; margin:0; line-height:1;'>⬅</p>", unsafe_allow_html=True)
+                    else:
+                        st.write("")
+
+    # 6. VOICE OF CUSTOMER (VOC)
+    st.divider()
+    st.header("6. Voice of Customer (VOC) - Flux Black Belt")
+
+    # Initialisation des variables
     if "voc_questions" not in p:
         p["voc_questions"] = ["Temps perdu ?", "Retouches ?", "Pénibilité ?", "Irritants ?", "Changement unique ?"]
-    if "voc_raw_data" not in p:
-        p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute"])
+    if "voc_raw_data" not in st.session_state:
+        st.session_state.voc_raw_data = pd.DataFrame(columns=["client", "question", "réponse brute"])
 
-    # --- ÉTAPE 1 : ÉLABORATION ---
     st.subheader("1. Élaboration du Questionnaire")
     with st.expander("📝 Configurer les questions"):
         for i, q in enumerate(p["voc_questions"]):
-            p["voc_questions"][i] = st.text_input(f"Question {i+1}", value=q, key=f"q_v9_{i}")
+            p["voc_questions"][i] = st.text_input(f"Question {i+1}", value=q, key=f"q_v9_{p_idx}_{i}")
 
-    # --- ÉTAPE 2 : COLLECTE DES DONNÉES (FLUX DYNAMIQUE) ---
     st.write("---")
     st.subheader("2. Collecte des Données")
     
-    # Importation sécurisée
-    up_file = st.file_uploader("Importer un fichier Excel", type=["xlsx", "xls"], key="up_v_final")
+    up_file = st.file_uploader("Importer un fichier Excel", type=["xlsx", "xls"], key=f"up_v_final_{p_idx}")
     
     if up_file is not None:
         file_id = f"{up_file.name}_{up_file.size}"
-        # Si c'est un nouveau fichier, on vide l'ancienne analyse
         if st.session_state.get("last_file") != file_id:
             try:
                 df_imp = pd.read_excel(up_file).fillna("")
                 df_imp.columns = [c.lower().strip() for c in df_imp.columns]
-                
-                # Mapping intelligent des colonnes
                 c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
                 r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
                 
@@ -474,46 +453,30 @@ else:
                     "question": "Import Excel",
                     "réponse brute": df_imp[r_col].astype(str)
                 })
-                
-                # Mise à jour de la session et RESET de l'analyse
                 st.session_state.voc_raw_data = new_rows
                 st.session_state.voc_results = None  
                 st.session_state.last_file = file_id
-                st.success("✅ Nouveau fichier détecté : Analyse réinitialisée.")
                 st.rerun()
             except Exception as e:
                 st.error(f"Erreur lors de l'import : {e}")
 
-    # Initialisation du tableau si vide
-    if "voc_raw_data" not in st.session_state:
-        st.session_state.voc_raw_data = pd.DataFrame(columns=["client", "question", "réponse brute"])
-
-    # ÉDITEUR : La source de vérité visuelle
-    edited_df = st.data_editor(
+    edited_voc_df = st.data_editor(
         st.session_state.voc_raw_data,
         num_rows="dynamic",
         use_container_width=True,
-        key="editor_sync_v10"
+        key=f"voc_editor_sync_{p_idx}"
     )
-    
-    # Synchronisation immédiate en cas de modification manuelle
-    if edited_df is not None:
-        st.session_state.voc_raw_data = edited_df
+    if edited_voc_df is not None:
+        st.session_state.voc_raw_data = edited_voc_df
 
-    # --- ÉTAPE 3 : ANALYSE THÉMATIQUE & CTQ (LE MOTEUR) ---
     st.write("---")
     st.subheader("3. Analyse Thématique & CTQ")
     
-    if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key="btn_run_analysis_v10"):
-        # On travaille sur les données exactes du tableau
+    if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
         df_to_analyze = st.session_state.voc_raw_data
-        
         if not df_to_analyze.empty:
-            # Extraction des verbatims (dernière colonne)
             verbatims = df_to_analyze.iloc[:, -1].astype(str).str.lower().tolist()
             total = len(verbatims)
-            
-            # Matrice sémantique Lean Six Sigma
             mapping = [
                 {"th": "Délais (Lead Time)", "kw": ["temps", "long", "attente", "lent", "délai", "retard", "planning"], "ex": "Muda d'attente (Gaspillage)", "ctq": "Lead Time < 24h"},
                 {"th": "Qualité (Défauts)", "kw": ["refaire", "erreur", "trompé", "faute", "qualité", "mauvais", "non-conforme"], "ex": "Non-conformités (COPQ)", "ctq": "First Pass Yield 100%"},
@@ -521,7 +484,6 @@ else:
                 {"th": "Outils", "kw": ["bug", "système", "outil", "logiciel", "ordinateur", "panne"], "ex": "Capabilité des moyens", "ctq": "Disponibilité IT > 99.9%"},
                 {"th": "Information", "kw": ["info", "manque", "flou", "comprendre", "échange", "communication"], "ex": "Mura (Variabilité du flux)", "ctq": "Standardisation de l'info"}
             ]
-
             res_data = []
             for m in mapping:
                 count = sum(1 for r in verbatims if any(k in r for k in m["kw"]))
@@ -533,157 +495,73 @@ else:
                     "CTQ": m["ctq"],
                     "score": count
                 })
-            
-            # Stockage du résultat trié par Pareto (score décroissant)
             st.session_state.voc_results = pd.DataFrame(res_data).sort_values("score", ascending=False).drop(columns=["score"])
             st.rerun()
         else:
-            st.warning("⚠️ Le tableau est vide. Veuillez ajouter des données.")
+            st.warning("⚠️ Le tableau est vide.")
 
-    # --- ÉTAPE 4 : DIAGNOSTIC & STRATÉGIE (EXPERTISE BLACK BELT) ---
     if st.session_state.get("voc_results") is not None:
         st.write("### 📊 Résultat de l'Analyse Thématique")
         st.table(st.session_state.voc_results)
-
         st.write("---")
         st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
-        
-        # Récupération sécurisée de l'irritant majeur (Pareto)
-        res = st.session_state.voc_results
-        top_theme = res.iloc[0]["thème des irritants"]
-        occurrence = res.iloc[0]["nombre d'occurrence"]
-        ctq_cible = res.iloc[0]["CTQ"]
+        res_voc = st.session_state.voc_results
+        top_theme = res_voc.iloc[0]["thème des irritants"]
+        occurrence = res_voc.iloc[0]["nombre d'occurrence"]
+        ctq_cible = res_voc.iloc[0]["CTQ"]
         
         st.markdown(f"### 🎯 Focus Prioritaire : {top_theme}")
         
-        # Réflexions stratégiques Lean Six Sigma
         reflexions = {
-            "Délais (Lead Time)": {
-                "analyse": f"Le diagnostic révèle {occurrence} frictions temporelles. En Black Belt, cela traduit un **Lead Time** supérieur au Takt Time, générant des encours inutiles (WIP).",
-                "strategie": "Prioriser une **VSM (Value Stream Mapping)** pour quantifier la Valeur Ajoutée et passer d'un flux poussé à un flux tiré.",
-                "outils": ["Kanban", "Chantier Kaizen", "Calcul du Takt Time"]
-            },
-            "Qualité (Défauts)": {
-                "analyse": f"La non-qualité ({occurrence} cas) indique une instabilité du processus. Chaque défaut est un **COPQ** (Coût de non-qualité) qui détruit la valeur.",
-                "strategie": "Utiliser le cycle **DMAIC** pour stabiliser la variance. L'objectif est le 'Bon du premier coup' (FTQ).",
-                "outils": ["5 Pourquoi (Root Cause)", "Poka-Yoke", "Standard Operating Procedures"]
-            },
-            "Pénibilité": {
-                "analyse": f"La pénibilité signalée ({occurrence} fois) est un symptôme de **Muri** (Surcharge). Cela dégrade la capabilité humaine du processus.",
-                "strategie": "Réduire la charge cognitive et physique via l'ergonomie Lean et le **Standard Work**.",
-                "outils": ["5S Digital & Physique", "Analyse de déroulement", "Yamazumi (Equilibrage)"]
-            },
-            "Outils": {
-                "analyse": f"L'outil actuel n'est plus **capable** par rapport aux exigences du processus. C'est un frein technique à l'excellence opérationnelle.",
-                "strategie": "Investir dans la capabilité des moyens. Automatiser (RPA) ce qui peut l'être pour recentrer l'humain sur la VA.",
-                "outils": ["AMDEC Moyens", "RPA / Low-Code", "Simplification UI"]
-            },
-            "Information": {
-                "analyse": f"Le flux d'information souffre de **Mura**. L'ambiguïté oblige les équipes à naviguer à vue, créant du stress et de la lenteur.",
-                "strategie": "Instaurer le **Management Visuel** (Obeya) pour rendre l'anomalie visible instantanément.",
-                "outils": ["Management Visuel", "Rituels AIC", "Source Unique de Vérité"]
-            }
+            "Délais (Lead Time)": {"analyse": f"Le diagnostic révèle {occurrence} frictions temporelles.", "strategie": "Prioriser une VSM.", "outils": ["Kanban", "Chantier Kaizen"]},
+            "Qualité (Défauts)": {"analyse": f"La non-qualité ({occurrence} cas) indique une instabilité.", "strategie": "Utiliser le cycle DMAIC.", "outils": ["5 Pourquoi", "Poka-Yoke"]},
+            "Pénibilité": {"analyse": f"La pénibilité signalée ({occurrence} fois) est un symptôme de Muri.", "strategie": "Réduire la charge via le Standard Work.", "outils": ["5S", "Analyse de déroulement"]},
+            "Outils": {"analyse": f"L'outil n'est plus capable.", "strategie": "Investir dans la capabilité.", "outils": ["AMDEC", "RPA"]},
+            "Information": {"analyse": f"Le flux souffre de Mura.", "strategie": "Instaurer le Management Visuel.", "outils": ["Obeya", "Rituels AIC"]}
         }
-
-        diag = reflexions.get(top_theme, {"analyse": "Analyse transverse requise.", "strategie": "Standardisation globale.", "outils": ["Audit"]})
-
+        diag = reflexions.get(top_theme, {"analyse": "Analyse requise.", "strategie": "Standardisation.", "outils": ["Audit"]})
         with st.expander("🔍 Deep Dive Black Belt : Diagnostic", expanded=True):
             st.write(diag["analyse"])
             st.write(f"**Indicateur CTQ cible :** `{ctq_cible}`")
-
         st.info(f"🚀 **Recommandation Stratégique :** {diag['strategie']}")
-
-        # Leviers opérationnels
-        cols = st.columns(len(diag["outils"]))
+        cols_tools = st.columns(len(diag["outils"]))
         for i, tool in enumerate(diag["outils"]):
-            cols[i].success(f"🛠️ {tool}")
+            cols_tools[i].success(f"🛠️ {tool}")
 
-        # Correction de la ligne finale pour éviter le NameError
-        count_data = len(st.session_state.voc_raw_data) if "voc_raw_data" in st.session_state else 0
-        st.caption(f"Statut : Phase **ANALYSE** complétée pour {count_data} verbatims.")   
-
-
-    # --- 7. : PROJECT MILESTONE & TIMING ---
-    import datetime
-    import pandas as pd
-    import plotly.express as px
-
+    # 7. PROJECT MILESTONE AND TIMING (GANTT)
     st.write("---")
-    st.header("📅 Project Milestone & Timing")
+    st.header("📅 7. Project Milestone & Timing")
     st.subheader("Planification des phases du projet")
 
-    # 1. Initialisation des données
     if "gantt_data" not in st.session_state:
-        default_data = [
-            {"Etape": "Define", "Début": "2026-05-01", "Fin": "2026-05-15", "Responsable": "Black Belt"},
-            {"Etape": "Measure", "Début": "2026-05-16", "Fin": "2026-06-15", "Responsable": "Green Belt"},
-            {"Etape": "Analyze", "Début": "2026-06-16", "Fin": "2026-07-15", "Responsable": "Black Belt"},
-            {"Etape": "Improve", "Début": "2026-07-16", "Fin": "2026-09-15", "Responsable": "Team"},
-            {"Etape": "Control", "Début": "2026-09-16", "Fin": "2026-10-31", "Responsable": "Process Owner"}
-        ]
-        df_init = pd.DataFrame(default_data)
-        df_init["Début"] = pd.to_datetime(df_init["Début"]).dt.date
-        df_init["Fin"] = pd.to_datetime(df_init["Fin"]).dt.date
-        st.session_state.gantt_data = df_init
+        df_init_gantt = pd.DataFrame([
+            {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+            {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+            {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+            {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+            {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+        ])
+        st.session_state.gantt_data = df_init_gantt
 
-    # 2. Éditeur avec Calendrier
     st.info("💡 Modifiez les dates via le calendrier, puis cliquez sur 'Générer le planning'.")
-    
     with st.expander("📝 Editer le calendrier du projet", expanded=True):
-        config_calendrier = {
-            "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"),
-            "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
-        }
-
-        edited_df = st.data_editor(
-            st.session_state.gantt_data,
-            column_config=config_calendrier,
-            num_rows="dynamic",
-            use_container_width=True,
-            key="gantt_editor_v3"
-        )
-
-        if st.button("🚀 Générer le planning"):
-            st.session_state.gantt_data = edited_df
-            st.success("Planning actualisé selon l'ordre du tableau.")
+        config_cal = {"Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY")}
+        edited_gantt = st.data_editor(st.session_state.gantt_data, column_config=config_cal, num_rows="dynamic", use_container_width=True, key=f"gantt_editor_{p_idx}")
+        if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
+            st.session_state.gantt_data = edited_gantt
+            st.success("Planning actualisé.")
             st.rerun()
 
-    # 3. Génération du graphique de Gantt
     try:
-        df_gantt = st.session_state.gantt_data.copy()
-        df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
-        df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
-
-        fig = px.timeline(
-            df_gantt, 
-            x_start="Début", 
-            x_end="Fin", 
-            y="Etape", 
-            color="Responsable",
-            labels={"Etape": "Phase"},
-            color_discrete_sequence=px.colors.qualitative.Prism
-        )
-
-        # --- CORRECTION DE L'ORDRE DE L'AXE Y ---
-        # categoryarray force l'ordre en fonction de la colonne 'Etape' du dataframe
-        fig.update_yaxes(
-            categoryorder="array", 
-            categoryarray=df_gantt["Etape"].unique()[::-1], # On inverse pour que la 1ère ligne soit en haut
-            autorange=True 
-        )
-        
-        fig.update_layout(
-            height=400,
-            xaxis_title="Timeline du Projet",
-            yaxis_title="",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=0, r=10, t=10, b=0)
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-    except Exception as e:
-        st.warning("Vérifiez la saisie des dates pour afficher le graphique.")
+        df_gantt_viz = st.session_state.gantt_data.copy()
+        df_gantt_viz["Début"] = pd.to_datetime(df_gantt_viz["Début"])
+        df_gantt_viz["Fin"] = pd.to_datetime(df_gantt_viz["Fin"])
+        fig_gantt = px.timeline(df_gantt_viz, x_start="Début", x_end="Fin", y="Etape", color="Responsable", color_discrete_sequence=px.colors.qualitative.Prism)
+        fig_gantt.update_yaxes(categoryorder="array", categoryarray=df_gantt_viz["Etape"].unique()[::-1])
+        fig_gantt.update_layout(height=400, plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=0, r=10, t=10, b=0))
+        st.plotly_chart(fig_gantt, use_container_width=True)
+    except:
+        st.warning("Vérifiez la saisie des dates.")
     
     # --- PHASE MEASURE ---
     with tabs[1]:
