@@ -562,11 +562,14 @@ else:
             st.info(f"🛠️ **Proposition 3**\n\n{propositions[2]}")
             st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
 
+    from datetime import date
+    import pandas as pd
+    import plotly.express as px
     # --- 7. PROJECT MILESTONE & TIMING ---
 st.divider()
 st.header("📅 7. Project Milestone & Timing")
 
-# 1. Initialisation de la donnée dans le dictionnaire du projet 'p'
+# 1. Initialisation sécurisée dans le dictionnaire du projet 'p'
 if "gantt_data" not in p:
     p["gantt_data"] = pd.DataFrame([
         {"Etape": "Define", "Début": date(2026, 5, 1), "Fin": date(2026, 5, 15), "Responsable": "Black Belt"},
@@ -579,12 +582,14 @@ if "gantt_data" not in p:
 st.info("💡 Modifiez les dates dans le tableau, puis cliquez sur le bouton pour mettre à jour le graphique.")
 
 with st.expander("📝 Editer le calendrier du projet", expanded=True):
+    # Configuration des colonnes
     config_cal = {
         "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), 
         "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
         "Responsable": st.column_config.SelectboxColumn("Responsable", options=["Black Belt", "Green Belt", "Team", "Process Owner"])
     }
     
+    # Édition des données (on utilise p_idx pour garantir l'unicité du widget)
     edited_gantt = st.data_editor(
         p["gantt_data"], 
         column_config=config_cal, 
@@ -593,22 +598,21 @@ with st.expander("📝 Editer le calendrier du projet", expanded=True):
         key=f"gantt_editor_{p_idx}"
     )
     
-    if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
+    if st.button("🚀 Générer le planning", key=f"btn_gantt_final_{p_idx}"):
         p["gantt_data"] = edited_gantt
-        st.success("Planning mis à jour avec succès !")
+        st.success("Planning mis à jour !")
         st.rerun()
 
 # 2. Affichage du graphique de Gantt
 try:
     df_viz = p["gantt_data"].copy()
     
-    # Conversion impérative pour Plotly
+    # Conversion impérative des dates pour Plotly
     df_viz["Début"] = pd.to_datetime(df_viz["Début"])
     df_viz["Fin"] = pd.to_datetime(df_viz["Fin"])
     
-    # CRUCIAL : On définit l'ordre de l'axe Y selon l'ordre actuel du tableau
-    # On inverse la liste car Plotly trace de bas en haut par défaut
-    ordre_etapes = df_viz["Etape"].tolist()[::-1]
+    # Pour respecter l'ordre du tableau, on crée une liste des étapes dans l'ordre actuel
+    ordre_actuel = df_viz["Etape"].tolist()
 
     fig_gantt = px.timeline(
         df_viz, 
@@ -618,11 +622,11 @@ try:
         color="Responsable", 
         color_discrete_sequence=px.colors.qualitative.Prism,
         template="plotly_white",
-        # On force l'ordre des catégories ici
-        category_orders={"Etape": df_viz["Etape"].tolist()}
+        # Force l'ordre des catégories selon le tableau
+        category_orders={"Etape": ordre_actuel}
     )
     
-    # On s'assure que Define est bien en haut
+    # Inverser l'axe Y pour que la première ligne du tableau soit en haut
     fig_gantt.update_yaxes(autorange="reversed")
     
     fig_gantt.update_layout(
@@ -636,7 +640,7 @@ try:
     st.plotly_chart(fig_gantt, use_container_width=True)
     
 except Exception as e:
-    st.warning("Assurez-vous que toutes les étapes et dates sont remplies.")
+    st.warning("Veuillez remplir correctement toutes les étapes et dates du tableau.")
     
     # --- PHASE MEASURE ---
     with tabs[1]:
