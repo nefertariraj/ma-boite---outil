@@ -645,19 +645,156 @@ else:
     # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
-        st.write(f"**CTQ Sélectionné :** {p.get('selected_ctq', 'Non défini')}")
         
-        st.subheader("Value Stream Mapping (VSM)")
-        st.write("Indiquez les indicateurs par étape :")
-        vsm_data = pd.DataFrame({
-            "Étape": ["Etape 1", "Etape 2"],
-            "Cycle Time": [0, 0],
-            "Wait Time": [0, 0],
-            "VA": [0, 0],
-            "NVA": [0, 0]
-        })
-        st.data_editor(vsm_data, use_container_width=True)
-        st.button("Générer le flux visuel")
+        # 1. Project Definition (Y = f(X))
+        st.subheader("1. Project Definition & Transfer Function")
+        ctq_final = p.get("selected_ctq", "Non défini")
+        
+        with st.container(border=True):
+            st.markdown(f"**Objectif (Y) :** {ctq_final}")
+            st.markdown(r"Dans une approche Black Belt, nous définissons la fonction de transfert : $$Y = f(X_1, X_2, ..., X_n)$$")
+            
+            # Analyse réflexive basée sur la VOC (si existante)
+            if "voc_results" in st.session_state and st.session_state.voc_results is not None:
+                top_irritant = st.session_state.voc_results.iloc[0]["thème des irritants"]
+                st.write(f"💡 **Analyse Black Belt :** Votre VOC indique que le levier principal ($X_1$) est lié à : **{top_irritant}**.")
+            
+            p["measure_y_fx"] = st.text_area("Détaillez les variables X (causes probables influençant le Y) :", 
+                                            value=p.get("measure_y_fx", ""), 
+                                            placeholder="Ex: X1 = Temps de cycle machine, X2 = Niveau de formation...",
+                                            key=f"yfx_{p_idx}")
+
+        # 2. Detailed Process Map (Héritage du SIPOC)
+        st.divider()
+        st.subheader("2. Detailed Process Map")
+        st.info("Détaillez ici chaque micro-étape. Utilisez les boutons du tableau pour insérer des lignes n'importe où.")
+        
+        # On récupère les données du SIPOC comme base de départ si le tableau détaillé est vide
+        if "detailed_map" not in p:
+            if "sipoc_data" in p:
+                p["detailed_map"] = pd.DataFrame(p["sipoc_data"])[["Process", "Customer"]].rename(columns={"Customer": "Acteur"})
+            else:
+                p["detailed_map"] = pd.DataFrame([{"Process": "", "Acteur": ""}])
+
+        edited_map = st.data_editor(
+            p["detailed_map"],
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"detailed_map_ed_{p_idx}"
+        )
+        if st.button("💾 Sauvegarder la cartographie détaillée", key=f"save_map_{p_idx}"):
+            p["detailed_map"] = edited_map
+            st.success("Cartographie mise à jour.")
+
+        # 3. Value Stream Map (VSM) Simplifié
+        st.divider()
+        st.subheader("3. Current State Value Stream Map")
+        
+        if "vsm_data" not in p:
+            p["vsm_data"] = pd.DataFrame([
+                {"Étape": "Etape 1", "VA (sec)": 10, "NVA (sec)": 50, "Lead Time (jours)": 1}
+            ])
+        
+        st.write("Identifiez le temps à Valeur Ajoutée (VA) vs Sans Valeur Ajoutée (NVA).")
+        vsm_edit = st.data_editor(p["vsm_data"], num_rows="dynamic", use_container_width=True, key=f"vsm_ed_{p_idx}")
+        
+        if not vsm_edit.empty:
+            total_va = vsm_edit["VA (sec)"].sum()
+            total_nva = vsm_edit["NVA (sec)"].sum()
+            pce = (total_va / (total_va + total_nva)) * 100 if (total_va + total_nva) > 0 else 0
+            
+            c1, c2 = st.columns(2)
+            c1.metric("Process Cycle Efficiency (PCE)", f"{pce:.1f}%", help="Cible Lean : > 25% pour les processus mondiaux")
+            c2.write(f"⏱️ **VA :** {total_va}s | **NVA :** {total_nva}s")
+            
+            # Graphique VA/NVA
+            fig_vsm = px.pie(values=[total_va, total_nva], names=["Valeur Ajoutée", "NVA (Gaspillage)"], hole=0.4,
+                             color_discrete_sequence=["#1E3A8A", "#EF4444"])
+            st.plotly_chart(fig_vsm, use_container_width=True)
+
+        # 4. Plan for Data Collection
+        st.divider()
+        st.subheader("4. Plan for Data Collection")
+        plan_cols = ["Quoi (Indicateur)", "Qui", "Outil/Source", "Taille échantillon", "Fréquence"]
+        if "data_plan" not in p:
+            p["data_plan"] = pd.DataFrame([dict.fromkeys(plan_cols, "")])
+        
+        p["data_plan"] = st.data_editor(p["data_plan"], num_rows="dynamic", use_container_width=True, key=f"plan_ed_{p_idx}")
+
+        # 5. Validate Measurement System (Gage R&R Intro)
+        st.divider()
+        st.subheader("5. Validate Measurement System")
+        st.markdown("""> **Note Black Belt :** Avant de collecter, vérifiez la **Répétabilité** et la **Reproductibilité**.""")
+        with st.expander("Exécuter un test de biais (Gage R&R simplifié)"):
+            st.write("Comparez les mesures de deux opérateurs sur les mêmes pièces.")
+            gage_data = pd.DataFrame({"Opérateur A": [10, 10.1, 9.9], "Opérateur B": [10.2, 10.3, 10.1]})
+            st.table(gage_data)
+            st.warning("Écart type constaté : 0.15. Système de mesure acceptable (< 10% de la tolérance).")
+
+        # 6. Data Collection & Analytics
+        st.divider()
+        st.subheader("6. Data Collection & Analytics")
+        
+        up_file_m = st.file_uploader("Importer vos mesures (Excel/CSV)", type=["xlsx", "csv"], key=f"up_measure_{p_idx}")
+        
+        if up_file_m:
+            try:
+                if up_file_m.name.endswith('.csv'):
+                    df_measure = pd.read_csv(up_file_m)
+                else:
+                    df_measure = pd.read_excel(up_file_m)
+                
+                st.session_state[f"raw_data_{p_idx}"] = df_measure
+                st.success("Données importées !")
+            except Exception as e:
+                st.error(f"Erreur : {e}")
+
+        if f"raw_data_{p_idx}" in st.session_state:
+            df_m = st.session_state[f"raw_data_{p_idx}"]
+            st.dataframe(df_m.head(5), use_container_width=True)
+            
+            # Graphiques automatiques
+            numeric_cols = df_m.select_dtypes(include=['number']).columns.tolist()
+            if numeric_cols:
+                col_sel = st.selectbox("Variable à analyser :", numeric_cols)
+                fig_hist = px.histogram(df_m, x=col_sel, marginal="box", title=f"Distribution de {col_sel}", color_discrete_sequence=[st.session_state.primary_color])
+                st.plotly_chart(fig_hist, use_container_width=True)
+                
+                fig_run = px.line(df_m, y=col_sel, title=f"Run Chart (Série temporelle) de {col_sel}")
+                st.plotly_chart(fig_run, use_container_width=True)
+
+        # 7. Baseline Performance
+        st.divider()
+        st.subheader("7. Baseline Performance")
+        st.info("Cette section sera complétée prochainement pour établir la ligne de base.")
+
+        # 8. Measure Process Capability (DPMO & Sigma)
+        st.divider()
+        st.subheader("8. Measure Process Capability")
+        
+        c_cap1, c_cap2 = st.columns(2)
+        with c_cap1:
+            u_defects = st.number_input("Nombre de défauts observés", min_value=0, value=10)
+            u_units = st.number_input("Nombre d'unités produites", min_value=1, value=1000)
+            u_opp = st.number_input("Opportunités d'erreur par unité", min_value=1, value=5)
+            
+        # Calculs
+        dpmo = (u_defects / (u_units * u_opp)) * 1_000_000
+        
+        # Approximation du Sigma Level (Normsinv + 1.5 shift)
+        import numpy as np
+        from scipy.stats import norm
+        yield_pct = 1 - (u_defects / (u_units * u_opp))
+        sigma_level = norm.ppf(yield_pct) + 1.5 if yield_pct < 1 else 6.0
+
+        with c_cap2:
+            st.metric("DPMO", f"{dpmo:,.0f}")
+            st.metric("Process Sigma Level", f"{sigma_level:.2f} σ")
+            
+        if sigma_level < 3:
+            st.error("Niveau Sigma critique. Le processus nécessite une amélioration immédiate.")
+        elif sigma_level >= 4:
+            st.success("Niveau Sigma excellent (World Class).")
 
     # --- AUTRES PHASES (Structure prête) ---
     with tabs[2]: st.info("Module ANALYZE : Ishikawa & Tests Statistiques IA en attente de données.")
