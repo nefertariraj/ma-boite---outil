@@ -637,9 +637,9 @@ else:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
     
-    st.plotly_chart(fig_gantt, use_container_width=True)
+        st.plotly_chart(fig_gantt, use_container_width=True)
     
-    except Exception as e:
+        except Exception as e:
         st.warning("Veuillez remplir correctement toutes les étapes et dates du tableau.")
     
     # --- PHASE MEASURE ---
