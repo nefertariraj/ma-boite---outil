@@ -608,8 +608,8 @@ else:
         df_viz = p["gantt_data"].copy()
     
     # Conversion impérative des dates pour Plotly
-    df_viz["Début"] = pd.to_datetime(df_viz["Début"])
-    df_viz["Fin"] = pd.to_datetime(df_viz["Fin"])
+        df_viz["Début"] = pd.to_datetime(df_viz["Début"])
+        df_viz["Fin"] = pd.to_datetime(df_viz["Fin"])
     
     # Pour respecter l'ordre du tableau, on crée une liste des étapes dans l'ordre actuel
     ordre_actuel = df_viz["Etape"].tolist()
