@@ -605,7 +605,7 @@ else:
 
     # 2. Affichage du graphique de Gantt
     try:
-    df_viz = p["gantt_data"].copy()
+        df_viz = p["gantt_data"].copy()
     
     # Conversion impérative des dates pour Plotly
     df_viz["Début"] = pd.to_datetime(df_viz["Début"])
