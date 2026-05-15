@@ -639,7 +639,7 @@ else:
     
         st.plotly_chart(fig_gantt, use_container_width=True)
     
-        except Exception as e:
+    except Exception as e:
         st.warning("Veuillez remplir correctement toutes les étapes et dates du tableau.")
     
     # --- PHASE MEASURE ---
