@@ -566,11 +566,11 @@ else:
     import pandas as pd
     import plotly.express as px
     # --- 7. PROJECT MILESTONE & TIMING ---
-st.divider()
-st.header("📅 7. Project Milestone & Timing")
+    st.divider()
+    st.header("📅 7. Project Milestone & Timing")
 
-# 1. Initialisation sécurisée dans le dictionnaire du projet 'p'
-if "gantt_data" not in p:
+    # 1. Initialisation sécurisée dans le dictionnaire du projet 'p'
+    if "gantt_data" not in p:
     p["gantt_data"] = pd.DataFrame([
         {"Etape": "Define", "Début": date(2026, 5, 1), "Fin": date(2026, 5, 15), "Responsable": "Black Belt"},
         {"Etape": "Measure", "Début": date(2026, 5, 16), "Fin": date(2026, 6, 15), "Responsable": "Green Belt"},
@@ -579,9 +579,9 @@ if "gantt_data" not in p:
         {"Etape": "Control", "Début": date(2026, 9, 16), "Fin": date(2026, 10, 31), "Responsable": "Process Owner"}
     ])
 
-st.info("💡 Modifiez les dates dans le tableau, puis cliquez sur le bouton pour mettre à jour le graphique.")
+    st.info("💡 Modifiez les dates dans le tableau, puis cliquez sur le bouton pour mettre à jour le graphique.")
 
-with st.expander("📝 Editer le calendrier du projet", expanded=True):
+    with st.expander("📝 Editer le calendrier du projet", expanded=True):
     # Configuration des colonnes
     config_cal = {
         "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), 
@@ -603,8 +603,8 @@ with st.expander("📝 Editer le calendrier du projet", expanded=True):
         st.success("Planning mis à jour !")
         st.rerun()
 
-# 2. Affichage du graphique de Gantt
-try:
+    # 2. Affichage du graphique de Gantt
+    try:
     df_viz = p["gantt_data"].copy()
     
     # Conversion impérative des dates pour Plotly
@@ -639,7 +639,7 @@ try:
     
     st.plotly_chart(fig_gantt, use_container_width=True)
     
-except Exception as e:
+    except Exception as e:
     st.warning("Veuillez remplir correctement toutes les étapes et dates du tableau.")
     
     # --- PHASE MEASURE ---
