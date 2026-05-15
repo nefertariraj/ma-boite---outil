@@ -612,7 +612,7 @@ else:
         df_viz["Fin"] = pd.to_datetime(df_viz["Fin"])
     
     # Pour respecter l'ordre du tableau, on crée une liste des étapes dans l'ordre actuel
-    ordre_actuel = df_viz["Etape"].tolist()
+        ordre_actuel = df_viz["Etape"].tolist()
 
     fig_gantt = px.timeline(
         df_viz, 
