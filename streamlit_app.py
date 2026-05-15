@@ -582,12 +582,12 @@ else:
     st.info("💡 Modifiez les dates dans le tableau, puis cliquez sur le bouton pour mettre à jour le graphique.")
 
     with st.expander("📝 Editer le calendrier du projet", expanded=True):
-    # Configuration des colonnes
-    config_cal = {
-        "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), 
-        "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
-        "Responsable": st.column_config.SelectboxColumn("Responsable", options=["Black Belt", "Green Belt", "Team", "Process Owner"])
-    }
+        # Configuration des colonnes
+        config_cal = {
+            "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), 
+            "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
+            "Responsable": st.column_config.SelectboxColumn("Responsable", options=["Black Belt", "Green Belt", "Team", "Process Owner"])
+        }
     
     # Édition des données (on utilise p_idx pour garantir l'unicité du widget)
     edited_gantt = st.data_editor(
