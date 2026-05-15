@@ -614,17 +614,17 @@ else:
     # Pour respecter l'ordre du tableau, on crée une liste des étapes dans l'ordre actuel
         ordre_actuel = df_viz["Etape"].tolist()
 
-    fig_gantt = px.timeline(
-        df_viz, 
-        x_start="Début", 
-        x_end="Fin", 
-        y="Etape", 
-        color="Responsable", 
-        color_discrete_sequence=px.colors.qualitative.Prism,
-        template="plotly_white",
-        # Force l'ordre des catégories selon le tableau
-        category_orders={"Etape": ordre_actuel}
-    )
+        fig_gantt = px.timeline(
+            df_viz, 
+            x_start="Début", 
+            x_end="Fin", 
+            y="Etape", 
+            color="Responsable", 
+            color_discrete_sequence=px.colors.qualitative.Prism,
+            template="plotly_white",
+            # Force l'ordre des catégories selon le tableau
+            category_orders={"Etape": ordre_actuel}
+        )
     
     # Inverser l'axe Y pour que la première ligne du tableau soit en haut
     fig_gantt.update_yaxes(autorange="reversed")
