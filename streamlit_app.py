@@ -447,31 +447,29 @@ else:
                 try:
                     df_imp = pd.read_excel(up_file).fillna("")
                     df_imp.columns = [c.lower().strip() for c in df_imp.columns]
+                    
+                    # Détection intelligente des colonnes
                     c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
+                    
+                    # CORRECTION ICI : On cherche une colonne "question" dans l'excel, sinon on prend la 2ème colonne
+                    q_col = next((c for c in df_imp.columns if "quest" in c), df_imp.columns[1] if len(df_imp.columns) > 1 else None)
+                    
                     r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
                 
+                    # Construction du nouveau DataFrame avec les vraies questions
                     new_rows = pd.DataFrame({
                         "client": df_imp[c_col].astype(str),
-                        "question": "Import Excel",
+                        # Si une colonne question existe dans le fichier, on la prend. Sinon, on applique une question générique.
+                        "question": df_imp[q_col].astype(str) if q_col else "Question non spécifiée",
                         "réponse brute": df_imp[r_col].astype(str)
                     })
+                    
                     st.session_state.voc_raw_data = new_rows
                     st.session_state.voc_results = None  
                     st.session_state.last_file = file_id
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erreur lors de l'import : {e}")
-
-        edited_voc_df = st.data_editor(
-            st.session_state.voc_raw_data,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"voc_editor_sync_{p_idx}"
-        )
-        if edited_voc_df is not None:
-            st.session_state.voc_raw_data = edited_voc_df
-
-        st.write("---")
         st.subheader("3. Analyse Thématique & CTQ")
     
         if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
