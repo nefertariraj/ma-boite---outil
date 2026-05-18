@@ -775,103 +775,139 @@ else:
 
         with st.container(border=True):
             st.markdown("### 🗺️ Décomposition du Flux & Roll-up des Délais (Lead Time)")
-            st.caption("Déployez les sous-sections de tâches pour chaque section macro du SIPOC. Les temps s'agrègent automatiquement par section et sur tout le processus.")
+            st.caption("Déployez les sous-sections de tâches pour chaque section macro du SIPOC. Sélectionnez l'unité de temps par tâche, le système harmonise les calculs.")
 
             # 2. Initialisation de la structure de stockage si inexistante
             if "vsm_detailed_map" not in p:
                 p["vsm_detailed_map"] = {step: [
-                    {"Détail de la tâche": "Exemple de micro-tâche A", "Délai (Min)": 10.0, "Type d'activité": "Valeur Ajoutée (VA)"},
-                    {"Détail de la tâche": "Exemple de micro-tâche B", "Délai (Min)": 5.0, "Type d'activité": "Non Valeur Ajoutée (NVA)"}
+                    {"Détail de la tâche": "Exemple de micro-tâche A", "Valeur": 10.0, "Unité": "Minutes", "Type d'activité": "Valeur Ajoutée (VA)"},
+                    {"Détail de la tâche": "Exemple de micro-tâche B", "Valeur": 2.0, "Unité": "Heures", "Type d'activité": "Non Valeur Ajoutée (NVA)"}
                 ] for step in macro_steps}
 
-            # Dictionnaire temporaire pour collecter les modifications de l'utilisateur
-            updated_map = {}
-            total_process_lead_time = 0.0
-            total_va_global = 0.0
-            total_nva_global = 0.0
-            total_attente_global = 0.0
+            # Fonction de conversion pour le Roll-up mathématique (Unité -> Minutes)
+            def convert_to_minutes(valeur, unite):
+                try:
+                    val = float(valeur)
+                except (ValueError, TypeError):
+                    return 0.0
+                if unite == "Heures":
+                    return val * 60.0
+                elif unite == "Jours":
+                    return val * 1440.0 # 24 heures * 60 minutes
+                return val # Minutes par défaut
 
-            # 3. Boucle dynamique : Création d'une section pour CHAQUE ligne du SIPOC
+            updated_map = {}
+            total_process_lead_time_min = 0.0
+            total_va_global_min = 0.0
+            total_nva_global_min = 0.0
+            total_attente_global_min = 0.0
+
+            # 3. Boucle dynamique par Section du SIPOC
             for idx_step, step in enumerate(macro_steps):
-                # Récupération ou création de la liste de sous-sections de cette étape macro
                 sub_tasks = p["vsm_detailed_map"].get(step, [])
                 if not sub_tasks:
-                    sub_tasks = [{"Détail de la tâche": "", "Délai (Min)": 0.0, "Type d'activité": "Valeur Ajoutée (VA)"}]
+                    sub_tasks = [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "Valeur Ajoutée (VA)"}]
 
                 df_sub = pd.DataFrame(sub_tasks)
 
-                # Calculs en temps réel (Roll-up) pour l'entête de la section
-                sum_section_time = df_sub["Délai (Min)"].sum() if not df_sub.empty else 0.0
+                # Calcul du total de la section en minutes (conversion à la volée)
+                sum_section_min = 0.0
+                if not df_sub.empty and "Valeur" in df_sub.columns and "Unité" in df_sub.columns:
+                    for _, r_task in df_sub.iterrows():
+                        sum_section_min += convert_to_minutes(r_task.get("Valeur", 0), r_task.get("Unité", "Minutes"))
                 
                 # Interface visuelle de la Section Macro
                 st.markdown(f"#### 📦 Section {idx_step + 1} : **{step}**")
                 
-                # Affichage du calculateur de section dynamique
-                st.caption(f"⏱️ **Délai Total de la Section :** `{sum_section_time:.1f} min`")
+                # Affichage adaptatif de la durée de la section
+                if sum_section_min >= 1440:
+                    text_durée = f"{sum_section_min/1440:.1f} jours ({sum_section_min:.0f} min)"
+                elif sum_section_min >= 60:
+                    text_durée = f"{sum_section_min/60:.1f} heures ({sum_section_min:.0f} min)"
+                else:
+                    text_durée = f"{sum_section_min:.1f} min"
+                    
+                st.caption(f"⏱️ **Délai Total Harmoneux de la Section :** `{text_durée}`")
 
-                # Éditeur de données dynamique pour les sous-sections (Micro-tâches)
+                # Éditeur de données de sous-sections avec choix de l'unité
                 edited_df = st.data_editor(
                     df_sub,
-                    num_rows="dynamic", # Possibilité de rajouter/supprimer des lignes à l'infini
+                    num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_{idx_step}_{p_idx}",
+                    key=f"vsm_editor_v4_{idx_step}_{p_idx}",
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des tâches à faire (Sous-section)", width="large"),
-                        "Délai (Min)": st.column_config.NumberColumn("Délai de réalisation", min_value=0.0, format="%.1f min", width="small"),
+                        "Valeur": st.column_config.NumberColumn("Délai de réalisation", min_value=0.0, format="%.1f", width="small", required=True),
+                        "Unité": st.column_config.SelectboxColumn(
+                            "Unité",
+                            options=["Minutes", "Heures", "Jours"],
+                            width="small",
+                            required=True
+                        ),
                         "Type d'activité": st.column_config.SelectboxColumn(
                             "Type d'activité (Lean)",
                             options=["Valeur Ajoutée (VA)", "Non Valeur Ajoutée (NVA)", "Temps d'attente / Stock"],
-                            width="medium"
+                            width="medium",
+                            required=True
                         )
                     }
                 )
 
-                # Nettoyage et conversion des données éditées
+                # Sauvegarde locale des modifications
                 cleaned_records = edited_df.dropna(subset=["Détail de la tâche"]).to_dict('records')
                 updated_map[step] = cleaned_records
 
-                # Agrégation pour les métriques globales du processus (Roll-up Global)
-                if not edited_df.empty:
-                    total_process_lead_time += edited_df["Délai (Min)"].sum()
-                    total_va_global += edited_df[edited_df["Type d'activité"] == "Valeur Ajoutée (VA)"]["Délai (Min)"].sum()
-                    total_nva_global += edited_df[edited_df["Type d'activité"] == "Non Valeur Ajoutée (NVA)"]["Délai (Min)"].sum()
-                    total_attente_global += edited_df[edited_df["Type d'activité"] == "Temps d'attente / Stock"]["Délai (Min)"].sum()
+                # Agrégation pour les métriques globales (Roll-up Global converti)
+                if not edited_df.empty and "Valeur" in edited_df.columns and "Unité" in edited_df.columns:
+                    for _, row in edited_df.iterrows():
+                        t_min = convert_to_minutes(row.get("Valeur", 0), row.get("Unité", "Minutes"))
+                        total_process_lead_time_min += t_min
+                        
+                        act_type = row.get("Type d'activité")
+                        if act_type == "Valeur Ajoutée (VA)":
+                            total_va_global_min += t_min
+                        elif act_type == "Non Valeur Ajoutée (NVA)":
+                            total_nva_global_min += t_min
+                        elif act_type == "Temps d'attente / Stock":
+                            total_attente_global_min += t_min
 
-                st.markdown("---") # Séparateur visuel entre les sections
+                st.markdown("---")
 
-            # 4. Bouton général de sauvegarde de l'arborescence
-            if st.button("💾 Enregistrer la Cartographie & Mettre à jour le Lead Time Total", key=f"save_vsm_map_global_{p_idx}"):
+            # 4. Bouton général de sauvegarde
+            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v4_{p_idx}"):
                 p["vsm_detailed_map"] = updated_map
-                st.success("🎯 Structure de processus et calculs de Lead Time mémorisés !")
+                st.success("🎯 Structure de processus multi-unités enregistrée avec succès !")
 
             # ==========================================
-            # TABLEAU DE BORD DES CALCS DE FLUX (VSM)
+            # TABLEAU DE BORD DES CALCS DE FLUX GLOBALS
             # ==========================================
             st.markdown("### 📊 Indicateurs de Performance du Processus (Roll-up Global)")
             
-            # Calcul du PCE (Process Cycle Efficiency)
-            pce = (total_va_global / total_process_lead_time * 100) if total_process_lead_time > 0 else 0.0
+            pce = (total_va_global_min / total_process_lead_time_min * 100) if total_process_lead_time_min > 0 else 0.0
 
-            # Affichage des kpis globaux demandés
-            c1, c2, c3 = st.columns(3)
-            c1.metric("⏳ LEAD TIME TOTAL (Process)", f"{total_process_lead_time:.1f} min")
-            c2.metric("🟢 Total Valeur Ajoutée (VA)", f"{total_va_global:.1f} min")
-            
-            # Alerte si l'efficience Six Sigma est mauvaise
-            if pce < 10.0:
-                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Flux sous-optimal", delta_color="inverse")
+            # Conversion intelligente de l'affichage global pour le Lead Time complet
+            if total_process_lead_time_min >= 1440:
+                display_lt = f"{total_process_lead_time_min / 1440:.1f} Jours"
+            elif total_process_lead_time_min >= 60:
+                display_lt = f"{total_process_lead_time_min / 60:.1f} Heures"
             else:
-                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Bonne dynamique de flux")
+                display_lt = f"{total_process_lead_time_min:.1f} Min"
 
-            # Synthèse visuelle des gaspillages pour préparer la VSM
-            with st.expander("🔍 Analyse Black Belt de la ligne de temps (Muda Analysis)"):
-                st.write(f"• **Temps à Non-Valeur Ajoutée (NVA - Gaspi) :** {total_nva_global:.1f} min")
-                st.write(f"• **Temps d'attente cumulé (Stocks/Délais) :** {total_attente_global:.1f} min")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("⏳ LEAD TIME TOTAL (Process)", display_lt)
+            c2.metric("🟢 Total Valeur Ajoutée (VA)", f"{total_va_global_min:.1f} min")
+            
+            if pce < 10.0:
+                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Flux critique (Muda élevé)", delta_color="inverse")
+            else:
+                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Flux fluide")
+
+            with st.expander("🔍 Analyse Black Belt de la ligne de temps (Détails en Minutes)"):
+                st.write(f"• **Temps Total du Cycle de Traitement :** {total_process_lead_time_min:.1f} min")
+                st.write(f"• **Temps à Valeur Ajoutée (VA) :** {total_va_global_min:.1f} min")
+                st.write(f"• **Temps à Non-Valeur Ajoutée (NVA) :** {total_nva_global_min:.1f} min")
+                st.write(f"• **Temps d'attente accumulé :** {total_attente_global_min:.1f} min")
                 st.progress(min(pce / 100, 1.0))
-                st.caption(
-                    "L'Efficience du Cycle du Processus (PCE) met en évidence la part de temps utile. "
-                    "En environnement de services, un PCE inférieur à 10% indique que le produit/dossier passe 90% de sa vie à attendre ou à subir des re-traitements."
-                )
 
         # 3. Current state value stream Map
         st.divider()
