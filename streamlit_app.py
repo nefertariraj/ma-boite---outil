@@ -867,7 +867,7 @@ else:
                         "Un PCE standard hors-Lean est souvent inférieur à 10%. Vos chantiers KAIZEN devront cibler les lignes 'NVA' et 'Attentes' ci-dessus."
                     )
                 except Exception as e:
-                    st.error(f"Erreur lors du calcul des indicateurs : {e}"))
+                    st.error(f"Erreur lors du calcul des indicateurs : {e}")
 
         # 3. Current state value stream Map
         st.divider()
