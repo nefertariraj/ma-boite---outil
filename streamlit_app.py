@@ -584,68 +584,59 @@ else:
                 {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
             ])
 
-        st.info("💡 Modifiez les dates dans le tableau, puis cliquez sur le bouton pour mettre à jour le graphique.")
-
-        with st.expander("📝 Editer le calendrier du projet", expanded=True):
-            # Configuration des colonnes
-            config_cal = {
-                "Début": st.column_config.DateColumn("Date de Début", format="DD/MM/YYYY"), 
-                "Fin": st.column_config.DateColumn("Date de Fin", format="DD/MM/YYYY"),
-                "Responsable": st.column_config.SelectboxColumn("Responsable", options=["Black Belt", "Green Belt", "Team", "Process Owner"])
-            }
-    
-        # Édition des données (on utilise p_idx pour garantir l'unicité du widget)
+        # 2. Affichage et édition du tableau
         edited_gantt = st.data_editor(
             p["gantt_data"], 
-            column_config=config_cal, 
             num_rows="dynamic", 
             use_container_width=True, 
-            key=f"gantt_editor_{p_idx}"
+            key=f"gantt_ed_{p_idx}"
         )
-    
-        if st.button("🚀 Générer le planning", key=f"btn_gantt_final_{p_idx}"):
-            p["gantt_data"] = edited_gantt
-            st.success("Planning mis à jour !")
-            st.rerun()
+        
+        if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
+            try:
+                # SÉCURITÉ ABSOLUE : On convertit de force en DataFrame et on nettoie les dates
+                df_gantt = pd.DataFrame(edited_gantt).dropna(subset=["Etape", "Début", "Fin"])
+                
+                if not df_gantt.empty:
+                    # Conversion universelle (gère le texte et les objets date)
+                    df_gantt["Début"] = pd.to_datetime(df_gantt["Début"], errors='coerce')
+                    df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"], errors='coerce')
+                    
+                    # On supprime les lignes qui n'ont pas pu être converties en vraies dates
+                    df_gantt = df_gantt.dropna(subset=["Début", "Fin"])
+                    
+                    if not df_gantt.empty:
+                        # Sauvegarde des données propres dans le projet
+                        p["gantt_data"] = df_gantt
+                        
+                        # Construction du graphique de Gantt Plotly
+                        import plotly.express as px
+                        fig = px.timeline(
+                            df_gantt, 
+                            x_start="Début", 
+                            x_end="Fin", 
+                            y="Etape", 
+                            color="Responsable",
+                            title=f"Planning DMAIC - {p['name']}",
+                            color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
+                        )
+                        # Ordre d'affichage logique du flux Lean Six Sigma
+                        fig.update_yaxes(categoryorder="array", categoryarray=["Control", "Improve", "Analyze", "Measure", "Define"])
+                        fig.update_layout(use_container_width=True)
+                        
+                        # Stockage du graphique dans le session_state
+                        st.session_state[f"gantt_fig_{p_idx}"] = fig
+                        st.success("✅ Diagramme de Gantt généré avec succès !")
+                    else:
+                        st.error("Le format des dates est incorrect. Utilisez le format AAAA-MM-JJ.")
+                else:
+                    st.error("Veuillez remplir correctement toutes les étapes et dates du tableau.")
+            except Exception as e:
+                st.error(f"Erreur lors de la génération du graphique : {e}")
 
-        # 2. Affichage du graphique de Gantt
-        try:
-            df_viz = p["gantt_data"].copy()
-    
-        # Conversion impérative des dates pour Plotly
-            df_viz["Début"] = pd.to_datetime(df_viz["Début"])
-            df_viz["Fin"] = pd.to_datetime(df_viz["Fin"])
-    
-        # Pour respecter l'ordre du tableau, on crée une liste des étapes dans l'ordre actuel
-            ordre_actuel = df_viz["Etape"].tolist()
-
-            fig_gantt = px.timeline(
-                df_viz, 
-                x_start="Début", 
-                x_end="Fin", 
-                y="Etape", 
-                color="Responsable", 
-                color_discrete_sequence=px.colors.qualitative.Prism,
-                template="plotly_white",
-                # Force l'ordre des catégories selon le tableau
-                category_orders={"Etape": ordre_actuel}
-            )
-    
-        # Inverser l'axe Y pour que la première ligne du tableau soit en haut
-            fig_gantt.update_yaxes(autorange="reversed")
-    
-            fig_gantt.update_layout(
-                height=400, 
-                margin=dict(l=0, r=10, t=10, b=0),
-                xaxis_title="Chronologie du Projet",
-                yaxis_title="",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-            )
-    
-            st.plotly_chart(fig_gantt, use_container_width=True)
-    
-        except Exception as e:
-            st.warning("Veuillez remplir correctement toutes les étapes et dates du tableau.")
+        # 3. Affichage persistant du graphique
+        if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
+            st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
     
     # --- PHASE MEASURE ---
     with tabs[1]:
