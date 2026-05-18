@@ -647,66 +647,88 @@ else:
         # ==========================================
         st.subheader("1. Project Definition & Transfer Function Y = f(X)")
         
-        # Récupération des données de la phase Define
+        # Récupération des données réelles de la phase Define
         ctq_v = p.get("selected_ctq", "Non défini")
         voc_df = st.session_state.get("voc_raw_data", pd.DataFrame())
         
         with st.container(border=True):
             st.markdown(f"### 🎯 Objectif du Projet (Y) : `{ctq_v}`")
             st.markdown(
-                r"En Lean Six Sigma, nous cherchons à résoudre l'équation de transfert : "
+                r"Équation de transfert Black Belt : "
                 r"$$Y = f(X_1, X_2, ..., X_n)$$"
             )
-            st.caption("Le succès du projet (Y) dépend de la maîtrise des variables indépendantes (X).")
+            st.caption("Détermination des variables critiques d'entrée (X) par rétro-ingénierie des verbatims clients.")
 
-            # --- MOTEUR D'ANALYSE IA DES IRRITANTS (VOC) ---
-            st.markdown("##### 🧠 Analyse IA des irritants & Génération des Hypothèses X")
+            # --- MOTEUR D'ANALYSE PAR EXTRACTION CONTEXTUELLE ---
+            st.markdown("##### 🧠 Analyse IA Contextuelle des Verbatims")
             
-            # Fonction interne simulant une analyse IA Black Belt
-            def analyze_x_hypotheses(df_voc):
-                suggestions = []
-                if df_voc.empty:
+            def analyze_voc_for_specific_x(df):
+                # Si le tableau VOC est vide, on fournit une structure d'attente minimale
+                if df.empty or "réponse brute" not in df.columns:
                     return [
-                        {"Code Variable": "x1", "Description": "Variabilité de la méthode (Standard Work non respecté)", "Impact Potentiel": "Fort", "Origine": "Hypothèse Expert"},
-                        {"Code Variable": "x2", "Description": "Capacité/Performance de l'outil de production", "Impact Potentiel": "Moyen", "Origine": "Analyse Processus"}
+                        {"Code Variable": "x1", "Description": "Attente de la collecte des verbatims réels pour extraction", "Impact Potentiel": "Moyen", "Origine": "Système"}
                     ]
                 
-                verbatims = " ".join(df_voc["réponse brute"].astype(str).tolist()).lower()
+                # 1. Nettoyage et tokenisation rudimentaire du texte réel du client
+                textes = df["réponse brute"].dropna().astype(str).tolist()
+                mots_poubelles = ["le", "la", "les", "des", "une", "pour", "dans", "avec", "plus", "fait", "tout", "cette"]
                 
-                # Logique d'analyse sémantique Black Belt
-                if any(k in verbatims for k in ["temps", "long", "délai", "attente"]):
-                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Taille des lots (Batch size) provoquant des attentes", "Impact Potentiel": "Très Fort", "Origine": "IA Analyse VOC (Temps)"})
-                if any(k in verbatims for k in ["erreur", "faute", "tromp", "qualité"]):
-                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Niveau de formation / Compétence des opérateurs", "Impact Potentiel": "Fort", "Origine": "IA Analyse VOC (Qualité)"})
-                if any(k in verbatims for k in ["outil", "bug", "système", "logiciel"]):
-                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Temps de réponse ou instabilité du système IT", "Impact Potentiel": "Fort", "Origine": "IA Analyse VOC (Outils)"})
-                if any(k in verbatims for k in ["manque", "info", "flou", "comprendre"]):
-                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Qualité des données d'entrée (Inputs SIPOC)", "Impact Potentiel": "Moyen", "Origine": "IA Analyse VOC (Info)"})
+                dictionnaire_contextuel = {}
+                for texte in textes:
+                    mots = [m.clean.strip(",.?!()\"") for m in texte.lower().split() if len(m) > 3]
+                    for m in mots:
+                        if m not in mots_poubelles:
+                            dictionnaire_contextuel[m] = dictionnaire_contextuel.get(m, 0) + 1
                 
-                # Complément si peu de suggestions
-                if len(suggestions) < 3:
-                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Variabilité inter-équipes (Shift-to-shift)", "Impact Potentiel": "Moyen", "Origine": "Analyse Black Belt"})
+                # 2. Tri des concepts les plus fréquemment cités par le client
+                concepts_cles = sorted(dictionnaire_contextuel.items(), key=lambda item: item[1], reverse=True)[:4]
                 
-                return suggestions
+                # 3. Traduction des concepts réels en Hypothèses Six Sigma (X)
+                suggestions_x = []
+                for idx, (mot, freq) in enumerate(concepts_cles):
+                    # Génération de la description basée sur le VRAI mot du client
+                    description_cause = f"Variabilité ou défaillance liée directement au facteur '{mot.upper()}' (Cité {freq} fois dans le VOC)"
+                    
+                    # Détermination de l'impact selon la récurrence du mot dans les plaintes
+                    if freq >= 5:
+                        impact = "Très Fort"
+                    elif freq >= 3:
+                        impact = "Fort"
+                    else:
+                        impact = "Moyen"
+                        
+                    suggestions_x.append({
+                        "Code Variable": f"x{idx+1}",
+                        "Description": description_cause,
+                        "Impact Potentiel": impact,
+                        "Origine": f"IA - Extraction Fréquence VOC ('{mot}')"
+                    })
+                
+                # Sécurité si aucun mot n'émerge
+                if not suggestions_x:
+                    suggestions_x.append({"Code Variable": "x1", "Description": "Variabilité du processus global", "Impact Potentiel": "Fort", "Origine": "Analyse Standard"})
+                    
+                return suggestions_x
 
-            # Initialisation de la matrice des X dans le projet
-            if "measure_x_table" not in p:
-                p["measure_x_table"] = analyze_x_hypotheses(voc_df)
+            # Génération/Mise à jour automatique basée sur l'état actuel du tableau VOC
+            if "measure_x_table" not in p or st.button("🔄 Ré-analyser les données du VOC en temps réel", key=f"recalc_voc_{p_idx}"):
+                p["measure_x_table"] = analyze_voc_for_specific_x(voc_df)
+                if not voc_df.empty:
+                    st.toast("⚡ Données réelles analysées avec succès !", icon="🧠")
 
-            st.info("🔎 L'IA a analysé vos verbatims et suggère les variables X suivantes comme causes probables de variabilité.")
+            st.info("📋 **Mode Black Belt activé** : Le tableau ci-dessous a extrait les termes récurrents spécifiques de votre VOC pour isoler les $X$. Modifiez, affinez ou ajoutez des lignes pour lier ces causes à vos indicateurs de terrain.")
 
             # --- TABLEAU DYNAMIQUE DES X (4 COLONNES) ---
-            # On transforme en DataFrame pour l'éditeur
             df_x = pd.DataFrame(p["measure_x_table"])
             
             edited_x_df = st.data_editor(
                 df_x,
-                num_rows="dynamic", # Permet d'ajouter/supprimer des lignes
+                num_rows="dynamic", # Permet à l'utilisateur d'ajouter/supprimer des lignes à la main
                 use_container_width=True,
-                key=f"x_matrix_editor_{p_idx}",
+                key=f"x_matrix_editor_v2_{p_idx}",
                 column_config={
                     "Code Variable": st.column_config.TextColumn("Code Variable", help="ex: x1, x2", width="small"),
-                    "Description": st.column_config.TextColumn("Description de la cause probable", width="large"),
+                    "Description": st.column_config.TextColumn("Description de la cause probable (Spécifique au contexte)", width="large"),
                     "Impact Potentiel": st.column_config.SelectboxColumn(
                         "Impact Potentiel",
                         options=["Faible", "Moyen", "Fort", "Très Fort"],
@@ -716,10 +738,10 @@ else:
                 }
             )
             
-            # Bouton de sauvegarde de la définition
-            if st.button("💾 Valider la Définition du Projet & Matrice X", key=f"save_def_x_{p_idx}"):
+            # Sauvegarde dans le dictionnaire projet
+            if st.button("💾 Enregistrer la Matrice des X Validée", key=f"save_def_x_v2_{p_idx}"):
                 p["measure_x_table"] = edited_x_df.to_dict('records')
-                st.success("✅ Équation de transfert et matrice des X enregistrées.")
+                st.success("🎯 Matrice $Y = f(X)$ mise à jour et mémorisée pour la phase Analyze.")
 
         # 2. Current state detailed process Map
         st.divider()
