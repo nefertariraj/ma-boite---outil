@@ -199,34 +199,34 @@ else:
         st.subheader("1. Énoncé du Problème & CTQ")
         col1, col2 = st.columns(2)
     
-    with col1:
-        st.markdown('<p title="X correspond aux causes">Décrivez le problème en détail :</p>', unsafe_allow_html=True)
-        # Utilisation de .get pour éviter le KeyError si le projet est ancien
-        p_input = st.text_area("Saisie libre", value=p.get("problem", ""), height=150, key=f"prob_in_{p_idx}")
+        with col1:
+            st.markdown('<p title="X correspond aux causes">Décrivez le problème en détail :</p>', unsafe_allow_html=True)
+            # Utilisation de .get pour éviter le KeyError si le projet est ancien
+            p_input = st.text_area("Saisie libre", value=p.get("problem", ""), height=150, key=f"prob_in_{p_idx}")
         
-        if st.button("🪄 Retranscrire via IA"):
-            p["problem"] = p_input
-            st.session_state.ai_suggest_ctq = [
-                "⏱️ Temps : Réduire le Lead Time global",
-                "🎯 Qualité : Augmenter le taux de conformité (%C&A)",
-                "💰 Coût : Réduire les coûts opérationnels",
-                f"✨ Spécifique : {p_input[:30]}..."
-            ]
-            st.rerun() 
+            if st.button("🪄 Retranscrire via IA"):
+                p["problem"] = p_input
+                st.session_state.ai_suggest_ctq = [
+                    "⏱️ Temps : Réduire le Lead Time global",
+                    "🎯 Qualité : Augmenter le taux de conformité (%C&A)",
+                    "💰 Coût : Réduire les coûts opérationnels",
+                    f"✨ Spécifique : {p_input[:30]}..."
+                ]
+                st.rerun() 
 
-    with col2:
-        st.write("Propositions de l'IA (CTQ) :")
-        if 'ai_suggest_ctq' in st.session_state:
-            for ctq in st.session_state.ai_suggest_ctq:
-                if st.button(ctq, key=f"btn_{ctq}"):
-                    p["selected_ctq"] = ctq
-                    st.rerun()
+        with col2:
+            st.write("Propositions de l'IA (CTQ) :")
+            if 'ai_suggest_ctq' in st.session_state:
+                for ctq in st.session_state.ai_suggest_ctq:
+                    if st.button(ctq, key=f"btn_{ctq}"):
+                        p["selected_ctq"] = ctq
+                        st.rerun()
         
-        st.divider()
+            st.divider()
         
-        if "selected_ctq" in p and p["selected_ctq"]:
-            st.write("✍️ **Ajustez votre CTQ final :**")
-            new_val = st.text_input("Libellé du CTQ", value=p["selected_ctq"], key=f"edit_ctq_{p_idx}")
+            if "selected_ctq" in p and p["selected_ctq"]:
+                st.write("✍️ **Ajustez votre CTQ final :**")
+                new_val = st.text_input("Libellé du CTQ", value=p["selected_ctq"], key=f"edit_ctq_{p_idx}")
             
             if new_val != p["selected_ctq"]:
                 p["selected_ctq"] = new_val
