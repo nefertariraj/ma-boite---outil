@@ -646,16 +646,72 @@ else:
     with tabs[1]:
         st.header("Phase Measure")
         
-        # 1. Project definition
-        st.subheader("1. Project Definition & Transfer Function")
+        # 1. Project definition & Équation Y = f(X)
+        st.subheader("1. Project Definition & Transfer Function Y = f(X)")
+        
         ctq_v = p.get("selected_ctq", "Non défini dans Define")
+        
         with st.container(border=True):
-            st.markdown(f"**Y (Objectif) :** {ctq_v}")
-            st.markdown(r"**Formule de transfert :** $$Y = f(X)$$")
-            st.caption("Y représente le projet et X les causes probables.")
-            p["measure_def_yfx"] = st.text_area("Analyse Black Belt (Définition des X) :", 
-                                              value=p.get("measure_def_yfx", ""), 
-                                              key=f"yfx_area_{p_idx}")
+            st.markdown(f"### 🎯 Objectif Principal (Y) : `{ctq_v}`")
+            st.markdown(
+                r"En tant que Black Belt, nous traduisons le problème en équation de transfert : "
+                r"$$Y = f(X_1, X_2, X_3, ..., X_n)$$"
+            )
+            st.caption("Où Y est votre indicateur de performance clé (CTQ) et les X sont les variables indépendantes (causes probables) à mesurer.")
+
+            # --- ANALYSE AUTOMATIQUE DE LA VOC & DONNÉES (SI DISPONIBLES) ---
+            st.markdown("##### 🔍 Alignement avec les données de la Phase DEFINE")
+            
+            x_de_depart = []
+            
+            # Extraction depuis la VOC brute si elle existe
+            if "voc_raw_data" in st.session_state and not st.session_state.voc_raw_data.empty:
+                st.write("✔️ *Analyse de la VOC détectée : Extraction des irritants clients...*")
+                for idx, row in st.session_state.voc_raw_data.iterrows():
+                    verbatim = str(row.get('réponse brute', '')).lower()
+                    if 'temps' in verbatim or 'long' in verbatim or 'délai' in verbatim:
+                        x_de_depart.append({"Variable X": "X_Délai", "Description": "Temps de traitement / Attentes inutiles", "Type": "Continu (Temps)", "Source": "VOC (Verbatim)"})
+                    if 'erreur' in verbatim or 'qualité' in verbatim or 'faute' in verbatim or 'retouche' in verbatim:
+                        x_de_depart.append({"Variable X": "X_Qualité", "Description": "Taux de non-conformité / Erreurs de saisie", "Type": "Discret (Attributs)", "Source": "VOC (Verbatim)"})
+            
+            # Si aucune donnée n'est encore saisie dans la VOC, on met des exemples Black Belt standards
+            if not x_de_depart:
+                x_de_depart = [
+                    {"Variable X": "X1", "Description": "Variabilité de la méthode opératoire entre les équipes", "Type": "Discret", "Source": "Hypothèse Processus"},
+                    {"Variable X": "X2", "Description": "Temps d'attente ou de transfert des dossiers", "Type": "Continu", "Source": "Hypothèse Lean"},
+                    {"Variable X": "X3", "Description": "Manque de clarté des données d'entrée (Inputs du SIPOC)", "Type": "Discret", "Source": "Analyse SIPOC"}
+                ]
+
+            # --- TABLEAU DYNAMIQUE DES X (MODIFIABLE & AJOUTABLE) ---
+            st.markdown("##### 📊 Registre des Variables X (Causes probables à mesurer)")
+            st.info("💡 **Conseil Black Belt :** Ce tableau est dynamique. Vous pouvez modifier les descriptions, changer les types de données, ou ajouter de nouvelles lignes tout en bas du tableau pour compléter vos X.")
+            
+            # Initialisation dans le dictionnaire du projet pour ne pas perdre les modifications
+            if "measure_x_table" not in p:
+                p["measure_x_table"] = pd.DataFrame(x_de_depart)
+            else:
+                # Sécurité si le format stocké n'était pas un DataFrame
+                if not isinstance(p["measure_x_table"], pd.DataFrame):
+                    p["measure_x_table"] = pd.DataFrame(p["measure_x_table"])
+
+            # Éditeur de données Streamlit (permet l'ajout/suppression/modification de lignes)
+            edited_x_df = st.data_editor(
+                p["measure_x_table"],
+                num_rows="dynamic", # Rend le tableau modifiable en lignes
+                use_container_width=True,
+                column_config={
+                    "Variable X": st.column_config.TextColumn("Code Variable", help="Ex: X1, X2, X_Temps", default="X_n"),
+                    "Description": st.column_config.TextColumn("Description de la cause probable", width="large"),
+                    "Type": st.column_config.SelectboxColumn("Type de Donnée", options=["Continu (Mesurable)", "Discret (Comptage/Catégorie)"]),
+                    "Source": st.column_config.TextColumn("Origine de l'hypothèse", default="Mesure Terrain")
+                },
+                key=f"x_matrix_editor_{p_idx}"
+            )
+            
+            # Sauvegarde automatique des modifications
+            if st.button("💾 Enregistrer la définition et la matrice des X", key=f"save_x_btn_{p_idx}"):
+                p["measure_x_table"] = edited_x_df
+                st.success("Matrice Y = f(X) mise à jour avec succès pour ce projet !")
 
         # 2. Current state detailed process Map
         st.divider()
