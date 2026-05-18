@@ -643,72 +643,83 @@ else:
     with tabs[1]:
         st.header("Phase Measure")
         
-        # 1. Project definition & Équation Y = f(X)
+        # 1. Project Definition & Équation Y = f(X)
+        # ==========================================
         st.subheader("1. Project Definition & Transfer Function Y = f(X)")
         
-        ctq_v = p.get("selected_ctq", "Non défini dans Define")
+        # Récupération des données de la phase Define
+        ctq_v = p.get("selected_ctq", "Non défini")
+        voc_df = st.session_state.get("voc_raw_data", pd.DataFrame())
         
         with st.container(border=True):
-            st.markdown(f"### 🎯 Objectif Principal (Y) : `{ctq_v}`")
+            st.markdown(f"### 🎯 Objectif du Projet (Y) : `{ctq_v}`")
             st.markdown(
-                r"En tant que Black Belt, nous traduisons le problème en équation de transfert : "
-                r"$$Y = f(X_1, X_2, X_3, ..., X_n)$$"
+                r"En Lean Six Sigma, nous cherchons à résoudre l'équation de transfert : "
+                r"$$Y = f(X_1, X_2, ..., X_n)$$"
             )
-            st.caption("Où Y est votre indicateur de performance clé (CTQ) et les X sont les variables indépendantes (causes probables) à mesurer.")
+            st.caption("Le succès du projet (Y) dépend de la maîtrise des variables indépendantes (X).")
 
-            # --- ANALYSE AUTOMATIQUE DE LA VOC & DONNÉES (SI DISPONIBLES) ---
-            st.markdown("##### 🔍 Alignement avec les données de la Phase DEFINE")
+            # --- MOTEUR D'ANALYSE IA DES IRRITANTS (VOC) ---
+            st.markdown("##### 🧠 Analyse IA des irritants & Génération des Hypothèses X")
             
-            x_de_depart = []
-            
-            # Extraction depuis la VOC brute si elle existe
-            if "voc_raw_data" in st.session_state and not st.session_state.voc_raw_data.empty:
-                st.write("✔️ *Analyse de la VOC détectée : Extraction des irritants clients...*")
-                for idx, row in st.session_state.voc_raw_data.iterrows():
-                    verbatim = str(row.get('réponse brute', '')).lower()
-                    if 'temps' in verbatim or 'long' in verbatim or 'délai' in verbatim:
-                        x_de_depart.append({"Variable X": "X_Délai", "Description": "Temps de traitement / Attentes inutiles", "Type": "Continu (Temps)", "Source": "VOC (Verbatim)"})
-                    if 'erreur' in verbatim or 'qualité' in verbatim or 'faute' in verbatim or 'retouche' in verbatim:
-                        x_de_depart.append({"Variable X": "X_Qualité", "Description": "Taux de non-conformité / Erreurs de saisie", "Type": "Discret (Attributs)", "Source": "VOC (Verbatim)"})
-            
-            # Si aucune donnée n'est encore saisie dans la VOC, on met des exemples Black Belt standards
-            if not x_de_depart:
-                x_de_depart = [
-                    {"Variable X": "X1", "Description": "Variabilité de la méthode opératoire entre les équipes", "Type": "Discret", "Source": "Hypothèse Processus"},
-                    {"Variable X": "X2", "Description": "Temps d'attente ou de transfert des dossiers", "Type": "Continu", "Source": "Hypothèse Lean"},
-                    {"Variable X": "X3", "Description": "Manque de clarté des données d'entrée (Inputs du SIPOC)", "Type": "Discret", "Source": "Analyse SIPOC"}
-                ]
+            # Fonction interne simulant une analyse IA Black Belt
+            def analyze_x_hypotheses(df_voc):
+                suggestions = []
+                if df_voc.empty:
+                    return [
+                        {"Code Variable": "x1", "Description": "Variabilité de la méthode (Standard Work non respecté)", "Impact Potentiel": "Fort", "Origine": "Hypothèse Expert"},
+                        {"Code Variable": "x2", "Description": "Capacité/Performance de l'outil de production", "Impact Potentiel": "Moyen", "Origine": "Analyse Processus"}
+                    ]
+                
+                verbatims = " ".join(df_voc["réponse brute"].astype(str).tolist()).lower()
+                
+                # Logique d'analyse sémantique Black Belt
+                if any(k in verbatims for k in ["temps", "long", "délai", "attente"]):
+                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Taille des lots (Batch size) provoquant des attentes", "Impact Potentiel": "Très Fort", "Origine": "IA Analyse VOC (Temps)"})
+                if any(k in verbatims for k in ["erreur", "faute", "tromp", "qualité"]):
+                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Niveau de formation / Compétence des opérateurs", "Impact Potentiel": "Fort", "Origine": "IA Analyse VOC (Qualité)"})
+                if any(k in verbatims for k in ["outil", "bug", "système", "logiciel"]):
+                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Temps de réponse ou instabilité du système IT", "Impact Potentiel": "Fort", "Origine": "IA Analyse VOC (Outils)"})
+                if any(k in verbatims for k in ["manque", "info", "flou", "comprendre"]):
+                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Qualité des données d'entrée (Inputs SIPOC)", "Impact Potentiel": "Moyen", "Origine": "IA Analyse VOC (Info)"})
+                
+                # Complément si peu de suggestions
+                if len(suggestions) < 3:
+                    suggestions.append({"Code Variable": f"x{len(suggestions)+1}", "Description": "Variabilité inter-équipes (Shift-to-shift)", "Impact Potentiel": "Moyen", "Origine": "Analyse Black Belt"})
+                
+                return suggestions
 
-            # --- TABLEAU DYNAMIQUE DES X (MODIFIABLE & AJOUTABLE) ---
-            st.markdown("##### 📊 Registre des Variables X (Causes probables à mesurer)")
-            st.info("💡 **Conseil Black Belt :** Ce tableau est dynamique. Vous pouvez modifier les descriptions, changer les types de données, ou ajouter de nouvelles lignes tout en bas du tableau pour compléter vos X.")
-            
-            # Initialisation dans le dictionnaire du projet pour ne pas perdre les modifications
+            # Initialisation de la matrice des X dans le projet
             if "measure_x_table" not in p:
-                p["measure_x_table"] = pd.DataFrame(x_de_depart)
-            else:
-                # Sécurité si le format stocké n'était pas un DataFrame
-                if not isinstance(p["measure_x_table"], pd.DataFrame):
-                    p["measure_x_table"] = pd.DataFrame(p["measure_x_table"])
+                p["measure_x_table"] = analyze_x_hypotheses(voc_df)
 
-            # Éditeur de données Streamlit (permet l'ajout/suppression/modification de lignes)
+            st.info("🔎 L'IA a analysé vos verbatims et suggère les variables X suivantes comme causes probables de variabilité.")
+
+            # --- TABLEAU DYNAMIQUE DES X (4 COLONNES) ---
+            # On transforme en DataFrame pour l'éditeur
+            df_x = pd.DataFrame(p["measure_x_table"])
+            
             edited_x_df = st.data_editor(
-                p["measure_x_table"],
-                num_rows="dynamic", # Rend le tableau modifiable en lignes
+                df_x,
+                num_rows="dynamic", # Permet d'ajouter/supprimer des lignes
                 use_container_width=True,
+                key=f"x_matrix_editor_{p_idx}",
                 column_config={
-                    "Variable X": st.column_config.TextColumn("Code Variable", help="Ex: X1, X2, X_Temps", default="X_n"),
+                    "Code Variable": st.column_config.TextColumn("Code Variable", help="ex: x1, x2", width="small"),
                     "Description": st.column_config.TextColumn("Description de la cause probable", width="large"),
-                    "Type": st.column_config.SelectboxColumn("Type de Donnée", options=["Continu (Mesurable)", "Discret (Comptage/Catégorie)"]),
-                    "Source": st.column_config.TextColumn("Origine de l'hypothèse", default="Mesure Terrain")
-                },
-                key=f"x_matrix_editor_{p_idx}"
+                    "Impact Potentiel": st.column_config.SelectboxColumn(
+                        "Impact Potentiel",
+                        options=["Faible", "Moyen", "Fort", "Très Fort"],
+                        width="medium"
+                    ),
+                    "Origine": st.column_config.TextColumn("Origine de l'hypothèse", width="medium")
+                }
             )
             
-            # Sauvegarde automatique des modifications
-            if st.button("💾 Enregistrer la définition et la matrice des X", key=f"save_x_btn_{p_idx}"):
-                p["measure_x_table"] = edited_x_df
-                st.success("Matrice Y = f(X) mise à jour avec succès pour ce projet !")
+            # Bouton de sauvegarde de la définition
+            if st.button("💾 Valider la Définition du Projet & Matrice X", key=f"save_def_x_{p_idx}"):
+                p["measure_x_table"] = edited_x_df.to_dict('records')
+                st.success("✅ Équation de transfert et matrice des X enregistrées.")
 
         # 2. Current state detailed process Map
         st.divider()
