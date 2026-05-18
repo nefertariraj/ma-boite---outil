@@ -567,12 +567,13 @@ else:
 
         # 1. Initialisation sécurisée dans le dictionnaire du projet 'p'
         if "gantt_data" not in p:
+            import datetime
             p["gantt_data"] = pd.DataFrame([
-                {"Etape": "Define", "Début": date(2026, 5, 1), "Fin": date(2026, 5, 15), "Responsable": "Black Belt"},
-                {"Etape": "Measure", "Début": date(2026, 5, 16), "Fin": date(2026, 6, 15), "Responsable": "Green Belt"},
-                {"Etape": "Analyze", "Début": date(2026, 6, 16), "Fin": date(2026, 7, 15), "Responsable": "Black Belt"},
-                {"Etape": "Improve", "Début": date(2026, 7, 16), "Fin": date(2026, 9, 15), "Responsable": "Team"},
-                {"Etape": "Control", "Début": date(2026, 9, 16), "Fin": date(2026, 10, 31), "Responsable": "Process Owner"}
+                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
             ])
 
         st.info("💡 Modifiez les dates dans le tableau, puis cliquez sur le bouton pour mettre à jour le graphique.")
