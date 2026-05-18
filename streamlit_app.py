@@ -428,6 +428,8 @@ else:
         # Initialisation des variables
         if "voc_questions" not in p:
             p["voc_questions"] = ["Temps perdu ?", "Retouches ?", "Pénibilité ?", "Irritants ?", "Changement unique ?"]
+        
+        # SÉCURITÉ : Initialisation propre du DataFrame dans le session_state
         if "voc_raw_data" not in st.session_state:
             st.session_state.voc_raw_data = pd.DataFrame(columns=["client", "question", "réponse brute"])
 
@@ -443,10 +445,11 @@ else:
     
         if up_file is not None:
             try:
+                # Lecture unique du fichier importé
                 df_imp = pd.read_excel(up_file).fillna("")
                 df_imp.columns = [c.lower().strip() for c in df_imp.columns]
                 
-                # Détection des colonnes
+                # Détection automatique des colonnes
                 c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
                 q_col = next((c for c in df_imp.columns if "quest" in c), df_imp.columns[1] if len(df_imp.columns) > 1 else None)
                 r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
@@ -457,15 +460,17 @@ else:
                     "réponse brute": df_imp[r_col].astype(str)
                 })
                 
-                # Force la mise à jour si les données sont différentes
-                if not st.session_state.voc_raw_data.equals(new_rows):
+                # CORRECTION : On vérifie si le fichier en cours est vraiment différent de ce qu'on a stocké
+                # en comparant les valeurs de la colonne réponse brute pour éviter le conflit avec le data_editor
+                if st.session_state.voc_raw_data.empty or not (st.session_state.voc_raw_data["réponse brute"].equals(new_rows["réponse brute"])):
                     st.session_state.voc_raw_data = new_rows
-                    st.session_state.voc_results = None  # Réinitialise l'analyse pour forcer l'affichage du bouton
+                    st.session_state.voc_results = None  # Réinitialise les résultats pour faire réapparaître le bouton d'analyse
                     st.rerun()
+                    
             except Exception as e:
                 st.error(f"Erreur lors de l'import : {e}")
 
-        # Affichage du tableau d'édition
+        # Affichage stabilisé du tableau d'édition
         edited_voc_df = st.data_editor(
             st.session_state.voc_raw_data,
             num_rows="dynamic",
@@ -474,8 +479,11 @@ else:
         )
         if edited_voc_df is not None:
             st.session_state.voc_raw_data = edited_voc_df
+
+        st.write("---")
         st.subheader("3. Analyse Thématique & CTQ")
     
+        # Le bouton s'affiche systématiquement si aucune analyse n'est encore enregistrée pour ce fichier
         if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
             df_to_analyze = st.session_state.voc_raw_data
             if not df_to_analyze.empty:
