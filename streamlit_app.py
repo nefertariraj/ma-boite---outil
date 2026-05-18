@@ -448,28 +448,34 @@ else:
                     df_imp = pd.read_excel(up_file).fillna("")
                     df_imp.columns = [c.lower().strip() for c in df_imp.columns]
                     
-                    # Détection intelligente des colonnes
+                    # Détection des colonnes
                     c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
-                    
-                    # CORRECTION ICI : On cherche une colonne "question" dans l'excel, sinon on prend la 2ème colonne
                     q_col = next((c for c in df_imp.columns if "quest" in c), df_imp.columns[1] if len(df_imp.columns) > 1 else None)
-                    
                     r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
                 
-                    # Construction du nouveau DataFrame avec les vraies questions
                     new_rows = pd.DataFrame({
                         "client": df_imp[c_col].astype(str),
-                        # Si une colonne question existe dans le fichier, on la prend. Sinon, on applique une question générique.
                         "question": df_imp[q_col].astype(str) if q_col else "Question non spécifiée",
                         "réponse brute": df_imp[r_col].astype(str)
                     })
-                    
                     st.session_state.voc_raw_data = new_rows
                     st.session_state.voc_results = None  
                     st.session_state.last_file = file_id
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erreur lors de l'import : {e}")
+
+        # L'AFFICHAGE DU TABLEAU RESTE ICI, EN DEHORS DE LA BOUCLE D'IMPORT
+        edited_voc_df = st.data_editor(
+            st.session_state.voc_raw_data,
+            num_rows="dynamic",
+            use_container_width=True,
+            key=f"voc_editor_sync_{p_idx}"
+        )
+        if edited_voc_df is not None:
+            st.session_state.voc_raw_data = edited_voc_df
+
+        st.write("---")
         st.subheader("3. Analyse Thématique & CTQ")
     
         if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
@@ -512,7 +518,6 @@ else:
             st.markdown(f"### 🎯 Focus Prioritaire : **{top_theme}**")
             st.write(f"Sur la base de l'analyse des verbatims, voici les 4 axes stratégiques pour impacter le CTQ : `{ctq_cible}`")
 
-            # Configuration des 4 propositions selon le thème dominant
             plans_action = {
                 "Délais (Lead Time)": [
                     "**Standardisation des flux (Takt Time)** : Aligner la cadence de production sur la demande client pour éliminer les stocks tampons.",
@@ -546,12 +551,10 @@ else:
                 ]
             }
 
-            # Récupération des propositions (ou par défaut si thème inconnu)
             propositions = plans_action.get(top_theme, [
                 "Audit approfondi des processus.", "Standardisation des tâches.", "Formation des équipes.", "Suivi des indicateurs."
             ])
 
-            # Affichage en colonnes pour un rendu "Dashboard"
             col_a, col_b = st.columns(2)
             with col_a:
                 st.info(f"💡 **Proposition 1**\n\n{propositions[0]}")
@@ -559,10 +562,6 @@ else:
             with col_b:
                 st.info(f"🛠️ **Proposition 3**\n\n{propositions[2]}")
                 st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
-
-        from datetime import date
-        import pandas as pd
-        import plotly.express as px
         # --- 7. PROJECT MILESTONE & TIMING ---
         st.divider()
         st.header("📅 7. Project Milestone & Timing")
