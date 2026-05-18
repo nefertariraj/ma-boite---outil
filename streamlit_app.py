@@ -584,7 +584,7 @@ else:
                 {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
             ])
 
-        # 2. Affichage et édition du tableau
+        # 2. Affichage et édition du tableau par l'utilisateur
         edited_gantt = st.data_editor(
             p["gantt_data"], 
             num_rows="dynamic", 
@@ -592,24 +592,25 @@ else:
             key=f"gantt_ed_{p_idx}"
         )
         
+        # 3. Bouton d'action pour générer le graphique
         if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
             try:
-                # SÉCURITÉ ABSOLUE : On convertit de force en DataFrame et on nettoie les dates
+                # Nettoyage et sécurisation des données saisies ou importées
                 df_gantt = pd.DataFrame(edited_gantt).dropna(subset=["Etape", "Début", "Fin"])
                 
                 if not df_gantt.empty:
-                    # Conversion universelle (gère le texte et les objets date)
+                    # Conversion universelle des dates (gère le texte brut et les formats natifs)
                     df_gantt["Début"] = pd.to_datetime(df_gantt["Début"], errors='coerce')
                     df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"], errors='coerce')
                     
-                    # On supprime les lignes qui n'ont pas pu être converties en vraies dates
+                    # Nettoyage des lignes dont le format de date est invalide
                     df_gantt = df_gantt.dropna(subset=["Début", "Fin"])
                     
                     if not df_gantt.empty:
-                        # Sauvegarde des données propres dans le projet
+                        # Sauvegarde des données nettoyées
                         p["gantt_data"] = df_gantt
                         
-                        # Construction du graphique de Gantt Plotly
+                        # Construction stricte du diagramme de Gantt Plotly Express
                         import plotly.express as px
                         fig = px.timeline(
                             df_gantt, 
@@ -620,11 +621,11 @@ else:
                             title=f"Planning DMAIC - {p['name']}",
                             color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
                         )
-                        # Ordre d'affichage logique du flux Lean Six Sigma
-                        fig.update_yaxes(categoryorder="array", categoryarray=["Control", "Improve", "Analyze", "Measure", "Define"])
-                        fig.update_layout(use_container_width=True)
                         
-                        # Stockage du graphique dans le session_state
+                        # Inversion de l'axe Y pour afficher chronologiquement le flux du haut vers le bas
+                        fig.update_yaxes(categoryorder="array", categoryarray=["Control", "Improve", "Analyze", "Measure", "Define"])
+                        
+                        # Stockage du graphique valide dans le session_state
                         st.session_state[f"gantt_fig_{p_idx}"] = fig
                         st.success("✅ Diagramme de Gantt généré avec succès !")
                     else:
@@ -634,7 +635,7 @@ else:
             except Exception as e:
                 st.error(f"Erreur lors de la génération du graphique : {e}")
 
-        # 3. Affichage persistant du graphique
+        # 4. Rendu visuel permanent du graphique (avec étirement responsive géré par Streamlit)
         if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
             st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
     
