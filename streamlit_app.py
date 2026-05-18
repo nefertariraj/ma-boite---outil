@@ -560,6 +560,7 @@ else:
             with col_b:
                 st.info(f"🛠️ **Proposition 3**\n\n{propositions[2]}")
                 st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
+                
         # --- 7. PROJECT MILESTONE & TIMING ---
         st.divider()
         st.header("📅 7. Project Milestone & Timing")
