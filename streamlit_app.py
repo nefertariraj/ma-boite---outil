@@ -660,13 +660,14 @@ else:
             st.caption("Détermination des variables critiques d'entrée (X) par rétro-ingénierie des verbatims clients.")
 
             # --- MOTEUR D'ANALYSE PAR EXTRACTION CONTEXTUELLE ---
-            st.markdown("##### 🧠 Analyse IA Contextuelle des Verbatims")
+            st.markdown("##### 🧠 Analyse IA Contextuelle des Verbatims (Top 10 X)")
             
             def analyze_voc_for_specific_x(df):
                 # Si le tableau VOC est vide, on fournit une structure d'attente minimale
                 if df.empty or "réponse brute" not in df.columns:
                     return [
-                        {"Code Variable": "x1", "Description": "Attente de la collecte des verbatims réels pour extraction", "Impact Potentiel": "Moyen", "Origine": "Système"}
+                        {"Code Variable": f"x{i}", "Description": f"Attente de la collecte des verbatims réels pour extraction du facteur X{i}", "Impact Potentiel": "Moyen", "Origine": "Système"}
+                        for i in range(1, 11)
                     ]
                 
                 # 1. Nettoyage et tokenisation du texte réel du client
@@ -674,19 +675,19 @@ else:
                 mots_poubelles = [
                     "le", "la", "les", "des", "une", "pour", "dans", "avec", "plus", "fait", 
                     "tout", "cette", "dans", "sont", "avec", "pour", "mais", "plus", "nous",
-                    "vous", "avec", "suis", "votre", "notre", "c'est", "d'un", "d'une"
+                    "vous", "avec", "suis", "votre", "notre", "c'est", "d'un", "d'une", "est",
+                    "elle", "ils", "elles", "pas", "que", "qui", "sur", "aux", "par", "dans"
                 ]
                 
                 dictionnaire_contextuel = {}
                 for texte in textes:
-                    # CORRECTION : Utilisation stricte de .strip() natif sur les mots séparés
                     mots = [m.strip(",.?!()\"';:/*-_+") for m in texte.lower().split() if len(m) > 3]
                     for m in mots:
                         if m not in mots_poubelles:
                             dictionnaire_contextuel[m] = dictionnaire_contextuel.get(m, 0) + 1
                 
-                # 2. Tri des concepts les plus fréquemment cités par le client
-                concepts_cles = sorted(dictionnaire_contextuel.items(), key=lambda item: item[1], reverse=True)[:4]
+                # 2. Tri des 10 concepts les plus fréquemment cités par le client (Top 10)
+                concepts_cles = sorted(dictionnaire_contextuel.items(), key=lambda item: item[1], reverse=True)[:10]
                 
                 # 3. Traduction des concepts réels en Hypothèses Six Sigma (X)
                 suggestions_x = []
@@ -709,9 +710,15 @@ else:
                         "Origine": f"IA - Extraction Fréquence VOC ('{mot}')"
                     })
                 
-                # Sécurité si aucun mot n'émerge
-                if not suggestions_x:
-                    suggestions_x.append({"Code Variable": "x1", "Description": "Variabilité du processus global", "Impact Potentiel": "Fort", "Origine": "Analyse Standard"})
+                # Remplissage de sécurité si le VOC est trop court pour atteindre 10 mots différents
+                while len(suggestions_x) < 10:
+                    current_len = len(suggestions_x) + 1
+                    suggestions_x.append({
+                        "Code Variable": f"x{current_len}", 
+                        "Description": f"Facteur de variabilité additionnel à investiguer sur le terrain (X{current_len})", 
+                        "Impact Potentiel": "Faible", 
+                        "Origine": "Analyse Complémentaire Black Belt"
+                    })
                     
                 return suggestions_x
 
@@ -719,18 +726,18 @@ else:
             if "measure_x_table" not in p or st.button("🔄 Ré-analyser les données du VOC en temps réel", key=f"recalc_voc_{p_idx}"):
                 p["measure_x_table"] = analyze_voc_for_specific_x(voc_df)
                 if not voc_df.empty:
-                    st.toast("⚡ Données réelles analysées avec succès !", icon="🧠")
+                    st.toast("⚡ Top 10 des variables X extrait avec succès !", icon="🧠")
 
-            st.info("📋 **Mode Black Belt activé** : Le tableau ci-dessous a extrait les termes récurrents spécifiques de votre VOC pour isoler les $X$. Modifiez, affinez ou ajoutez des lignes pour lier ces causes à vos indicateurs de terrain.")
+            st.info("📋 **Mode Black Belt activé** : Le tableau ci-dessous a isolé le **Top 10 des variables X** les plus critiques basées sur votre VOC. Vous pouvez modifier, affiner, ou ajouter de nouvelles lignes.")
 
             # --- TABLEAU DYNAMIQUE DES X (4 COLONNES) ---
             df_x = pd.DataFrame(p["measure_x_table"])
             
             edited_x_df = st.data_editor(
                 df_x,
-                num_rows="dynamic", # Permet à l'utilisateur d'ajouter/supprimer des lignes dynamiquement
+                num_rows="dynamic", # Permet d'ajouter/supprimer librement des lignes
                 use_container_width=True,
-                key=f"x_matrix_editor_v2_{p_idx}",
+                key=f"x_matrix_editor_v3_{p_idx}",
                 column_config={
                     "Code Variable": st.column_config.TextColumn("Code Variable", help="ex: x1, x2", width="small"),
                     "Description": st.column_config.TextColumn("Description de la cause probable (Spécifique au contexte)", width="large"),
@@ -744,9 +751,9 @@ else:
             )
             
             # Sauvegarde dans le dictionnaire projet
-            if st.button("💾 Enregistrer la Matrice des X Validée", key=f"save_def_x_v2_{p_idx}"):
+            if st.button("💾 Enregistrer la Matrice des X Validée", key=f"save_def_x_v3_{p_idx}"):
                 p["measure_x_table"] = edited_x_df.to_dict('records')
-                st.success("🎯 Matrice $Y = f(X)$ mise à jour et mémorisée pour la phase Analyze.")
+                st.success("🎯 Matrice complète des 10 X enregistrée avec succès pour la phase Analyze.")
 
         # 2. Current state detailed process Map
         st.divider()
