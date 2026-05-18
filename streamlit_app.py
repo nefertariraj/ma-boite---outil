@@ -442,30 +442,30 @@ else:
         up_file = st.file_uploader("Importer un fichier Excel", type=["xlsx", "xls"], key=f"up_v_final_{p_idx}")
     
         if up_file is not None:
-            file_id = f"{up_file.name}_{up_file.size}"
-            if st.session_state.get("last_file") != file_id:
-                try:
-                    df_imp = pd.read_excel(up_file).fillna("")
-                    df_imp.columns = [c.lower().strip() for c in df_imp.columns]
-                    
-                    # Détection des colonnes
-                    c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
-                    q_col = next((c for c in df_imp.columns if "quest" in c), df_imp.columns[1] if len(df_imp.columns) > 1 else None)
-                    r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
+            try:
+                df_imp = pd.read_excel(up_file).fillna("")
+                df_imp.columns = [c.lower().strip() for c in df_imp.columns]
                 
-                    new_rows = pd.DataFrame({
-                        "client": df_imp[c_col].astype(str),
-                        "question": df_imp[q_col].astype(str) if q_col else "Question non spécifiée",
-                        "réponse brute": df_imp[r_col].astype(str)
-                    })
+                # Détection des colonnes
+                c_col = next((c for c in df_imp.columns if "client" in c or "nom" in c), df_imp.columns[0])
+                q_col = next((c for c in df_imp.columns if "quest" in c), df_imp.columns[1] if len(df_imp.columns) > 1 else None)
+                r_col = next((c for c in df_imp.columns if "rép" in c or "verbatim" in c or "brute" in c), df_imp.columns[-1])
+            
+                new_rows = pd.DataFrame({
+                    "client": df_imp[c_col].astype(str),
+                    "question": df_imp[q_col].astype(str) if q_col else "Question non spécifiée",
+                    "réponse brute": df_imp[r_col].astype(str)
+                })
+                
+                # Force la mise à jour si les données sont différentes
+                if not st.session_state.voc_raw_data.equals(new_rows):
                     st.session_state.voc_raw_data = new_rows
-                    st.session_state.voc_results = None  
-                    st.session_state.last_file = file_id
+                    st.session_state.voc_results = None  # Réinitialise l'analyse pour forcer l'affichage du bouton
                     st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur lors de l'import : {e}")
+            except Exception as e:
+                st.error(f"Erreur lors de l'import : {e}")
 
-        # L'AFFICHAGE DU TABLEAU RESTE ICI, EN DEHORS DE LA BOUCLE D'IMPORT
+        # Affichage du tableau d'édition
         edited_voc_df = st.data_editor(
             st.session_state.voc_raw_data,
             num_rows="dynamic",
@@ -474,8 +474,6 @@ else:
         )
         if edited_voc_df is not None:
             st.session_state.voc_raw_data = edited_voc_df
-
-        st.write("---")
         st.subheader("3. Analyse Thématique & CTQ")
     
         if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
