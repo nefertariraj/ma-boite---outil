@@ -669,13 +669,18 @@ else:
                         {"Code Variable": "x1", "Description": "Attente de la collecte des verbatims réels pour extraction", "Impact Potentiel": "Moyen", "Origine": "Système"}
                     ]
                 
-                # 1. Nettoyage et tokenisation rudimentaire du texte réel du client
+                # 1. Nettoyage et tokenisation du texte réel du client
                 textes = df["réponse brute"].dropna().astype(str).tolist()
-                mots_poubelles = ["le", "la", "les", "des", "une", "pour", "dans", "avec", "plus", "fait", "tout", "cette"]
+                mots_poubelles = [
+                    "le", "la", "les", "des", "une", "pour", "dans", "avec", "plus", "fait", 
+                    "tout", "cette", "dans", "sont", "avec", "pour", "mais", "plus", "nous",
+                    "vous", "avec", "suis", "votre", "notre", "c'est", "d'un", "d'une"
+                ]
                 
                 dictionnaire_contextuel = {}
                 for texte in textes:
-                    mots = [m.clean.strip(",.?!()\"") for m in texte.lower().split() if len(m) > 3]
+                    # CORRECTION : Utilisation stricte de .strip() natif sur les mots séparés
+                    mots = [m.strip(",.?!()\"';:/*-_+") for m in texte.lower().split() if len(m) > 3]
                     for m in mots:
                         if m not in mots_poubelles:
                             dictionnaire_contextuel[m] = dictionnaire_contextuel.get(m, 0) + 1
@@ -723,7 +728,7 @@ else:
             
             edited_x_df = st.data_editor(
                 df_x,
-                num_rows="dynamic", # Permet à l'utilisateur d'ajouter/supprimer des lignes à la main
+                num_rows="dynamic", # Permet à l'utilisateur d'ajouter/supprimer des lignes dynamiquement
                 use_container_width=True,
                 key=f"x_matrix_editor_v2_{p_idx}",
                 column_config={
