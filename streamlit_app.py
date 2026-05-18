@@ -775,13 +775,13 @@ else:
 
         with st.container(border=True):
             st.markdown("### 🗺️ Décomposition du Flux & Roll-up des Délais (Lead Time)")
-            st.caption("Déployez les sous-sections de tâches pour chaque section macro du SIPOC. Sélectionnez l'unité de temps par tâche, le système harmonise les calculs.")
+            st.caption("Déployez les sous-sections de tâches pour chaque section macro du SIPOC. Sélectionnez la qualification Lean parmi les 4 catégories Black Belt.")
 
             # 2. Initialisation de la structure de stockage si inexistante
             if "vsm_detailed_map" not in p:
                 p["vsm_detailed_map"] = {step: [
-                    {"Détail de la tâche": "Exemple de micro-tâche A", "Valeur": 10.0, "Unité": "Minutes", "Type d'activité": "Valeur Ajoutée (VA)"},
-                    {"Détail de la tâche": "Exemple de micro-tâche B", "Valeur": 2.0, "Unité": "Heures", "Type d'activité": "Non Valeur Ajoutée (NVA)"}
+                    {"Détail de la tâche": "Exemple de micro-tâche A", "Valeur": 10.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"},
+                    {"Détail de la tâche": "Exemple de micro-tâche B", "Valeur": 2.0, "Unité": "Heures", "Type d'activité": "NVA (Non Valeur Ajoutée)"}
                 ] for step in macro_steps}
 
             # Fonction de conversion pour le Roll-up mathématique (Unité -> Minutes)
@@ -793,24 +793,25 @@ else:
                 if unite == "Heures":
                     return val * 60.0
                 elif unite == "Jours":
-                    return val * 1440.0 # 24 heures * 60 minutes
-                return val # Minutes par défaut
+                    return val * 1440.0
+                return val
 
             updated_map = {}
             total_process_lead_time_min = 0.0
             total_va_global_min = 0.0
             total_nva_global_min = 0.0
+            total_bnrva_global_min = 0.0
             total_attente_global_min = 0.0
 
             # 3. Boucle dynamique par Section du SIPOC
             for idx_step, step in enumerate(macro_steps):
                 sub_tasks = p["vsm_detailed_map"].get(step, [])
                 if not sub_tasks:
-                    sub_tasks = [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "Valeur Ajoutée (VA)"}]
+                    sub_tasks = [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
 
                 df_sub = pd.DataFrame(sub_tasks)
 
-                # Calcul du total de la section en minutes (conversion à la volée)
+                # Calcul du total de la section en minutes
                 sum_section_min = 0.0
                 if not df_sub.empty and "Valeur" in df_sub.columns and "Unité" in df_sub.columns:
                     for _, r_task in df_sub.iterrows():
@@ -827,14 +828,14 @@ else:
                 else:
                     text_durée = f"{sum_section_min:.1f} min"
                     
-                st.caption(f"⏱️ **Délai Total Harmoneux de la Section :** `{text_durée}`")
+                st.caption(f"⏱️ **Délai Total Harmonisé de la Section :** `{text_durée}`")
 
-                # Éditeur de données de sous-sections avec choix de l'unité
+                # Éditeur de données avec les 4 types d'activités demandés
                 edited_df = st.data_editor(
                     df_sub,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_v4_{idx_step}_{p_idx}",
+                    key=f"vsm_editor_v5_{idx_step}_{p_idx}",
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des tâches à faire (Sous-section)", width="large"),
                         "Valeur": st.column_config.NumberColumn("Délai de réalisation", min_value=0.0, format="%.1f", width="small", required=True),
@@ -846,8 +847,14 @@ else:
                         ),
                         "Type d'activité": st.column_config.SelectboxColumn(
                             "Type d'activité (Lean)",
-                            options=["Valeur Ajoutée (VA)", "Non Valeur Ajoutée (NVA)", "Temps d'attente / Stock"],
-                            width="medium",
+                            # CORRECTION : Intégration des 4 types d'activités requis
+                            options=[
+                                "VA (Valeur Ajoutée)", 
+                                "NVA (Non Valeur Ajoutée)", 
+                                "BNRVA (Business Necessary, Non-Value Added)", 
+                                "Temps d'attente / Stock"
+                            ],
+                            width="large",
                             required=True
                         )
                     }
@@ -864,28 +871,30 @@ else:
                         total_process_lead_time_min += t_min
                         
                         act_type = row.get("Type d'activité")
-                        if act_type == "Valeur Ajoutée (VA)":
+                        if act_type == "VA (Valeur Ajoutée)":
                             total_va_global_min += t_min
-                        elif act_type == "Non Valeur Ajoutée (NVA)":
+                        elif act_type == "NVA (Non Valeur Ajoutée)":
                             total_nva_global_min += t_min
+                        elif act_type == "BNRVA (Business Necessary, Non-Value Added)":
+                            total_bnrva_global_min += t_min
                         elif act_type == "Temps d'attente / Stock":
                             total_attente_global_min += t_min
 
                 st.markdown("---")
 
             # 4. Bouton général de sauvegarde
-            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v4_{p_idx}"):
+            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v5_{p_idx}"):
                 p["vsm_detailed_map"] = updated_map
-                st.success("🎯 Structure de processus multi-unités enregistrée avec succès !")
+                st.success("🎯 Structure de processus et typologies d'activités enregistrées !")
 
             # ==========================================
             # TABLEAU DE BORD DES CALCS DE FLUX GLOBALS
             # ==========================================
             st.markdown("### 📊 Indicateurs de Performance du Processus (Roll-up Global)")
             
+            # Formule PCE standard : VA / Total Lead Time
             pce = (total_va_global_min / total_process_lead_time_min * 100) if total_process_lead_time_min > 0 else 0.0
 
-            # Conversion intelligente de l'affichage global pour le Lead Time complet
             if total_process_lead_time_min >= 1440:
                 display_lt = f"{total_process_lead_time_min / 1440:.1f} Jours"
             elif total_process_lead_time_min >= 60:
@@ -898,16 +907,24 @@ else:
             c2.metric("🟢 Total Valeur Ajoutée (VA)", f"{total_va_global_min:.1f} min")
             
             if pce < 10.0:
-                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Flux critique (Muda élevé)", delta_color="inverse")
+                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Flux encombré (Muda élevé)", delta_color="inverse")
             else:
-                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Flux fluide")
+                c3.metric("📈 Efficience du Cycle (PCE)", f"{pce:.1f}%", delta="Bonne dynamique de flux")
 
-            with st.expander("🔍 Analyse Black Belt de la ligne de temps (Détails en Minutes)"):
-                st.write(f"• **Temps Total du Cycle de Traitement :** {total_process_lead_time_min:.1f} min")
+            with st.expander("🔍 Analyse Black Belt approfondie (Répartition de la Ligne de Temps)"):
+                st.write(f"• **Temps Total du Processus (Lead Time) :** {total_process_lead_time_min:.1f} min")
                 st.write(f"• **Temps à Valeur Ajoutée (VA) :** {total_va_global_min:.1f} min")
-                st.write(f"• **Temps à Non-Valeur Ajoutée (NVA) :** {total_nva_global_min:.1f} min")
-                st.write(f"• **Temps d'attente accumulé :** {total_attente_global_min:.1f} min")
+                st.write(f"• **Temps BNRVA (Contraintes Business / Légales) :** {total_bnrva_global_min:.1f} min")
+                st.write(f"• **Temps à Non-Valeur Ajoutée pure (NVA / Gaspillage) :** {total_nva_global_min:.1f} min")
+                st.write(f"• **Temps d'attente cumulé (Files d'attente/Stocks) :** {total_attente_global_min:.1f} min")
+                
                 st.progress(min(pce / 100, 1.0))
+                st.caption(
+                    "💡 **Note d'Analyse :** Les activités **BNRVA** ne créent pas de valeur directe pour le client final, "
+                    "mais ne peuvent pas être éliminées immédiatement (ex: contrôles financiers, conformité RGPD). "
+                    "Le plan d'action en phase *Improve* devra cibler en priorité les NVA pures et les Temps d'attente, "
+                    "puis tenter d'automatiser ou de réduire le temps passé sur les BNRVA."
+                )
 
         # 3. Current state value stream Map
         st.divider()
