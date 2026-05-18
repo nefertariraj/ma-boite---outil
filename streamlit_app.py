@@ -755,18 +755,119 @@ else:
                 p["measure_x_table"] = edited_x_df.to_dict('records')
                 st.success("🎯 Matrice complète des 10 X enregistrée avec succès pour la phase Analyze.")
 
-        # 2. Current state detailed process Map
-        st.divider()
-        st.subheader("2. Current state detailed process Map")
-        st.info("Détaillez le processus à analyser. Vous pouvez insérer des lignes entre les étapes existantes.")
-        if "detailed_map" not in p:
-            # On initialise avec le SIPOC de Define si disponible, sinon vide
-            p["detailed_map"] = pd.DataFrame(p.get("sipoc_data", [{"Process": "", "Customer": ""}]))
+        # 2. Current State Detailed Process Map
+        # ==========================================
+        st.subheader("2. Current State Detailed Process Map (Base VSM)")
         
-        edited_map = st.data_editor(p["detailed_map"], num_rows="dynamic", use_container_width=True, key=f"det_map_{p_idx}")
-        if st.button("💾 Sauvegarder la Map détaillée", key=f"btn_map_{p_idx}"):
-            p["detailed_map"] = edited_map
-            st.success("Process Map enregistrée.")
+        # 1. Récupération dynamique des étapes du Process du SIPOC (Phase Define)
+        # On cherche dans le dictionnaire du projet 'p' ou le session_state selon votre structure
+        sipoc_data = p.get("sipoc_data", [])
+        
+        # Extraction des étapes macro du SIPOC
+        macro_steps = []
+        if isinstance(sipoc_data, list) and len(sipoc_data) > 0:
+            for row in sipoc_data:
+                if "Process" in row and row["Process"]:
+                    macro_steps.append(row["Process"])
+                elif "process" in row and row["process"]:
+                    macro_steps.append(row["process"])
+        
+        # Sécurité : Si le SIPOC n'est pas encore rempli, on génère les étapes standards du DMAIC/Process
+        if not macro_steps:
+            macro_steps = ["Étape Macro 1 (Ex: Réception)", "Étape Macro 2 (Ex: Traitement)", "Étape Macro 3 (Ex: Validation)", "Étape Macro 4 (Ex: Expédition)"]
+            st.warning("⚠️ Aucune donnée de processus trouvée dans le SIPOC. Affichage d'étapes génériques pour exemple.")
+
+        with st.container(border=True):
+            st.markdown("### 🗺️ Cartographie Détaillée & Qualification du Flux")
+            st.caption("Décomposez chaque étape macro du SIPOC en micro-tâches, quantifiez les délais et qualifiez la valeur ajoutée.")
+
+            # 2. Initialisation ou persistance de la table de Process Mapping
+            if "detailed_process_map" not in p:
+                # Génération d'une structure initiale basée sur le SIPOC pour guider l'utilisateur
+                initial_map = []
+                for step in macro_steps:
+                    initial_map.append({
+                        "Étape Macro (SIPOC)": step,
+                        "Sous-section (Micro-tâche)": "Saisir la tâche détaillée ici...",
+                        "Délai Moyen (Minutes)": 5.0,
+                        "Qualification Lean": "Valeur Ajoutée (VA)"
+                    })
+                p["detailed_process_map"] = initial_map
+
+            # Convertir en DataFrame pour l'utilisation dans le st.data_editor
+            df_map = pd.DataFrame(p["detailed_process_map"])
+
+            # 3. Configuration des colonnes pour le Data Editor (Rigueur LSS)
+            edited_map_df = st.data_editor(
+                df_map,
+                num_rows="dynamic",  # Permet à l'opérateur de rajouter autant de micro-tâches que nécessaire
+                use_container_width=True,
+                key=f"proc_map_editor_{p_idx}",
+                column_config={
+                    "Étape Macro (SIPOC)": st.column_config.SelectboxColumn(
+                        "Étape Macro (SIPOC)",
+                        help="Sélectionnez l'étape macro correspondante du SIPOC",
+                        options=macro_steps,
+                        width="medium",
+                        required=True
+                    ),
+                    "Sous-section (Micro-tâche)": st.column_config.TextColumn(
+                        "Détail des tâches à faire",
+                        help="Description précise de l'action de terrain",
+                        width="large",
+                        required=True
+                    ),
+                    "Délai Moyen (Minutes)": st.column_config.NumberColumn(
+                        "Délai de réalisation",
+                        help="Temps moyen chronométré ou estimé pour accomplir la tâche",
+                        min_value=0.0,
+                        format="%.1f min",
+                        width="small"
+                    ),
+                    "Qualification Lean": st.column_config.SelectboxColumn(
+                        "Catégorisation Lean",
+                        help="VA: Change la forme/fonction pour le client | NVA: Gaspillage pur | Temps d'attente: Muda de transport/stock",
+                        options=["Valeur Ajoutée (VA)", "Non Valeur Ajoutée (NVA)", "Temps d'attente / Stock"],
+                        width="medium",
+                        required=True
+                    )
+                }
+            )
+
+            # 4. Bouton de validation et calcul automatique des métriques VSM
+            if st.button("💾 Valider et Analyser le Flux (Métriques VSM)", key=f"save_proc_map_{p_idx}"):
+                p["detailed_process_map"] = edited_map_df.to_dict('records')
+                st.success("✅ Cartographie détaillée enregistrée.")
+                
+                # --- CALCULS AUTOMATIQUES NIVEAU BLACK BELT ---
+                try:
+                    total_va = edited_map_df[edited_map_df["Qualification Lean"] == "Valeur Ajoutée (VA)"]["Délai Moyen (Minutes)"].sum()
+                    total_nva = edited_map_df[edited_map_df["Qualification Lean"] == "Non Valeur Ajoutée (NVA)"]["Délai Moyen (Minutes)"].sum()
+                    total_attente = edited_map_df[edited_map_df["Qualification Lean"] == "Temps d'attente / Stock"]["Délai Moyen (Minutes)"].sum()
+                    
+                    lead_time_total = total_va + total_nva + total_attente
+                    pce = (total_va / lead_time_total * 100) if lead_time_total > 0 else 0
+                    
+                    st.write("---")
+                    st.markdown("#### 📊 Diagnostic Flash - Indicateurs VSM Préparatoires")
+                    
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Processing Time (VA)", f"{total_va:.1f} min")
+                    c2.metric("Muda Time (NVA)", f"{total_nva:.1f} min")
+                    c3.metric("Queue Time (Attentes)", f"{total_attente:.1f} min")
+                    
+                    # Alerte si l'efficience est basse (classique en processus non optimisés)
+                    if pce < 10:
+                        c4.metric("Process Cycle Efficiency (PCE)", f"{pce:.1f}%", delta="- Flux Critique", delta_color="inverse")
+                    else:
+                        c4.metric("Process Cycle Efficiency (PCE)", f"{pce:.1f}%", delta="+ Flux Fluide")
+                        
+                    st.caption(
+                        "ℹ️ **Note Black Belt :** Le *Process Cycle Efficiency* (PCE) mesure le ratio de temps utile. "
+                        "Un PCE standard hors-Lean est souvent inférieur à 10%. Vos chantiers KAIZEN devront cibler les lignes 'NVA' et 'Attentes' ci-dessus."
+                    )
+                except Exception as e:
+                    st.error(f"Erreur lors du calcul des indicateurs : {e}"))
 
         # 3. Current state value stream Map
         st.divider()
