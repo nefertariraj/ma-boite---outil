@@ -1019,134 +1019,164 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-        # 3. Lean Six Sigma Data Collection Plan
+        # 3. Lean Six Sigma Data Collection Plan (Y = f(X))
         # ==========================================
         st.subheader("3. Lean Six Sigma Data Collection Plan")
         
         st.markdown("""
-        ### 📊 Plan de Collecte de Données Ciblé (Goulots & Variabilité)
-        En tant que **Black Belt**, vous ne devez pas tout mesurer. Ce plan automatise le ciblage des métriques là où le VSM a détecté des gaspillages ou des soupçons de goulots d'étranglement (files d'attente, forte NVA, ou variations de charge).
+        ### 📊 Alignement Top-Down : $Y = f(X)$ & Matrice de Priorisation
+        En tant que **Black Belt**, toute collecte doit être justifiée. Nous partons du **$Y$ global (Lead Time total du processus)** et nous listons les **$X$ (causes potentielles de variabilité)** identifiés dans votre *Detailed Process Map*.
+        
+        Chaque $X$ est soumis au filtre des 3 questions clés pour déterminer s'il doit être mesuré en priorité :
+        1. **Influence :** Le $X$ influence-t-il fortement le $Y$ ?
+        2. **Fréquence :** Le $X$ apparaît-il souvent ?
+        3. **Mesurabilité :** Peut-on mesurer le $X$ de façon fiable ?
         """)
 
-        # Récupération sécurisée des données du VSM issues du session_state
+        # Récupération des données réelles du VSM depuis le session_state
         vsm_steps = st.session_state.get("vsm_macro_steps", [])
         vsm_detailed = st.session_state.get("vsm_detailed_map", {})
         vsm_totals = st.session_state.get("vsm_totals", {})
         section_totals = vsm_totals.get("section_totals", {})
 
-        # Génération automatique des suggestions de ciblage basées sur le VSM réel
-        cibles_automatiques = []
-        
+        # --------------------------------------------------
+        # INVENTAIRE AUTOMATIQUE DES X VISIBLES DANS LE PROCESSUS
+        # --------------------------------------------------
+        liste_x_potentiels = []
+
         if vsm_steps:
-            # 1. Identifier la section qui a le plus grand Lead Time (Goulot potentiel)
+            # Recherche du goulot d'étranglement principal
             if section_totals:
                 highest_step = max(section_totals, key=section_totals.get)
-                highest_time = section_totals[highest_step]
-                if highest_time > 0:
-                    cibles_automatiques.append({
-                        "Étape du Processus": highest_step,
-                        "Métrique à collecter": "Temps de cycle individuel & Taux d'utilisation",
-                        "Type de donnée": "Continue (Temps)",
-                        "Objectif Six Sigma": f"Valider le goulot d'étranglement (Étape la plus longue : {highest_time:.1f} min)",
-                        "Méthode de mesure": "Chronométrage unitaire / Horodatage ERP",
-                        "Taille Échantillon": "n = 30 mesures minimum (Stabilité)"
-                    })
+                liste_x_potentiels.append({
+                    "Étape Source": highest_step,
+                    "Variable (X)": f"Temps de traitement sur le goulot ({highest_step})",
+                    "Catégorie": "Goulot d'étranglement",
+                    "Description": "Étape avec le Lead Time le plus élevé du flux actuel."
+                })
 
-            # 2. Identifier les tâches de type Attente ou NVA pour cibler le Muda
+            # Extraction des NVA, Attentes et Retouches de la map détaillée
             for step in vsm_steps:
                 tasks = vsm_detailed.get(step, [])
-                has_waste = any(t.get("Type d'activité") in ["Temps d'attente / Stock", "NVA (Non Valeur Ajoutée)"] for t in tasks)
-                
-                if has_waste:
-                    cibles_automatiques.append({
-                        "Étape du Processus": step,
-                        "Métrique à collecter": "Temps d'attente inter-tâches & Volume des En-cours (WIP)",
-                        "Type d'activité": "Gaspillage (Muda)",
-                        "Type de donnée": "Continue & Discrète",
-                        "Objectif Six Sigma": "Mesurer l'impact des files d'attente sur la variance du Lead Time",
-                        "Méthode de mesure": "Suivi des jetons de temps (Time-stamping)",
-                        "Taille Échantillon": "n = 50 observations ou 2 semaines glissantes"
-                    })
+                for t in tasks:
+                    desc_tache = t.get("Détail de la tâche", "")
+                    type_act = t.get("Type d'activité", "")
+                    
+                    if type_act == "Temps d'attente / Stock":
+                        liste_x_potentiels.append({
+                            "Étape Source": step,
+                            "Variable (X)": f"Temps d'attente avant/pendant : {desc_tache}",
+                            "Catégorie": "Attente / File",
+                            "Description": "Temps mort générant du stockage d'en-cours (WIP)."
+                        })
+                    elif type_act == "NVA (Non Valeur Ajoutée)":
+                        # Détection intelligente des boucles de retouches ou gaspillages par mots-clés
+                        is_rework = any(kw in desc_tache.lower() for kw in ["retouche", "correction", "refaire", "erreur", "rework", "rejet"])
+                        cat = "Retouche / Rebut" if is_rework else "NVA / Gaspillage"
+                        liste_x_potentiels.append({
+                            "Étape Source": step,
+                            "Variable (X)": f"Impact de la tâche : {desc_tache}",
+                            "Catégorie": cat,
+                            "Description": "Action n'apportant pas de valeur directe perçue par le client."
+                        })
 
-        # Si le VSM est vide, on initialise un modèle standard pour ne pas bloquer l'écran
-        if not cibles_automatiques:
-            cibles_automatiques = [
-                {
-                    "Étape du Processus": "1. Réception & Tri",
-                    "Métrique à collecter": "Taux d'erreur à l'entrée / Qualité du dossier",
-                    "Type de donnée": "Discrète (Attribut)",
-                    "Objectif Six Sigma": "Calculer le First Time Yield (FTY) et identifier les causes de retravail",
-                    "Méthode de mesure": "Feuille de pointage des défauts (Checksheet)",
-                    "Taille Échantillon": "n = 100 dossiers entrants"
-                },
-                {
-                    "Étape du Processus": "3. Traitement & Analyse",
-                    "Métrique à collecter": "Temps de traitement (Touch Time)",
-                    "Type de donnée": "Continue (Temps)",
-                    "Objectif Six Sigma": "Analyser la capabilité de l'opérateur et la variabilité intra-processus",
-                    "Méthode de mesure": "Extraction des logs du système",
-                    "Taille Échantillon": "n = 30 mesures"
-                }
+        # Back-up si la map détaillée n'est pas encore complétée
+        if not liste_x_potentiels:
+            liste_x_potentiels = [
+                {"Étape Source": "1. Réception & Tri", "Variable (X)": "Dossiers incomplets / Erreurs de saisie", "Catégorie": "Retouche / Rebut", "Description": "Données manquantes obligeant à relancer le demandeur."},
+                {"Étape Source": "3. Traitement & Analyse", "Variable (X)": "Temps d'attente de validation managériale", "Catégorie": "Attente / File", "Description": "Dossiers bloqués dans la boîte de validation."}
             ]
 
-        # Initialisation du plan de collecte dans le session state pour assurer la persistance
-        if "data_collection_plan" not in st.session_state:
-            st.session_state["data_collection_plan"] = cibles_automatiques
+        # --------------------------------------------------
+        # INTELLIGENCE DE PRIORISATION (EVALUATION DES 3 QUESTIONS)
+        # --------------------------------------------------
+        # Initialisation dans le session_state pour éviter les resets de saisie
+        if "matrix_x_prioritization" not in st.session_state:
+            initial_matrix = []
+            for item in liste_x_potentiels:
+                # L'IA/Règle pré-remplit à "Oui" les éléments critiques (Goulots et Retouches) pour guider l'utilisateur
+                is_critique = item["Catégorie"] in ["Goulot d'étranglement", "Retouche / Rebut"]
+                initial_matrix.append({
+                    "Étape Source": item["Étape Source"],
+                    "Variable (X)": item["Variable (X)"],
+                    "Catégorie": item["Catégorie"],
+                    "Influence forte sur Y ?": "Oui" if is_critique else "À évaluer",
+                    "Apparaît souvent ?": "Oui" if is_critique else "À évaluer",
+                    "Mesurable de façon fiable ?": "Oui",
+                    "Métrique cible suggérée": "Temps de cycle (min)" if "Temps" in item["Catégorie"] else "Taux de défaut (%) / Fréquence"
+                })
+            st.session_state["matrix_x_prioritization"] = initial_matrix
 
         with st.container(border=True):
-            st.markdown("### 📋 Matrice du Plan de Collecte (DMAIC - Phase Measure)")
-            st.caption("Ajustez, ajoutez ou supprimez des lignes directement dans la matrice de planification ci-dessous.")
+            st.markdown("### 🧠 Étape 1 : Matrice de Décision Black Belt ($X$ les plus influents)")
+            st.caption("Répondez aux 3 questions filtres pour chaque X. L'algorithme qualifiera automatiquement les variables à mesurer.")
 
-            # Conversion en DataFrame pour l'édition
-            df_collection = pd.DataFrame(st.session_state["data_collection_plan"])
+            df_priorisation = pd.DataFrame(st.session_state["matrix_x_prioritization"])
 
-            # Éditeur de données interactif et persistant
-            edited_collection_df = st.data_editor(
-                df_collection,
+            # Éditeur interactif de la matrice de filtrage
+            edited_priorisation_df = st.data_editor(
+                df_priorisation,
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"collection_plan_editor_{p_idx}",
+                key=f"x_prior_editor_{p_idx}",
                 column_config={
-                    "Étape du Processus": st.column_config.SelectboxColumn(
-                        "Étape ciblée", 
-                        options=vsm_steps if vsm_steps else ["Général / Entrée", "Général / Sortie"],
-                        width="medium", required=True
-                    ),
-                    "Métrique à collecter": st.column_config.TextColumn("Métrique / Indicateur (Y ou X)", width="large", required=True),
-                    "Type de donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Temps, Dimension)", "Discrète (Attribut, Comptage)", "Ratio / Pourcentage"], width="medium"),
-                    "Objectif Six Sigma": st.column_config.TextColumn("Objectif de l'analyse (Hypothèse à valider)", width="large"),
-                    "Méthode de mesure": st.column_config.TextColumn("Outil / Source de données", width="medium"),
-                    "Taille Échantillon": st.column_config.TextColumn("Échantillonnage (n)", width="small")
+                    "Étape Source": st.column_config.TextColumn("Étape", disabled=True, width="medium"),
+                    "Variable (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
+                    "Catégorie": st.column_config.TextColumn("Type", disabled=True, width="small"),
+                    "Influence forte sur Y ?": st.column_config.SelectboxColumn("1. Influence forte ?", options=["Oui", "Non", "À évaluer"], width="small"),
+                    "Apparaît souvent ?": st.column_config.SelectboxColumn("2. Fréquent ?", options=["Oui", "Non", "À évaluer"], width="small"),
+                    "Mesurable de façon fiable ?": st.column_config.SelectboxColumn("3. Mesurable ?", options=["Oui", "Non"], width="small"),
+                    "Métrique cible suggérée": st.column_config.TextColumn("Indicateur de mesure", width="medium")
                 }
             )
 
-            # Bouton de sauvegarde et de validation de la matrice
-            if st.button("💾 Valider et Verrouiller le Plan de Collecte", type="primary", key=f"btn_save_collection_{p_idx}"):
-                # Nettoyage des lignes vides
-                if not edited_collection_df.empty:
-                    edited_collection_df = edited_collection_df.dropna(subset=["Métrique à collecter"])
+            # Bouton de calcul et de bascule vers le plan de collecte final
+            if st.button("⚙️ Calculer et Générer le Plan de Collecte Ciblé", type="primary", use_container_width=True, key=f"btn_calc_plan_{p_idx}"):
+                st.session_state["matrix_x_prioritization"] = edited_priorisation_df.to_dict('records')
                 
-                st.session_state["data_collection_plan"] = edited_collection_df.to_dict('records')
-                p["saved_collection_plan"] = st.session_state["data_collection_plan"]
-                st.success("🎯 Le Plan de Collecte de Données a été validé et intégré au projet.")
+                # Filtrage Black Belt : Prioriser uniquement les X qui valident le triptyque (Influence = Oui AND Fréquence = Oui AND Mesurable = Oui)
+                plan_final = []
+                for row in st.session_state["matrix_x_prioritization"]:
+                    if row["Influence forte sur Y ?"] == "Oui" and row["Apparaît souvent ?"] == "Oui" and row["Mesurable de façon fiable ?"] == "Oui":
+                        
+                        # Définition de la taille d'échantillon optimale selon les préceptes Lean Six Sigma
+                        taille_n = "n ≥ 30 mesures (Donnée Continue)" if "Temps" in str(row["Métrique cible suggérée"]) else "n ≥ 100 unités (Donnée Discrète)"
+                        
+                        plan_final.append({
+                            "Étape du Processus": row["Étape Source"],
+                            "Variable Prioritaire (X)": row["Variable (X)"],
+                            "Indicateur à mesurer": row["Métrique cible suggérée"],
+                            "Type de donnée": "Continue (Chronométrage)" if "Temps" in str(row["Métrique cible suggérée"]) else "Discrète (Comptage)",
+                            "Méthode / Outil de collecte": "Extraction logs Système / Horodatage manuel" if "Temps" in str(row["Métrique cible suggérée"]) else "Feuille de pointage des défauts",
+                            "Taille Échantillon Requise (n)": taille_n
+                        })
+                
+                st.session_state["final_data_collection_plan"] = plan_final
+                st.success(f"🎯 Algorithme exécuté ! {len(plan_final)} variables prioritaires retiennent l'attention de la collecte.")
                 st.rerun()
 
         # --------------------------------------------------
-        # DIRECTIVES DE DEPLOYEMENT BLACK BELT (GUIDE METHODOLOGIQUE)
+        # AFFICHAGE DU PLAN DE COLLECTE FINAL FILTRÉ ET SÉLECTIONNÉ
         # --------------------------------------------------
-        with st.expander("ℹ️ Directives d'échantillonnage Black Belt (Aide au calcul de n)"):
-            st.markdown("""
-            Pour garantir la validité statistique de vos futures analyses (tests d'hypothèses, ANOVA, cartes de contrôle, analyses de capabilité $Cp/Cpk$), appliquez les règles suivantes lors de la collecte :
+        if "final_data_collection_plan" in st.session_state and st.session_state["final_data_collection_plan"]:
+            st.markdown("### 📋 Étape 2 : Plan de Collecte Actionnable (Filtres Validés)")
+            st.info("💡 Seules les variables combinant **Forte Influence**, **Haute Fréquence** et **Haute Mesurabilité** ont été retenues pour concentrer l'effort de vos équipes.")
             
-            *   **Données Continues (ex. Temps de cycle) :** 
-                *   *Objectif de stabilité :* Un échantillon de **$n \\ge 30$** est requis au minimum (Théorème Central Limite) pour assumer une distribution normale des moyennes.
-                *   *Analyse de Capabilité robuste :* Visez **$n = 100$** à **$125$** points de données collectés de manière rationnelle (ex. 25 sous-groupes de 5).
-            *   **Données Discrètes / Attributs (ex. Nombre de défauts, taux de rebut) :**
-                *   Nécessite des tailles d'échantillons beaucoup plus grandes en raison de la distribution binomiale ou de Poisson.
-                *   *Règle empirique :* Assurez-vous d'observer au moins **5 à 10 défauts** dans votre échantillon total. Si votre taux de défaut est de 5%, visez un échantillon d'au moins $n = 200$ unités.
-            *   **Limitation des biais de mesure (Gage R&R) :**
-                *   Avant de lancer la collecte à grande échelle, assurez-vous que les personnes en charge de collecter la donnée s'accordent sur les définitions opérationnelles (ex. *Quand commence précisément le chronomètre ?*). Un test de capabilité du système de mesure (Gage R&R) est fortement recommandé si la mesure est manuelle.
-            """)
+            df_final_plan = pd.DataFrame(st.session_state["final_data_collection_plan"])
+            
+            st.dataframe(
+                df_final_plan,
+                use_container_width=True,
+                column_config={
+                    "Étape du Processus": st.column_config.TextColumn("Étape ciblée"),
+                    "Variable Prioritaire (X)": st.column_config.TextColumn("Variable validée (X)"),
+                    "Indicateur à mesurer": st.column_config.TextColumn("Ce qu'il faut mesurer"),
+                    "Taille Échantillon Requise (n)": st.column_config.TextColumn("Échantillon (Rigueur LSS)")
+                }
+            )
+            
+            # Export vers l'objet global p pour sauvegarde
+            p["final_data_collection_plan"] = st.session_state["final_data_collection_plan"]
 
         # 4. Validate measurement system
         st.divider()
