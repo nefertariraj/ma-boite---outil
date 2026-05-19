@@ -763,8 +763,10 @@ else:
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
-        # INITIALISATION DYNAMIQUE DE LA STRUCTURE DE PROCESSUS
-        if "vsm_macro_steps" not in p or not p["vsm_macro_steps"]:
+        # --------------------------------------------------
+        # INITIALISATION STRICTE ET PERSISTANTE DANS LE SESSION STATE
+        # --------------------------------------------------
+        if "vsm_macro_steps" not in st.session_state:
             sipoc_data = p.get("sipoc_data", [])
             macro_steps = []
             if isinstance(sipoc_data, list) and len(sipoc_data) > 0:
@@ -775,13 +777,17 @@ else:
             
             if not macro_steps:
                 macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
-            
-            p["vsm_macro_steps"] = macro_steps
+            st.session_state["vsm_macro_steps"] = macro_steps
 
-        if "vsm_detailed_map" not in p:
-            p["vsm_detailed_map"] = {step: [
-                {"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
-            ] for step in p["vsm_macro_steps"]}
+        if "vsm_detailed_map" not in st.session_state:
+            st.session_state["vsm_detailed_map"] = {
+                step: [{"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
+                for step in st.session_state["vsm_macro_steps"]
+            }
+
+        # Pousse les données initiales vers l'objet global 'p' pour la compatibilité avec le reste de votre outil
+        p["vsm_macro_steps"] = st.session_state["vsm_macro_steps"]
+        p["vsm_detailed_map"] = st.session_state["vsm_detailed_map"]
 
         # Fonction de conversion interne sécurisée
         def convert_to_minutes(valeur, unite):
@@ -793,31 +799,64 @@ else:
             except (ValueError, TypeError): 
                 return 0.0
 
+        # --------------------------------------------------
+        # FONCTIONS CALLBACKS (ACTIONS IMMÉDIATES)
+        # --------------------------------------------------
+        def add_section_callback(name, index_pos):
+            clean_name = name.strip()
+            if clean_name and clean_name not in st.session_state["vsm_macro_steps"]:
+                # Insertion à l'index choisi (0 = début, len = fin, etc.)
+                st.session_state["vsm_macro_steps"].insert(index_pos, clean_name)
+                st.session_state["vsm_detailed_map"][clean_name] = [
+                    {"Détail de la tâche": "Première tâche à définir", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
+                ]
+                st.toast(f"ℹ️ Section '{clean_name}' ajoutée avec succès !", icon="➕")
+            elif clean_name in st.session_state["vsm_macro_steps"]:
+                st.toast("⚠️ Cette section existe déjà !", icon="❌")
+
+        def delete_section_callback(step_to_del):
+            if step_to_del in st.session_state["vsm_macro_steps"]:
+                st.session_state["vsm_macro_steps"].remove(step_to_del)
+                if step_to_del in st.session_state["vsm_detailed_map"]:
+                    del st.session_state["vsm_detailed_map"][step_to_del]
+                st.toast(f"ℹ️ Section '{step_to_del}' supprimée.", icon="🗑️")
+
+        # --------------------------------------------------
+        # INTERFACE DE GESTION DU FLUX
+        # --------------------------------------------------
         with st.container(border=True):
             st.markdown("### 🗺️ Gestion du Flux & Décomposition (Lead Time)")
-            st.caption("Pilotez la structure de votre VSM : Créez, modifiez ou supprimez des sections entières pour affiner l'analyse.")
+            st.caption("Pilotez la structure de votre VSM : Créez une section où vous voulez (au début, au milieu, à la fin) ou supprimez-en une instantanément.")
 
-            # --------------------------------------------------
-            # INTERFACE DE CRÉATION DE SECTION (100% NATIVE)
-            # --------------------------------------------------
-            col_add1, col_add2 = st.columns([3, 1])
+            # Zone d'ajout dynamique avec choix de la position
+            col_add1, col_add2, col_add3 = st.columns([3, 2, 1.5])
             with col_add1:
-                new_section_name = st.text_input("📝 Nom de la nouvelle section à ajouter :", placeholder="Ex: 2.bis Contrôle Qualité Intermédiaire", key=f"new_sec_input_{p_idx}")
+                new_sec_name = st.text_input("📝 Nom de la nouvelle section :", placeholder="Ex: 2.bis Contrôle Qualité", key=f"new_input_text_{p_idx}")
             with col_add2:
-                st.write("") # Espace natif pour l'alignement vertical
-                if st.button("➕ Ajouter la section", use_container_width=True, key=f"btn_add_sec_{p_idx}"):
-                    if new_section_name.strip() != "":
-                        clean_new_name = new_section_name.strip()
-                        if clean_new_name not in p["vsm_macro_steps"]:
-                            p["vsm_macro_steps"].append(clean_new_name)
-                            p["vsm_detailed_map"][clean_new_name] = [
-                                {"Détail de la tâche": "Première tâche à définir", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
-                            ]
-                            st.rerun()
-                        else:
-                            st.error("Cette section existe déjà.")
+                # Construction dynamique de la liste des positions d'insertion possibles
+                positions = ["En fin de processus", "Au tout début"]
+                for i, step in enumerate(st.session_state["vsm_macro_steps"]):
+                    positions.append(f"Après : {step}")
+                
+                chosen_pos_text = st.selectbox("📍 Insérer la section :", options=positions, key=f"pos_select_{p_idx}")
+                
+                # Traduction du texte de position en index numérique pour l'insertion
+                if chosen_pos_text == "Au tout début":
+                    insert_idx = 0
+                elif chosen_pos_text == "En fin de processus":
+                    insert_idx = len(st.session_state["vsm_macro_steps"])
+                else:
+                    selected_step = chosen_pos_text.replace("Après : ", "")
+                    insert_idx = st.session_state["vsm_macro_steps"].index(selected_step) + 1
+
+            with col_add3:
+                st.write("") # Équilibre de l'alignement vertical
+                if st.button("➕ Créer la section", use_container_width=True, key=f"btn_create_{p_idx}"):
+                    if new_sec_name.strip():
+                        add_section_callback(new_sec_name, insert_idx)
+                        st.rerun()
                     else:
-                        st.warning("Veuillez saisir un nom valide.")
+                        st.warning("Nom invalide.")
 
             st.markdown("---")
 
@@ -831,8 +870,8 @@ else:
             section_totals_display = {}
 
             # Pré-calcul des totaux pour l'affichage en amont dans les titres
-            for step in p["vsm_macro_steps"]:
-                sub_tasks = p["vsm_detailed_map"].get(step, [])
+            for step in st.session_state["vsm_macro_steps"]:
+                sub_tasks = st.session_state["vsm_detailed_map"].get(step, [])
                 sub_df = pd.DataFrame(sub_tasks)
                 s_min = 0.0
                 if not sub_df.empty and "Valeur" in sub_df.columns and "Unité" in sub_df.columns:
@@ -841,12 +880,10 @@ else:
                 section_totals_display[step] = s_min
 
             # --------------------------------------------------
-            # BOUCLE DYNAMIQUE : AFFICHAGE, ÉDITION & SUPPRESSION
+            # BOUCLE DYNAMIQUE D'AFFICHAGE DES SECTIONS
             # --------------------------------------------------
-            current_steps = list(p["vsm_macro_steps"])
-            
-            for idx_step, step in enumerate(current_steps):
-                sub_tasks = p["vsm_detailed_map"].get(step, [])
+            for idx_step, step in enumerate(st.session_state["vsm_macro_steps"]):
+                sub_tasks = st.session_state["vsm_detailed_map"].get(step, [])
                 if not sub_tasks:
                     sub_tasks = [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
 
@@ -857,24 +894,22 @@ else:
                 elif current_sec_min >= 60: t_text = f"{current_sec_min/60:.1f} h"
                 else: t_text = f"{current_sec_min:.1f} min"
 
-                # Ligne de titre de section avec son bouton Supprimer natif
+                # Ligne de titre + Bouton Supprimer
                 col_title, col_del = st.columns([5, 1])
                 with col_title:
                     st.markdown(f"#### 📦 Section {idx_step + 1} : {step} `⏱️ Total: {t_text}`")
                 with col_del:
-                    st.write("") # Alignement
-                    if st.button("🗑️ Supprimer", key=f"del_sec_{idx_step}_{p_idx}", use_container_width=True, help=f"Supprimer la section: {step}"):
-                        p["vsm_macro_steps"].remove(step)
-                        if step in p["vsm_detailed_map"]:
-                            del p["vsm_detailed_map"][step]
+                    st.write("") 
+                    if st.button("🗑️ Supprimer", key=f"del_sec_{idx_step}_{p_idx}", use_container_width=True):
+                        delete_section_callback(step)
                         st.rerun()
 
-                # Éditeur de données de sous-tâches
+                # Éditeur de données (Data Editor)
                 edited_df = st.data_editor(
                     df_sub,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_v10_{idx_step}_{p_idx}",
+                    key=f"vsm_editor_v11_{idx_step}_{p_idx}",
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des micro-tâches", width="large"),
                         "Valeur": st.column_config.NumberColumn("Délai", min_value=0.0, format="%.1f", width="small", required=True),
@@ -887,10 +922,12 @@ else:
                     }
                 )
 
+                # Extraction immédiate vers la map mise à jour
                 cleaned_records = edited_df.dropna(subset=["Détail de la tâche"]).to_dict('records')
                 updated_map[step] = cleaned_records
+                st.session_state["vsm_detailed_map"][step] = cleaned_records
 
-                # Calcul des agrégations globales
+                # Cumul global pour les indicateurs
                 if not edited_df.empty and "Valeur" in edited_df.columns and "Unité" in edited_df.columns:
                     for _, row in edited_df.iterrows():
                         t_min = convert_to_minutes(row.get("Valeur", 0), row.get("Unité", "Minutes"))
@@ -903,37 +940,37 @@ else:
 
                 st.markdown("---")
 
-            # Bouton d'enregistrement global
-            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v10_{p_idx}"):
-                p["vsm_detailed_map"] = updated_map
+            # Sauvegarde finale manuelle pour figer les modifications dans l'objet principal
+            if st.button("💾 Enregistrer définitivement la Cartographie", key=f"save_vsm_map_v11_{p_idx}"):
+                p["vsm_macro_steps"] = list(st.session_state["vsm_macro_steps"])
+                p["vsm_detailed_map"] = dict(st.session_state["vsm_detailed_map"])
                 if "voc_raw_data" in st.session_state:
                     p["saved_voc_dict"] = st.session_state["voc_raw_data"].to_dict('records')
-                st.success("🎯 Structure et données enregistrées avec succès.")
+                st.success("🎯 Structure VSM enregistrée avec succès.")
 
             # ==========================================
-            # RENDU DU SCHÉMA VSM RÉSUMÉ (100% NATIF)
+            # RENDU VISUEL DU SCHÉMA VSM RÉSUMÉ
             # ==========================================
             st.markdown("### 🗺️ Schéma Value Stream Mapping (VSM) Résumé")
             
-            if len(p["vsm_macro_steps"]) > 0:
-                vsm_cols = st.columns(len(p["vsm_macro_steps"]))
-                for i, step in enumerate(p["vsm_macro_steps"]):
+            if len(st.session_state["vsm_macro_steps"]) > 0:
+                vsm_cols = st.columns(len(st.session_state["vsm_macro_steps"]))
+                for i, step in enumerate(st.session_state["vsm_macro_steps"]):
                     with vsm_cols[i]:
                         sec_min = section_totals_display.get(step, 0.0)
                         tasks_count = len(updated_map.get(step, []))
                         short_name = str(step)[:15] + "..." if len(str(step)) > 15 else str(step)
                         
-                        # Blocs visuels robustes utilisant des conteneurs natifs
                         with st.container(border=True):
                             st.markdown(f"**🔹 ÉTAPE {i+1}**")
                             st.caption(f"*{short_name}*")
-                            st.markdown(f"📋 `{tasks_count} tâche(s)`")
-                            st.code(f"{sec_min:.1f} min", language="text")
+                            st.markdown(f"📋 `{tasks_count} tsk`")
+                            st.code(f"{sec_min:.1f} m", language="text")
 
-            # Fil d'Ariane / Timeline du flux
+            # Timeline
             st.markdown("#### ⏱️ Ligne de temps du Flux (Value Stream Timeline)")
             timeline_markdown = ""
-            for i, step in enumerate(p["vsm_macro_steps"]):
+            for i, step in enumerate(st.session_state["vsm_macro_steps"]):
                 sec_min = section_totals_display.get(step, 0.0)
                 short_name = str(step)[:20] + "..." if len(str(step)) > 20 else str(step)
                 timeline_markdown += f"**[{i+1}] {short_name}** ({sec_min:.1f} min) `——➡️` "
