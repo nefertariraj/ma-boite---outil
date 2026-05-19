@@ -759,12 +759,11 @@ else:
         # ==========================================
         st.subheader("2. Current State Detailed Process Map")
 
-        # [PERSISTANCE VOC] Sécurité pour le rechargement
+        # [PERSISTANCE VOC] Sécurité pour le rechargement automatique
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
         # INITIALISATION DYNAMIQUE DE LA STRUCTURE DE PROCESSUS
-        # Si elle n'existe pas, on tente de la bâtir sur le SIPOC, sinon sur un modèle standard
         if "vsm_macro_steps" not in p or not p["vsm_macro_steps"]:
             sipoc_data = p.get("sipoc_data", [])
             macro_steps = []
@@ -781,7 +780,7 @@ else:
 
         if "vsm_detailed_map" not in p:
             p["vsm_detailed_map"] = {step: [
-                {"Détail de la tâche": f"Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
+                {"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
             ] for step in p["vsm_macro_steps"]}
 
         # Fonction de conversion interne sécurisée
@@ -799,13 +798,13 @@ else:
             st.caption("Pilotez la structure de votre VSM : Créez, modifiez ou supprimez des sections entières pour affiner l'analyse.")
 
             # --------------------------------------------------
-            # [NOUVEAU] INTERFACE DE CRÉATION DE SECTION
+            # INTERFACE DE CRÉATION DE SECTION (100% NATIVE)
             # --------------------------------------------------
             col_add1, col_add2 = st.columns([3, 1])
             with col_add1:
                 new_section_name = st.text_input("📝 Nom de la nouvelle section à ajouter :", placeholder="Ex: 2.bis Contrôle Qualité Intermédiaire", key=f"new_sec_input_{p_idx}")
             with col_add2:
-                st.markdown("<div style='padding-top:24px;'></div>", unsafe_html=True) # Alignement vertical
+                st.write("") # Espace natif pour l'alignement vertical
                 if st.button("➕ Ajouter la section", use_container_width=True, key=f"btn_add_sec_{p_idx}"):
                     if new_section_name.strip() != "":
                         clean_new_name = new_section_name.strip()
@@ -831,7 +830,7 @@ else:
             
             section_totals_display = {}
 
-            # Pré-calcul des totaux pour l'affichage dynamique
+            # Pré-calcul des totaux pour l'affichage en amont dans les titres
             for step in p["vsm_macro_steps"]:
                 sub_tasks = p["vsm_detailed_map"].get(step, [])
                 sub_df = pd.DataFrame(sub_tasks)
@@ -842,9 +841,8 @@ else:
                 section_totals_display[step] = s_min
 
             # --------------------------------------------------
-            # BOUCLE DYNAMIQUE : AFFICHAGE & ÉDITION (AVEC SUPPRESSION)
+            # BOUCLE DYNAMIQUE : AFFICHAGE, ÉDITION & SUPPRESSION
             # --------------------------------------------------
-            # On crée une copie de la liste pour pouvoir la modifier durant la boucle si suppression
             current_steps = list(p["vsm_macro_steps"])
             
             for idx_step, step in enumerate(current_steps):
@@ -859,25 +857,24 @@ else:
                 elif current_sec_min >= 60: t_text = f"{current_sec_min/60:.1f} h"
                 else: t_text = f"{current_sec_min:.1f} min"
 
-                # Layout de ligne pour le Titre de la Section + Son bouton Supprimer
+                # Ligne de titre de section avec son bouton Supprimer natif
                 col_title, col_del = st.columns([5, 1])
                 with col_title:
                     st.markdown(f"#### 📦 Section {idx_step + 1} : {step} `⏱️ Total: {t_text}`")
                 with col_del:
-                    st.markdown("<div style='padding-top:5px;'></div>", unsafe_html=True)
-                    # [NOUVEAU] Bouton de suppression de la section
-                    if st.button("🗑️ Supprimer", key=f"del_sec_{idx_step}_{p_idx}", use_container_width=True, help=f"Supprimer définitivement la section: {step}"):
+                    st.write("") # Alignement
+                    if st.button("🗑️ Supprimer", key=f"del_sec_{idx_step}_{p_idx}", use_container_width=True, help=f"Supprimer la section: {step}"):
                         p["vsm_macro_steps"].remove(step)
                         if step in p["vsm_detailed_map"]:
                             del p["vsm_detailed_map"][step]
                         st.rerun()
 
-                # Éditeur de données pour insérer/supprimer des lignes de tâches à la volée
+                # Éditeur de données de sous-tâches
                 edited_df = st.data_editor(
                     df_sub,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_v9_{idx_step}_{p_idx}",
+                    key=f"vsm_editor_v10_{idx_step}_{p_idx}",
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des micro-tâches", width="large"),
                         "Valeur": st.column_config.NumberColumn("Délai", min_value=0.0, format="%.1f", width="small", required=True),
@@ -890,11 +887,10 @@ else:
                     }
                 )
 
-                # Nettoyage et stockage des données modifiées
                 cleaned_records = edited_df.dropna(subset=["Détail de la tâche"]).to_dict('records')
                 updated_map[step] = cleaned_records
 
-                # Calcul des indicateurs globaux cumulés
+                # Calcul des agrégations globales
                 if not edited_df.empty and "Valeur" in edited_df.columns and "Unité" in edited_df.columns:
                     for _, row in edited_df.iterrows():
                         t_min = convert_to_minutes(row.get("Valeur", 0), row.get("Unité", "Minutes"))
@@ -907,15 +903,15 @@ else:
 
                 st.markdown("---")
 
-            # Bouton de sauvegarde globale de l'état de l'arbre VSM
-            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v9_{p_idx}"):
+            # Bouton d'enregistrement global
+            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v10_{p_idx}"):
                 p["vsm_detailed_map"] = updated_map
                 if "voc_raw_data" in st.session_state:
                     p["saved_voc_dict"] = st.session_state["voc_raw_data"].to_dict('records')
-                st.success("🎯 Structure des processus mise à jour et enregistrée avec succès !")
+                st.success("🎯 Structure et données enregistrées avec succès.")
 
             # ==========================================
-            # RENDU DU SCHÉMA VSM RÉSUMÉ
+            # RENDU DU SCHÉMA VSM RÉSUMÉ (100% NATIF)
             # ==========================================
             st.markdown("### 🗺️ Schéma Value Stream Mapping (VSM) Résumé")
             
@@ -927,13 +923,14 @@ else:
                         tasks_count = len(updated_map.get(step, []))
                         short_name = str(step)[:15] + "..." if len(str(step)) > 15 else str(step)
                         
+                        # Blocs visuels robustes utilisant des conteneurs natifs
                         with st.container(border=True):
                             st.markdown(f"**🔹 ÉTAPE {i+1}**")
                             st.caption(f"*{short_name}*")
                             st.markdown(f"📋 `{tasks_count} tâche(s)`")
                             st.code(f"{sec_min:.1f} min", language="text")
 
-            # Ligne de temps du Flux en cascade
+            # Fil d'Ariane / Timeline du flux
             st.markdown("#### ⏱️ Ligne de temps du Flux (Value Stream Timeline)")
             timeline_markdown = ""
             for i, step in enumerate(p["vsm_macro_steps"]):
@@ -944,7 +941,7 @@ else:
             if timeline_markdown:
                 st.info(timeline_markdown.rstrip(" `——➡️` "))
 
-            # Indicateurs globaux finaux
+            # Rapports Métriques Globaux du Lead Time
             st.markdown("### 📊 Rapports Globaux du Processus")
             pce = (total_va_global_min / total_process_lead_time_min * 100) if total_process_lead_time_min > 0 else 0.0
             
