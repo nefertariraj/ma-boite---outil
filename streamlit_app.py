@@ -1021,162 +1021,241 @@ else:
 
         # 3. Lean Six Sigma Data Collection Plan (Y = f(X))
         # ==========================================
-        st.subheader("3. Lean Six Sigma Data Collection Plan")
+        st.subheader("3. Master Black Belt Data Collection Plan")
         
         st.markdown("""
-        ### 📊 Alignement Top-Down : $Y = f(X)$ & Matrice de Priorisation
-        En tant que **Black Belt**, toute collecte doit être justifiée. Nous partons du **$Y$ global (Lead Time total du processus)** et nous listons les **$X$ (causes potentielles de variabilité)** identifiés dans votre *Detailed Process Map*.
-        
-        Chaque $X$ est soumis au filtre des 3 questions clés pour déterminer s'il doit être mesuré en priorité :
-        1. **Influence :** Le $X$ influence-t-il fortement le $Y$ ?
-        2. **Fréquence :** Le $X$ apparaît-il souvent ?
-        3. **Mesurabilité :** Peut-on mesurer le $X$ de façon fiable ?
+        ### 📊 Alignement Stratégique $Y = f(X)$ & Matrice de Collecte Phase Measure
+        En tant que **Master Black Belt**, ce module structure votre plan de collecte de données terrain de manière rigoureuse. 
+        L'algorithme extrait automatiquement les **$X$ potentiels** de votre *Detailed Process Map* en isolant les **NVA**, les **gaspillages Lean (Muda)**, les **boucles de retouches (Rework)** et les **goulots d'étranglement**.
         """)
 
-        # Récupération des données réelles du VSM depuis le session_state
+        # --------------------------------------------------
+        # RECUPÉRATION SÉCURISÉE DES DONNÉES DU PROCESS MAP
+        # --------------------------------------------------
         vsm_steps = st.session_state.get("vsm_macro_steps", [])
         vsm_detailed = st.session_state.get("vsm_detailed_map", {})
         vsm_totals = st.session_state.get("vsm_totals", {})
         section_totals = vsm_totals.get("section_totals", {})
 
-        # --------------------------------------------------
-        # INVENTAIRE AUTOMATIQUE DES X VISIBLES DANS LE PROCESSUS
-        # --------------------------------------------------
-        liste_x_potentiels = []
-
+        # Inventaire automatique complet des X potentiels basés sur les gaspillages Lean
+        extracted_x_list = []
+        
         if vsm_steps:
-            # Recherche du goulot d'étranglement principal
+            # 1. Identification du Goulot (Théorie des Contraintes)
             if section_totals:
                 highest_step = max(section_totals, key=section_totals.get)
-                liste_x_potentiels.append({
-                    "Étape Source": highest_step,
-                    "Variable (X)": f"Temps de traitement sur le goulot ({highest_step})",
-                    "Catégorie": "Goulot d'étranglement",
-                    "Description": "Étape avec le Lead Time le plus élevé du flux actuel."
-                })
+                if section_totals[highest_step] > 0:
+                    extracted_x_list.append({
+                        "etape": highest_step,
+                        "variable": f"Temps de cycle unitaire sur le goulot - {highest_step}",
+                        "muda": "Surproduction / Capacité",
+                        "description": "L'étape la plus longue qui limite le débit global du processus."
+                    })
 
-            # Extraction des NVA, Attentes et Retouches de la map détaillée
+            # 2. Scan sémantique et par catégorie de la carte détaillée
             for step in vsm_steps:
                 tasks = vsm_detailed.get(step, [])
                 for t in tasks:
-                    desc_tache = t.get("Détail de la tâche", "")
+                    desc_tache = str(t.get("Détail de la tâche", ""))
                     type_act = t.get("Type d'activité", "")
+                    desc_lower = desc_tache.lower()
                     
-                    if type_act == "Temps d'attente / Stock":
-                        liste_x_potentiels.append({
-                            "Étape Source": step,
-                            "Variable (X)": f"Temps d'attente avant/pendant : {desc_tache}",
-                            "Catégorie": "Attente / File",
-                            "Description": "Temps mort générant du stockage d'en-cours (WIP)."
+                    if not desc_tache or desc_tache == "Sous-tâche initiale" or desc_tache == "Première tâche à définir":
+                        continue
+
+                    # Isolation des Attentes / Files d'attente
+                    if type_act == "Temps d'attente / Stock" or any(kw in desc_lower for kw in ["attente", "file", "stock", "bloqué", "en cours", "wip"]):
+                        extracted_x_list.append({
+                            "etape": step,
+                            "variable": f"Temps de stagnation de la tâche : {desc_tache}",
+                            "muda": "Attente (Waiting)",
+                            "description": "Temps mort générant des délais inter-processus et du gonflement d'en-cours."
                         })
-                    elif type_act == "NVA (Non Valeur Ajoutée)":
-                        # Détection intelligente des boucles de retouches ou gaspillages par mots-clés
-                        is_rework = any(kw in desc_tache.lower() for kw in ["retouche", "correction", "refaire", "erreur", "rework", "rejet"])
-                        cat = "Retouche / Rebut" if is_rework else "NVA / Gaspillage"
-                        liste_x_potentiels.append({
-                            "Étape Source": step,
-                            "Variable (X)": f"Impact de la tâche : {desc_tache}",
-                            "Catégorie": cat,
-                            "Description": "Action n'apportant pas de valeur directe perçue par le client."
+                    
+                    # Isolation des Retouches / Corrections / Rework
+                    elif type_act == "NVA (Non Valeur Ajoutée)" and any(kw in desc_lower for kw in ["retouche", "correction", "refaire", "erreur", "rework", "rejet", "validation", "approbation", "signature"]):
+                        muda_type = "Défauts / Retouches" if "validation" not in desc_lower else "Sur-traitement (Overprocessing)"
+                        extracted_x_list.append({
+                            "etape": step,
+                            "variable": f"Fréquence et temps de traitement de : {desc_tache}",
+                            "muda": muda_type,
+                            "description": "Boucle de retravail ou rupture de flux pour validation hiérarchique."
+                        })
+                    
+                    # Isolation des Déplacements / Transports
+                    elif any(kw in desc_lower for kw in ["déplacement", "transport", "envoi", "transfert", "aller", "retour"]):
+                        extracted_x_list.append({
+                            "etape": step,
+                            "variable": f"Distance ou temps de transfert : {desc_tache}",
+                            "muda": "Transport / Mouvement",
+                            "description": "Rupture physique ou numérique obligeant au transfert d'informations."
                         })
 
-        # Back-up si la map détaillée n'est pas encore complétée
-        if not liste_x_potentiels:
-            liste_x_potentiels = [
-                {"Étape Source": "1. Réception & Tri", "Variable (X)": "Dossiers incomplets / Erreurs de saisie", "Catégorie": "Retouche / Rebut", "Description": "Données manquantes obligeant à relancer le demandeur."},
-                {"Étape Source": "3. Traitement & Analyse", "Variable (X)": "Temps d'attente de validation managériale", "Catégorie": "Attente / File", "Description": "Dossiers bloqués dans la boîte de validation."}
+        # Données de repli (Fallback réglementaire LSS) si le VSM est vide ou initial
+        if not extracted_x_list:
+            extracted_x_list = [
+                {"etape": "1. Réception & Tri", "variable": "Taux d'erreurs et de dossiers incomplets à l'entrée", "muda": "Défauts / Retouches", "description": "Qualité de l'information entrante générant des demandes de compléments."},
+                {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation par la hiérarchie", "muda": "Attente (Waiting)", "description": "Dossier en attente dans une file d'approbation numérique."},
+                {"etape": "3. Traitement & Analyse", "variable": "Nombre de boucles de retravail (Rework)", "muda": "Défauts / Retouches", "description": "Non-conformité obligeant à refaire l'analyse initiale."}
             ]
 
         # --------------------------------------------------
-        # INTELLIGENCE DE PRIORISATION (EVALUATION DES 3 QUESTIONS)
+        # ETAPE 1 : MATRICE DE PRIORISATION INTELLIGENTE DES X (FILTRES MBB)
         # --------------------------------------------------
-        # Initialisation dans le session_state pour éviter les resets de saisie
-        if "matrix_x_prioritization" not in st.session_state:
-            initial_matrix = []
-            for item in liste_x_potentiels:
-                # L'IA/Règle pré-remplit à "Oui" les éléments critiques (Goulots et Retouches) pour guider l'utilisateur
-                is_critique = item["Catégorie"] in ["Goulot d'étranglement", "Retouche / Rebut"]
-                initial_matrix.append({
-                    "Étape Source": item["Étape Source"],
-                    "Variable (X)": item["Variable (X)"],
-                    "Catégorie": item["Catégorie"],
-                    "Influence forte sur Y ?": "Oui" if is_critique else "À évaluer",
-                    "Apparaît souvent ?": "Oui" if is_critique else "À évaluer",
-                    "Mesurable de façon fiable ?": "Oui",
-                    "Métrique cible suggérée": "Temps de cycle (min)" if "Temps" in item["Catégorie"] else "Taux de défaut (%) / Fréquence"
+        if "mbb_prioritization_matrix" not in st.session_state:
+            initial_prio = []
+            for item in extracted_x_list:
+                initial_prio.append({
+                    "Étape Source": item["etape"],
+                    "Variable Potentielle (X)": item["variable"],
+                    "Gaspillage / Muda": item["muda"],
+                    "1. Influence fortement le Y ?": "Oui" if item["muda"] in ["Attente (Waiting)", "Défauts / Retouches", "Surproduction / Capacité"] else "Non",
+                    "2. Apparaît souvent ?": "Oui",
+                    "3. Peut-on mesurer fiablement ?": "Oui",
+                    "Utilité Analytique (Futur Test d'Hypothèse)": f"Démontrer la corrélation mathématique avec la variation du Lead Time global."
                 })
-            st.session_state["matrix_x_prioritization"] = initial_matrix
+            st.session_state["mbb_prioritization_matrix"] = initial_prio
 
         with st.container(border=True):
-            st.markdown("### 🧠 Étape 1 : Matrice de Décision Black Belt ($X$ les plus influents)")
-            st.caption("Répondez aux 3 questions filtres pour chaque X. L'algorithme qualifiera automatiquement les variables à mesurer.")
+            st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
+            st.caption("Passez chaque variable au crible des 3 questions filtres fondamentales. Seuls les X validant l'ensemble des critères passeront dans le Data Collection Plan final.")
 
-            df_priorisation = pd.DataFrame(st.session_state["matrix_x_prioritization"])
+            df_prio = pd.DataFrame(st.session_state["mbb_prioritization_matrix"])
 
-            # Éditeur interactif de la matrice de filtrage
-            edited_priorisation_df = st.data_editor(
-                df_priorisation,
+            # Éditeur interactif de filtrage
+            edited_prio_df = st.data_editor(
+                df_prio,
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"x_prior_editor_{p_idx}",
+                key=f"mbb_prio_editor_{p_idx}",
                 column_config={
-                    "Étape Source": st.column_config.TextColumn("Étape", disabled=True, width="medium"),
-                    "Variable (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
-                    "Catégorie": st.column_config.TextColumn("Type", disabled=True, width="small"),
-                    "Influence forte sur Y ?": st.column_config.SelectboxColumn("1. Influence forte ?", options=["Oui", "Non", "À évaluer"], width="small"),
-                    "Apparaît souvent ?": st.column_config.SelectboxColumn("2. Fréquent ?", options=["Oui", "Non", "À évaluer"], width="small"),
-                    "Mesurable de façon fiable ?": st.column_config.SelectboxColumn("3. Mesurable ?", options=["Oui", "Non"], width="small"),
-                    "Métrique cible suggérée": st.column_config.TextColumn("Indicateur de mesure", width="medium")
+                    "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
+                    "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
+                    "Gaspillage / Muda": st.column_config.TextColumn("Type de Muda", disabled=True, width="medium"),
+                    "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"], width="small"),
+                    "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"], width="small"),
+                    "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"], width="small"),
+                    "Utilité Analytique (Futur Test d'Hypothèse)": st.column_config.TextColumn("Utilité Future", width="large")
                 }
             )
 
-            # Bouton de calcul et de bascule vers le plan de collecte final
-            if st.button("⚙️ Calculer et Générer le Plan de Collecte Ciblé", type="primary", use_container_width=True, key=f"btn_calc_plan_{p_idx}"):
-                st.session_state["matrix_x_prioritization"] = edited_priorisation_df.to_dict('records')
+            # Rerunning et mise à jour dynamique de la structure des X validés
+            if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{p_idx}"):
+                st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
                 
-                # Filtrage Black Belt : Prioriser uniquement les X qui valident le triptyque (Influence = Oui AND Fréquence = Oui AND Mesurable = Oui)
-                plan_final = []
-                for row in st.session_state["matrix_x_prioritization"]:
-                    if row["Influence forte sur Y ?"] == "Oui" and row["Apparaît souvent ?"] == "Oui" and row["Mesurable de façon fiable ?"] == "Oui":
+                # Génération de la matrice réglementaire à 16 colonnes pour les éléments validés (Oui / Oui / Oui)
+                dcp_final_rows = []
+                for row in st.session_state["mbb_prioritization_matrix"]:
+                    if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
                         
-                        # Définition de la taille d'échantillon optimale selon les préceptes Lean Six Sigma
-                        taille_n = "n ≥ 30 mesures (Donnée Continue)" if "Temps" in str(row["Métrique cible suggérée"]) else "n ≥ 100 unités (Donnée Discrète)"
+                        # Déduction logique du type de métrique
+                        var_name = str(row["Variable Potentielle (X)"])
+                        is_time = any(kw in var_name.lower() for kw in ["temps", "délai", "stagnation", "durée"])
                         
-                        plan_final.append({
-                            "Étape du Processus": row["Étape Source"],
-                            "Variable Prioritaire (X)": row["Variable (X)"],
-                            "Indicateur à mesurer": row["Métrique cible suggérée"],
-                            "Type de donnée": "Continue (Chronométrage)" if "Temps" in str(row["Métrique cible suggérée"]) else "Discrète (Comptage)",
-                            "Méthode / Outil de collecte": "Extraction logs Système / Horodatage manuel" if "Temps" in str(row["Métrique cible suggérée"]) else "Feuille de pointage des défauts",
-                            "Taille Échantillon Requise (n)": taille_n
+                        dcp_final_rows.append({
+                            "Variable à mesurer": var_name,
+                            "Objectif de mesure": f"Quantifier la variance et l'impact de ce Muda sur le processus.",
+                            "Lien avec le Y": "Contribution directe au Lead Time Global (Y) par allongement du temps de traversée.",
+                            "Définition opérationnelle exacte": f"Chrono démarré au moment exact du début de l'action/attente et stoppé à sa complétion complète.",
+                            "Type de donnée": "Continue (Temps)" if is_time else "Discrète (Défauts / Attributaire)",
+                            "Unité": "Minutes" if is_time else "Nombre d'occurrences",
+                            "Source de donnée": "Système d'information (Logs) / Saisie terrain",
+                            "Méthode de collecte": "Extraction automatique de base de données" if is_time else "Feuille de pointage standardisée (Checksheet)",
+                            "Point de mesure dans le processus": row["Étape Source"],
+                            "Responsable collecte": "Pilote du Processus / Opérateur Terrain",
+                            "Fréquence": "En continu (Temps réel)" if is_time else "Quotidienne",
+                            "Taille échantillon": "n ≥ 30 mesures minimum" if is_time else "n ≥ 100 transactions",
+                            "Période de collecte": "2 semaines glissantes",
+                            "Outil utilisé": "Application Web / Fiche Excel partagée",
+                            "Risques de biais": "Effet Hawthorne (modification du comportement des opérateurs observés)",
+                            "Méthode de contrôle qualité des données": "Audit à blanc au jour 2 / Test Gage R&R ou Kappa linguistique si saisie humaine"
                         })
                 
-                st.session_state["final_data_collection_plan"] = plan_final
-                st.success(f"🎯 Algorithme exécuté ! {len(plan_final)} variables prioritaires retiennent l'attention de la collecte.")
+                st.session_state["master_dcp_table"] = dcp_final_rows
+                st.toast(f"🎯 Plan de collecte généré avec {len(dcp_final_rows)} variables critiques !", icon="🚀")
                 st.rerun()
 
         # --------------------------------------------------
-        # AFFICHAGE DU PLAN DE COLLECTE FINAL FILTRÉ ET SÉLECTIONNÉ
+        # ETAPE 2 : LE TABLEAU OFFICIEL DU DATA COLLECTION PLAN (16 COLONNES)
         # --------------------------------------------------
-        if "final_data_collection_plan" in st.session_state and st.session_state["final_data_collection_plan"]:
-            st.markdown("### 📋 Étape 2 : Plan de Collecte Actionnable (Filtres Validés)")
-            st.info("💡 Seules les variables combinant **Forte Influence**, **Haute Fréquence** et **Haute Mesurabilité** ont été retenues pour concentrer l'effort de vos équipes.")
+        if "master_dcp_table" in st.session_state and st.session_state["master_dcp_table"]:
+            st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
+            st.caption("Cette matrice constitue le livrable réglementaire pour votre jalon de validation DMAIC. Modifiez les cellules pour affiner les paramètres terrain.")
             
-            df_final_plan = pd.DataFrame(st.session_state["final_data_collection_plan"])
+            df_dcp = pd.DataFrame(st.session_state["master_dcp_table"])
             
-            st.dataframe(
-                df_final_plan,
+            edited_dcp_df = st.data_editor(
+                df_dcp,
+                num_rows="dynamic",
                 use_container_width=True,
+                key=f"mbb_dcp_matrix_editor_{p_idx}",
                 column_config={
-                    "Étape du Processus": st.column_config.TextColumn("Étape ciblée"),
-                    "Variable Prioritaire (X)": st.column_config.TextColumn("Variable validée (X)"),
-                    "Indicateur à mesurer": st.column_config.TextColumn("Ce qu'il faut mesurer"),
-                    "Taille Échantillon Requise (n)": st.column_config.TextColumn("Échantillon (Rigueur LSS)")
+                    "Variable à mesurer": st.column_config.TextColumn("Variable (X)", required=True, width="large"),
+                    "Objectif de mesure": st.column_config.TextColumn("Objectif de mesure", width="medium"),
+                    "Lien avec le Y": st.column_config.TextColumn("Lien avec le Y", width="medium"),
+                    "Définition opérationnelle exacte": st.column_config.TextColumn("Définition Opérationnelle", width="large"),
+                    "Type de donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Temps)", "Discrète (Défauts / Attributaire)", "Discrète (Comptage)", "Catégorielle"], width="medium"),
+                    "Unité": st.column_config.TextColumn("Unité", width="small"),
+                    "Source de donnée": st.column_config.TextColumn("Source", width="small"),
+                    "Méthode de collecte": st.column_config.TextColumn("Méthode de collecte", width="medium"),
+                    "Point de mesure dans le processus": st.column_config.TextColumn("Point de mesure", width="medium"),
+                    "Responsable collecte": st.column_config.TextColumn("Responsable", width="small"),
+                    "Fréquence": st.column_config.TextColumn("Fréquence", width="small"),
+                    "Taille échantillon": st.column_config.TextColumn("Échantillon (n)", width="small"),
+                    "Période de collecte": st.column_config.TextColumn("Période", width="small"),
+                    "Outil utilisé": st.column_config.TextColumn("Outil utilisé", width="small"),
+                    "Risques de biais": st.column_config.TextColumn("Risque de Biais", width="medium"),
+                    "Méthode de contrôle qualité des données": st.column_config.TextColumn("Contrôle Qualité de la Donnée", width="large")
                 }
             )
+
+            if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{p_idx}"):
+                st.session_state["master_dcp_table"] = edited_dcp_df.to_dict('records')
+                p["final_mbb_dcp"] = st.session_state["master_dcp_table"]
+                st.success("🎯 Spécifications de collecte terrain enregistrées avec succès.")
+
+            st.markdown("---")
+
+            # --------------------------------------------------
+            # ETAPE 3 : RECOMMANDATIONS TERRAIN ET DIRECTIVES GAGE R&R
+            # --------------------------------------------------
+            st.markdown("### 🗺️ 2. Recommandations de Collecte Terrain & Gestion des Biais")
             
-            # Export vers l'objet global p pour sauvegarde
-            p["final_data_collection_plan"] = st.session_state["final_data_collection_plan"]
+            c_rec1, c_rec2 = st.columns(2)
+            with c_rec1:
+                with st.container(border=True):
+                    st.markdown("#### 🚨 Maîtrise des Risques de Subjectivité & Interprétation")
+                    st.markdown("""
+                    *   **Suppression des définitions ambiguës :** Pour les données discrètes/attributaires (ex. Dossier non conforme), publiez un *catalogue des défauts* visuel. Si deux opérateurs interprètent un défaut différemment, votre système de mesure est inutile.
+                    *   **Lutte contre l'Effet Hawthorne :** Lorsque les équipes se savent observées ou chronométrées, les performances s'améliorent artificiellement de 10 à 15%. Privilégiez les collectes en tâche de fond (système) ou automatisez l'enregistrement sans présence physique pesante du Black Belt.
+                    *   **Procédures de Contrôle Qualité :** Réalisez un audit complet des données dès le deuxième jour (*Day-2 Review*). Comparez les 20 premières lignes saisies avec la réalité pour corriger immédiatement les dérives de compréhension.
+                    """)
+            
+            with c_rec2:
+                with st.container(border=True):
+                    st.markdown("#### 📐 Validation de la Fiabilité (Rigueur Master Black Belt)")
+                    st.markdown("""
+                    Avant d'utiliser ces données pour des tests statistiques avancés dans la phase *Analyze*, vous devez obligatoirement valider la capabilité de votre système de mesure :
+                    *   **Pour les Données Continues (Temps de cycle, délais) :** Réalisez une étude **Gage R&R (Répétabilité & Reproductibilité)**. La variance de votre outil de mesure doit représenter moins de 10% de la tolérance totale du processus.
+                    *   **Pour les Données Attributaires (Conforme / Non conforme) :** Déployez un **Test d'accord d'attributs (Attribute Agreement Analysis)** en calculant le coefficient **Kappa de Fleiss**. Un score inférieur à **0.70** indique un besoin immédiat de standardisation et de requalification des contrôleurs.
+                    """)
+
+            # --------------------------------------------------
+            # ETAPE 4 : POINTS CRITIQUES À SURVEILLER (CHECKLIST)
+            # --------------------------------------------------
+            st.markdown("### ⚠️ 3. Points Critiques à Surveiller pour le Jalon Measure")
+            
+            with st.container(border=True):
+                col_chk1, col_chk2, col_chk3 = st.columns(3)
+                with col_chk1:
+                    st.checkbox("Zéro Donnée Inutile (Muda de stockage)", value=True, disabled=True, help="Chaque ligne collectée est directement mappée à un futur test statistique d'impact sur le Y.")
+                    st.checkbox("Définitions Opérationnelles figées", value=False, help="Chaque contributeur de la collecte sait exactement à quelle milliseconde le chronomètre démarre et s'arrête.")
+                with col_chk2:
+                    st.checkbox("Taille d'échantillon statistiquement valide", value=False, help="Règle du TCL respectée : n ≥ 30 pour les distributions continues, échantillon large pour le calcul du FTY.")
+                    st.checkbox("Découplage des boucles de validation", value=False, help="Les délais d'attente de signature sont isolés du temps de traitement pur (Touch Time).")
+                with col_chk3:
+                    st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
+                    st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
 
         # 4. Validate measurement system
         st.divider()
