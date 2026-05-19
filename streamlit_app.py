@@ -778,7 +778,7 @@ else:
 
         with st.container(border=True):
             st.markdown("### 🗺️ Décomposition du Flux & Roll-up des Délais (Lead Time)")
-            st.caption("Déployez les sous-sections de tâches. Les temps s'agrègent automatiquement par section et sur tout le processus.")
+            st.caption("Déployez les sous-sections de tâches. Les temps s'agrègent automatiquement par section.")
 
             # Initialisation de la structure de stockage
             if "vsm_detailed_map" not in p:
@@ -789,7 +789,10 @@ else:
             # Fonction de conversion interne sécurisée
             def convert_to_minutes(valeur, unite):
                 try: 
-                    return float(valeur) if unite == "Minutes" else (float(valeur) * 60.0 if unite == "Heures" else float(valeur) * 1440.0)
+                    val = float(valeur)
+                    if unite == "Heures": return val * 60.0
+                    if unite == "Jours": return val * 1440.0
+                    return val
                 except (ValueError, TypeError): 
                     return 0.0
 
@@ -825,14 +828,15 @@ else:
                 elif current_sec_min >= 60: t_text = f"{current_sec_min/60:.1f} h"
                 else: t_text = f"{current_sec_min:.1f} min"
 
+                # Affichage du total à côté du titre de la section
                 st.markdown(f"#### 📦 Section {idx_step + 1} : {step} `⏱️ Total: {t_text}`")
 
-                # Éditeur de données sécurisé
+                # Éditeur de données
                 edited_df = st.data_editor(
                     df_sub,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_v7_{idx_step}_{p_idx}",
+                    key=f"vsm_editor_v8_{idx_step}_{p_idx}",
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des tâches à faire (Sous-section)", width="large"),
                         "Valeur": st.column_config.NumberColumn("Délai", min_value=0.0, format="%.1f", width="small", required=True),
@@ -862,62 +866,44 @@ else:
                 st.markdown("---")
 
             # Bouton de sauvegarde globale
-            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v7_{p_idx}"):
+            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v8_{p_idx}"):
                 p["vsm_detailed_map"] = updated_map
                 if "voc_raw_data" in st.session_state:
                     p["saved_voc_dict"] = st.session_state["voc_raw_data"].to_dict('records')
                 st.success("🎯 Données enregistrées avec succès.")
 
             # ==========================================
-            # RENDU DU SCHÉMA VSM AVEC SÉCURISATION HTML
+            # CORRECTION ERREUR : RENDU VSM 100% SÉCURISÉ (NATIF STREAMLIT)
             # ==========================================
             st.markdown("### 🗺️ Schéma Value Stream Mapping (VSM) Résumé")
             
-            # Utilisation de st.columns sécurisée
             if len(macro_steps) > 0:
+                # Utilisation des colonnes Streamlit natives sans injection HTML complexe
                 vsm_cols = st.columns(len(macro_steps))
                 for i, step in enumerate(macro_steps):
                     with vsm_cols[i]:
                         sec_min = section_totals_display.get(step, 0.0)
                         tasks_count = len(updated_map.get(step, []))
-                        clean_step_name = str(step)[:20] + "..." if len(str(step)) > 20 else str(step)
+                        short_name = str(step)[:15] + "..." if len(str(step)) > 15 else str(step)
                         
-                        st.markdown(
-                            f"""
-                            <div style="border:2px solid #4A90E2; border-radius:5px; padding:8px; background-color:#f0f4f8; text-align:center; min-height:140px;">
-                                <b style="color:#1E3A8A; font-size:0.85em;">🚀 ETAPE {i+1}</b><br>
-                                <span style="font-size:0.8em; font-weight:bold; color:#333;">{clean_step_name}</span>
-                                <hr style="margin:4px 0; border-color:#4A90E2;">
-                                <span style="font-size:0.75em; color:#666;">📋 {tasks_count} tâche(s)</span><br><br>
-                                <span style="background-color:#4A90E2; color:white; padding:2px 4px; border-radius:3px; font-size:0.8em; font-weight:bold;">⏱️ {sec_min:.1f} m</span>
-                            </div>
-                            """, 
-                            unsafe_html=True
-                        )
+                        # Rendu propre et robuste via des tuiles conteneurs natives
+                        with st.container(border=True):
+                            st.markdown(f"**🔹 ÉTAPE {i+1}**")
+                            st.caption(f"*{short_name}*")
+                            st.markdown(f"📋 `{tasks_count} tâche(s)`")
+                            st.code(f"{sec_min:.1f} min", language="text")
 
-            # Ligne de temps Kaizen sécurisée (Évite les f-strings brisés ou caractères {} en HTML)
-            st.markdown("#### ⏱️ Ligne de temps du Flux (Value & Waste Timeline)")
+            # Ligne de temps Kaizen alternative en pur texte Markdown (Zéro risque de plantage)
+            st.markdown("#### ⏱️ Ligne de temps du Flux (Value Stream Timeline)")
             
-            timeline_blocks = []
-            for step in macro_steps:
+            timeline_markdown = ""
+            for i, step in enumerate(macro_steps):
                 sec_min = section_totals_display.get(step, 0.0)
-                short_name = str(step)[:12] + "..." if len(str(step)) > 12 else str(step)
-                pct = max((sec_min / total_process_lead_time_min * 100), 15.0) if total_process_lead_time_min > 0 else 25.0
-                
-                block_html = f"""
-                <div style="width: {pct}%; border-left: 2px dashed #fff; padding-left: 5px; margin-right: 5px;">
-                    <b style="color:#4A90E2;">| {short_name}</b><br>
-                    <span>|— {sec_min:.1f} min</span>
-                </div>
-                """
-                timeline_blocks.append(block_html)
-                
-            full_timeline_html = f"""
-            <div style="display: flex; flex-direction: row; background-color: #222; padding: 12px; border-radius: 5px; color: white; font-family: monospace; font-size: 0.85em; overflow-x: auto;">
-                {"".join(timeline_blocks)}
-            </div>
-            """
-            st.markdown(full_timeline_html, unsafe_html=True)
+                short_name = str(step)[:20] + "..." if len(str(step)) > 20 else str(step)
+                timeline_markdown += f"**[{i+1}] {short_name}** ({sec_min:.1f} min) `——➡️` "
+            
+            # Affichage de la chaîne de flux
+            st.info(timeline_markdown.rstrip(" `——➡️` "))
 
             # Metrics Globales du Lead Time
             st.markdown("### 📊 Rapports Globaux du Processus")
