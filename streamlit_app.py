@@ -763,9 +763,7 @@ else:
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
-        # --------------------------------------------------
-        # INITIALISATION STRICTE ET PERSISTANTE DANS LE SESSION STATE
-        # --------------------------------------------------
+        # 1. INITIALISATION STRICTE DE LA STRUCTURE DES MACRO-ÉTAPES
         if "vsm_macro_steps" not in st.session_state:
             sipoc_data = p.get("sipoc_data", [])
             macro_steps = []
@@ -779,15 +777,19 @@ else:
                 macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
             st.session_state["vsm_macro_steps"] = macro_steps
 
+        # 2. INITIALISATION DU STOCKAGE DES DONNÉES DE TÂCHES
         if "vsm_detailed_map" not in st.session_state:
             st.session_state["vsm_detailed_map"] = {
                 step: [{"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
                 for step in st.session_state["vsm_macro_steps"]
             }
 
-        # Pousse les données initiales vers l'objet global 'p' pour la compatibilité avec le reste de votre outil
-        p["vsm_macro_steps"] = st.session_state["vsm_macro_steps"]
-        p["vsm_detailed_map"] = st.session_state["vsm_detailed_map"]
+        # 3. INITIALISATION DES METRICS CALCULÉES (Pour persistance au rechargement)
+        if "vsm_totals" not in st.session_state:
+            st.session_state["vsm_totals"] = {
+                "lead_time": 0.0, "va": 0.0, "nva": 0.0, "bnrva": 0.0, "attente": 0.0, "pce": 0.0,
+                "section_totals": {step: 5.0 for step in st.session_state["vsm_macro_steps"]}
+            }
 
         # Fonction de conversion interne sécurisée
         def convert_to_minutes(valeur, unite):
@@ -800,17 +802,18 @@ else:
                 return 0.0
 
         # --------------------------------------------------
-        # FONCTIONS CALLBACKS (ACTIONS IMMÉDIATES)
+        # FONCTIONS CALLBACKS (GESTION DE LA STRUCTURE)
         # --------------------------------------------------
         def add_section_callback(name, index_pos):
             clean_name = name.strip()
             if clean_name and clean_name not in st.session_state["vsm_macro_steps"]:
-                # Insertion à l'index choisi (0 = début, len = fin, etc.)
                 st.session_state["vsm_macro_steps"].insert(index_pos, clean_name)
+                # On initialise la session de l'éditeur de données pour cette nouvelle clé
                 st.session_state["vsm_detailed_map"][clean_name] = [
                     {"Détail de la tâche": "Première tâche à définir", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
                 ]
-                st.toast(f"ℹ️ Section '{clean_name}' ajoutée avec succès !", icon="➕")
+                st.session_state["vsm_totals"]["section_totals"][clean_name] = 0.0
+                st.toast(f"ℹ️ Section '{clean_name}' ajoutée !", icon="➕")
             elif clean_name in st.session_state["vsm_macro_steps"]:
                 st.toast("⚠️ Cette section existe déjà !", icon="❌")
 
@@ -819,28 +822,28 @@ else:
                 st.session_state["vsm_macro_steps"].remove(step_to_del)
                 if step_to_del in st.session_state["vsm_detailed_map"]:
                     del st.session_state["vsm_detailed_map"][step_to_del]
+                if step_to_del in st.session_state["vsm_totals"]["section_totals"]:
+                    del st.session_state["vsm_totals"]["section_totals"][step_to_del]
                 st.toast(f"ℹ️ Section '{step_to_del}' supprimée.", icon="🗑️")
 
         # --------------------------------------------------
-        # INTERFACE DE GESTION DU FLUX
+        # INTERFACE DE STRUCTURATION DU FLUX
         # --------------------------------------------------
         with st.container(border=True):
             st.markdown("### 🗺️ Gestion du Flux & Décomposition (Lead Time)")
-            st.caption("Pilotez la structure de votre VSM : Créez une section où vous voulez (au début, au milieu, à la fin) ou supprimez-en une instantanément.")
+            st.caption("Pilotez la structure de votre VSM. Saisissez vos tâches librement, puis cliquez sur le bouton de sauvegarde en bas pour recalculer l'ensemble du flux.")
 
-            # Zone d'ajout dynamique avec choix de la position
+            # Formulaire d'ajout de section (évite les rafraîchissements intempestifs)
             col_add1, col_add2, col_add3 = st.columns([3, 2, 1.5])
             with col_add1:
                 new_sec_name = st.text_input("📝 Nom de la nouvelle section :", placeholder="Ex: 2.bis Contrôle Qualité", key=f"new_input_text_{p_idx}")
             with col_add2:
-                # Construction dynamique de la liste des positions d'insertion possibles
                 positions = ["En fin de processus", "Au tout début"]
-                for i, step in enumerate(st.session_state["vsm_macro_steps"]):
+                for step in st.session_state["vsm_macro_steps"]:
                     positions.append(f"Après : {step}")
                 
                 chosen_pos_text = st.selectbox("📍 Insérer la section :", options=positions, key=f"pos_select_{p_idx}")
                 
-                # Traduction du texte de position en index numérique pour l'insertion
                 if chosen_pos_text == "Au tout début":
                     insert_idx = 0
                 elif chosen_pos_text == "En fin de processus":
@@ -850,7 +853,7 @@ else:
                     insert_idx = st.session_state["vsm_macro_steps"].index(selected_step) + 1
 
             with col_add3:
-                st.write("") # Équilibre de l'alignement vertical
+                st.write("") 
                 if st.button("➕ Créer la section", use_container_width=True, key=f"btn_create_{p_idx}"):
                     if new_sec_name.strip():
                         add_section_callback(new_sec_name, insert_idx)
@@ -860,56 +863,38 @@ else:
 
             st.markdown("---")
 
-            updated_map = {}
-            total_process_lead_time_min = 0.0
-            total_va_global_min = 0.0
-            total_nva_global_min = 0.0
-            total_bnrva_global_min = 0.0
-            total_attente_global_min = 0.0
-            
-            section_totals_display = {}
-
-            # Pré-calcul des totaux pour l'affichage en amont dans les titres
-            for step in st.session_state["vsm_macro_steps"]:
-                sub_tasks = st.session_state["vsm_detailed_map"].get(step, [])
-                sub_df = pd.DataFrame(sub_tasks)
-                s_min = 0.0
-                if not sub_df.empty and "Valeur" in sub_df.columns and "Unité" in sub_df.columns:
-                    for _, r_t in sub_df.iterrows():
-                        s_min += convert_to_minutes(r_t.get("Valeur", 0), r_t.get("Unité", "Minutes"))
-                section_totals_display[step] = s_min
-
             # --------------------------------------------------
-            # BOUCLE DYNAMIQUE D'AFFICHAGE DES SECTIONS
+            # BOUCLE D'ÉDITION LIBRE (SANS EFFACEMENT)
             # --------------------------------------------------
+            # Dictionnaire temporaire pour capturer l'état visuel actuel des éditeurs de données
+            current_editors_state = {}
+
             for idx_step, step in enumerate(st.session_state["vsm_macro_steps"]):
-                sub_tasks = st.session_state["vsm_detailed_map"].get(step, [])
-                if not sub_tasks:
-                    sub_tasks = [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
-
-                df_sub = pd.DataFrame(sub_tasks)
-                current_sec_min = section_totals_display.get(step, 0.0)
+                # On récupère les données de référence actuelles
+                current_data = st.session_state["vsm_detailed_map"].get(step, [])
+                df_sub = pd.DataFrame(current_data)
                 
-                if current_sec_min >= 1440: t_text = f"{current_sec_min/1440:.1f} j"
-                elif current_sec_min >= 60: t_text = f"{current_sec_min/60:.1f} h"
-                else: t_text = f"{current_sec_min:.1f} min"
+                # Récupération du dernier total calculé pour l'affichage statique du titre
+                sec_min = st.session_state["vsm_totals"]["section_totals"].get(step, 0.0)
+                if sec_min >= 1440: t_text = f"{sec_min/1440:.1f} j"
+                elif sec_min >= 60: t_text = f"{sec_min/60:.1f} h"
+                else: t_text = f"{sec_min:.1f} min"
 
-                # Ligne de titre + Bouton Supprimer
                 col_title, col_del = st.columns([5, 1])
                 with col_title:
-                    st.markdown(f"#### 📦 Section {idx_step + 1} : {step} `⏱️ Total: {t_text}`")
+                    st.markdown(f"#### 📦 Section {idx_step + 1} : {step} `⏱️ Dernier calcul: {t_text}`")
                 with col_del:
                     st.write("") 
                     if st.button("🗑️ Supprimer", key=f"del_sec_{idx_step}_{p_idx}", use_container_width=True):
                         delete_section_callback(step)
                         st.rerun()
 
-                # Éditeur de données (Data Editor)
+                # CRUCIAL : On passe le DataFrame initial. Streamlit maintient l'état utilisateur en tâche de fond.
                 edited_df = st.data_editor(
                     df_sub,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_v11_{idx_step}_{p_idx}",
+                    key=f"vsm_editor_v12_{step}_{p_idx}", # La clé est liée au NOM de l'étape pour rester stable
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des micro-tâches", width="large"),
                         "Valeur": st.column_config.NumberColumn("Délai", min_value=0.0, format="%.1f", width="small", required=True),
@@ -921,44 +906,87 @@ else:
                         )
                     }
                 )
-
-                # Extraction immédiate vers la map mise à jour
-                cleaned_records = edited_df.dropna(subset=["Détail de la tâche"]).to_dict('records')
-                updated_map[step] = cleaned_records
-                st.session_state["vsm_detailed_map"][step] = cleaned_records
-
-                # Cumul global pour les indicateurs
-                if not edited_df.empty and "Valeur" in edited_df.columns and "Unité" in edited_df.columns:
-                    for _, row in edited_df.iterrows():
-                        t_min = convert_to_minutes(row.get("Valeur", 0), row.get("Unité", "Minutes"))
-                        total_process_lead_time_min += t_min
-                        act_type = row.get("Type d'activité")
-                        if act_type == "VA (Valeur Ajoutée)": total_va_global_min += t_min
-                        elif act_type == "NVA (Non Valeur Ajoutée)": total_nva_global_min += t_min
-                        elif act_type == "BNRVA (Business Necessary, Non-Value Added)": total_bnrva_global_min += t_min
-                        elif act_type == "Temps d'attente / Stock": total_attente_global_min += t_min
-
+                # On stocke l'état actuel de l'écran dans notre dictionnaire temporaire
+                current_editors_state[step] = edited_df
                 st.markdown("---")
 
-            # Sauvegarde finale manuelle pour figer les modifications dans l'objet principal
-            if st.button("💾 Enregistrer définitivement la Cartographie", key=f"save_vsm_map_v11_{p_idx}"):
+            # --------------------------------------------------
+            # BOUTON UNIQUE DE SÉCURISATION & CALCULS GLOBAUX
+            # --------------------------------------------------
+            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", type="primary", use_container_width=True, key=f"save_vsm_map_v12_{p_idx}"):
+                
+                # Réinitialisation des compteurs globaux pour le recalcul
+                total_lt = 0.0
+                total_va = 0.0
+                total_nva = 0.0
+                total_bnrva = 0.0
+                total_attente = 0.0
+                new_section_totals = {}
+
+                # Parcours et figeage définitif des modifications de chaque tableau
+                for step in st.session_state["vsm_macro_steps"]:
+                    # Récupération de ce qui est écrit à l'écran
+                    df_edited = current_editors_state.get(step, pd.DataFrame())
+                    
+                    # Nettoyage des lignes vides
+                    if not df_edited.empty and "Détail de la tâche" in df_edited.columns:
+                        df_edited = df_edited.dropna(subset=["Détail de la tâche"])
+                    
+                    # Sauvegarde dans la mémoire de session persistante
+                    records = df_edited.to_dict('records')
+                    st.session_state["vsm_detailed_map"][step] = records
+                    
+                    # Calcul du roll-up pour cette section particulière
+                    sec_sum = 0.0
+                    if not df_edited.empty:
+                        for _, row in df_edited.iterrows():
+                            t_min = convert_to_minutes(row.get("Valeur", 0), row.get("Unité", "Minutes"))
+                            sec_sum += t_min
+                            total_lt += t_min
+                            
+                            act_type = row.get("Type d'activité")
+                            if act_type == "VA (Valeur Ajoutée)": total_va += t_min
+                            elif act_type == "NVA (Non Valeur Ajoutée)": total_nva += t_min
+                            elif act_type == "BNRVA (Business Necessary, Non-Value Added)": total_bnrva += t_min
+                            elif act_type == "Temps d'attente / Stock": total_attente += t_min
+                    
+                    new_section_totals[step] = sec_sum
+
+                # Calcul de l'efficience (PCE)
+                pce_calc = (total_va / total_lt * 100) if total_lt > 0 else 0.0
+
+                # Enregistrement du pack complet dans le state global de calcul
+                st.session_state["vsm_totals"] = {
+                    "lead_time": total_lt,
+                    "va": total_va,
+                    "nva": total_nva,
+                    "bnrva": total_bnrva,
+                    "attente": total_attente,
+                    "pce": pce_calc,
+                    "section_totals": new_section_totals
+                }
+
+                # Exportation vers l'objet global outil 'p' pour compatibilité externe
                 p["vsm_macro_steps"] = list(st.session_state["vsm_macro_steps"])
                 p["vsm_detailed_map"] = dict(st.session_state["vsm_detailed_map"])
                 if "voc_raw_data" in st.session_state:
                     p["saved_voc_dict"] = st.session_state["voc_raw_data"].to_dict('records')
-                st.success("🎯 Structure VSM enregistrée avec succès.")
+                
+                st.success("🎯 Tous les calculs ont été mis à jour avec succès sur l'ensemble de la chaîne !")
+                st.rerun()
 
             # ==========================================
-            # RENDU VISUEL DU SCHÉMA VSM RÉSUMÉ
+            # RENDU VISUEL BASÉ SUR LES DERNIÈRES DONNÉES VALIDÉES
             # ==========================================
             st.markdown("### 🗺️ Schéma Value Stream Mapping (VSM) Résumé")
             
-            if len(st.session_state["vsm_macro_steps"]) > 0:
-                vsm_cols = st.columns(len(st.session_state["vsm_macro_steps"]))
-                for i, step in enumerate(st.session_state["vsm_macro_steps"]):
+            steps_list = st.session_state["vsm_macro_steps"]
+            if len(steps_list) > 0:
+                vsm_cols = st.columns(len(steps_list))
+                for i, step in enumerate(steps_list):
                     with vsm_cols[i]:
-                        sec_min = section_totals_display.get(step, 0.0)
-                        tasks_count = len(updated_map.get(step, []))
+                        sec_min = st.session_state["vsm_totals"]["section_totals"].get(step, 0.0)
+                        tasks_count = len(st.session_state["vsm_detailed_map"].get(step, []))
                         short_name = str(step)[:15] + "..." if len(str(step)) > 15 else str(step)
                         
                         with st.container(border=True):
@@ -970,8 +998,8 @@ else:
             # Timeline
             st.markdown("#### ⏱️ Ligne de temps du Flux (Value Stream Timeline)")
             timeline_markdown = ""
-            for i, step in enumerate(st.session_state["vsm_macro_steps"]):
-                sec_min = section_totals_display.get(step, 0.0)
+            for i, step in enumerate(steps_list):
+                sec_min = st.session_state["vsm_totals"]["section_totals"].get(step, 0.0)
                 short_name = str(step)[:20] + "..." if len(str(step)) > 20 else str(step)
                 timeline_markdown += f"**[{i+1}] {short_name}** ({sec_min:.1f} min) `——➡️` "
             
@@ -980,16 +1008,16 @@ else:
 
             # Rapports Métriques Globaux du Lead Time
             st.markdown("### 📊 Rapports Globaux du Processus")
-            pce = (total_va_global_min / total_process_lead_time_min * 100) if total_process_lead_time_min > 0 else 0.0
             
-            if total_process_lead_time_min >= 1440: display_lt = f"{total_process_lead_time_min / 1440:.1f} Jours"
-            elif total_process_lead_time_min >= 60: display_lt = f"{total_process_lead_time_min / 60:.1f} Heures"
-            else: display_lt = f"{total_process_lead_time_min:.1f} Min"
+            totals = st.session_state["vsm_totals"]
+            if totals["lead_time"] >= 1440: display_lt = f"{totals['lead_time'] / 1440:.1f} Jours"
+            elif totals["lead_time"] >= 60: display_lt = f"{totals['lead_time'] / 60:.1f} Heures"
+            else: display_lt = f"{totals['lead_time']:.1f} Min"
 
             c1, c2, c3 = st.columns(3)
             c1.metric("⏳ LEAD TIME TOTAL", display_lt)
-            c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{total_va_global_min:.1f} min")
-            c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{pce:.1f}%")
+            c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
+            c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
         # 3. Current state value stream Map
         st.divider()
