@@ -760,7 +760,6 @@ else:
         st.subheader("2. Current State Detailed Process Map")
 
         # [CORRECTION REMARQUE 1] Sécurité de persistance pour le VOC
-        # Si voc_raw_data est dans le projet 'p' mais pas dans session_state, on le restaure
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
@@ -771,7 +770,7 @@ else:
             for row in sipoc_data:
                 step_name = row.get("Process") or row.get("process")
                 if step_name:
-                    macro_steps.append(step_name)
+                    macro_steps.append(str(step_name))
 
         if not macro_steps:
             macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
@@ -787,13 +786,12 @@ else:
                     {"Détail de la tâche": f"Sous-tâche initiale de {step}", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
                 ] for step in macro_steps}
 
-            # Fonction de conversion interne
+            # Fonction de conversion interne sécurisée
             def convert_to_minutes(valeur, unite):
-                try: val = float(valeur)
-                except (ValueError, TypeError): return 0.0
-                if unite == "Heures": return val * 60.0
-                elif unite == "Jours": return val * 1440.0
-                return val
+                try: 
+                    return float(valeur) if unite == "Minutes" else (float(valeur) * 60.0 if unite == "Heures" else float(valeur) * 1440.0)
+                except (ValueError, TypeError): 
+                    return 0.0
 
             updated_map = {}
             total_process_lead_time_min = 0.0
@@ -802,10 +800,9 @@ else:
             total_bnrva_global_min = 0.0
             total_attente_global_min = 0.0
             
-            # Pour stocker les totaux par section pour l'affichage à côté du titre
             section_totals_display = {}
 
-            # Étape préliminaire : Calcul des totaux pour pouvoir les afficher DANS les titres
+            # Étape préliminaire : Pré-calcul des totaux par section
             for step in macro_steps:
                 sub_tasks = p["vsm_detailed_map"].get(step, [])
                 sub_df = pd.DataFrame(sub_tasks)
@@ -824,20 +821,18 @@ else:
                 df_sub = pd.DataFrame(sub_tasks)
                 current_sec_min = section_totals_display.get(step, 0.0)
                 
-                # Formatage propre de la durée de la section
                 if current_sec_min >= 1440: t_text = f"{current_sec_min/1440:.1f} j"
                 elif current_sec_min >= 60: t_text = f"{current_sec_min/60:.1f} h"
                 else: t_text = f"{current_sec_min:.1f} min"
 
-                # [CORRECTION REMARQUE 2] : Affichage du total à côté du titre de la section
                 st.markdown(f"#### 📦 Section {idx_step + 1} : {step} `⏱️ Total: {t_text}`")
 
-                # Éditeur de données
+                # Éditeur de données sécurisé
                 edited_df = st.data_editor(
                     df_sub,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_v6_{idx_step}_{p_idx}",
+                    key=f"vsm_editor_v7_{idx_step}_{p_idx}",
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des tâches à faire (Sous-section)", width="large"),
                         "Valeur": st.column_config.NumberColumn("Délai", min_value=0.0, format="%.1f", width="small", required=True),
@@ -854,7 +849,7 @@ else:
                 updated_map[step] = cleaned_records
 
                 # Calcul des cumuls globaux
-                if not edited_df.empty:
+                if not edited_df.empty and "Valeur" in edited_df.columns and "Unité" in edited_df.columns:
                     for _, row in edited_df.iterrows():
                         t_min = convert_to_minutes(row.get("Valeur", 0), row.get("Unité", "Minutes"))
                         total_process_lead_time_min += t_min
@@ -867,64 +862,73 @@ else:
                 st.markdown("---")
 
             # Bouton de sauvegarde globale
-            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v6_{p_idx}"):
+            if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", key=f"save_vsm_map_v7_{p_idx}"):
                 p["vsm_detailed_map"] = updated_map
-                # Sauvegarde du VOC s'il existe pour la persistance au rechargement
                 if "voc_raw_data" in st.session_state:
                     p["saved_voc_dict"] = st.session_state["voc_raw_data"].to_dict('records')
-                st.success("🎯 Données et calculs de structure enregistrés. Schéma VSM généré ci-dessous.")
+                st.success("🎯 Données enregistrées avec succès.")
 
             # ==========================================
-            # [NOUVEAU] GÉNÉRATION DU SCHÉMA VSM RÉSUMÉ
+            # RENDU DU SCHÉMA VSM AVEC SÉCURISATION HTML
             # ==========================================
             st.markdown("### 🗺️ Schéma Value Stream Mapping (VSM) Résumé")
             
-            # Construction visuelle du flux d'étapes (Timeline VSM)
-            vsm_cols = st.columns(len(macro_steps))
-            
-            for i, step in enumerate(macro_steps):
-                with vsm_cols[i]:
-                    sec_min = section_totals_display.get(step, 0.0)
-                    tasks_list = updated_map.get(step, [])
-                    
-                    # Style CSS pour simuler un bloc de processus VSM
-                    st.markdown(
-                        f"""
-                        <div style="border:2px solid #4A90E2; border-radius:5px; padding:10px; background-color:#f0f4f8; text-align:center; min-height:160px;">
-                            <b style="color:#1E3A8A;">🚀 ETAPE {i+1}</b><br>
-                            <span style="font-size:0.85em; font-weight:bold;">{step[:25]}...</span>
-                            <hr style="margin:5px 0; border-color:#4A90E2;">
-                            <span style="font-size:0.8em; color:#555;">📋 {len(tasks_list)} sous-tâche(s)</span><br>
-                            <span style="background-color:#4A90E2; color:white; padding:2px 6px; border-radius:3px; font-size:0.85em; font-weight:bold;">⏱️ {sec_min:.1f} min</span>
-                        </div>
-                        """, 
-                        unsafe_html=True
-                    )
-                    
-                    # Petit connecteur de flux entre les blocs
-                    if i < len(macro_steps) - 1:
-                        st.markdown("<p style='text-align:center; color:#4A90E2; margin:0;'>🔹 ➡️ 🔹</p>", unsafe_html=True)
+            # Utilisation de st.columns sécurisée
+            if len(macro_steps) > 0:
+                vsm_cols = st.columns(len(macro_steps))
+                for i, step in enumerate(macro_steps):
+                    with vsm_cols[i]:
+                        sec_min = section_totals_display.get(step, 0.0)
+                        tasks_count = len(updated_map.get(step, []))
+                        clean_step_name = str(step)[:20] + "..." if len(str(step)) > 20 else str(step)
+                        
+                        st.markdown(
+                            f"""
+                            <div style="border:2px solid #4A90E2; border-radius:5px; padding:8px; background-color:#f0f4f8; text-align:center; min-height:140px;">
+                                <b style="color:#1E3A8A; font-size:0.85em;">🚀 ETAPE {i+1}</b><br>
+                                <span style="font-size:0.8em; font-weight:bold; color:#333;">{clean_step_name}</span>
+                                <hr style="margin:4px 0; border-color:#4A90E2;">
+                                <span style="font-size:0.75em; color:#666;">📋 {tasks_count} tâche(s)</span><br><br>
+                                <span style="background-color:#4A90E2; color:white; padding:2px 4px; border-radius:3px; font-size:0.8em; font-weight:bold;">⏱️ {sec_min:.1f} m</span>
+                            </div>
+                            """, 
+                            unsafe_html=True
+                        )
 
-            # Ligne de temps Kaizen classique (Ligne en escalier VA / NVA)
+            # Ligne de temps Kaizen sécurisée (Évite les f-strings brisés ou caractères {} en HTML)
             st.markdown("#### ⏱️ Ligne de temps du Flux (Value & Waste Timeline)")
             
-            timeline_html = "<div style='display: flex; flex-direction: row; background-color: #222; padding: 10px; border-radius: 5px; color: white; font-family: monospace; font-size: 0.9em;'>"
+            timeline_blocks = []
             for step in macro_steps:
                 sec_min = section_totals_display.get(step, 0.0)
-                if total_process_lead_time_min > 0:
-                    pct = max((sec_min / total_process_lead_time_min) * 100, 10.0) # minimum de largeur visuelle
-                else:
-                    pct = 25
-                timeline_html += f"<div style='width: {pct}%; border-left: 2px dashed #fff; padding-left: 5px;'>| {step[:12]}...<br>|— VA/NVA<br>|— {sec_min:.1f} min</div>"
-            timeline_html += "</div>"
-            st.markdown(timeline_html, unsafe_html=True)
+                short_name = str(step)[:12] + "..." if len(str(step)) > 12 else str(step)
+                pct = max((sec_min / total_process_lead_time_min * 100), 15.0) if total_process_lead_time_min > 0 else 25.0
+                
+                block_html = f"""
+                <div style="width: {pct}%; border-left: 2px dashed #fff; padding-left: 5px; margin-right: 5px;">
+                    <b style="color:#4A90E2;">| {short_name}</b><br>
+                    <span>|— {sec_min:.1f} min</span>
+                </div>
+                """
+                timeline_blocks.append(block_html)
+                
+            full_timeline_html = f"""
+            <div style="display: flex; flex-direction: row; background-color: #222; padding: 12px; border-radius: 5px; color: white; font-family: monospace; font-size: 0.85em; overflow-x: auto;">
+                {"".join(timeline_blocks)}
+            </div>
+            """
+            st.markdown(full_timeline_html, unsafe_html=True)
 
             # Metrics Globales du Lead Time
             st.markdown("### 📊 Rapports Globaux du Processus")
             pce = (total_va_global_min / total_process_lead_time_min * 100) if total_process_lead_time_min > 0 else 0.0
             
+            if total_process_lead_time_min >= 1440: display_lt = f"{total_process_lead_time_min / 1440:.1f} Jours"
+            elif total_process_lead_time_min >= 60: display_lt = f"{total_process_lead_time_min / 60:.1f} Heures"
+            else: display_lt = f"{total_process_lead_time_min:.1f} Min"
+
             c1, c2, c3 = st.columns(3)
-            c1.metric("⏳ LEAD TIME TOTAL", f"{total_process_lead_time_min:.1f} min")
+            c1.metric("⏳ LEAD TIME TOTAL", display_lt)
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{total_va_global_min:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{pce:.1f}%")
 
