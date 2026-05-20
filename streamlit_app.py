@@ -573,9 +573,11 @@ else:
         st.divider()
         st.header("📅 7. Project Milestone & Timing")
 
-        # 1. Initialisation initiale propre avec des objets dates natifs (indispensable pour le calendrier)
-        if "gantt_data" not in p:
-            import datetime
+        # 1. Initialisation initiale / Sécurisation si la structure est altérée par st.data_editor
+        import datetime
+        
+        # Si la clé n'existe pas, ou si son contenu est corrompu/bizarre, on remet le DataFrame par défaut
+        if "gantt_data" not in p or not isinstance(p["gantt_data"], pd.DataFrame):
             p["gantt_data"] = pd.DataFrame([
                 {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
                 {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
@@ -584,10 +586,21 @@ else:
                 {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
             ])
 
-        # 1b. Nettoyage préventif des types pour forcer le calendrier à chaque chargement de page
-        df_input = pd.DataFrame(p["gantt_data"]).copy()
-        df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
-        df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
+        # 1b. Préparation propre des données pour l'affichage (Calendrier)
+        try:
+            df_input = p["gantt_data"].copy()
+            df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
+            df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
+        except Exception:
+            # Sécurité ultime en cas de crash lors de la conversion des dates
+            p["gantt_data"] = pd.DataFrame([
+                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+            ])
+            df_input = p["gantt_data"].copy()
 
         # 2. Configuration des colonnes pour FORCER le sélecteur de date (calendrier cliquable)
         config_colonnes = {
@@ -603,7 +616,7 @@ else:
             column_config=config_colonnes,
             num_rows="dynamic", 
             use_container_width=True, 
-            key=f"gantt_table_final_{p_idx}" # Nouvelle clé propre pour réinitialiser le cache Streamlit Cloud
+            key=f"gantt_table_final_{p_idx}"
         )
         
         # 3. Bouton d'action pour générer le graphique
@@ -617,8 +630,8 @@ else:
                     df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
                     df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
                     
-                    # Sauvegarde pour la session
-                    p["gantt_data"] = df_gantt
+                    # Sauvegarde immédiate au format DataFrame propre pour écraser tout résidu
+                    p["gantt_data"] = df_gantt.copy()
                     
                     # Récupération de l'ordre exact du tableau pour l'axe Y
                     ordre_etapes = df_gantt["Etape"].tolist()
@@ -635,7 +648,7 @@ else:
                         color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
                     )
                     
-                    # REMÈDE AXE Y : Force Plotly à respecter STRICTEMENT l'ordre d'apparition du tableau (du haut vers le bas)
+                    # Respect de l'ordre d'apparition du tableau (du haut vers le bas)
                     fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
                     
                     # Stockage du graphique dans le session_state
