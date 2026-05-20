@@ -54,9 +54,9 @@ if 'current_project_idx' not in st.session_state:
 if not st.session_state.authenticated:
     st.title("🔐 Lean Six Sigma - Personal Toolbox")
     with st.container(border=True):
-        user = st.text_input("Identifiant (Email Google)")
-        pwd = st.text_input("Mot de passe", type="password")
-        if st.button("Se connecter via Google Drive"):
+        user = st.text_input("Identifiant (Email Google)", key="login_user_input")
+        pwd = st.text_input("Mot de passe", type="password", key="login_pwd_input")
+        if st.button("Se connecter via Google Drive", key="login_submit_btn"):
             if user and pwd: 
                 st.session_state.authenticated = True
                 st.rerun()
@@ -69,7 +69,7 @@ if not st.session_state.authenticated:
 with st.sidebar:
     st.title("⚙️ Paramètres & Sauvegarde")
     
-    color = st.color_picker("Couleur de l'outil", st.session_state.primary_color)
+    color = st.color_picker("Couleur de l'outil", st.session_state.primary_color, key="sidebar_color_picker")
     st.session_state.primary_color = color
     
     st.divider()
@@ -89,7 +89,7 @@ with st.sidebar:
 
         try:
             data_json = json.dumps(clean_for_json(st.session_state.projects), indent=4, ensure_ascii=False, default=force_serialize_dates)
-            st.sidebar.download_button("📤 Télécharger la sauvegarde (.json)", data=data_json, file_name="sauvegarde_boite_outils.json", mime="application/json")
+            st.sidebar.download_button("📤 Télécharger la sauvegarde (.json)", data=data_json, file_name="sauvegarde_boite_outils.json", mime="application/json", key="sidebar_download_btn")
         except Exception as e:
             st.sidebar.error(f"Erreur export : {e}")
     else:
@@ -98,7 +98,7 @@ with st.sidebar:
     # --- IMPORTATION ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
-    uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json")
+    uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json", key="sidebar_uploader_file")
 
     if uploaded_file is not None:
         if f"loaded_{uploaded_file.name}" not in st.session_state:
@@ -122,7 +122,7 @@ with st.sidebar:
 # ==========================================
 
 # Bouton de nettoyage d'urgence pour vider les résidus
-if st.button("⚠️ Cliquer ici une fois pour vider les anciens blocs fantômes", type="primary"):
+if st.button("⚠️ Cliquer ici une fois pour vider les anciens blocs fantômes", type="primary", key="clear_ghost_blocks_btn"):
     st.session_state.projects = []
     st.session_state.current_project_idx = None
     st.rerun()
@@ -131,10 +131,10 @@ if st.button("⚠️ Cliquer ici une fois pour vider les anciens blocs fantômes
 if st.session_state["current_project_idx"] is None:
     st.title("🗂️ Mes Projets Lean Six Sigma")
 
-    # Bouton d'initialisation
+    # Bouton d'initialisation avec clés uniques pour éviter la duplication
     with st.expander("➕ Initialiser un nouveau projet"):
-        nouveau_nom = st.text_input("Nom du projet")
-        if st.button("Confirmer la création"):
+        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
+        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
             if nouveau_nom:
                 st.session_state.projects.append({
                     "nom": nouveau_nom,
@@ -156,14 +156,14 @@ if st.session_state["current_project_idx"] is None:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_open_{idx}", use_container_width=True):
+                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_open_card_{idx}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
 # DANS UN PROJET
 else:
     projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
-    if st.button("⬅️ Retourner à l'accueil"):
+    if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
         st.session_state["current_project_idx"] = None
         st.rerun()
         
