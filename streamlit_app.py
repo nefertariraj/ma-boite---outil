@@ -116,7 +116,6 @@ with st.sidebar:
             except Exception as e:
                 st.sidebar.error(f"Erreur : {e}")
 
-else:
     # ----------------------------------------------------
     # 📍 BLOC INTERNE DU PROJET (S'affiche UNIQUEMENT si un projet est ouvert)
     # ----------------------------------------------------
