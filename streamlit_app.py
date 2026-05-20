@@ -1,3 +1,4 @@
+Python
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -52,7 +53,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- GESTION DES DONNÉES ---
+# --- GESTION DES DONNÉES SÉCURISÉES ---
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'projects' not in st.session_state:
@@ -72,111 +73,163 @@ if not st.session_state.authenticated:
                 st.rerun()
     st.stop()
 
-# --- BARRE LATÉRALE ---
+
+# ==========================================
+# ⚙️ CONSTRUTION DE LA BARRE LATÉRALE
+# ==========================================
 with st.sidebar:
     st.title("⚙️ Paramètres & Sauvegarde")
     
     # 1. PERSONNALISATION
-    color = st.color_picker("Couleur de l'outil", st.session_state.get('primary_color', '#007BFF'))
+    color = st.color_picker("Couleur de l'outil", st.session_state.get('primary_color', '#1E3A8A'))
     st.session_state.primary_color = color
     
     st.divider()
 
-   # --- 2. EXPORTATION (SAUVEGARDER) DANS LA BARRE LATÉRALE ---
-st.sidebar.subheader("💾 Sauvegarder mon travail")
+    # --- 2. EXPORTATION (SAUVEGARDER) ---
+    st.sidebar.subheader("💾 Sauvegarder mon travail")
 
-# Sécurité : On vérifie que la liste existe ET contient au moins un projet
-if "projects" in st.session_state and isinstance(st.session_state.projects, list) and len(st.session_state.projects) > 0:
+    if "projects" in st.session_state and isinstance(st.session_state.projects, list) and len(st.session_state.projects) > 0:
+        def clean_for_json(obj):
+            if isinstance(obj, pd.DataFrame): 
+                return obj.to_dict(orient="records")
+            if isinstance(obj, dict): 
+                return {str(k): clean_for_json(v) for k, v in obj.items()}
+            if isinstance(obj, list): 
+                return [clean_for_json(i) for i in obj]
+            return obj
 
-    def clean_for_json(obj):
-        if isinstance(obj, pd.DataFrame): 
-            return obj.to_dict(orient="records")
-        if isinstance(obj, dict): 
-            return {str(k): clean_for_json(v) for k, v in obj.items()}
-        if isinstance(obj, list): 
-            return [clean_for_json(i) for i in obj]
-        return obj
+        def force_serialize_dates(obj):
+            if hasattr(obj, 'strftime'): return obj.strftime('%Y-%m-%d')
+            if hasattr(obj, 'isoformat'): return obj.isoformat()
+            return str(obj)
 
-    def force_serialize_dates(obj):
-        if hasattr(obj, 'strftime'): return obj.strftime('%Y-%m-%d')
-        if hasattr(obj, 'isoformat'): return obj.isoformat()
-        return str(obj)
+        try:
+            projects_cleaned = clean_for_json(st.session_state.projects)
+            data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False, default=force_serialize_dates)
+            
+            st.sidebar.download_button(
+                label="📤 Télécharger la sauvegarde (.json)",
+                data=data_json,
+                file_name="sauvegarde_boite_outils.json",
+                mime="application/json",
+                key="btn_download_save"
+            )
+        except Exception as e:
+            st.sidebar.error(f"Erreur préparation export : {e}")
+    else:
+        st.sidebar.info("Aucun projet en cours à sauvegarder.")
 
-    try:
-        # Exportation propre de TOUS les projets présents en mémoire
-        projects_cleaned = clean_for_json(st.session_state.projects)
-        data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False, default=force_serialize_dates)
-        
-        st.sidebar.download_button(
-            label="📤 Télécharger la sauvegarde (.json)",
-            data=data_json,
-            file_name="sauvegarde_boite_outils.json",
-            mime="application/json",
-            key="btn_download_save"
-        )
-    except Exception as e:
-        st.sidebar.error(f"Erreur préparation export : {e}")
+    # --- 3. IMPORTATION (RECHARGER) ---
+    st.sidebar.divider()
+    st.sidebar.subheader("📥 Reprendre mon travail")
+
+    uploaded_file = st.sidebar.file_uploader(
+        "Importer un fichier de sauvegarde", 
+        type="json",
+        key="file_uploader_global"
+    )
+
+    if uploaded_file is not None:
+        # Sécurité pour ne traiter le fichier qu'une fois et éviter les conflits de rechargement
+        if f"loaded_{uploaded_file.name}" not in st.session_state:
+            try:
+                restored_data = json.load(uploaded_file)
+                
+                if isinstance(restored_data, list):
+                    for p_item in restored_data:
+                        if "nom" not in p_item:
+                            p_item["nom"] = "Projet Importé"
+                        
+                        if "gantt_data" in p_item:
+                            p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"]) if p_item["gantt_data"] else pd.DataFrame()
+                        else:
+                            p_item["gantt_data"] = pd.DataFrame()
+                            
+                        if "mesure_data" in p_item:
+                            p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"]) if p_item["mesure_data"] else pd.DataFrame()
+                        else:
+                            p_item["mesure_data"] = pd.DataFrame()
+
+                    # Écrase l'état global proprement SANS déconnecter l'utilisateur
+                    st.session_state.projects = restored_data
+                    st.session_state["current_project_idx"] = None
+                    
+                    st.session_state[f"loaded_{uploaded_file.name}"] = True
+                    st.sidebar.success("✅ Données synchronisées !")
+                    st.rerun()
+                else:
+                    st.sidebar.error("Le format du fichier n'est pas valide.")
+            except Exception as e:
+                st.sidebar.error(f"Erreur d'importation : {e}")
+
+
+# ==========================================
+# 🖼️ ZONE CENTRALE : LOGIQUE D'AFFICHAGE
+# ==========================================
+
+# CAS N°1 : Aucun projet n'est sélectionné -> On affiche la page d'accueil avec les cartes
+if st.session_state["current_project_idx"] is None:
+    st.title("🗂️ Mon Espace de Travail Lean Six Sigma")
+    st.write("Sélectionnez un projet existant ou importez votre travail à gauche pour commencer.")
+    st.divider()
+
+    # Formulaire de création rapide en haut de la page d'accueil
+    with st.expander("➕ Créer un tout nouveau projet vierge"):
+        nouveau_nom = st.text_input("Nom de votre nouveau projet", placeholder="Ex: Réduction des rebuts - Ligne B")
+        if st.button("Confirmer la création"):
+            if nouveau_nom:
+                nouveau_bloc = {
+                    "nom": nouveau_nom,
+                    "statut": "En cours",
+                    "gantt_data": pd.DataFrame(),
+                    "mesure_data": pd.DataFrame()
+                }
+                st.session_state.projects.append(nouveau_bloc)
+                st.success(f"Projet '{nouveau_nom}' créé !")
+                st.rerun()
+
+    st.write("### 📋 Vos projets disponibles")
+    projets_a_afficher = st.session_state.projects
+
+    if len(projets_a_afficher) == 0:
+        st.info("💡 Aucun projet disponible pour le moment. Créez-en un juste au-dessus ou déposez votre fichier de sauvegarde dans la barre latérale.")
+    else:
+        # Création d'une grille fluide de 3 colonnes pour aligner les cartes de projets
+        cols = st.columns(3)
+        for idx, projet in enumerate(projets_a_afficher):
+            with cols[idx % 3]:
+                # Nombre de tâches présentes pour enrichir la carte
+                nb_tasks = len(projet["gantt_data"]) if isinstance(projet.get("gantt_data"), pd.DataFrame) else 0
+                
+                # Rendu visuel propre sous forme de boîte
+                st.markdown(f"""
+                <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
+                    <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
+                    <p style="margin: 0; font-size: 0.9em; color: #606266;">
+                        <b>Statut :</b> En cours<br>
+                        <b>Données :</b> {nb_tasks} ligne(s) détectée(s)
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Bouton interactif pour entrer directement dans ce projet
+                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_card_open_{idx}", use_container_width=True):
+                    st.session_state["current_project_idx"] = idx
+                    st.rerun()
+
+# CAS N°2 : Un projet est sélectionné -> On affiche ton espace de travail interne
 else:
-    st.sidebar.info("Aucun projet en cours à sauvegarder.")
-
-
-# --- 3. IMPORTATION (RECHARGER) DANS LA BARRE LATÉRALE ---
-st.sidebar.divider()
-st.sidebar.subheader("📥 Reprendre mon travail")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Importer un fichier de sauvegarde", 
-    type="json",
-    key="file_uploader_global"
-)
-
-if uploaded_file is not None:
-    try:
-        # Lecture brute du JSON importé
-        restored_data = json.load(uploaded_file)
+    # Sélection active du projet choisi par l'utilisateur
+    projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
+    
+    # Bouton d'échappement pour quitter le projet actif et retourner aux cartes d'accueil
+    if st.button("⬅️ Quitter le projet (Retour au tableau de bord)"):
+        st.session_state["current_project_idx"] = None
+        st.rerun()
         
-        # Vérification qu'il s'agit bien d'une liste de projets
-        if isinstance(restored_data, list):
-            
-            # Reconstruction rigoureuse des DataFrames pour chaque projet
-            for p_item in restored_data:
-                # Sécurité : S'assurer que le projet possède au moins un nom
-                if "nom" not in p_item:
-                    p_item["nom"] = "Projet Importé Anonyme"
-                
-                # Conversion des données Gantt de liste vers DataFrame
-                if "gantt_data" in p_item:
-                    if isinstance(p_item["gantt_data"], list):
-                        p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
-                    elif not isinstance(p_item["gantt_data"], pd.DataFrame):
-                        p_item["gantt_data"] = pd.DataFrame()
-                else:
-                    p_item["gantt_data"] = pd.DataFrame()
-                
-                # Conversion des données de Mesure de liste vers DataFrame
-                if "mesure_data" in p_item:
-                    if isinstance(p_item["mesure_data"], list):
-                        p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
-                    elif not isinstance(p_item["mesure_data"], pd.DataFrame):
-                        p_item["mesure_data"] = pd.DataFrame()
-                else:
-                    p_item["mesure_data"] = pd.DataFrame()
-
-            # 🚀 INJECTION DIRECTE DANS LA SESSION GLOBALE
-            st.session_state.projects = restored_data
-            
-            # On réinitialise l'index de sélection pour forcer le retour à l'accueil
-            st.session_state["current_project_idx"] = None
-            st.session_state["current_project"] = None
-            
-            # Petit message de succès temporaire et rafraîchissement
-            st.sidebar.success("✅ Données synchronisées !")
-            st.rerun()
-        else:
-            st.sidebar.error("Le format du fichier n'est pas une liste de projets valide.")
-
-    except Exception as e:
-        st.sidebar.error(f"Erreur d'importation : {e}")
+    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
+    st.divider()
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
