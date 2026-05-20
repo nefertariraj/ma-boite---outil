@@ -684,6 +684,22 @@ st.header("📅 7. Project Milestone & Timing")
 
 import datetime
 import plotly.express as px
+import pandas as pd  # 👈 SÉCURITÉ : Assure l'existence de 'pd' pour éviter le crash NameError
+
+# SÉCURITÉ EXTENDED : Si 'p' a été perdu ou renommé lors du rechargement de l'application
+if 'p' not in locals() and 'p' not in globals():
+    if "current_project" in st.session_state:
+        p = st.session_state["current_project"]
+    elif "project" in st.session_state:
+        p = st.session_state["project"]
+    elif "projects" in st.session_state and "p_idx" in locals():
+        p = st.session_state["projects"][p_idx]
+    else:
+        p = {}
+
+# SÉCURITÉ INDEX : Assure la présence de p_idx pour les clés de composants
+if 'p_idx' not in locals() and 'p_idx' not in globals():
+    p_idx = 0
 
 # 1. Initialisation initiale / Sécurisation si la structure est altérée ou absente
 if "gantt_data" not in p or not isinstance(p["gantt_data"], pd.DataFrame):
@@ -778,7 +794,7 @@ if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
             
             fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
             
-            # Sauvegarde forcée du nouveau graphique dans le session_state (SANS st.rerun)
+            # Sauvegarde forcée du nouveau graphique dans le session_state
             st.session_state[f"gantt_fig_{p_idx}"] = fig
             st.toast("✅ Diagramme de Gantt mis à jour !", icon="📊")
         else:
