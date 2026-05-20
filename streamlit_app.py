@@ -118,14 +118,15 @@ with st.sidebar:
 
 
 # ==========================================
-# 🖼️ LOGIQUE DE NAVIGATION UNIQUE (SANS DOUBLON)
+# 🖼️ STRUCTURE DE NAVIGATION ÉTANCHÉIFIÉE
 # ==========================================
 
-# CAS N°1 : ACCUEIL UNIQUE
 if st.session_state["current_project_idx"] is None:
+    # ----------------------------------------------------
+    # 🏠 BLOC ACCUEIL UNIQUE (S'affiche UNIQUEMENT si aucun projet n'est ouvert)
+    # ----------------------------------------------------
     st.title("🗂️ Mes Projets Lean Six Sigma")
 
-    # Bouton d'initialisation unique
     with st.expander("➕ Initialiser un nouveau projet"):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -139,7 +140,6 @@ if st.session_state["current_project_idx"] is None:
 
     st.divider()
 
-    # Affichage des cartes de projets existants
     if len(st.session_state.projects) == 0:
         st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
     else:
@@ -156,8 +156,10 @@ if st.session_state["current_project_idx"] is None:
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-# CAS N°2 : INTÉRIEUR DU PROJET SÉLECTIONNÉ
 else:
+    # ----------------------------------------------------
+    # 📍 BLOC INTERNE DU PROJET (S'affiche UNIQUEMENT si un projet est ouvert)
+    # ----------------------------------------------------
     projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
     
     if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
@@ -166,6 +168,9 @@ else:
         
     st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
+    
+    # --- Vos outils DMAIC se chargent exclusivement ici ---
+    st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
