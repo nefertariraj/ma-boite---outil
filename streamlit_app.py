@@ -1,4 +1,4 @@
-Python
+# Fichier initialisé proprement sans résidu de texte
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
