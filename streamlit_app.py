@@ -2,6 +2,40 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
+import json
+
+# ==========================================
+# 🛠️ FONCTION DE SYNCHRONISATION EN TEMPS RÉEL (PARTIE 7)
+# ==========================================
+def synchroniser_gantt(p_idx, key_editeur):
+    """Capture immédiatement les modifications du tableau Gantt pour éviter toute perte au rechargement"""
+    if key_editeur in st.session_state and "projects" in st.session_state:
+        # Récupération des changements bruts depuis l'éditeur de texte de Streamlit
+        etat_editeur = st.session_state[key_editeur]
+        
+        # Accès direct au bon projet dans ta liste globale
+        p_cible = st.session_state["projects"][p_idx]
+        
+        # Si la donnée est bien un DataFrame, on applique les modifications à la volée
+        if "gantt_data" in p_cible and isinstance(p_cible["gantt_data"], pd.DataFrame):
+            df_actuel = p_cible["gantt_data"].copy()
+            
+            # 1. Traitement des lignes modifiées par l'utilisateur
+            for row_idx, changes in etat_editeur.get("edited_rows", {}).items():
+                for col, val in changes.items():
+                    df_actuel.iloc[row_idx, df_actuel.columns.get_loc(col)] = val
+            
+            # 2. Traitement des lignes ajoutées (ex: une nouvelle ligne dans "Mesure")
+            for new_row in etat_editeur.get("added_rows", []):
+                df_actuel = pd.concat([df_actuel, pd.DataFrame([new_row])], ignore_index=True)
+            
+            # 3. Traitement des lignes supprimées
+            indices_a_supprimer = etat_editeur.get("deleted_rows", [])
+            if indices_a_supprimer:
+                df_actuel = df_actuel.drop(indices_a_supprimer).reset_index(drop=True)
+                
+            # Sauvegarde et écrasement immédiat dans la mémoire du projet avant le rechargement de page
+            st.session_state["projects"][p_idx]["gantt_data"] = df_actuel
 
 # --- CONFIGURATION DE LA PAGE & STYLE ---
 st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
@@ -51,16 +85,21 @@ with st.sidebar:
     # --- 2. EXPORTATION (SAUVEGARDER) ---
     st.subheader("💾 Sauvegarder mon travail")
     if st.session_state.get('projects'):
-        import json
 
-        # Fonction pour ignorer les objets complexes (comme les graphiques) qui font planter le JSON
+        # ✅ NOUVELLE FONCTION DE NETTOYAGE COMPATIBLE DATAFRAMES & DATES
         def clean_for_json(obj):
+            if isinstance(obj, pd.DataFrame):
+                # Convertit proprement le tableau de données en format dictionnaire JSONisable
+                return obj.to_dict(orient="records")
             if isinstance(obj, (dict, list, str, int, float, bool, type(None))):
                 if isinstance(obj, dict):
                     return {k: clean_for_json(v) for k, v in obj.items()}
                 if isinstance(obj, list):
                     return [clean_for_json(i) for i in obj]
                 return obj
+            # Force la conversion des dates (comme les objets datetime.date) en texte propre YYYY-MM-DD
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
             return str(obj)
 
         try:
@@ -85,8 +124,13 @@ with st.sidebar:
     
     if uploaded_file is not None:
         try:
-            import json
             restored_data = json.load(uploaded_file)
+            
+            # ✅ RE-CONVERSION : Transforme les textes bruts importés en vrais DataFrames exploitables
+            for p_item in restored_data:
+                if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
+                    p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+            
             st.session_state.projects = restored_data
             st.success("✅ Données chargées !")
             if st.button("🔄 Actualiser l'affichage"):
