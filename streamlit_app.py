@@ -116,46 +116,6 @@ with st.sidebar:
             except Exception as e:
                 st.sidebar.error(f"Erreur : {e}")
 
-
-# ==========================================
-# 🖼️ STRUCTURE DE NAVIGATION ÉTANCHÉIFIÉE
-# ==========================================
-
-if st.session_state["current_project_idx"] is None:
-    # ----------------------------------------------------
-    # 🏠 BLOC ACCUEIL UNIQUE (S'affiche UNIQUEMENT si aucun projet n'est ouvert)
-    # ----------------------------------------------------
-    st.title("🗂️ Mes Projets Lean Six Sigma")
-
-    with st.expander("➕ Initialiser un nouveau projet"):
-        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-            if nouveau_nom:
-                st.session_state.projects.append({
-                    "nom": nouveau_nom,
-                    "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame()
-                })
-                st.rerun()
-
-    st.divider()
-
-    if len(st.session_state.projects) == 0:
-        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
-    else:
-        cols = st.columns(3)
-        for idx, projet in enumerate(st.session_state.projects):
-            with cols[idx % 3]:
-                st.markdown(f"""
-                <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
-                    <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_open_card_{idx}", use_container_width=True):
-                    st.session_state["current_project_idx"] = idx
-                    st.rerun()
-
 else:
     # ----------------------------------------------------
     # 📍 BLOC INTERNE DU PROJET (S'affiche UNIQUEMENT si un projet est ouvert)
