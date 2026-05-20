@@ -584,13 +584,22 @@ else:
                 {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
             ])
 
-        # 2. Affichage et édition du tableau par l'utilisateur
-        edited_gantt = st.data_editor(
-            p["gantt_data"], 
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key=f"gantt_ed_{p_idx}"
-        )
+        # 2. Affichage et édition du tableau par l'utilisateur (Sécurisé contre les crashs de clé à la reconnexion)
+        try:
+            edited_gantt = st.data_editor(
+                p["gantt_data"], 
+                num_rows="dynamic", 
+                use_container_width=True, 
+                key=f"gantt_ed_{p_idx}"
+            )
+        except st.errors.StreamlitAPIException:
+            # Clé de repli automatique si Streamlit Cloud a corrompu le cache de la clé principale
+            edited_gantt = st.data_editor(
+                p["gantt_data"], 
+                num_rows="dynamic", 
+                use_container_width=True, 
+                key=f"gantt_ed_{p_idx}_fallback"
+            )
         
         # 3. Bouton d'action pour générer le graphique
         if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
