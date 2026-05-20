@@ -757,7 +757,6 @@ edited_gantt = st.data_editor(
 # 3. Bouton d'action pour générer le graphique Plotly
 if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
     try:
-        # PISTE DE SÉCURITÉ : On utilise directement p["gantt_data"] mis à jour par le sync_live
         df_gantt = p["gantt_data"].copy().dropna(subset=["Etape", "Début", "Fin"])
         
         if not df_gantt.empty:
@@ -779,10 +778,9 @@ if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
             
             fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
             
-            # Sauvegarde forcée du nouveau graphique dans le session_state
+            # Sauvegarde forcée du nouveau graphique dans le session_state (SANS st.rerun)
             st.session_state[f"gantt_fig_{p_idx}"] = fig
-            st.success("✅ Diagramme de Gantt mis à jour avec succès !")
-            st.rerun()
+            st.toast("✅ Diagramme de Gantt mis à jour !", icon="📊")
         else:
             st.error("Veuillez remplir correctement toutes les étapes et dates du tableau.")
     except Exception as e:
