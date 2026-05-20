@@ -84,12 +84,17 @@ with st.sidebar:
 
    # --- 2. EXPORTATION (SAUVEGARDER) DANS LA BARRE LATÉRALE ---
 st.sidebar.subheader("💾 Sauvegarder mon travail")
-if st.session_state.get('projects'):
+
+# Sécurité : On vérifie que la liste existe ET contient au moins un projet
+if "projects" in st.session_state and isinstance(st.session_state.projects, list) and len(st.session_state.projects) > 0:
 
     def clean_for_json(obj):
-        if isinstance(obj, pd.DataFrame): return obj.to_dict(orient="records")
-        if isinstance(obj, dict): return {str(k): clean_for_json(v) for k, v in obj.items()}
-        if isinstance(obj, list): return [clean_for_json(i) for i in obj]
+        if isinstance(obj, pd.DataFrame): 
+            return obj.to_dict(orient="records")
+        if isinstance(obj, dict): 
+            return {str(k): clean_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list): 
+            return [clean_for_json(i) for i in obj]
         return obj
 
     def force_serialize_dates(obj):
@@ -98,7 +103,7 @@ if st.session_state.get('projects'):
         return str(obj)
 
     try:
-        # Note : si tu as une fonction appliquer_modifications_session(), tu peux l'appeler ici
+        # Exportation propre de TOUS les projets présents en mémoire
         projects_cleaned = clean_for_json(st.session_state.projects)
         data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False, default=force_serialize_dates)
         
@@ -106,12 +111,13 @@ if st.session_state.get('projects'):
             label="📤 Télécharger la sauvegarde (.json)",
             data=data_json,
             file_name="sauvegarde_boite_outils.json",
-            mime="application/json"
+            mime="application/json",
+            key="btn_download_save"
         )
     except Exception as e:
-        st.sidebar.error(f"Erreur préparation : {e}")
+        st.sidebar.error(f"Erreur préparation export : {e}")
 else:
-    st.sidebar.info("Aucun projet à sauvegarder.")
+    st.sidebar.info("Aucun projet en cours à sauvegarder.")
 
 
 # --- 3. IMPORTATION (RECHARGER) DANS LA BARRE LATÉRALE ---
@@ -126,24 +132,51 @@ uploaded_file = st.sidebar.file_uploader(
 
 if uploaded_file is not None:
     try:
+        # Lecture brute du JSON importé
         restored_data = json.load(uploaded_file)
         
-        # Reconstruction des DataFrames
-        for p_item in restored_data:
-            if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
-                p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
-            if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
-                p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
-        
-        # 🚀 INJECTION DIRECTE ET IMMÉDIATE
-        st.session_state.projects = restored_data
-        st.sidebar.success("✅ Fichier synchronisé !")
-        
-        # On force l'application à se redessiner pour afficher les projets au centre
-        st.rerun()
+        # Vérification qu'il s'agit bien d'une liste de projets
+        if isinstance(restored_data, list):
+            
+            # Reconstruction rigoureuse des DataFrames pour chaque projet
+            for p_item in restored_data:
+                # Sécurité : S'assurer que le projet possède au moins un nom
+                if "nom" not in p_item:
+                    p_item["nom"] = "Projet Importé Anonyme"
+                
+                # Conversion des données Gantt de liste vers DataFrame
+                if "gantt_data" in p_item:
+                    if isinstance(p_item["gantt_data"], list):
+                        p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+                    elif not isinstance(p_item["gantt_data"], pd.DataFrame):
+                        p_item["gantt_data"] = pd.DataFrame()
+                else:
+                    p_item["gantt_data"] = pd.DataFrame()
+                
+                # Conversion des données de Mesure de liste vers DataFrame
+                if "mesure_data" in p_item:
+                    if isinstance(p_item["mesure_data"], list):
+                        p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+                    elif not isinstance(p_item["mesure_data"], pd.DataFrame):
+                        p_item["mesure_data"] = pd.DataFrame()
+                else:
+                    p_item["mesure_data"] = pd.DataFrame()
+
+            # 🚀 INJECTION DIRECTE DANS LA SESSION GLOBALE
+            st.session_state.projects = restored_data
+            
+            # On réinitialise l'index de sélection pour forcer le retour à l'accueil
+            st.session_state["current_project_idx"] = None
+            st.session_state["current_project"] = None
+            
+            # Petit message de succès temporaire et rafraîchissement
+            st.sidebar.success("✅ Données synchronisées !")
+            st.rerun()
+        else:
+            st.sidebar.error("Le format du fichier n'est pas une liste de projets valide.")
 
     except Exception as e:
-        st.sidebar.error(f"Erreur lors de l'import : {e}")
+        st.sidebar.error(f"Erreur d'importation : {e}")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
