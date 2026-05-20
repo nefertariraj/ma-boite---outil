@@ -172,8 +172,8 @@ uploaded_file = st.sidebar.file_uploader(
 
 if uploaded_file is not None:
     try:
-        # Si les données ne sont pas encore chargées en mémoire temporaire
-        if "temp_imported_data" not North in st.session_state:
+        # La ligne corrigée se trouve juste ici 🛠️
+        if "temp_imported_data" not in st.session_state:
             restored_data = json.load(uploaded_file)
             
             # Reconstruction des DataFrames
@@ -184,42 +184,37 @@ if uploaded_file is not None:
                 if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
                     p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
             
-            # On stocke temporairement sans écraser le projet en cours
+            # Stockage temporaire en mémoire
             st.session_state["temp_imported_data"] = restored_data
 
-        # Interface intermédiaire : Affichage du projet détecté et bouton Ouvrir
+        # Affichage intermédiaire de la sauvegarde et du bouton d'ouverture
         if "temp_imported_data" in st.session_state:
             projets_detectes = st.session_state["temp_imported_data"]
             nb_projets = len(projets_detectes)
             
-            st.sidebar.info(f"📂 Sauvegarde détectée : {nb_projets} projet(s) disponible(s).")
+            st.sidebar.info(f"📂 Sauvegarde détectée : {nb_projets} projet(s) trouvé(s).")
             
-            # Petit aperçu du/des projet(s) trouvé(s)
-            for i, p in enumerate(projets_detectes):
+            for p in projets_detectes:
                 st.sidebar.text(f"• {p.get('nom', 'Projet sans nom')}")
             
-            # Bouton de validation pour entrer dans le projet
-            if st.sidebar.button("🔓 Ouvrir et charger les projets", type="primary"):
+            # Bouton pour déclencher l'ouverture finale
+            if st.sidebar.button("🔓 Ouvrir", type="primary"):
                 
-                # 🚨 NETTOYAGE CIBLÉ : On supprime l'ancien cache visuel SANS toucher à l'authentification
-                clés_a_conserver = ["logged_in", "auth_user", "username", "user", "credentials"] # Adapte selon tes clés d'authentification
+                # NETTOYAGE SÉLECTIF (Préserve l'authentification)
+                clés_a_conserver = ["logged_in", "auth_user", "username", "user", "credentials"]
                 
                 for key in list(st.session_state.keys()):
-                    # On ne supprime pas les clés de connexion ni le téléverseur
                     if key not in clés_a_conserver and key != "app_file_uploader":
-                        # On supprime tout le reste (gantt, éditeurs, anciens index de projets)
                         if any(x in key for x in ["gantt", "editor", "project", "select_"]):
                             del st.session_state[key]
                 
-                # Injection définitive des données
+                # Injection finale et mise à jour des index
                 st.session_state.projects = st.session_state["temp_imported_data"]
-                
-                # Initialisation des index sur le premier projet importé
                 st.session_state["current_project_idx"] = 0
                 st.session_state["current_project"] = st.session_state.projects[0]
                 st.session_state["select_projet"] = st.session_state.projects[0].get("nom", "Projet sans nom")
                 
-                # Nettoyage de la variable temporaire devenue inutile
+                # Nettoyage de la variable temporaire
                 del st.session_state["temp_imported_data"]
                 
                 st.sidebar.success("🚀 Projet chargé !")
