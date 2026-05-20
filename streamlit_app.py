@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, date
 import json
 
 # ==========================================
@@ -86,20 +86,27 @@ with st.sidebar:
     st.subheader("💾 Sauvegarder mon travail")
     if st.session_state.get('projects'):
 
-        # ✅ NOUVELLE FONCTION DE NETTOYAGE COMPATIBLE DATAFRAMES & DATES
+        # ✅ FONCTION DE NETTOYAGE CORRIGÉE POUR LES DATES COINCÉES DANS LES DICTIONNAIRES
         def clean_for_json(obj):
-            if isinstance(obj, pd.DataFrame):
-                # Convertit proprement le tableau de données en format dictionnaire JSONisable
-                return obj.to_dict(orient="records")
-            if isinstance(obj, (dict, list, str, int, float, bool, type(None))):
-                if isinstance(obj, dict):
-                    return {k: clean_for_json(v) for k, v in obj.items()}
-                if isinstance(obj, list):
-                    return [clean_for_json(i) for i in obj]
-                return obj
-            # Force la conversion des dates (comme les objets datetime.date) en texte propre YYYY-MM-DD
-            if hasattr(obj, 'isoformat'):
+            # 1. Priorité absolue : Convertir les formats dates et datetime en texte YYYY-MM-DD
+            if isinstance(obj, (date, datetime)) or hasattr(obj, 'isoformat'):
                 return obj.isoformat()
+            
+            # 2. Convertir les DataFrames Pandas en listes/dictionnaires standards
+            if isinstance(obj, pd.DataFrame):
+                return obj.to_dict(orient="records")
+            
+            # 3. Parcourir de manière récursive les listes et dictionnaires standards
+            if isinstance(obj, dict):
+                return {k: clean_for_json(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [clean_for_json(i) for i in obj]
+                
+            # 4. Pour les types de base, on retourne directement la valeur
+            if isinstance(obj, (str, int, float, bool, type(None))):
+                return obj
+                
+            # Sécurité pour tout autre type d'objet complexe (comme les graphiques)
             return str(obj)
 
         try:
@@ -126,7 +133,7 @@ with st.sidebar:
         try:
             restored_data = json.load(uploaded_file)
             
-            # ✅ RE-CONVERSION : Transforme les textes bruts importés en vrais DataFrames exploitables
+            # RE-CONVERSION : On transforme à nouveau les données brutes lues en DataFrames exploitables
             for p_item in restored_data:
                 if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
                     p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
