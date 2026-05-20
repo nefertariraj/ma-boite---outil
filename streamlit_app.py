@@ -82,8 +82,8 @@ with st.sidebar:
     
     st.divider()
 
-   # --- 2. EXPORTATION (SAUVEGARDER) ---
-st.subheader("💾 Sauvegarder mon travail")
+   # --- 2. EXPORTATION (SAUVEGARDER) DANS LA BARRE LATÉRALE ---
+st.sidebar.subheader("💾 Sauvegarder mon travail")
 if st.session_state.get('projects'):
 
     # FONCTION DE NETTOYAGE DES DATAFRAMES UNIQUEMENT
@@ -160,22 +160,30 @@ if st.session_state.get('projects'):
             default=force_serialize_dates
         )
         
-        st.download_button(
-            label="📤 Télécharger ma sauvegarde (.json)",
+        # Bouton placé dans la barre latérale
+        st.sidebar.download_button(
+            label="📤 Télécharger la sauvegarde (.json)",
             data=data_json,
             file_name="sauvegarde_boite_outils.json",
             mime="application/json",
             help="Cliquez ici pour enregistrer vos projets sur votre ordinateur."
         )
     except Exception as e:
-        st.error(f"Erreur préparation : {e}")
+        st.sidebar.error(f"Erreur préparation : {e}")
 else:
-    st.info("Aucun projet à sauvegarder.")
+    st.sidebar.info("Aucun projet à sauvegarder.")
 
-# --- 3. IMPORTATION (RECHARGER) ---
-st.divider()
-st.subheader("📥 Reprendre mon travail")
-uploaded_file = st.file_uploader("Importer un fichier de sauvegarde", type="json", key="app_file_uploader")
+
+# --- 3. IMPORTATION (RECHARGER) DANS LA BARRE LATÉRALE ---
+st.sidebar.divider()
+st.sidebar.subheader("📥 Reprendre mon travail")
+
+# Zone de dépôt de fichier placée dans la barre latérale
+uploaded_file = st.sidebar.file_uploader(
+    "Importer un fichier de sauvegarde", 
+    type="json", 
+    key="app_file_uploader"
+)
 
 if uploaded_file is not None:
     try:
@@ -189,7 +197,7 @@ if uploaded_file is not None:
             if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
                 p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
 
-        # 🚨 NETTOYAGE TOTAL ET AGRESSIF DU STATE POUR ÉVITER LES CONFLITS DE CACHE D'ÉDITION
+        # 🚨 NETTOYAGE TOTAL ET AGRESSIF DU STATE POUR ÉVITER LES CONFLITS
         for key in list(st.session_state.keys()):
             if any(x in key for x in ["gantt_table_", "editor_", "gantt_fig_", "btn_gantt_"]):
                 del st.session_state[key]
@@ -203,13 +211,13 @@ if uploaded_file is not None:
             if "projects" in st.session_state and len(st.session_state["projects"]) > 0:
                 st.session_state["current_project"] = st.session_state["projects"][0]
 
-        st.success("✅ Données chargées avec succès ! Le projet s'ouvre...")
+        st.sidebar.success("✅ Données chargées avec succès !")
         
-        # Le rerun reconstruit l'interface proprement sans les caches de l'ancienne session
+        # Le rerun reconstruit l'interface proprement
         st.rerun()
         
     except Exception as e:
-        st.error(f"Erreur lors de l'import : {e}")
+        st.sidebar.error(f"Erreur lors de l'import : {e}")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
