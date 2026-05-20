@@ -679,132 +679,132 @@ else:
                 st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
                 
         # --- 7. PROJECT MILESTONE & TIMING ---
-st.divider()
-st.header("📅 7. Project Milestone & Timing")
+        st.divider()
+        st.header("📅 7. Project Milestone & Timing")
 
-import datetime
-import plotly.express as px
-import pandas as pd  # 👈 SÉCURITÉ : Assure l'existence de 'pd' pour éviter le crash NameError
+        import datetime
+        import plotly.express as px
+        import pandas as pd  # 👈 SÉCURITÉ : Assure l'existence de 'pd' pour éviter le crash NameError
 
-# SÉCURITÉ EXTENDED : Si 'p' a été perdu ou renommé lors du rechargement de l'application
-if 'p' not in locals() and 'p' not in globals():
-    if "current_project" in st.session_state:
-        p = st.session_state["current_project"]
-    elif "project" in st.session_state:
-        p = st.session_state["project"]
-    elif "projects" in st.session_state and "p_idx" in locals():
-        p = st.session_state["projects"][p_idx]
-    else:
-        p = {}
+        # SÉCURITÉ EXTENDED : Si 'p' a été perdu ou renommé lors du rechargement de l'application
+        if 'p' not in locals() and 'p' not in globals():
+            if "current_project" in st.session_state:
+                p = st.session_state["current_project"]
+            elif "project" in st.session_state:
+                p = st.session_state["project"]
+            elif "projects" in st.session_state and "p_idx" in locals():
+                p = st.session_state["projects"][p_idx]
+            else:
+                p = {}
 
-# SÉCURITÉ INDEX : Assure la présence de p_idx pour les clés de composants
-if 'p_idx' not in locals() and 'p_idx' not in globals():
-    p_idx = 0
+        # SÉCURITÉ INDEX : Assure la présence de p_idx pour les clés de composants
+        if 'p_idx' not in locals() and 'p_idx' not in globals():
+            p_idx = 0
 
-# 1. Initialisation initiale / Sécurisation si la structure est altérée ou absente
-if "gantt_data" not in p or not isinstance(p["gantt_data"], pd.DataFrame):
-    p["gantt_data"] = pd.DataFrame([
-        {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-        {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-        {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-        {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-        {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-    ])
+        # 1. Initialisation initiale / Sécurisation si la structure est altérée ou absente
+        if "gantt_data" not in p or not isinstance(p["gantt_data"], pd.DataFrame):
+            p["gantt_data"] = pd.DataFrame([
+                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+            ])
 
-# 1b. Préparation propre des données pour l'affichage (Calendrier)
-try:
-    df_input = p["gantt_data"].copy()
-    df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
-    df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
-except Exception:
-    p["gantt_data"] = pd.DataFrame([
-        {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-        {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-        {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-        {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-        {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-    ])
-    df_input = p["gantt_data"].copy()
+        # 1b. Préparation propre des données pour l'affichage (Calendrier)
+        try:
+            df_input = p["gantt_data"].copy()
+            df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
+            df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
+        except Exception:
+            p["gantt_data"] = pd.DataFrame([
+                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+            ])
+            df_input = p["gantt_data"].copy()
 
-# 2. Configuration des colonnes pour le sélecteur de date
-config_colonnes = {
-    "Etape": st.column_config.TextColumn("Etape", required=True),
-    "Début": st.column_config.DateColumn("Début", format="YYYY-MM-DD", required=True),
-    "Fin": st.column_config.DateColumn("Fin", format="YYYY-MM-DD", required=True),
-    "Responsable": st.column_config.TextColumn("Responsable")
-}
+        # 2. Configuration des colonnes pour le sélecteur de date
+        config_colonnes = {
+            "Etape": st.column_config.TextColumn("Etape", required=True),
+            "Début": st.column_config.DateColumn("Début", format="YYYY-MM-DD", required=True),
+            "Fin": st.column_config.DateColumn("Fin", format="YYYY-MM-DD", required=True),
+            "Responsable": st.column_config.TextColumn("Responsable")
+        }
 
-# Clé unique pour l'état d'édition
-gantt_key = f"gantt_table_final_{p_idx}"
+        # Clé unique pour l'état d'édition
+        gantt_key = f"gantt_table_final_{p_idx}"
 
-# 📊 FONCTION DE SAUVEGARDE EN TEMPS RÉEL (on_change)
-def sync_gantt_live():
-    if gantt_key in st.session_state:
-        state = st.session_state[gantt_key]
-        df_base = p["gantt_data"].copy()
+        # 📊 FONCTION DE SAUVEGARDE EN TEMPS RÉEL (on_change)
+        def sync_gantt_live():
+            if gantt_key in st.session_state:
+                state = st.session_state[gantt_key]
+                df_base = p["gantt_data"].copy()
         
-        # Appliquer les lignes modifiées
-        for row_idx, changes in state.get("edited_rows", {}).items():
-            for col, val in changes.items():
-                df_base.iloc[row_idx, df_base.columns.get_loc(col)] = val
+                # Appliquer les lignes modifiées
+                for row_idx, changes in state.get("edited_rows", {}).items():
+                    for col, val in changes.items():
+                        df_base.iloc[row_idx, df_base.columns.get_loc(col)] = val
                 
-        # Appliquer les lignes ajoutées
-        for new_row in state.get("added_rows", []):
-            df_base = pd.concat([df_base, pd.DataFrame([new_row])], ignore_index=True)
+                # Appliquer les lignes ajoutées
+                for new_row in state.get("added_rows", []):
+                    df_base = pd.concat([df_base, pd.DataFrame([new_row])], ignore_index=True)
             
-        # Appliquer les lignes supprimées
-        deleted_rows = state.get("deleted_rows", [])
-        if deleted_rows:
-            df_base = df_base.drop(deleted_rows).reset_index(drop=True)
+                # Appliquer les lignes supprimées
+                deleted_rows = state.get("deleted_rows", [])
+                if deleted_rows:
+                    df_base = df_base.drop(deleted_rows).reset_index(drop=True)
             
-        # Mise à jour immédiate de la source de données principale
-        p["gantt_data"] = df_base
+                # Mise à jour immédiate de la source de données principale
+                p["gantt_data"] = df_base
 
-# Affichage du tableau éditable avec synchronisation automatique au changement
-edited_gantt = st.data_editor(
-    df_input, 
-    column_config=config_colonnes,
-    num_rows="dynamic", 
-    use_container_width=True, 
-    key=gantt_key,
-    on_change=sync_gantt_live
-)
+        # Affichage du tableau éditable avec synchronisation automatique au changement
+        edited_gantt = st.data_editor(
+            df_input, 
+            column_config=config_colonnes,
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key=gantt_key,
+            on_change=sync_gantt_live
+        )
 
-# 3. Bouton d'action pour générer le graphique Plotly
-if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
-    try:
-        df_gantt = p["gantt_data"].copy().dropna(subset=["Etape", "Début", "Fin"])
+        # 3. Bouton d'action pour générer le graphique Plotly
+        if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
+            try:
+                df_gantt = p["gantt_data"].copy().dropna(subset=["Etape", "Début", "Fin"])
         
-        if not df_gantt.empty:
-            df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
-            df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
+                if not df_gantt.empty:
+                    df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
+                    df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
             
-            ordre_etapes = df_gantt["Etape"].tolist()
+                    ordre_etapes = df_gantt["Etape"].tolist()
             
-            # Création du graphique Plotly rafraîchi
-            fig = px.timeline(
-                df_gantt, 
-                x_start="Début", 
-                x_end="Fin", 
-                y="Etape", 
-                color="Responsable",
-                title=f"Planning DMAIC - {p.get('name', 'Projet')}",
-                color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
-            )
+                    # Création du graphique Plotly rafraîchi
+                    fig = px.timeline(
+                        df_gantt, 
+                        x_start="Début", 
+                        x_end="Fin", 
+                        y="Etape", 
+                        color="Responsable",
+                        title=f"Planning DMAIC - {p.get('name', 'Projet')}",
+                        color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
+                    )
             
-            fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
+                    fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
             
-            # Sauvegarde forcée du nouveau graphique dans le session_state
-            st.session_state[f"gantt_fig_{p_idx}"] = fig
-            st.toast("✅ Diagramme de Gantt mis à jour !", icon="📊")
-        else:
-            st.error("Veuillez remplir correctement toutes les étapes et dates du tableau.")
-    except Exception as e:
-        st.error(f"Erreur lors de la génération : {e}")
+                    # Sauvegarde forcée du nouveau graphique dans le session_state
+                    st.session_state[f"gantt_fig_{p_idx}"] = fig
+                    st.toast("✅ Diagramme de Gantt mis à jour !", icon="📊")
+                else:
+                    st.error("Veuillez remplir correctement toutes les étapes et dates du tableau.")
+            except Exception as e:
+                st.error(f"Erreur lors de la génération : {e}")
 
-# 4. Rendu visuel permanent du graphique
-if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
-    st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
+        # 4. Rendu visuel permanent du graphique
+        if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
+            st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
     
     # --- PHASE MEASURE ---
     with tabs[1]:
