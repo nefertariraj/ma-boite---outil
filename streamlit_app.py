@@ -86,37 +86,35 @@ with st.sidebar:
     st.subheader("💾 Sauvegarder mon travail")
     if st.session_state.get('projects'):
 
-        # ✅ FONCTION DE NETTOYAGE ABSOLUE POUR TOUS LES TYPES DE DATES ET DATAFRAMES
+        # FONCTION DE NETTOYAGE DES DATAFRAMES UNIQUEMENT
         def clean_for_json(obj):
-            # 1. Traitement des DataFrames Pandas (convertis en listes de dictionnaires)
             if isinstance(obj, pd.DataFrame):
                 return obj.to_dict(orient="records")
-            
-            # 2. Intercepter les objets dates natifs (Python date, datetime, Timestamp)
-            if isinstance(obj, (date, datetime)) or hasattr(obj, 'isoformat'):
-                try:
-                    return obj.strftime('%Y-%m-%d')
-                except Exception:
-                    return str(obj)
-            
-            # 3. Parcourir de manière récursive les dictionnaires
             if isinstance(obj, dict):
                 return {str(k): clean_for_json(v) for k, v in obj.items()}
-            
-            # 4. Parcourir de manière récursive les listes
             if isinstance(obj, list):
                 return [clean_for_json(i) for i in obj]
-                
-            # 5. Types primitifs acceptés par JSON directement
-            if isinstance(obj, (str, int, float, bool, type(None))):
-                return obj
-                
-            # Sécurité ultime pour tout autre type inconnu
+            return obj
+
+        # FONCTION DE SÉCURITÉ ULTIME : Convertit n'importe quel type de date bizarre en texte brut YYYY-MM-DD
+        def force_serialize_dates(obj):
+            if hasattr(obj, 'strftime'):
+                return obj.strftime('%Y-%m-%d')
+            if hasattr(obj, 'isoformat'):
+                return obj.isoformat()
             return str(obj)
 
         try:
+            # 1. On transforme d'abord les DataFrames en listes/dictionnaires standards
             projects_cleaned = clean_for_json(st.session_state.projects)
-            data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False)
+            
+            # 2. On encode en JSON en forçant TOUTES les dates rebelles à devenir du texte brut
+            data_json = json.dumps(
+                projects_cleaned, 
+                indent=4, 
+                ensure_ascii=False, 
+                default=force_serialize_dates # S'active automatiquement dès qu'un objet (comme une date NumPy/Pandas) bloque
+            )
             
             st.download_button(
                 label="📤 Télécharger ma sauvegarde (.json)",
