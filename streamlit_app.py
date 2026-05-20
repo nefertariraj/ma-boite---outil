@@ -104,7 +104,7 @@ if st.session_state.get('projects'):
             return obj.isoformat()
         return str(obj)
 
-    # 🚨 APPLIQUER LES MODIFICATIONS EN ATTENTE AVANT DE GÉNÉRER LE FICHIER
+    # APPLIQUER LES MODIFICATIONS EN ATTENTE AVANT DE GÉNÉRER LE FICHIER
     def appliquer_modifications_session():
         if "current_project_idx" in st.session_state and st.session_state.current_project_idx is not None:
             p_idx = st.session_state.current_project_idx
@@ -172,41 +172,63 @@ uploaded_file = st.sidebar.file_uploader(
 
 if uploaded_file is not None:
     try:
-        restored_data = json.load(uploaded_file)
-        
-        # Reconstruction des DataFrames
-        for p_item in restored_data:
-            if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
-                p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+        # Si les données ne sont pas encore chargées en mémoire temporaire
+        if "temp_imported_data" not North in st.session_state:
+            restored_data = json.load(uploaded_file)
             
-            if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
-                p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+            # Reconstruction des DataFrames
+            for p_item in restored_data:
+                if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
+                    p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+                
+                if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
+                    p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+            
+            # On stocke temporairement sans écraser le projet en cours
+            st.session_state["temp_imported_data"] = restored_data
 
-        # 🚨 1. PURGE RADICALE DU STATE (Sélecteurs inclus)
-        # On stocke temporairement le fichier pour ne pas le perdre pendant le vidage
-        for key in list(st.session_state.keys()):
-            if key != "app_file_uploader":
-                del st.session_state[key]
-        
-        # 🚨 2. ATTRIBUTION SÉCURISÉE DES DONNÉES
-        st.session_state.projects = restored_data
-        
-        # 🚨 3. MISE À JOUR DE LA CLÉ DE SÉLECTION DYNAMIQUE
-        # Si ton selectbox de choix de projet utilise une clé (ex: key="select_projet"),
-        # changer sa valeur ou l'initialiser ici l'empêchera de chercher l'ancien index.
-        if len(restored_data) > 0:
-            st.session_state["current_project_idx"] = 0
-            st.session_state["current_project"] = restored_data[0]
-            # Force la valeur par défaut pour le widget selectbox si tu as configuré une clé
-            st.session_state["select_projet"] = restored_data[0].get("nom", "Projet sans nom")
-
-        st.sidebar.success("✅ Chargement réussi ! Rafraîchissement...")
-        
-        # Le rerun reconstruit un arbre d'exécution propre
-        st.rerun()
-        
+        # Interface intermédiaire : Affichage du projet détecté et bouton Ouvrir
+        if "temp_imported_data" in st.session_state:
+            projets_detectes = st.session_state["temp_imported_data"]
+            nb_projets = len(projets_detectes)
+            
+            st.sidebar.info(f"📂 Sauvegarde détectée : {nb_projets} projet(s) disponible(s).")
+            
+            # Petit aperçu du/des projet(s) trouvé(s)
+            for i, p in enumerate(projets_detectes):
+                st.sidebar.text(f"• {p.get('nom', 'Projet sans nom')}")
+            
+            # Bouton de validation pour entrer dans le projet
+            if st.sidebar.button("🔓 Ouvrir et charger les projets", type="primary"):
+                
+                # 🚨 NETTOYAGE CIBLÉ : On supprime l'ancien cache visuel SANS toucher à l'authentification
+                clés_a_conserver = ["logged_in", "auth_user", "username", "user", "credentials"] # Adapte selon tes clés d'authentification
+                
+                for key in list(st.session_state.keys()):
+                    # On ne supprime pas les clés de connexion ni le téléverseur
+                    if key not in clés_a_conserver and key != "app_file_uploader":
+                        # On supprime tout le reste (gantt, éditeurs, anciens index de projets)
+                        if any(x in key for x in ["gantt", "editor", "project", "select_"]):
+                            del st.session_state[key]
+                
+                # Injection définitive des données
+                st.session_state.projects = st.session_state["temp_imported_data"]
+                
+                # Initialisation des index sur le premier projet importé
+                st.session_state["current_project_idx"] = 0
+                st.session_state["current_project"] = st.session_state.projects[0]
+                st.session_state["select_projet"] = st.session_state.projects[0].get("nom", "Projet sans nom")
+                
+                # Nettoyage de la variable temporaire devenue inutile
+                del st.session_state["temp_imported_data"]
+                
+                st.sidebar.success("🚀 Projet chargé !")
+                st.rerun()
+                
     except Exception as e:
         st.sidebar.error(f"Erreur lors de l'import : {e}")
+        if "temp_imported_data" in st.session_state:
+            del st.session_state["temp_imported_data"]
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
