@@ -180,19 +180,26 @@ with st.sidebar:
         try:
             restored_data = json.load(uploaded_file)
             
-            # RE-CONVERSION DES TABLEAUX À L'IMPORT
+            # Reconstruction rigoureuse des DataFrames pour chaque projet importé
             for p_item in restored_data:
-                # Restaure le tableau Gantt
                 if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
                     p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
-                # Restaure le tableau Mesure (ajoute cette ligne pour bloquer le bug sur la partie Mesure !)
+                
+                # Ajoute ici la restauration de tes autres tableaux si nécessaire
                 if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
                     p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+
+            # Nettoyage des anciens états d'éditeurs en session pour forcer l'affichage des nouvelles données
+            for key in list(st.session_state.keys()):
+                if "gantt_editor" in key or "pm_" in key:
+                    del st.session_state[key]
             
             st.session_state.projects = restored_data
-            st.success("✅ Données chargées !")
-            if st.button("🔄 Actualiser l'affichage"):
-                st.rerun()
+            st.success("✅ Données chargées avec succès !")
+            
+            # Le rerun est obligatoire ici pour reconstruire l'interface avec le nouveau JSON
+            st.rerun()
+            
         except Exception as e:
             st.error(f"Erreur lors de l'import : {e}")
 
@@ -672,99 +679,120 @@ else:
                 st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
                 
         # --- 7. PROJECT MILESTONE & TIMING ---
-        st.divider()
-        st.header("📅 7. Project Milestone & Timing")
+st.divider()
+st.header("📅 7. Project Milestone & Timing")
 
-        # 1. Initialisation initiale / Sécurisation si la structure est altérée par st.data_editor
-        import datetime
+import datetime
+import plotly.express as px
+
+# 1. Initialisation initiale / Sécurisation si la structure est altérée ou absente
+if "gantt_data" not in p or not isinstance(p["gantt_data"], pd.DataFrame):
+    p["gantt_data"] = pd.DataFrame([
+        {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+        {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+        {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+        {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+        {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+    ])
+
+# 1b. Préparation propre des données pour l'affichage (Calendrier)
+try:
+    df_input = p["gantt_data"].copy()
+    df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
+    df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
+except Exception:
+    p["gantt_data"] = pd.DataFrame([
+        {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+        {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+        {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+        {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+        {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+    ])
+    df_input = p["gantt_data"].copy()
+
+# 2. Configuration des colonnes pour le sélecteur de date
+config_colonnes = {
+    "Etape": st.column_config.TextColumn("Etape", required=True),
+    "Début": st.column_config.DateColumn("Début", format="YYYY-MM-DD", required=True),
+    "Fin": st.column_config.DateColumn("Fin", format="YYYY-MM-DD", required=True),
+    "Responsable": st.column_config.TextColumn("Responsable")
+}
+
+# Clé unique pour l'état d'édition
+gantt_key = f"gantt_table_final_{p_idx}"
+
+# 📊 FONCTION DE SAUVEGARDE EN TEMPS RÉEL (on_change)
+def sync_gantt_live():
+    if gantt_key in st.session_state:
+        state = st.session_state[gantt_key]
+        df_base = p["gantt_data"].copy()
         
-        # Si la clé n'existe pas, ou si son contenu est corrompu/bizarre, on remet le DataFrame par défaut
-        if "gantt_data" not in p or not isinstance(p["gantt_data"], pd.DataFrame):
-            p["gantt_data"] = pd.DataFrame([
-                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-            ])
-
-        # 1b. Préparation propre des données pour l'affichage (Calendrier)
-        try:
-            df_input = p["gantt_data"].copy()
-            df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
-            df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
-        except Exception:
-            # Sécurité ultime en cas de crash lors de la conversion des dates
-            p["gantt_data"] = pd.DataFrame([
-                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-            ])
-            df_input = p["gantt_data"].copy()
-
-        # 2. Configuration des colonnes pour FORCER le sélecteur de date (calendrier cliquable)
-        config_colonnes = {
-            "Etape": st.column_config.TextColumn("Etape", required=True),
-            "Début": st.column_config.DateColumn("Début", format="YYYY-MM-DD", required=True),
-            "Fin": st.column_config.DateColumn("Fin", format="YYYY-MM-DD", required=True),
-            "Responsable": st.column_config.TextColumn("Responsable")
-        }
-
-        # Affichage du tableau éditable
-        edited_gantt = st.data_editor(
-            df_input, 
-            column_config=config_colonnes,
-            num_rows="dynamic", 
-            use_container_width=True, 
-            key=f"gantt_table_final_{p_idx}"
-        )
-        
-        # 3. Bouton d'action pour générer le graphique
-        if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
-            try:
-                # Nettoyage des lignes vides
-                df_gantt = pd.DataFrame(edited_gantt).dropna(subset=["Etape", "Début", "Fin"])
+        # Appliquer les lignes modifiées
+        for row_idx, changes in state.get("edited_rows", {}).items():
+            for col, val in changes.items():
+                df_base.iloc[row_idx, df_base.columns.get_loc(col)] = val
                 
-                if not df_gantt.empty:
-                    # Conversion propre pour Plotly
-                    df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
-                    df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
-                    
-                    # Sauvegarde immédiate au format DataFrame propre pour écraser tout résidu
-                    p["gantt_data"] = df_gantt.copy()
-                    
-                    # Récupération de l'ordre exact du tableau pour l'axe Y
-                    ordre_etapes = df_gantt["Etape"].tolist()
-                    
-                    # Construction du diagramme de Gantt
-                    import plotly.express as px
-                    fig = px.timeline(
-                        df_gantt, 
-                        x_start="Début", 
-                        x_end="Fin", 
-                        y="Etape", 
-                        color="Responsable",
-                        title=f"Planning DMAIC - {p.get('name', 'Projet')}",
-                        color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
-                    )
-                    
-                    # Respect de l'ordre d'apparition du tableau (du haut vers le bas)
-                    fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
-                    
-                    # Stockage du graphique dans le session_state
-                    st.session_state[f"gantt_fig_{p_idx}"] = fig
-                    st.success("✅ Diagramme de Gantt généré avec succès !")
-                    st.rerun()
-                else:
-                    st.error("Veuillez remplir correctement toutes les étapes et dates du tableau.")
-            except Exception as e:
-                st.error(f"Erreur lors de la génération du graphique : {e}")
+        # Appliquer les lignes ajoutées
+        for new_row in state.get("added_rows", []):
+            df_base = pd.concat([df_base, pd.DataFrame([new_row])], ignore_index=True)
+            
+        # Appliquer les lignes supprimées
+        deleted_rows = state.get("deleted_rows", [])
+        if deleted_rows:
+            df_base = df_base.drop(deleted_rows).reset_index(drop=True)
+            
+        # Mise à jour immédiate de la source de données principale
+        p["gantt_data"] = df_base
 
-        # 4. Rendu visuel permanent du graphique
-        if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
-            st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
+# Affichage du tableau éditable avec synchronisation automatique au changement
+edited_gantt = st.data_editor(
+    df_input, 
+    column_config=config_colonnes,
+    num_rows="dynamic", 
+    use_container_width=True, 
+    key=gantt_key,
+    on_change=sync_gantt_live
+)
+
+# 3. Bouton d'action pour générer le graphique Plotly
+if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
+    try:
+        # Nettoyage et récupération finale
+        df_gantt = pd.DataFrame(edited_gantt).dropna(subset=["Etape", "Début", "Fin"])
+        
+        if not df_gantt.empty:
+            df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
+            df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
+            
+            # Enregistrement de sécurité
+            p["gantt_data"] = df_gantt.copy()
+            ordre_etapes = df_gantt["Etape"].tolist()
+            
+            # Création du graphique Plotly
+            fig = px.timeline(
+                df_gantt, 
+                x_start="Début", 
+                x_end="Fin", 
+                y="Etape", 
+                color="Responsable",
+                title=f"Planning DMAIC - {p.get('name', 'Projet')}",
+                color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
+            )
+            
+            fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
+            
+            # Persistance du graphique généré
+            st.session_state[f"gantt_fig_{p_idx}"] = fig
+            st.success("✅ Diagramme de Gantt généré avec succès !")
+            st.rerun()
+        else:
+            st.error("Veuillez remplir correctement toutes les étapes et dates du tableau.")
+    except Exception as e:
+        st.error(f"Erreur lors de l'icône de génération : {e}")
+
+# 4. Rendu visuel permanent du graphique
+if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
+    st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
     
     # --- PHASE MEASURE ---
     with tabs[1]:
@@ -890,28 +918,35 @@ else:
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
-        # 1. INITIALISATION STRICTE DE LA STRUCTURE DES MACRO-ÉTAPES
-        if "vsm_macro_steps" not in st.session_state:
-            sipoc_data = p.get("sipoc_data", [])
-            macro_steps = []
-            if isinstance(sipoc_data, list) and len(sipoc_data) > 0:
-                for row in sipoc_data:
-                    step_name = row.get("Process") or row.get("process")
-                    if step_name:
-                        macro_steps.append(str(step_name))
-            
-            if not macro_steps:
-                macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
-            st.session_state["vsm_macro_steps"] = macro_steps
+        # 1. INITIALISATION STRICTE DE LA STRUCTURE DES MACRO-ÉTAPES (AVEC PRIORITÉ À L'IMPORT)
+        if "vsm_macro_steps" not in st.session_state or "vsm_macro_steps" in p:
+            # Si le projet contient des étapes (chargées depuis un JSON), on les prend en priorité
+            if "vsm_macro_steps" in p and isinstance(p["vsm_macro_steps"], list):
+                st.session_state["vsm_macro_steps"] = list(p["vsm_macro_steps"])
+            else:
+                sipoc_data = p.get("sipoc_data", [])
+                macro_steps = []
+                if isinstance(sipoc_data, list) and len(sipoc_data) > 0:
+                    for row in sipoc_data:
+                        step_name = row.get("Process") or row.get("process")
+                        if step_name:
+                            macro_steps.append(str(step_name))
+                
+                if not macro_steps:
+                    macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
+                st.session_state["vsm_macro_steps"] = macro_steps
 
-        # 2. INITIALISATION DU STOCKAGE DES DONNÉES DE TÂCHES
-        if "vsm_detailed_map" not in st.session_state:
-            st.session_state["vsm_detailed_map"] = {
-                step: [{"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
-                for step in st.session_state["vsm_macro_steps"]
-            }
+        # 2. INITIALISATION DU STOCKAGE DES DONNÉES DE TÂCHES (AVEC PRIORITÉ À L'IMPORT)
+        if "vsm_detailed_map" not in st.session_state or "vsm_detailed_map" in p:
+            if "vsm_detailed_map" in p and isinstance(p["vsm_detailed_map"], dict):
+                st.session_state["vsm_detailed_map"] = dict(p["vsm_detailed_map"])
+            else:
+                st.session_state["vsm_detailed_map"] = {
+                    step: [{"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
+                    for step in st.session_state["vsm_macro_steps"]
+                }
 
-        # 3. INITIALISATION DES METRICS CALCULÉES (Pour persistance au rechargement)
+        # 3. INITIALISATION DES METRICS CALCULÉES
         if "vsm_totals" not in st.session_state:
             st.session_state["vsm_totals"] = {
                 "lead_time": 0.0, "va": 0.0, "nva": 0.0, "bnrva": 0.0, "attente": 0.0, "pce": 0.0,
@@ -935,7 +970,6 @@ else:
             clean_name = name.strip()
             if clean_name and clean_name not in st.session_state["vsm_macro_steps"]:
                 st.session_state["vsm_macro_steps"].insert(index_pos, clean_name)
-                # On initialise la session de l'éditeur de données pour cette nouvelle clé
                 st.session_state["vsm_detailed_map"][clean_name] = [
                     {"Détail de la tâche": "Première tâche à définir", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}
                 ]
@@ -960,7 +994,7 @@ else:
             st.markdown("### 🗺️ Gestion du Flux & Décomposition (Lead Time)")
             st.caption("Pilotez la structure de votre VSM. Saisissez vos tâches librement, puis cliquez sur le bouton de sauvegarde en bas pour recalculer l'ensemble du flux.")
 
-            # Formulaire d'ajout de section (évite les rafraîchissements intempestifs)
+            # Formulaire d'ajout de section
             col_add1, col_add2, col_add3 = st.columns([3, 2, 1.5])
             with col_add1:
                 new_sec_name = st.text_input("📝 Nom de la nouvelle section :", placeholder="Ex: 2.bis Contrôle Qualité", key=f"new_input_text_{p_idx}")
@@ -991,17 +1025,14 @@ else:
             st.markdown("---")
 
             # --------------------------------------------------
-            # BOUCLE D'ÉDITION LIBRE (SANS EFFACEMENT)
+            # BOUCLE D'ÉDITION LIBRE
             # --------------------------------------------------
-            # Dictionnaire temporaire pour capturer l'état visuel actuel des éditeurs de données
             current_editors_state = {}
 
             for idx_step, step in enumerate(st.session_state["vsm_macro_steps"]):
-                # On récupère les données de référence actuelles
                 current_data = st.session_state["vsm_detailed_map"].get(step, [])
                 df_sub = pd.DataFrame(current_data)
                 
-                # Récupération du dernier total calculé pour l'affichage statique du titre
                 sec_min = st.session_state["vsm_totals"]["section_totals"].get(step, 0.0)
                 if sec_min >= 1440: t_text = f"{sec_min/1440:.1f} j"
                 elif sec_min >= 60: t_text = f"{sec_min/60:.1f} h"
@@ -1016,12 +1047,11 @@ else:
                         delete_section_callback(step)
                         st.rerun()
 
-                # CRUCIAL : On passe le DataFrame initial. Streamlit maintient l'état utilisateur en tâche de fond.
                 edited_df = st.data_editor(
                     df_sub,
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"vsm_editor_v12_{step}_{p_idx}", # La clé est liée au NOM de l'étape pour rester stable
+                    key=f"vsm_editor_v12_{step}_{p_idx}", 
                     column_config={
                         "Détail de la tâche": st.column_config.TextColumn("Détail des micro-tâches", width="large"),
                         "Valeur": st.column_config.NumberColumn("Délai", min_value=0.0, format="%.1f", width="small", required=True),
@@ -1033,7 +1063,6 @@ else:
                         )
                     }
                 )
-                # On stocke l'état actuel de l'écran dans notre dictionnaire temporaire
                 current_editors_state[step] = edited_df
                 st.markdown("---")
 
@@ -1042,7 +1071,6 @@ else:
             # --------------------------------------------------
             if st.button("💾 Enregistrer la Cartographie & Mettre à jour les Calculs", type="primary", use_container_width=True, key=f"save_vsm_map_v12_{p_idx}"):
                 
-                # Réinitialisation des compteurs globaux pour le recalcul
                 total_lt = 0.0
                 total_va = 0.0
                 total_nva = 0.0
@@ -1050,20 +1078,15 @@ else:
                 total_attente = 0.0
                 new_section_totals = {}
 
-                # Parcours et figeage définitif des modifications de chaque tableau
                 for step in st.session_state["vsm_macro_steps"]:
-                    # Récupération de ce qui est écrit à l'écran
                     df_edited = current_editors_state.get(step, pd.DataFrame())
                     
-                    # Nettoyage des lignes vides
                     if not df_edited.empty and "Détail de la tâche" in df_edited.columns:
                         df_edited = df_edited.dropna(subset=["Détail de la tâche"])
                     
-                    # Sauvegarde dans la mémoire de session persistante
                     records = df_edited.to_dict('records')
                     st.session_state["vsm_detailed_map"][step] = records
                     
-                    # Calcul du roll-up pour cette section particulière
                     sec_sum = 0.0
                     if not df_edited.empty:
                         for _, row in df_edited.iterrows():
@@ -1079,10 +1102,8 @@ else:
                     
                     new_section_totals[step] = sec_sum
 
-                # Calcul de l'efficience (PCE)
                 pce_calc = (total_va / total_lt * 100) if total_lt > 0 else 0.0
 
-                # Enregistrement du pack complet dans le state global de calcul
                 st.session_state["vsm_totals"] = {
                     "lead_time": total_lt,
                     "va": total_va,
@@ -1093,7 +1114,7 @@ else:
                     "section_totals": new_section_totals
                 }
 
-                # Exportation vers l'objet global outil 'p' pour compatibilité externe
+                # 🚨 ALIGNEMENT ET SAUVEGARDE DIRECTE DANS LE DICTIONNAIRE DE PROJET
                 p["vsm_macro_steps"] = list(st.session_state["vsm_macro_steps"])
                 p["vsm_detailed_map"] = dict(st.session_state["vsm_detailed_map"])
                 if "voc_raw_data" in st.session_state:
