@@ -573,7 +573,7 @@ else:
         st.divider()
         st.header("📅 7. Project Milestone & Timing")
 
-        # 1. Initialisation sécurisée dans le dictionnaire du projet 'p'
+        # 1. Initialisation initiale dans le dictionnaire du projet 'p'
         if "gantt_data" not in p:
             import datetime
             p["gantt_data"] = pd.DataFrame([
@@ -584,18 +584,29 @@ else:
                 {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
             ])
 
-        # 2. Affichage et édition du tableau par l'utilisateur (Sécurisé contre les crashs de clé à la reconnexion)
+        # 1b. SÉCURISATION DES TYPES DE DONNÉES (Anti-crash Reconnexion)
+        # On force la copie pour isoler la donnée et on convertit les Timestamp Pandas lourds en formats éditables
+        try:
+            df_input = pd.DataFrame(p["gantt_data"]).copy()
+            if "Début" in df_input.columns:
+                df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
+            if "Fin" in df_input.columns:
+                df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
+        except Exception:
+            # Sécurité absolue : si la structure est corrompue au rechargement, on repart de la structure de base
+            df_input = p["gantt_data"]
+
+        # 2. Affichage et édition du tableau par l'utilisateur
         try:
             edited_gantt = st.data_editor(
-                p["gantt_data"], 
+                df_input, 
                 num_rows="dynamic", 
                 use_container_width=True, 
                 key=f"gantt_ed_{p_idx}"
             )
         except st.errors.StreamlitAPIException:
-            # Clé de repli automatique si Streamlit Cloud a corrompu le cache de la clé principale
             edited_gantt = st.data_editor(
-                p["gantt_data"], 
+                df_input, 
                 num_rows="dynamic", 
                 use_container_width=True, 
                 key=f"gantt_ed_{p_idx}_fallback"
