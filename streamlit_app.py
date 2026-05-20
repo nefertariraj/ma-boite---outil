@@ -60,7 +60,7 @@ if not st.session_state.authenticated:
             if user and pwd: 
                 st.session_state.authenticated = True
                 st.rerun()
-    st.stop()
+    st.stop()  # Sécurité absolue : bloque tout affichage du reste du code tant qu'on n'est pas loggé
 
 
 # ==========================================
