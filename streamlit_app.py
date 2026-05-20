@@ -86,27 +86,32 @@ with st.sidebar:
     st.subheader("💾 Sauvegarder mon travail")
     if st.session_state.get('projects'):
 
-        # ✅ FONCTION DE NETTOYAGE CORRIGÉE POUR LES DATES COINCÉES DANS LES DICTIONNAIRES
+        # ✅ FONCTION DE NETTOYAGE ABSOLUE POUR TOUS LES TYPES DE DATES ET DATAFRAMES
         def clean_for_json(obj):
-            # 1. Priorité absolue : Convertir les formats dates et datetime en texte YYYY-MM-DD
-            if isinstance(obj, (date, datetime)) or hasattr(obj, 'isoformat'):
-                return obj.isoformat()
-            
-            # 2. Convertir les DataFrames Pandas en listes/dictionnaires standards
+            # 1. Traitement des DataFrames Pandas (convertis en listes de dictionnaires)
             if isinstance(obj, pd.DataFrame):
                 return obj.to_dict(orient="records")
             
-            # 3. Parcourir de manière récursive les listes et dictionnaires standards
+            # 2. Intercepter les objets dates natifs (Python date, datetime, Timestamp)
+            if isinstance(obj, (date, datetime)) or hasattr(obj, 'isoformat'):
+                try:
+                    return obj.strftime('%Y-%m-%d')
+                except Exception:
+                    return str(obj)
+            
+            # 3. Parcourir de manière récursive les dictionnaires
             if isinstance(obj, dict):
-                return {k: clean_for_json(v) for k, v in obj.items()}
+                return {str(k): clean_for_json(v) for k, v in obj.items()}
+            
+            # 4. Parcourir de manière récursive les listes
             if isinstance(obj, list):
                 return [clean_for_json(i) for i in obj]
                 
-            # 4. Pour les types de base, on retourne directement la valeur
+            # 5. Types primitifs acceptés par JSON directement
             if isinstance(obj, (str, int, float, bool, type(None))):
                 return obj
                 
-            # Sécurité pour tout autre type d'objet complexe (comme les graphiques)
+            # Sécurité ultime pour tout autre type inconnu
             return str(obj)
 
         try:
@@ -133,7 +138,7 @@ with st.sidebar:
         try:
             restored_data = json.load(uploaded_file)
             
-            # RE-CONVERSION : On transforme à nouveau les données brutes lues en DataFrames exploitables
+            # RE-CONVERSION DES TABLEAUX À L'IMPORT
             for p_item in restored_data:
                 if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
                     p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
