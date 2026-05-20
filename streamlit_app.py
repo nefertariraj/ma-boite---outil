@@ -106,53 +106,40 @@ if st.session_state.get('projects'):
 
     # 🚨 APPLIQUER LES MODIFICATIONS EN ATTENTE AVANT DE GÉNÉRER LE FICHIER
     def appliquer_modifications_session():
-        """Parcourt la mémoire de Streamlit pour valider les modifications des tableaux à la volée"""
         if "current_project_idx" in st.session_state and st.session_state.current_project_idx is not None:
             p_idx = st.session_state.current_project_idx
             
-            # On cherche toutes les clés d'éditeurs de données actives en session
             for key in list(st.session_state.keys()):
                 if ("editor_" in key or "gantt_table_" in key) and key in st.session_state:
                     changes = st.session_state[key]
                     
-                    # Déterminer la cible
                     target_field = None
                     if "gantt" in key:
                         target_field = "gantt_data"
                     elif "mesure" in key or "measure" in key:
                         target_field = "mesure_data"
                     
-                    # Si on trouve un tableau correspondant dans ton projet
                     if target_field and target_field in st.session_state["projects"][p_idx]:
                         df_actuel = st.session_state["projects"][p_idx][target_field]
                         if isinstance(df_actuel, pd.DataFrame):
                             df_modifie = df_actuel.copy()
                             
-                            # Appliquer les lignes modifiées
                             for r_idx, v_changes in changes.get("edited_rows", {}).items():
                                 for col, val in v_changes.items():
                                     df_modifie.iloc[r_idx, df_modifie.columns.get_loc(col)] = val
                             
-                            # Appliquer les lignes ajoutées
                             for new_row in changes.get("added_rows", []):
                                 df_modifie = pd.concat([df_modifie, pd.DataFrame([new_row])], ignore_index=True)
                             
-                            # Appliquer les lignes supprimées
                             indices_del = changes.get("deleted_rows", [])
                             if indices_del:
                                 df_modifie = df_modifie.drop(indices_del).reset_index(drop=True)
                             
-                            # Enregistrement définitif
                             st.session_state["projects"][p_idx][target_field] = df_modifie
 
     try:
-        # Sécurité forcée : On applique les modifs à l'instant T avant de fabriquer le JSON
         appliquer_modifications_session()
-        
-        # 1. On transforme les DataFrames en listes/dictionnaires standards
         projects_cleaned = clean_for_json(st.session_state.projects)
-        
-        # 2. On encode en JSON
         data_json = json.dumps(
             projects_cleaned, 
             indent=4, 
@@ -160,7 +147,6 @@ if st.session_state.get('projects'):
             default=force_serialize_dates
         )
         
-        # Bouton placé dans la barre latérale
         st.sidebar.download_button(
             label="📤 Télécharger la sauvegarde (.json)",
             data=data_json,
@@ -178,7 +164,6 @@ else:
 st.sidebar.divider()
 st.sidebar.subheader("📥 Reprendre mon travail")
 
-# Zone de dépôt de fichier placée dans la barre latérale
 uploaded_file = st.sidebar.file_uploader(
     "Importer un fichier de sauvegarde", 
     type="json", 
@@ -189,7 +174,7 @@ if uploaded_file is not None:
     try:
         restored_data = json.load(uploaded_file)
         
-        # Reconstruction rigoureuse des DataFrames pour chaque projet importé
+        # Reconstruction des DataFrames
         for p_item in restored_data:
             if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
                 p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
@@ -197,23 +182,27 @@ if uploaded_file is not None:
             if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
                 p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
 
-        # 🚨 NETTOYAGE TOTAL ET AGRESSIF DU STATE POUR ÉVITER LES CONFLITS
+        # 🚨 1. PURGE RADICALE DU STATE (Sélecteurs inclus)
+        # On stocke temporairement le fichier pour ne pas le perdre pendant le vidage
         for key in list(st.session_state.keys()):
-            if any(x in key for x in ["gantt_table_", "editor_", "gantt_fig_", "btn_gantt_"]):
+            if key != "app_file_uploader":
                 del st.session_state[key]
         
-        # Injection des données restaurées
+        # 🚨 2. ATTRIBUTION SÉCURISÉE DES DONNÉES
         st.session_state.projects = restored_data
         
-        # 🚀 RE-SÉLECTION AUTOMATIQUE DU PREMIER PROJET POUR ÉVITER LE BLOCAGE VISUEL
+        # 🚨 3. MISE À JOUR DE LA CLÉ DE SÉLECTION DYNAMIQUE
+        # Si ton selectbox de choix de projet utilise une clé (ex: key="select_projet"),
+        # changer sa valeur ou l'initialiser ici l'empêchera de chercher l'ancien index.
         if len(restored_data) > 0:
             st.session_state["current_project_idx"] = 0
-            if "projects" in st.session_state and len(st.session_state["projects"]) > 0:
-                st.session_state["current_project"] = st.session_state["projects"][0]
+            st.session_state["current_project"] = restored_data[0]
+            # Force la valeur par défaut pour le widget selectbox si tu as configuré une clé
+            st.session_state["select_projet"] = restored_data[0].get("nom", "Projet sans nom")
 
-        st.sidebar.success("✅ Données chargées avec succès !")
+        st.sidebar.success("✅ Chargement réussi ! Rafraîchissement...")
         
-        # Le rerun reconstruit l'interface proprement
+        # Le rerun reconstruit un arbre d'exécution propre
         st.rerun()
         
     except Exception as e:
