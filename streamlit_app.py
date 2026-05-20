@@ -576,43 +576,55 @@ else:
         # 1. Initialisation initiale dans le dictionnaire du projet 'p'
         if "gantt_data" not in p:
             import datetime
-            p["gantt_data"] = pd.DataFrame([
-                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
-                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
-                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
-                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
-                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
-            ])
+            p["gantt_data"] = [
+                {"Etape": "Define", "Début": "2026-05-01", "Fin": "2026-05-15", "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": "2026-05-16", "Fin": "2026-06-15", "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": "2026-06-16", "Fin": "2026-07-15", "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": "2026-07-16", "Fin": "2026-09-15", "Responsable": "Team"},
+                {"Etape": "Control", "Début": "2026-09-16", "Fin": "2026-10-31", "Responsable": "Process Owner"}
+            ]
 
-        # 1b. SÉCURISATION DES TYPES DE DONNÉES (Anti-crash Reconnexion)
-        # On force la copie pour isoler la donnée et on convertit les Timestamp Pandas lourds en formats éditables
+        # 1b. SÉCURISATION ABSOLUE : Conversion forcée en liste de dictionnaires pure (Anti-StreamlitAPIException)
         try:
-            df_input = pd.DataFrame(p["gantt_data"]).copy()
-            if "Début" in df_input.columns:
-                df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
-            if "Fin" in df_input.columns:
-                df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
+            if isinstance(p["gantt_data"], pd.DataFrame):
+                # Si c'était un DataFrame de la veille, on extrait les lignes en dictionnaires propres
+                raw_data = p["gantt_data"].copy()
+                # On s'assure que les dates complexes deviennent des chaînes de caractères simples (format ISO)
+                if "Début" in raw_data.columns:
+                    raw_data["Début"] = pd.to_datetime(raw_data["Début"], errors='coerce').dt.strftime('%Y-%m-%d')
+                if "Fin" in raw_data.columns:
+                    raw_data["Fin"] = pd.to_datetime(raw_data["Fin"], errors='coerce').dt.strftime('%Y-%m-%d')
+                list_data = raw_data.to_dict(orient="records")
+            else:
+                list_data = list(p["gantt_data"])
         except Exception:
-            # Sécurité absolue : si la structure est corrompue au rechargement, on repart de la structure de base
-            df_input = p["gantt_data"]
+            # En cas de corruption lourde, reset sur la structure de base en texte brut
+            list_data = [
+                {"Etape": "Define", "Début": "2026-05-01", "Fin": "2026-05-15", "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": "2026-05-16", "Fin": "2026-06-15", "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": "2026-06-16", "Fin": "2026-07-15", "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": "2026-07-16", "Fin": "2026-09-15", "Responsable": "Team"},
+                {"Etape": "Control", "Début": "2026-09-16", "Fin": "2026-10-31", "Responsable": "Process Owner"}
+            ]
 
         # 2. Affichage et édition du tableau par l'utilisateur
         try:
             edited_gantt = st.data_editor(
-                df_input, 
+                list_data, 
                 num_rows="dynamic", 
                 use_container_width=True, 
-                key=f"gantt_ed_{p_idx}"
+                key=f"gantt_ed_v3_{p_idx}"  # Changement de nom de clé pour purger le cache défaillant de Streamlit
             )
-        except st.errors.StreamlitAPIException:
+        except Exception:
+            # Fallback ultime au cas où
             edited_gantt = st.data_editor(
-                df_input, 
+                list_data, 
                 num_rows="dynamic", 
                 use_container_width=True, 
-                key=f"gantt_ed_{p_idx}_fallback"
+                key=f"gantt_ed_v3_{p_idx}_fallback"
             )
         
-        # 3. Bouton d'action pour générer le graphique
+        # 3. Bouton d'action pour générer le graphique (Ta logique reste 100% intacte)
         if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
             try:
                 # Nettoyage et sécurisation des données saisies ou importées
@@ -627,8 +639,8 @@ else:
                     df_gantt = df_gantt.dropna(subset=["Début", "Fin"])
                     
                     if not df_gantt.empty:
-                        # Sauvegarde des données nettoyées
-                        p["gantt_data"] = df_gantt
+                        # Sauvegarde des données nettoyées au format dictionnaire pour la prochaine connexion !
+                        p["gantt_data"] = df_gantt.copy().to_dict(orient="records")
                         
                         # Construction stricte du diagramme de Gantt Plotly Express
                         import plotly.express as px
@@ -648,6 +660,7 @@ else:
                         # Stockage du graphique valide dans le session_state
                         st.session_state[f"gantt_fig_{p_idx}"] = fig
                         st.success("✅ Diagramme de Gantt généré avec succès !")
+                        st.rerun() # Force le rafraîchissement propre
                     else:
                         st.error("Le format des dates est incorrect. Utilisez le format AAAA-MM-JJ.")
                 else:
