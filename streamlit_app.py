@@ -96,7 +96,7 @@ with st.sidebar:
                 return [clean_for_json(i) for i in obj]
             return obj
 
-        # FONCTION DE SÉCURITÉ ULTIME : Convertit n'importe quel type de date bizarre en texte brut YYYY-MM-DD
+        # FONCTION DE SÉCURITÉ POUR LES DATES
         def force_serialize_dates(obj):
             if hasattr(obj, 'strftime'):
                 return obj.strftime('%Y-%m-%d')
@@ -104,16 +104,60 @@ with st.sidebar:
                 return obj.isoformat()
             return str(obj)
 
+        # 🚨 APPLIQUER TOUTES LES MODIFICATIONS EN ATTENTE AVANT DE GÉNÉRER LE FICHIER
+        def appliquer_modifications_session():
+            """Parcourt la mémoire de Streamlit pour valider les modifications des tableaux à la volée"""
+            if "current_project_idx" in st.session_state and st.session_state.current_project_idx is not None:
+                p_idx = st.session_state.current_project_idx
+                
+                # On cherche toutes les clés d'éditeurs de données actives en session
+                for key in list(st.session_state.keys()):
+                    if key.startswith("editor_") and key in st.session_state:
+                        changes = st.session_state[key]
+                        
+                        # Déterminer si c'est le Gantt ou un tableau de la partie Mesure
+                        target_field = None
+                        if "gantt" in key:
+                            target_field = "gantt_data"
+                        elif "mesure" in key or "measure" in key:
+                            target_field = "mesure_data"  # Ajuste ce nom selon le nom de ta variable pour Mesure
+                        
+                        # Si on trouve un tableau correspondant dans ton projet
+                        if target_field and target_field in st.session_state["projects"][p_idx]:
+                            df_actuel = st.session_state["projects"][p_idx][target_field]
+                            if isinstance(df_actuel, pd.DataFrame):
+                                df_modifie = df_actuel.copy()
+                                
+                                # Appliquer les lignes modifiées
+                                for r_idx, v_changes in changes.get("edited_rows", {}).items():
+                                    for col, val in v_changes.items():
+                                        df_modifie.iloc[r_idx, df_modifie.columns.get_loc(col)] = val
+                                
+                                # Appliquer les lignes ajoutées
+                                for new_row in changes.get("added_rows", []):
+                                    df_modifie = pd.concat([df_modifie, pd.DataFrame([new_row])], ignore_index=True)
+                                
+                                # Appliquer les lignes supprimées
+                                indices_del = changes.get("deleted_rows", [])
+                                if indices_del:
+                                    df_modifie = df_modifie.drop(indices_del).reset_index(drop=True)
+                                
+                                # Enregistrement définitif
+                                st.session_state["projects"][p_idx][target_field] = df_modifie
+
         try:
-            # 1. On transforme d'abord les DataFrames en listes/dictionnaires standards
+            # Sécurité forcée : On applique les modifs à l'instant T avant de fabriquer le JSON
+            appliquer_modifications_session()
+            
+            # 1. On transforme les DataFrames en listes/dictionnaires standards
             projects_cleaned = clean_for_json(st.session_state.projects)
             
-            # 2. On encode en JSON en forçant TOUTES les dates rebelles à devenir du texte brut
+            # 2. On encode en JSON
             data_json = json.dumps(
                 projects_cleaned, 
                 indent=4, 
                 ensure_ascii=False, 
-                default=force_serialize_dates # S'active automatiquement dès qu'un objet (comme une date NumPy/Pandas) bloque
+                default=force_serialize_dates
             )
             
             st.download_button(
@@ -138,8 +182,12 @@ with st.sidebar:
             
             # RE-CONVERSION DES TABLEAUX À L'IMPORT
             for p_item in restored_data:
+                # Restaure le tableau Gantt
                 if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
                     p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+                # Restaure le tableau Mesure (ajoute cette ligne pour bloquer le bug sur la partie Mesure !)
+                if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
+                    p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
             
             st.session_state.projects = restored_data
             st.success("✅ Données chargées !")
