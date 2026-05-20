@@ -1,4 +1,3 @@
-Python
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -190,7 +189,7 @@ if st.session_state["current_project_idx"] is None:
     if len(projets_a_afficher) == 0:
         st.info("💡 Aucun projet disponible pour le moment. Créez-en un juste au-dessus ou déposez votre fichier de sauvegarde dans la barre latérale.")
     else:
-        # Grille fluide de 3 colonnes pour afficher uniquement les cartes
+        # Grille de 3 colonnes pour afficher uniquement les cartes
         cols = st.columns(3)
         for idx, projet in enumerate(projets_a_afficher):
             with cols[idx % 3]:
