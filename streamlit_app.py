@@ -573,102 +573,81 @@ else:
         st.divider()
         st.header("📅 7. Project Milestone & Timing")
 
-        # 1. Initialisation initiale dans le dictionnaire du projet 'p'
+        # 1. Initialisation initiale propre avec des objets dates natifs (indispensable pour le calendrier)
         if "gantt_data" not in p:
             import datetime
-            p["gantt_data"] = [
-                {"Etape": "Define", "Début": "2026-05-01", "Fin": "2026-05-15", "Responsable": "Black Belt"},
-                {"Etape": "Measure", "Début": "2026-05-16", "Fin": "2026-06-15", "Responsable": "Green Belt"},
-                {"Etape": "Analyze", "Début": "2026-06-16", "Fin": "2026-07-15", "Responsable": "Black Belt"},
-                {"Etape": "Improve", "Début": "2026-07-16", "Fin": "2026-09-15", "Responsable": "Team"},
-                {"Etape": "Control", "Début": "2026-09-16", "Fin": "2026-10-31", "Responsable": "Process Owner"}
-            ]
+            p["gantt_data"] = pd.DataFrame([
+                {"Etape": "Define", "Début": datetime.date(2026, 5, 1), "Fin": datetime.date(2026, 5, 15), "Responsable": "Black Belt"},
+                {"Etape": "Measure", "Début": datetime.date(2026, 5, 16), "Fin": datetime.date(2026, 6, 15), "Responsable": "Green Belt"},
+                {"Etape": "Analyze", "Début": datetime.date(2026, 6, 16), "Fin": datetime.date(2026, 7, 15), "Responsable": "Black Belt"},
+                {"Etape": "Improve", "Début": datetime.date(2026, 7, 16), "Fin": datetime.date(2026, 9, 15), "Responsable": "Team"},
+                {"Etape": "Control", "Début": datetime.date(2026, 9, 16), "Fin": datetime.date(2026, 10, 31), "Responsable": "Process Owner"}
+            ])
 
-        # 1b. SÉCURISATION ABSOLUE : Conversion forcée en liste de dictionnaires pure (Anti-StreamlitAPIException)
-        try:
-            if isinstance(p["gantt_data"], pd.DataFrame):
-                # Si c'était un DataFrame de la veille, on extrait les lignes en dictionnaires propres
-                raw_data = p["gantt_data"].copy()
-                # On s'assure que les dates complexes deviennent des chaînes de caractères simples (format ISO)
-                if "Début" in raw_data.columns:
-                    raw_data["Début"] = pd.to_datetime(raw_data["Début"], errors='coerce').dt.strftime('%Y-%m-%d')
-                if "Fin" in raw_data.columns:
-                    raw_data["Fin"] = pd.to_datetime(raw_data["Fin"], errors='coerce').dt.strftime('%Y-%m-%d')
-                list_data = raw_data.to_dict(orient="records")
-            else:
-                list_data = list(p["gantt_data"])
-        except Exception:
-            # En cas de corruption lourde, reset sur la structure de base en texte brut
-            list_data = [
-                {"Etape": "Define", "Début": "2026-05-01", "Fin": "2026-05-15", "Responsable": "Black Belt"},
-                {"Etape": "Measure", "Début": "2026-05-16", "Fin": "2026-06-15", "Responsable": "Green Belt"},
-                {"Etape": "Analyze", "Début": "2026-06-16", "Fin": "2026-07-15", "Responsable": "Black Belt"},
-                {"Etape": "Improve", "Début": "2026-07-16", "Fin": "2026-09-15", "Responsable": "Team"},
-                {"Etape": "Control", "Début": "2026-09-16", "Fin": "2026-10-31", "Responsable": "Process Owner"}
-            ]
+        # 1b. Nettoyage préventif des types pour forcer le calendrier à chaque chargement de page
+        df_input = pd.DataFrame(p["gantt_data"]).copy()
+        df_input["Début"] = pd.to_datetime(df_input["Début"], errors='coerce').dt.date
+        df_input["Fin"] = pd.to_datetime(df_input["Fin"], errors='coerce').dt.date
 
-        # 2. Affichage et édition du tableau par l'utilisateur
-        try:
-            edited_gantt = st.data_editor(
-                list_data, 
-                num_rows="dynamic", 
-                use_container_width=True, 
-                key=f"gantt_ed_v3_{p_idx}"  # Changement de nom de clé pour purger le cache défaillant de Streamlit
-            )
-        except Exception:
-            # Fallback ultime au cas où
-            edited_gantt = st.data_editor(
-                list_data, 
-                num_rows="dynamic", 
-                use_container_width=True, 
-                key=f"gantt_ed_v3_{p_idx}_fallback"
-            )
+        # 2. Configuration des colonnes pour FORCER le sélecteur de date (calendrier cliquable)
+        config_colonnes = {
+            "Etape": st.column_config.TextColumn("Etape", required=True),
+            "Début": st.column_config.DateColumn("Début", format="YYYY-MM-DD", required=True),
+            "Fin": st.column_config.DateColumn("Fin", format="YYYY-MM-DD", required=True),
+            "Responsable": st.column_config.TextColumn("Responsable")
+        }
+
+        # Affichage du tableau éditable
+        edited_gantt = st.data_editor(
+            df_input, 
+            column_config=config_colonnes,
+            num_rows="dynamic", 
+            use_container_width=True, 
+            key=f"gantt_table_final_{p_idx}" # Nouvelle clé propre pour réinitialiser le cache Streamlit Cloud
+        )
         
-        # 3. Bouton d'action pour générer le graphique (Ta logique reste 100% intacte)
+        # 3. Bouton d'action pour générer le graphique
         if st.button("🚀 Générer le planning", key=f"btn_gantt_{p_idx}"):
             try:
-                # Nettoyage et sécurisation des données saisies ou importées
+                # Nettoyage des lignes vides
                 df_gantt = pd.DataFrame(edited_gantt).dropna(subset=["Etape", "Début", "Fin"])
                 
                 if not df_gantt.empty:
-                    # Conversion universelle des dates (gère le texte brut et les formats natifs)
-                    df_gantt["Début"] = pd.to_datetime(df_gantt["Début"], errors='coerce')
-                    df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"], errors='coerce')
+                    # Conversion propre pour Plotly
+                    df_gantt["Début"] = pd.to_datetime(df_gantt["Début"])
+                    df_gantt["Fin"] = pd.to_datetime(df_gantt["Fin"])
                     
-                    # Nettoyage des lignes dont le format de date est invalide
-                    df_gantt = df_gantt.dropna(subset=["Début", "Fin"])
+                    # Sauvegarde pour la session
+                    p["gantt_data"] = df_gantt
                     
-                    if not df_gantt.empty:
-                        # Sauvegarde des données nettoyées au format dictionnaire pour la prochaine connexion !
-                        p["gantt_data"] = df_gantt.copy().to_dict(orient="records")
-                        
-                        # Construction stricte du diagramme de Gantt Plotly Express
-                        import plotly.express as px
-                        fig = px.timeline(
-                            df_gantt, 
-                            x_start="Début", 
-                            x_end="Fin", 
-                            y="Etape", 
-                            color="Responsable",
-                            title=f"Planning DMAIC - {p['name']}",
-                            color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
-                        )
-                        
-                        # Inversion de l'axe Y pour afficher chronologiquement le flux du haut vers le bas
-                        fig.update_yaxes(categoryorder="array", categoryarray=["Control", "Improve", "Analyze", "Measure", "Define"])
-                        
-                        # Stockage du graphique valide dans le session_state
-                        st.session_state[f"gantt_fig_{p_idx}"] = fig
-                        st.success("✅ Diagramme de Gantt généré avec succès !")
-                        st.rerun() # Force le rafraîchissement propre
-                    else:
-                        st.error("Le format des dates est incorrect. Utilisez le format AAAA-MM-JJ.")
+                    # Récupération de l'ordre exact du tableau pour l'axe Y
+                    ordre_etapes = df_gantt["Etape"].tolist()
+                    
+                    # Construction du diagramme de Gantt
+                    import plotly.express as px
+                    fig = px.timeline(
+                        df_gantt, 
+                        x_start="Début", 
+                        x_end="Fin", 
+                        y="Etape", 
+                        color="Responsable",
+                        title=f"Planning DMAIC - {p.get('name', 'Projet')}",
+                        color_discrete_sequence=["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#6B7280"]
+                    )
+                    
+                    # REMÈDE AXE Y : Force Plotly à respecter STRICTEMENT l'ordre d'apparition du tableau (du haut vers le bas)
+                    fig.update_yaxes(categoryorder="array", categoryarray=ordre_etapes[::-1])
+                    
+                    # Stockage du graphique dans le session_state
+                    st.session_state[f"gantt_fig_{p_idx}"] = fig
+                    st.success("✅ Diagramme de Gantt généré avec succès !")
+                    st.rerun()
                 else:
                     st.error("Veuillez remplir correctement toutes les étapes et dates du tableau.")
             except Exception as e:
                 st.error(f"Erreur lors de la génération du graphique : {e}")
 
-        # 4. Rendu visuel permanent du graphique (avec étirement responsive géré par Streamlit)
+        # 4. Rendu visuel permanent du graphique
         if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
             st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
     
