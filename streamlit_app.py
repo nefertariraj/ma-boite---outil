@@ -42,7 +42,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- GESTION DES DONNÉES ---
+# --- GESTION DES DONNÉES SÉCURISÉES ---
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 if 'projects' not in st.session_state:
@@ -118,20 +118,14 @@ with st.sidebar:
 
 
 # ==========================================
-# 🖼️ ZONE CENTRALE ÉPURÉE
+# 🖼️ LOGIQUE DE NAVIGATION UNIQUE (SANS DOUBLON)
 # ==========================================
 
-# Bouton de nettoyage d'urgence pour vider les résidus
-if st.button("⚠️ Cliquer ici une fois pour vider les anciens blocs fantômes", type="primary", key="clear_ghost_blocks_btn"):
-    st.session_state.projects = []
-    st.session_state.current_project_idx = None
-    st.rerun()
-
-# ACCUEIL
+# CAS N°1 : ACCUEIL UNIQUE
 if st.session_state["current_project_idx"] is None:
     st.title("🗂️ Mes Projets Lean Six Sigma")
 
-    # Bouton d'initialisation avec clés uniques pour éviter la duplication
+    # Bouton d'initialisation unique
     with st.expander("➕ Initialiser un nouveau projet"):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -143,9 +137,11 @@ if st.session_state["current_project_idx"] is None:
                 })
                 st.rerun()
 
-    # Affichage exclusif des projets enregistrés
+    st.divider()
+
+    # Affichage des cartes de projets existants
     if len(st.session_state.projects) == 0:
-        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde pour afficher vos projets.")
+        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
     else:
         cols = st.columns(3)
         for idx, projet in enumerate(st.session_state.projects):
@@ -160,16 +156,16 @@ if st.session_state["current_project_idx"] is None:
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-# DANS UN PROJET
+# CAS N°2 : INTÉRIEUR DU PROJET SÉLECTIONNÉ
 else:
     projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
+    
     if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
         st.session_state["current_project_idx"] = None
         st.rerun()
         
     st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
-    st.info("Espace de travail chargé. Vos outils vont s'afficher ici.")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
