@@ -83,114 +83,67 @@ with st.sidebar:
     st.divider()
 
    # --- 2. EXPORTATION (SAUVEGARDER) DANS LA BARRE LATÉRALE ---
-    st.sidebar.subheader("💾 Sauvegarder mon travail")
-    if st.session_state.get('projects'):
+st.sidebar.subheader("💾 Sauvegarder mon travail")
+if st.session_state.get('projects'):
 
-        def clean_for_json(obj):
-            if isinstance(obj, pd.DataFrame):
-                return obj.to_dict(orient="records")
-            if isinstance(obj, dict):
-                return {str(k): clean_for_json(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [clean_for_json(i) for i in obj]
-            return obj
+    def clean_for_json(obj):
+        if isinstance(obj, pd.DataFrame): return obj.to_dict(orient="records")
+        if isinstance(obj, dict): return {str(k): clean_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list): return [clean_for_json(i) for i in obj]
+        return obj
 
-        def force_serialize_dates(obj):
-            if hasattr(obj, 'strftime'):
-                return obj.strftime('%Y-%m-%d')
-            if hasattr(obj, 'isoformat'):
-                return obj.isoformat()
-            return str(obj)
+    def force_serialize_dates(obj):
+        if hasattr(obj, 'strftime'): return obj.strftime('%Y-%m-%d')
+        if hasattr(obj, 'isoformat'): return obj.isoformat()
+        return str(obj)
 
-        def appliquer_modifications_session():
-            if "current_project_idx" in st.session_state and st.session_state.current_project_idx is not None:
-                p_idx = st.session_state.current_project_idx
-                for key in list(st.session_state.keys()):
-                    if ("editor_" in key or "gantt_table_" in key) and key in st.session_state:
-                        changes = st.session_state[key]
-                        target_field = "gantt_data" if "gantt" in key else ("mesure_data" if "mesure" in key or "measure" in key else None)
-                    
-                        if target_field and target_field in st.session_state["projects"][p_idx]:
-                            df_actuel = st.session_state["projects"][p_idx][target_field]
-                            if isinstance(df_actuel, pd.DataFrame):
-                                df_modifie = df_actuel.copy()
-                                for r_idx, v_changes in changes.get("edited_rows", {}).items():
-                                    for col, val in v_changes.items():
-                                        df_modifie.iloc[r_idx, df_modifie.columns.get_loc(col)] = val
-                                for new_row in changes.get("added_rows", []):
-                                    df_modifie = pd.concat([df_modifie, pd.DataFrame([new_row])], ignore_index=True)
-                                indices_del = changes.get("deleted_rows", [])
-                                if indices_del:
-                                    df_modifie = df_modifie.drop(indices_del).reset_index(drop=True)
-                                st.session_state["projects"][p_idx][target_field] = df_modifie
-
-        try:
-            appliquer_modifications_session()
-            projects_cleaned = clean_for_json(st.session_state.projects)
-            data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False, default=force_serialize_dates)
+    try:
+        # Note : si tu as une fonction appliquer_modifications_session(), tu peux l'appeler ici
+        projects_cleaned = clean_for_json(st.session_state.projects)
+        data_json = json.dumps(projects_cleaned, indent=4, ensure_ascii=False, default=force_serialize_dates)
         
-            st.sidebar.download_button(
-                label="📤 Télécharger la sauvegarde (.json)",
-                data=data_json,
-                file_name="sauvegarde_boite_outils.json",
-                mime="application/json"
-            )
-        except Exception as e:
-            st.sidebar.error(f"Erreur préparation : {e}")
-    else:
-        st.sidebar.info("Aucun projet à sauvegarder.")
+        st.sidebar.download_button(
+            label="📤 Télécharger la sauvegarde (.json)",
+            data=data_json,
+            file_name="sauvegarde_boite_outils.json",
+            mime="application/json"
+        )
+    except Exception as e:
+        st.sidebar.error(f"Erreur préparation : {e}")
+else:
+    st.sidebar.info("Aucun projet à sauvegarder.")
 
 
-    # --- 3. IMPORTATION (RECHARGER) DANS LA BARRE LATÉRALE ---
-    st.sidebar.divider()
-    st.sidebar.subheader("📥 Reprendre mon travail")
+# --- 3. IMPORTATION (RECHARGER) DANS LA BARRE LATÉRALE ---
+st.sidebar.divider()
+st.sidebar.subheader("📥 Reprendre mon travail")
 
-    # Utilisation d'un sélecteur sans clé d'état instable pour éviter les boucles de rafraîchissement
-    uploaded_file = st.sidebar.file_uploader(
-        "Importer un fichier de sauvegarde", 
-        type="json"
-    )
+uploaded_file = st.sidebar.file_uploader(
+    "Importer un fichier de sauvegarde", 
+    type="json",
+    key="file_uploader_global"
+)
 
-    if uploaded_file is not None:
-        try:
-            # Étape 1 : On lit le fichier directement s'il vient d'être déposé
-            restored_data = json.load(uploaded_file)
+if uploaded_file is not None:
+    try:
+        restored_data = json.load(uploaded_file)
         
-            # Étape 2 : Reconstruction à la volée des DataFrames
-            for p_item in restored_data:
-                if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
-                    p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
-                if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
-                    p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+        # Reconstruction des DataFrames
+        for p_item in restored_data:
+            if "gantt_data" in p_item and isinstance(p_item["gantt_data"], list):
+                p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+            if "mesure_data" in p_item and isinstance(p_item["mesure_data"], list):
+                p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
         
-            nb_projets = len(restored_data)
-            st.sidebar.info(f"📂 Sauvegarde détectée : {nb_projets} projet(s).")
-            for p in restored_data:
-                st.sidebar.text(f"• {p.get('nom', 'Projet sans nom')}")
+        # 🚀 INJECTION DIRECTE ET IMMÉDIATE
+        st.session_state.projects = restored_data
+        st.sidebar.success("✅ Fichier synchronisé !")
         
-            # Étape 3 : Le bouton "Ouvrir" valide et synchronise l'application
-            if st.sidebar.button("🔓 Ouvrir", type="primary"):
-                # Remplacement immédiat des projets de la session par ceux du fichier
-                st.session_state.projects = restored_data
-            
-                # Initialisation forcée sur le premier projet de l'archive
-                st.session_state["current_project_idx"] = 0
-                st.session_state["current_project"] = restored_data[0]
-            
-                # Synchronisation explicite avec le sélecteur de projets global de ton application
-                if "select_projet" in st.session_state:
-                    st.session_state["select_projet"] = restored_data[0].get("nom", "Projet sans nom")
-            
-                # Nettoyage manuel des anciens graphiques Gantt pour forcer leur reconstruction
-                for k in list(st.session_state.keys()):
-                    if "gantt_fig" in k or "gantt_table" in k:
-                        del st.session_state[k]
+        # On force l'application à se redessiner pour afficher les projets au centre
+        st.rerun()
 
-                st.sidebar.success("🚀 Projet chargé avec succès !")
-                st.rerun()
-
-        except Exception as e:
-            st.sidebar.error(f"Erreur lors de l'import : {e}")
+    except Exception as e:
+        st.sidebar.error(f"Erreur lors de l'import : {e}")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
