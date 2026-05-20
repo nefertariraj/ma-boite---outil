@@ -1,3 +1,4 @@
+Python
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -74,7 +75,7 @@ if not st.session_state.authenticated:
 
 
 # ==========================================
-# ⚙️ CONSTRUTION DE LA BARRE LATÉRALE
+# ⚙️ CONSTRUCTION DE LA BARRE LATÉRALE
 # ==========================================
 with st.sidebar:
     st.title("⚙️ Paramètres & Sauvegarde")
@@ -130,7 +131,6 @@ with st.sidebar:
     )
 
     if uploaded_file is not None:
-        # Sécurité pour ne traiter le fichier qu'une fois et éviter les conflits de rechargement
         if f"loaded_{uploaded_file.name}" not in st.session_state:
             try:
                 restored_data = json.load(uploaded_file)
@@ -150,7 +150,6 @@ with st.sidebar:
                         else:
                             p_item["mesure_data"] = pd.DataFrame()
 
-                    # Écrase l'état global proprement SANS déconnecter l'utilisateur
                     st.session_state.projects = restored_data
                     st.session_state["current_project_idx"] = None
                     
@@ -164,17 +163,15 @@ with st.sidebar:
 
 
 # ==========================================
-# 🖼️ ZONE CENTRALE : LOGIQUE D'AFFICHAGE
+# 🖼️ ZONE CENTRALE : LOGIQUE D'AFFICHAGE ÉPURÉE
 # ==========================================
 
-# CAS N°1 : Aucun projet n'est sélectionné -> On affiche la page d'accueil avec les cartes
+# CAS N°1 : Aucun projet n'est sélectionné -> Page d'accueil minimaliste
 if st.session_state["current_project_idx"] is None:
-    st.title("🗂️ Mon Espace de Travail Lean Six Sigma")
-    st.write("Sélectionnez un projet existant ou importez votre travail à gauche pour commencer.")
-    st.divider()
+    st.title("🗂️ Mes Projets Lean Six Sigma")
 
-    # Formulaire de création rapide en haut de la page d'accueil
-    with st.expander("➕ Créer un tout nouveau projet vierge"):
+    # Formulaire de création rapide (Initialiser un nouveau projet)
+    with st.expander("➕ Initialiser un nouveau projet"):
         nouveau_nom = st.text_input("Nom de votre nouveau projet", placeholder="Ex: Réduction des rebuts - Ligne B")
         if st.button("Confirmer la création"):
             if nouveau_nom:
@@ -188,20 +185,18 @@ if st.session_state["current_project_idx"] is None:
                 st.success(f"Projet '{nouveau_nom}' créé !")
                 st.rerun()
 
-    st.write("### 📋 Vos projets disponibles")
     projets_a_afficher = st.session_state.projects
 
     if len(projets_a_afficher) == 0:
         st.info("💡 Aucun projet disponible pour le moment. Créez-en un juste au-dessus ou déposez votre fichier de sauvegarde dans la barre latérale.")
     else:
-        # Création d'une grille fluide de 3 colonnes pour aligner les cartes de projets
+        # Grille fluide de 3 colonnes pour afficher uniquement les cartes
         cols = st.columns(3)
         for idx, projet in enumerate(projets_a_afficher):
             with cols[idx % 3]:
-                # Nombre de tâches présentes pour enrichir la carte
                 nb_tasks = len(projet["gantt_data"]) if isinstance(projet.get("gantt_data"), pd.DataFrame) else 0
                 
-                # Rendu visuel propre sous forme de boîte
+                # Rendu visuel propre sous forme de boîte blanche
                 st.markdown(f"""
                 <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
                     <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
@@ -217,13 +212,12 @@ if st.session_state["current_project_idx"] is None:
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-# CAS N°2 : Un projet est sélectionné -> On affiche ton espace de travail interne
+# CAS N°2 : Un projet est sélectionné -> Vue outils interne
 else:
-    # Sélection active du projet choisi par l'utilisateur
     projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
     
-    # Bouton d'échappement pour quitter le projet actif et retourner aux cartes d'accueil
-    if st.button("⬅️ Quitter le projet (Retour au tableau de bord)"):
+    # Bouton de retour vers l'accueil épuré
+    if st.button("⬅️ Retourner à l'accueil"):
         st.session_state["current_project_idx"] = None
         st.rerun()
         
