@@ -124,7 +124,9 @@ with st.sidebar:
                         p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
                         projets_nettoyes.append(p_item)
                         
-                    st.session_state.projects = projets_nettoyes
+                    # Correction ici : On ne remplace la session QUE si on a trouvé des projets valides
+                    if projets_nettoyes:
+                        st.session_state.projects = projets_nettoyes
                     st.session_state["current_project_idx"] = None
                     st.session_state[f"loaded_{uploaded_file.name}"] = True
                     st.sidebar.success("✅ Données nettoyées et chargées !")
