@@ -162,9 +162,6 @@ with st.sidebar:
     if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
         st.session_state["current_project_idx"] = None
         st.rerun()
-        
-    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
-    st.divider()
     
     # --- Vos outils DMAIC se chargent exclusivement ici ---
     st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
