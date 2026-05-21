@@ -31,7 +31,7 @@ def deep_deserialize(obj):
     return obj
 
 # ==========================================
-# 🔄 FIX : SYSTÈME D'IMPORTATION INVISIBLE SANS CASSE
+# 🔄 SYSTÈME D'IMPORTATION INVISIBLE SANS CASSE
 # ==========================================
 def traiter_importation_json():
     """ 
@@ -50,10 +50,8 @@ def traiter_importation_json():
                     if not isinstance(p_item, dict):
                         continue
                     
-                    # On duplique l'intégralité de l'objet pour préserver absolument tout le travail
                     projet_reconstruit = p_item.copy()
                     
-                    # Reconstruction stricte des DataFrames attendus par vos composants (Gantt, Tableaux, etc.)
                     if "gantt_data" in p_item and not isinstance(p_item["gantt_data"], pd.DataFrame):
                         projet_reconstruit["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
                     elif "gantt_data" not in p_item:
@@ -64,7 +62,6 @@ def traiter_importation_json():
                     elif "mesure_data" not in p_item:
                         projet_reconstruit["mesure_data"] = pd.DataFrame()
 
-                    # Restauration transparente de l'arbre complet des phases DMAIC (Define, Measure, Analyze, Improve, Control)
                     dmaic_originel = p_item.get("dmaic", {})
                     dmaic_structure = {}
                     for phase in ["define", "measure", "analyze", "improve", "innovate", "control"]:
@@ -77,8 +74,6 @@ def traiter_importation_json():
                     projets_valides.append(projet_reconstruit)
 
                 if projets_valides:
-                    # Remplacement des données du State global. Vos composants d'origine vont 
-                    # lire directement ces lignes lors du re-calcul de la page.
                     st.session_state.projects = projets_valides
                     st.session_state["current_project_idx"] = None
                     st.session_state["import_success_msg"] = f"✅ {len(projets_valides)} projet(s) synchronisé(s) avec succès !"
@@ -92,7 +87,6 @@ st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
 if 'primary_color' not in st.session_state:
     st.session_state.primary_color = "#1E3A8A" 
 
-# Injection du CSS pour la disposition sous forme de grille compacte
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #FFFFFF; }}
@@ -131,7 +125,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ==========================================
-# ⚙️ BARRE LATÉRALE ORIGINAL
+# ⚙️ BARRE LATÉRALE
 # ==========================================
 with st.sidebar:
     st.title("⚙️ Paramètres & Sauvegarde")
@@ -174,12 +168,13 @@ with st.sidebar:
         del st.session_state["import_error_msg"]
 
 # ==========================================
-# 🖼️ INTERFACE PRINCIPALE (ÉCRAN D'ACCUEIL SÉCURISÉ)
+# 🖼️ INTERFACE PRINCIPALE
 # ==========================================
 if st.session_state["current_project_idx"] is None:
-    st.title("🗂️ Mes Projets Lean Six Sigma")
+    # CORRECTION : Titre unique et épuré pour l'écran initial
+    st.title("Mes projets Lean Six Sigma")
 
-    # Formulaire de création
+    # CORRECTION : Bouton d'initialisation unique
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -196,7 +191,7 @@ if st.session_state["current_project_idx"] is None:
 
     st.divider()
     
-    # Rendu propre des carrés/cartes compactes requis
+    # Rendu dynamique des projets (affiche automatiquement les projets créés ou importés via JSON)
     if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
@@ -221,14 +216,8 @@ if st.session_state["current_project_idx"] is None:
 
 else:
     # ==========================================
-    # 📍 REMISE EN PLACE : VOTRE ARCHITECTURE ORIGINALE SANS ALTÉRATION
+    # 📍 INTERFACE INTERNE DU PROJET SÉLECTIONNÉ (NON MODIFIÉE)
     # ==========================================
-    
-    # [ICI SE TROUVE TOUTE LA LOGIQUE MÉTIER ET LE RENDU DE VOS COMPOSANTS INTERACTIFS D'ORIGINE]
-    # Les données chargées par le JSON sont à présent disponibles à 100% dans :
-    # st.session_state.projects[st.session_state["current_project_idx"]]
-    
-    # Exemple d'appel d'environnement standard pour la sécurité du script :
     projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
     
     if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
@@ -238,8 +227,7 @@ else:
     st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
-    
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")    
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
     if st.session_state.get('current_project_idx') is not None:
