@@ -6,6 +6,62 @@ from datetime import datetime, date
 import json
 
 # ==========================================
+# 🛠️ FONCTIONS DE SÉRIALISATION / DÉSÉRIALISATION
+# ==========================================
+def deep_serialize(obj):
+    """ Convertit récursivement les objets complexes (DataFrames, dates) en types JSON de base """
+    if isinstance(obj, pd.DataFrame):
+        return {"_type_df_": True, "data": obj.to_dict(orient="records")}
+    if isinstance(obj, dict):
+        return {str(k): deep_serialize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [deep_serialize(i) for i in obj]
+    if hasattr(obj, 'strftime'):
+        return obj.strftime('%Y-%m-%d')
+    return obj
+
+def deep_deserialize(obj):
+    """ Parcourt récursivement le JSON pour reconstruire à l'identique les DataFrames originaux """
+    if isinstance(obj, dict):
+        if obj.get("_type_df_") is True:
+            return pd.DataFrame(obj.get("data", []))
+        return {k: deep_deserialize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [deep_deserialize(i) for i in obj]
+    return obj
+
+# ==========================================
+# 🔄 CALLBACK D'IMPORTATION INSTATANÉE (ANTI-BUG)
+# ==========================================
+def traiter_importation_json():
+    """ Fonction exécutée immédiatement par Streamlit dès qu'un fichier est déposé """
+    fichier_charge = st.session_state.get("sidebar_uploader_file")
+    if fichier_charge is not None:
+        try:
+            raw_data = json.load(fichier_charge)
+            restored_data = deep_deserialize(raw_data)
+            
+            if isinstance(restored_data, list):
+                for p_item in restored_data:
+                    if "gantt_data" in p_item and not isinstance(p_item["gantt_data"], pd.DataFrame):
+                        p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+                    if "mesure_data" in p_item and not isinstance(p_item["mesure_data"], pd.DataFrame):
+                        p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+                    
+                    if "dmaic" not in p_item:
+                        p_item["dmaic"] = {}
+                    for phase in ["define", "measure", "analyze", "improve", "control"]:
+                        if phase not in p_item["dmaic"]:
+                            p_item["dmaic"][phase] = {}
+
+                # Injection directe et écrasement propre du state global
+                st.session_state.projects = restored_data
+                st.session_state["current_project_idx"] = None
+                st.session_state["import_success_msg"] = "✅ Projets restaurés avec succès !"
+        except Exception as e:
+            st.session_state["import_error_msg"] = f"Erreur lors du parsing : {e}"
+
+# ==========================================
 # 🛠️ FONCTION DE SYNCHRONISATION EN TEMPS RÉEL
 # ==========================================
 def synchroniser_gantt(p_idx, key_editeur):
@@ -78,17 +134,6 @@ with st.sidebar:
     # --- EXPORTATION JSON ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
-        def deep_serialize(obj):
-            if isinstance(obj, pd.DataFrame):
-                return {"_type_df_": True, "data": obj.to_dict(orient="records")}
-            if isinstance(obj, dict):
-                return {str(k): deep_serialize(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [deep_serialize(i) for i in obj]
-            if hasattr(obj, 'strftime'):
-                return obj.strftime('%Y-%m-%d')
-            return obj
-
         try:
             data_json = json.dumps(deep_serialize(st.session_state.projects), indent=4, ensure_ascii=False)
             st.sidebar.download_button(
@@ -103,48 +148,26 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION JSON SÉCURISÉE AVEC SHUTDOWN DU COMPOSANT ---
+    # --- IMPORTATION DIRECTE PAR CALLBACK ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
-    uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json", key="sidebar_uploader_file")
+    
+    # L'astuce est ici : on lie le uploader directement à la fonction de rappel 'traiter_importation_json'
+    st.sidebar.file_uploader(
+        "Importer un fichier de sauvegarde", 
+        type="json", 
+        key="sidebar_uploader_file",
+        on_change=traiter_importation_json
+    )
 
-    if uploaded_file is not None:
-        def deep_deserialize(obj):
-            if isinstance(obj, dict):
-                if obj.get("_type_df_") is True:
-                    return pd.DataFrame(obj.get("data", []))
-                return {k: deep_deserialize(v) for k, v in obj.items()}
-            if isinstance(obj, list):
-                return [deep_deserialize(i) for i in obj]
-            return obj
-
-        # Ajout d'un bouton d'action explicite pour valider l'importation
-        if st.sidebar.button("✅ Charger ce fichier", key="sidebar_confirm_import_btn", use_container_width=True):
-            try:
-                raw_data = json.load(uploaded_file)
-                restored_data = deep_deserialize(raw_data)
-                
-                if isinstance(restored_data, list):
-                    for p_item in restored_data:
-                        if "gantt_data" in p_item and not isinstance(p_item["gantt_data"], pd.DataFrame):
-                            p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
-                        if "mesure_data" in p_item and not isinstance(p_item["mesure_data"], pd.DataFrame):
-                            p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
-                        
-                        if "dmaic" not in p_item:
-                            p_item["dmaic"] = {}
-                        for phase in ["define", "measure", "analyze", "improve", "control"]:
-                            if phase not in p_item["dmaic"]:
-                                p_item["dmaic"][phase] = {}
-
-                    # Injection des données restaurées
-                    st.session_state.projects = restored_data
-                    st.session_state["current_project_idx"] = None
-                    
-                    st.sidebar.success("✅ Projets restaurés avec succès !")
-                    st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Erreur lors du parsing : {e}")
+    # Affichage des messages de statut persistants après le rerun du callback
+    if "import_success_msg" in st.session_state:
+        st.sidebar.success(st.session_state["import_success_msg"])
+        del st.session_state["import_success_msg"] # Nettoyage du message au prochain cycle
+        
+    if "import_error_msg" in st.session_state:
+        st.sidebar.error(st.session_state["import_error_msg"])
+        del st.session_state["import_error_msg"]
 
 # ==========================================
 # 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE ÉTANCHÉIFIÉE
