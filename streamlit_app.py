@@ -133,11 +133,6 @@ with st.sidebar:
                 st.sidebar.error(f"Erreur : {e}")
 
 
-# ==========================================
-# 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
-# ==========================================
-
-if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
     # ----------------------------------------------------
