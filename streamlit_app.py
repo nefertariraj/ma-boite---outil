@@ -228,7 +228,9 @@ else:
     # ----------------------------------------------------
     # 🖼️ RENDU DE L'INTERFACE INTERNE DU PROJET
     # ----------------------------------------------------
-    if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
+    # Correction ici : clé rendue unique avec le nom du projet pour éviter le conflit Streamlit
+    nom_projet_securise = str(projet_actuel.get('nom', 'projet')).strip().replace(" ", "_")
+    if st.button("⬅️ Retourner à l'accueil", key=f"unique_back_to_home_btn_{nom_projet_securise}"):
         st.session_state["current_project_idx"] = None
         st.rerun()
         
