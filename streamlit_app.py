@@ -155,18 +155,46 @@ with st.sidebar:
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-    # ----------------------------------------------------
-    # 📍 BLOC INTERNE DU PROJET ACCESSIBLE
-    # ----------------------------------------------------
-    
-    if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
-        st.session_state["current_project_idx"] = None
-        st.rerun()
-    
-    # --- Vos outils DMAIC se chargent exclusivement ici ---
-    st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
+    # ==========================================
+# 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
+# ==========================================
 
+if st.session_state["current_project_idx"] is None:
+    # ----------------------------------------------------
+    # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
+    # ----------------------------------------------------
+    st.title("🗂️ Mes Projets Lean Six Sigma")
+
+    with st.expander("➕ Initialiser un nouveau projet"):
+        nouveau_nom = st.text_input("Nom du projet", key="unique_creation_name_input")
+        if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
+            if nouveau_nom and nouveau_nom.strip().lower() != "none":
+                st.session_state.projects.append({
+                    "nom": nouveau_nom.strip(),
+                    "gantt_data": pd.DataFrame(),
+                    "mesure_data": pd.DataFrame()
+                })
+                st.rerun()
+
+    st.divider()
+
+    if len(st.session_state.projects) == 0:
+        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
     else:
+        cols = st.columns(3)
+        for idx, projet in enumerate(st.session_state.projects):
+            with cols[idx % 3]:
+                st.markdown(f"""
+                <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
+                    <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"unique_btn_open_{idx}", use_container_width=True):
+                    st.session_state["current_project_idx"] = idx
+                    st.rerun()
+
+else:
     # ----------------------------------------------------
     # 📍 CONFIGURATION ET VÉRIFICATION STRICTE DU PROJET ACTIF
     # ----------------------------------------------------
@@ -207,14 +235,20 @@ with st.sidebar:
     st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
     
-    # À partir d'ici, ton code de traitement et tes onglets s'exécutent de façon standardisée.
-    # Exemple de ta ligne de filtrage SIPOC (sécurisée) :
+    # Filtrage sécurisé du SIPOC
     if not df_viz_sipoc.empty:
         df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
                                     (df_viz_sipoc["Process"].notna())]
 
     st.info("Espace de travail normalisé. Les modules GANTT et SIPOC partagent désormais la même structure.")
-    # Intègre tes onglets st.tabs(["SIPOC", "GANTT"...]) juste ici.
+    
+    # ========================================================
+    # 📊 C'EST ICI QUE TU PLACES TES ONGLETS ET OUTILS DMAIC !
+    # ========================================================
+    # Exemple : 
+    # tabs = st.tabs(["🔒 Définir (SIPOC)", "📊 Mesurer (GANTT)"])
+    # with tabs[0]:
+    #     st.dataframe(df_viz_sipoc)
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
