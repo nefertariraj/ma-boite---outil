@@ -4,4 +4,3 @@ plotly
 openpyxl
 fpdf2
 python-pptx
-```text
