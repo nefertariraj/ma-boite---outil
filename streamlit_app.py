@@ -31,10 +31,10 @@ def deep_deserialize(obj):
     return obj
 
 # ==========================================
-# 🔄 CALLBACK D'IMPORTATION SÉCURISÉ (INTEGRAL)
+# 🔄 CALLBACK D'IMPORTATION INTEGRAL (ZÉRO PERTE)
 # ==========================================
 def traiter_importation_json():
-    """ Importation stricte sans perte de champs utilisateur """
+    """ Importation brute miroir : restaure l'intégralité des variables sans aucun filtre """
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
@@ -47,46 +47,24 @@ def traiter_importation_json():
                     if not isinstance(p_item, dict):
                         continue
                     
-                    # Extraction profonde en conservant l'exactitude de TOUTES les données utilisateur
-                    # On duplique l'objet d'origine pour ne perdre aucun champ personnalisé ou paramètre libre
+                    # CORRECTION : On prend une copie miroir totale de l'objet JSON.
+                    # N'importe quel champ, dictionnaire DMAIC complexe, état de progression,
+                    # paramètres ou texte libre saisi est préservé à 100%.
                     projet_reconstruit = p_item.copy()
                     
-                    # Garantir que les structures de base minimales existent sans écraser le contenu chargé
-                    if "gantt_data" in p_item:
-                        projet_reconstruit["gantt_data"] = pd.DataFrame(p_item["gantt_data"]) if not isinstance(p_item["gantt_data"], pd.DataFrame) else p_item["gantt_data"]
-                    else:
-                        projet_reconstruit["gantt_data"] = pd.DataFrame()
-                        
-                    if "mesure_data" in p_item:
-                        projet_reconstruit["mesure_data"] = pd.DataFrame(p_item["mesure_data"]) if not isinstance(p_item["mesure_data"], pd.DataFrame) else p_item["mesure_data"]
-                    else:
-                        projet_reconstruit["mesure_data"] = pd.DataFrame()
+                    # Convertit en DataFrame uniquement si la clé existe et contient des données tabulaires
+                    for cle, valeur in projet_reconstruit.items():
+                        if isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
+                            # Si l'élément ressemble à un tableau exporté, on s'assure qu'il garde son type DataFrame
+                            if cle in ["gantt_data", "mesure_data"] or "data" in cle:
+                                projet_reconstruit[cle] = pd.DataFrame(valeur)
 
-                    # Restauration et sécurisation des phases DMAIC historiques et progression
-                    dmaic_originel = p_item.get("dmaic", {})
-                    dmaic_structure = {}
-                    # Prise en compte des variantes de nommage (ex: improve / innovate)
-                    liste_phases = ["define", "measure", "analyze", "improve", "innovate", "control"]
-                    for phase in liste_phases:
-                        if phase in dmaic_originel:
-                            dmaic_structure[phase] = dmaic_originel[phase]
-                        elif phase == "improve" and "innovate" in dmaic_originel:
-                            dmaic_structure["improve"] = dmaic_originel["innovate"]
-                        elif phase == "innovate" and "improve" in dmaic_originel:
-                            dmaic_structure["innovate"] = dmaic_originel["improve"]
-                    
-                    # Si aucune clé DMAIC n'était présente, on initialise proprement la structure
-                    if not dmaic_structure:
-                        for phase in ["define", "measure", "analyze", "improve", "control"]:
-                            dmaic_structure[phase] = {}
-                            
-                    projet_reconstruit["dmaic"] = dmaic_structure
                     projets_valides.append(projet_reconstruit)
 
                 if projets_valides:
                     st.session_state.projects = projets_valides
                     st.session_state["current_project_idx"] = None
-                    st.session_state["import_success_msg"] = f"✅ {len(projets_valides)} projet(s) chargé(s) à 100% !"
+                    st.session_state["import_success_msg"] = f"✅ {len(projets_valides)} projet(s) restauré(s) intégralement !"
                     st.rerun()
         except Exception as e:
             st.session_state["import_error_msg"] = f"Erreur chargement : {e}"
@@ -97,18 +75,17 @@ st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
 if 'primary_color' not in st.session_state:
     st.session_state.primary_color = "#1E3A8A" 
 
-# CSS injecté pour les cartes compactes et la suppression des marges inutiles
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #FFFFFF; }}
     .stButton>button {{ background-color: {st.session_state.primary_color}; color: white; border-radius: 5px; }}
-    /* Style custom pour les cartes de projets */
     .project-card {{
         border: 1px solid #E2E8F0;
         border-radius: 8px;
-        padding: 12px;
+        padding: 16px;
         background-color: #F8FAFC;
         margin-bottom: 0.5rem;
+        text-align: center;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -205,34 +182,29 @@ if st.session_state["current_project_idx"] is None:
 
         st.divider()
         
-        # 3. Affichage sous forme de Grille Responsive Compacte
-        st.subheader("Projets enregistrés")
+        # 3. Affichage sous forme de Grille de Cartes Minimalistes (Sans sous-titre global)
         if len(st.session_state.projects) > 0:
-            
-            # Création d'une grille à 3 colonnes pour un rendu sous forme de "carrés cliquables"
             nombre_colonnes = 3
             cols_grille = st.columns(nombre_colonnes)
             
             for idx, p in enumerate(st.session_state.projects):
                 nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
-                
-                # Distribution cyclique des projets dans les colonnes disponibles
                 col_cible = cols_grille[idx % nombre_colonnes]
                 
                 with col_cible:
-                    # Conteneur visuel compact
+                    # CORRECTION VISUELLE : Uniquement le nom du projet dans la carte
                     st.markdown(f"""
                     <div class="project-card">
-                        <span style="font-size: 1.15rem; font-weight: bold;">📊 {nom_du_projet}</span>
+                        <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Bouton d'ouverture ajusté à la largeur du carré
+                    # Uniquement le bouton "Ouvrir le projet" juste en dessous
                     if st.button("Ouvrir le projet", key=f"ouvrir_projet_btn_{idx}", use_container_width=True):
                         st.session_state["current_project_idx"] = idx
                         st.rerun()
                         
-                    st.write("") # Léger espacement vertical entre les lignes de la grille
+                    st.write("") 
         else:
             st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
 
@@ -252,44 +224,20 @@ else:
         st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
         st.divider()
         
-        # --- BLOC DE VÉRIFICATION ET DE RENDU DES DONNÉES RESTAURÉES ---
-        st.subheader("Données d'avancement et phases du projet")
+        # Démonstration technique de la présence de TOUT l'arbre de données
+        st.subheader("Inspection des modules chargés")
         
-        # Affichage dynamique sous forme de colonnes pour prouver la présence de TOUTES les données importées
-        liste_phases_affichage = ["define", "measure", "analyze", "improve", "innovate", "control"]
-        cols_dmaic = st.columns(len(liste_phases_affichage))
+        # Rendu dynamique basé sur l'intégralité des clés réellement présentes dans le projet
+        cles_disponibles = [cle for cle in projet_actuel.keys() if cle != "nom"]
         
-        for i, phase in enumerate(liste_phases_affichage):
-            with cols_dmaic[i]:
-                # Extraction directe des champs utilisateur stockés dans la phase sans écrasement destructif
-                donnees_de_la_phase = projet_actuel.get("dmaic", {}).get(phase, None)
-                
-                if donnees_de_la_phase is not None and len(donnees_de_la_phase) > 0:
-                    st.success(f"**{phase.upper()}**\n\nDonnées restaurées")
-                    # Rendu optionnel de la progression utilisateur ou des clés si présentes
-                    if "progression" in donnees_de_la_phase:
-                        st.caption(f"Progression : {donnees_de_la_phase['progression']}%")
-                else:
-                    st.info(f"**{phase.upper()}**\n\nVide")
-                    
-        # --- AFFICHAGE DES TABLEAUX (EXEMPLE GANTT / MESURE) ---
-        st.write("")
-        col_t1, col_t2 = st.columns(2)
-        with col_t1:
-            st.subheader("📋 Tableau de données Gantt")
-            if "gantt_data" in projet_actuel and isinstance(projet_actuel["gantt_data"], pd.DataFrame) and not projet_actuel["gantt_data"].empty:
-                st.dataframe(projet_actuel["gantt_data"], use_container_width=True)
-            else:
-                st.caption("Aucun enregistrement dans le tableau Gantt.")
-                
-        with col_t2:
-            st.subheader("📉 Tableau des mesures Six Sigma")
-            if "mesure_data" in projet_actuel and isinstance(projet_actuel["mesure_data"], pd.DataFrame) and not projet_actuel["mesure_data"].empty:
-                st.dataframe(projet_actuel["mesure_data"], use_container_width=True)
-            else:
-                st.caption("Aucun enregistrement dans le tableau des mesures.")
+        if cles_disponibles:
+            for cle in cles_disponibles:
+                with st.expander(f"📦 Données du module : {cle.upper()}", expanded=False):
+                    st.write(projet_actuel[cle])
+        else:
+            st.caption("Le dictionnaire de ce projet ne contient pas encore de données secondaires.")
 
-        st.success("✨ Intégralité de la configuration et des variables d'environnement utilisateur synchronisées avec succès.")
+        st.success("✨ L'intégralité de vos configurations, analyses DMAIC et tableaux a été injectée dans l'environnement de travail.")
         
     st.stop()
     
