@@ -75,13 +75,11 @@ with st.sidebar:
     
     st.divider()
 
-    # --- EXPORTATION JSON ET SÉRIALISATION AVANCÉE ---
+    # --- EXPORTATION JSON ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         def deep_serialize(obj):
-            """ Convertit récursivement les objets complexes (DataFrames, dates) en types JSON de base """
             if isinstance(obj, pd.DataFrame):
-                # Ajout d'un marqueur de type pour reconnaître le DataFrame à la restauration
                 return {"_type_df_": True, "data": obj.to_dict(orient="records")}
             if isinstance(obj, dict):
                 return {str(k): deep_serialize(v) for k, v in obj.items()}
@@ -92,7 +90,6 @@ with st.sidebar:
             return obj
 
         try:
-            # Sérialisation profonde sans perte de structure
             data_json = json.dumps(deep_serialize(st.session_state.projects), indent=4, ensure_ascii=False)
             st.sidebar.download_button(
                 label="📤 Télécharger la sauvegarde (.json)",
@@ -106,14 +103,13 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION JSON ET PARSING RÉCURSIF ---
+    # --- IMPORTATION JSON SÉCURISÉE AVEC SHUTDOWN DU COMPOSANT ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json", key="sidebar_uploader_file")
 
     if uploaded_file is not None:
         def deep_deserialize(obj):
-            """ Parcourt récursivement le JSON pour reconstruire à l'identique les DataFrames originaux """
             if isinstance(obj, dict):
                 if obj.get("_type_df_") is True:
                     return pd.DataFrame(obj.get("data", []))
@@ -122,32 +118,30 @@ with st.sidebar:
                 return [deep_deserialize(i) for i in obj]
             return obj
 
-        # Utilisation d'un identifiant unique de session pour éviter que Streamlit n'importe en boucle à chaque clic
-        file_id = f"processed_{uploaded_file.name}_{uploaded_file.size}"
-        if file_id not in st.session_state:
+        # Ajout d'un bouton d'action explicite pour valider l'importation
+        if st.sidebar.button("✅ Charger ce fichier", key="sidebar_confirm_import_btn", use_container_width=True):
             try:
                 raw_data = json.load(uploaded_file)
                 restored_data = deep_deserialize(raw_data)
                 
                 if isinstance(restored_data, list):
                     for p_item in restored_data:
-                        # Rétrocompatibilité : conversion des anciens formats de tableaux si existants
                         if "gantt_data" in p_item and not isinstance(p_item["gantt_data"], pd.DataFrame):
                             p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
                         if "mesure_data" in p_item and not isinstance(p_item["mesure_data"], pd.DataFrame):
                             p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
                         
-                        # Sécurisation systématique de l'arborescence DMAIC complète
                         if "dmaic" not in p_item:
                             p_item["dmaic"] = {}
                         for phase in ["define", "measure", "analyze", "improve", "control"]:
                             if phase not in p_item["dmaic"]:
                                 p_item["dmaic"][phase] = {}
 
+                    # Injection des données restaurées
                     st.session_state.projects = restored_data
                     st.session_state["current_project_idx"] = None
-                    st.session_state[file_id] = True
-                    st.sidebar.success("✅ Données chargées !")
+                    
+                    st.sidebar.success("✅ Projets restaurés avec succès !")
                     st.rerun()
             except Exception as e:
                 st.sidebar.error(f"Erreur lors du parsing : {e}")
@@ -159,7 +153,7 @@ zone_principale = st.container()
 
 if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
-    # 🏠 BLOC ACCUEIL (Verrouillé, aucune modification visuelle)
+    # 🏠 BLOC ACCUEIL
     # ----------------------------------------------------
     with zone_principale:
         st.title("🗂️ Mes Projets Lean Six Sigma")
@@ -200,7 +194,6 @@ else:
         st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
         st.divider()
         
-        # Injection et sécurité de la structure DMAIC globale persistante
         if "dmaic" not in projet_actuel:
             st.session_state.projects[st.session_state["current_project_idx"]]["dmaic"] = {
                 "define": {}, "measure": {}, "analyze": {}, "improve": {}, "control": {}
