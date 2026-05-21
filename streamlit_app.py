@@ -6,7 +6,7 @@ from datetime import datetime, date
 import json
 
 # ==========================================
-# 🛠️ FONCTION DE SYNCHRONISATION EN TEMPS RÉEL
+# 🛠️ FONCTIONS DE SÉCURITÉ & NETTOYAGE DES DONNÉES
 # ==========================================
 def synchroniser_gantt(p_idx, key_editeur):
     if key_editeur in st.session_state and "projects" in st.session_state:
@@ -28,6 +28,22 @@ def synchroniser_gantt(p_idx, key_editeur):
                 df_actuel = df_actuel.drop(indices_a_supprimer).reset_index(drop=True)
                 
             st.session_state["projects"][p_idx]["gantt_data"] = df_actuel
+
+def preparer_projets_pour_export(liste_projets):
+    """Nettoie et sérialise les DataFrames et les dates pour le format JSON"""
+    def clean_element(obj):
+        if isinstance(obj, pd.DataFrame): 
+            return obj.to_dict(orient="records")
+        if isinstance(obj, dict): 
+            return {str(k): clean_element(v) for k, v in obj.items()}
+        if isinstance(obj, list): 
+            return [clean_element(i) for i in obj]
+        if hasattr(obj, 'strftime'): 
+            return obj.strftime('%Y-%m-%d')
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        return obj
+    return clean_element(liste_projets)
 
 # --- CONFIGURATION DE LA PAGE & STYLE ---
 st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
@@ -83,7 +99,6 @@ def importer_sauvegarde_callback():
             fichier_charge.seek(0)
             raw_data = json.load(fichier_charge)
             
-            # Tolérance structurelle dictionnaire vs liste
             if isinstance(raw_data, dict):
                 if "projects" in raw_data: liste_projets = raw_data["projects"]
                 elif "projets" in raw_data: liste_projets = raw_data["projets"]
@@ -99,7 +114,6 @@ def importer_sauvegarde_callback():
                 if not isinstance(p_item, dict) or p_item == {}:
                     continue
                 
-                # Récupération flexible du nom
                 nom_trouve = p_item.get("name") or p_item.get("nom") or p_item.get("nom_projet") or f"Projet Récupéré #{i+1}"
                 nom_projet = str(nom_trouve).strip()
                 
@@ -121,7 +135,7 @@ def importer_sauvegarde_callback():
                 st.session_state["erreur_import"] = "Aucun projet valide trouvé dans ce fichier."
                     
         except Exception as e:
-            st.session_state["erreur_import"] = f"Fichier invalide : assurez-vous d'importer un fichier d'extension .json de sauvegarde."
+            st.session_state["erreur_import"] = "Fichier invalide : assurez-vous d'importer un fichier d'extension .json de sauvegarde."
 
 
 # ==========================================
@@ -135,22 +149,13 @@ with st.sidebar:
     
     st.divider()
 
-    # --- EXPORTATION ---
+    # --- EXPORTATION (CORRIGÉE & SÉCURISÉE) ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
-        def clean_for_json(obj):
-            if isinstance(obj, pd.DataFrame): return obj.to_dict(orient="records")
-            if isinstance(obj, dict): return {str(k): clean_for_json(v) for k, v in obj.items()}
-            if isinstance(obj, list): return [clean_for_json(i) for i in obj]
-            return obj
-
-        def force_serialize_dates(obj):
-            if hasattr(obj, 'strftime'): return obj.strftime('%Y-%m-%d')
-            return str(obj)
-
         try:
-            projets_propres = clean_for_json(st.session_state.projects)
-            data_json = json.dumps(projets_propres, indent=4, ensure_ascii=False, default=force_serialize_dates)
+            # L'encodage JSON se fait désormais de manière fluide sans bloquer le bouton
+            projets_propres = preparer_projets_pour_export(st.session_state.projects)
+            data_json = json.dumps(projets_propres, indent=4, ensure_ascii=False)
             
             st.sidebar.download_button(
                 label="📤 Télécharger la sauvegarde (.json)", 
@@ -160,7 +165,7 @@ with st.sidebar:
                 key="sidebar_download_btn"
             )
         except Exception as e:
-            st.sidebar.error(f"Erreur export : {e}")
+            st.sidebar.error(f"Erreur préparation export : {e}")
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
@@ -168,7 +173,6 @@ with st.sidebar:
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     
-    # Restreint uniquement aux fichiers JSON
     st.sidebar.file_uploader(
         "Importer un fichier de sauvegarde (.json)", 
         type=["json"], 
