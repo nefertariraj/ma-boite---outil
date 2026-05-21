@@ -166,6 +166,56 @@ with st.sidebar:
     # --- Vos outils DMAIC se chargent exclusivement ici ---
     st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
 
+    else:
+    # ----------------------------------------------------
+    # 📍 CONFIGURATION ET VÉRIFICATION STRICTE DU PROJET ACTIF
+    # ----------------------------------------------------
+    idx_actif = st.session_state["current_project_idx"]
+    projet_actuel = st.session_state.projects[idx_actif]
+    
+    # 🛠️ SÉCURITÉ UNIVERSELLE : Garantit que la structure est STRICTEMENT IDENTIQUE pour TOUS les projets
+    COLONNES_GANTT = ["Tâche", "Début", "Fin", "Responsable", "Avancement"]
+    COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
+    
+    # Vérification et injection pour GANTT
+    if not isinstance(projet_actuel.get("gantt_data"), pd.DataFrame):
+        st.session_state.projects[idx_actif]["gantt_data"] = pd.DataFrame(columns=COLONNES_GANTT)
+    else:
+        for col in COLONNES_GANTT:
+            if col not in st.session_state.projects[idx_actif]["gantt_data"].columns:
+                st.session_state.projects[idx_actif]["gantt_data"][col] = None
+
+    # Vérification et injection pour SIPOC (mesure_data)
+    if not isinstance(projet_actuel.get("mesure_data"), pd.DataFrame):
+        st.session_state.projects[idx_actif]["mesure_data"] = pd.DataFrame(columns=COLONNES_SIPOC)
+    else:
+        for col in COLONNES_SIPOC:
+            if col not in st.session_state.projects[idx_actif]["mesure_data"].columns:
+                st.session_state.projects[idx_actif]["mesure_data"][col] = None
+
+    # Re-déclaration locale après sécurisation pour exécution fluide du reste du script
+    projet_actuel = st.session_state.projects[idx_actif]
+    df_viz_sipoc = projet_actuel["mesure_data"]
+
+    # ----------------------------------------------------
+    # 🖼️ RENDU DE L'INTERFACE INTERNE DU PROJET
+    # ----------------------------------------------------
+    if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
+        st.session_state["current_project_idx"] = None
+        st.rerun()
+        
+    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
+    st.divider()
+    
+    # À partir d'ici, ton code de traitement et tes onglets s'exécutent de façon standardisée.
+    # Exemple de ta ligne de filtrage SIPOC (sécurisée) :
+    if not df_viz_sipoc.empty:
+        df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
+                                    (df_viz_sipoc["Process"].notna())]
+
+    st.info("Espace de travail normalisé. Les modules GANTT et SIPOC partagent désormais la même structure.")
+    # Intègre tes onglets st.tabs(["SIPOC", "GANTT"...]) juste ici.
+    
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
     if st.session_state.get('current_project_idx') is not None:
