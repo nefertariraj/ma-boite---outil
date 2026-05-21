@@ -64,33 +64,59 @@ if not st.session_state.authenticated:
 
 
 # ==========================================
-# ⚙️ FONCTION DE CHARGEMENT SÉCURISÉE (CALLBACK)
+# ⚙️ FONCTION DE CHARGEMENT ULTRA-TOLÉRANTE (CALLBACK)
 # ==========================================
 def importer_sauvegarde_callback():
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
-            # 🔄 CRUCIAL : On remet le pointeur de lecture au début du fichier
             fichier_charge.seek(0)
+            raw_data = json.load(fichier_charge)
             
-            restored_data = json.load(fichier_charge)
-            if isinstance(restored_data, list):
-                projets_nettoyes = []
-                for p_item in restored_data:
-                    nom_projet = str(p_item.get("nom", "")).strip().lower()
-                    if not nom_projet or nom_projet == "none" or p_item == {}:
-                        continue
-                        
-                    p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
-                    p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
-                    projets_nettoyes.append(p_item)
-                    
-                if projets_nettoyes:
-                    st.session_state.projects = projets_nettoyes
-                    st.session_state["current_project_idx"] = None
+            # 🩺 Tolérance structurelle : Si le JSON racine est un dictionnaire au lieu d'une liste
+            if isinstance(raw_data, dict):
+                if "projects" in raw_data:
+                    liste_projets = raw_data["projects"]
+                elif "projets" in raw_data:
+                    liste_projets = raw_data["projets"]
+                else:
+                    liste_projets = [raw_data] # On traite le dictionnaire comme un projet unique
+            elif isinstance(raw_data, list):
+                liste_projets = raw_data
+            else:
+                st.session_state["erreur_import"] = "Format JSON non supporté (doit être une liste ou un dictionnaire)."
+                return
+
+            projets_nettoyes = []
+            for i, p_item in enumerate(liste_projets):
+                if not isinstance(p_item, dict) or p_item == {}:
+                    continue
+                
+                # 🏷️ Récupération ultra-souple du nom du projet
+                nom_trouve = p_item.get("nom") or p_item.get("nom_projet") or p_item.get("name") or f"Projet Importé #{i+1}"
+                nom_projet = str(nom_trouve).strip()
+                
+                if nom_projet.lower() == "none" or not nom_projet:
+                    nom_projet = f"Projet Récupéré #{i+1}"
+                
+                # Extraction et conversion sécurisée des DataFrames
+                gantt_raw = p_item.get("gantt_data", [])
+                mesure_raw = p_item.get("mesure_data", []) or p_item.get("sipoc_data", [])
+                
+                projets_nettoyes.append({
+                    "nom": nom_projet,
+                    "gantt_data": pd.DataFrame(gantt_raw if isinstance(gantt_raw, list) else []),
+                    "mesure_data": pd.DataFrame(mesure_raw if isinstance(mesure_raw, list) else [])
+                })
+                
+            if projets_nettoyes:
+                st.session_state.projects = projets_nettoyes
+                st.session_state["current_project_idx"] = None
+                st.session_state["succes_import"] = f"📊 {len(projets_nettoyes)} projet(s) chargé(s) avec succès !"
+            else:
+                st.session_state["erreur_import"] = "Aucun projet valide trouvé à l'intérieur du fichier."
                     
         except Exception as e:
-            # On stocke l'erreur temporairement pour l'afficher proprement dans l'interface
             st.session_state["erreur_import"] = str(e)
 
 
@@ -138,7 +164,6 @@ with st.sidebar:
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     
-    # Utilisation du callback natif on_change pour exécuter l'import proprement
     st.sidebar.file_uploader(
         "Importer un fichier de sauvegarde", 
         type="json", 
@@ -146,10 +171,14 @@ with st.sidebar:
         on_change=importer_sauvegarde_callback
     )
     
-    # Affichage de l'erreur dans la sidebar si elle survient
+    # Retours d'information visuels immédiats dans la barre latérale
     if "erreur_import" in st.session_state:
-        st.sidebar.error(f"Erreur fichier : {st.session_state['erreur_import']}")
+        st.sidebar.error(f"❌ Erreur : {st.session_state['erreur_import']}")
         del st.session_state["erreur_import"]
+        
+    if "succes_import" in st.session_state:
+        st.sidebar.success(st.session_state["succes_import"])
+        del st.session_state["succes_import"]
 
 # ==========================================
 # 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
@@ -232,16 +261,12 @@ else:
     st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
     
-    # À partir d'ici, ton code de traitement et tes onglets s'exécutent de façon standardisée.
     if not df_viz_sipoc.empty:
         df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
                                     (df_viz_sipoc["Process"].notna())]
 
-    # --- Vos outils DMAIC se chargent exclusivement ici ---
     st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
-    
     st.info("Espace de travail normalisé. Les modules GANTT et SIPOC partagent désormais la même structure.")
-    # Intègre tes onglets st.tabs(["SIPOC", "GANTT"...]) juste ici.
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
