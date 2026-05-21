@@ -103,7 +103,7 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION ---
+    # --- IMPORTATION AVEC NETTOYAGE ANTI-DOUBLON/NONE ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json", key="sidebar_uploader_file")
@@ -113,13 +113,21 @@ with st.sidebar:
             try:
                 restored_data = json.load(uploaded_file)
                 if isinstance(restored_data, list):
+                    projets_nettoyes = []
                     for p_item in restored_data:
+                        # 🧹 SÉCURITÉ : On ignore le projet s'il est vide, s'il n'a pas de nom ou s'il s'appelle "none"
+                        nom_projet = str(p_item.get("nom", "")).strip().lower()
+                        if not nom_projet or nom_projet == "none" or p_item == {}:
+                            continue
+                            
                         p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
                         p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
-                    st.session_state.projects = restored_data
+                        projets_nettoyes.append(p_item)
+                        
+                    st.session_state.projects = projets_nettoyes
                     st.session_state["current_project_idx"] = None
                     st.session_state[f"loaded_{uploaded_file.name}"] = True
-                    st.sidebar.success("✅ Données chargées !")
+                    st.sidebar.success("✅ Données nettoyées et chargées !")
                     st.rerun()
             except Exception as e:
                 st.sidebar.error(f"Erreur : {e}")
@@ -129,62 +137,58 @@ with st.sidebar:
 # 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
 # ==========================================
 
-# Utilisation d'un conteneur dynamique unique pour tuer l'effet doublon
-crane_principal = st.empty()
+if st.session_state["current_project_idx"] is None:
+    # ----------------------------------------------------
+    # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
+    # ----------------------------------------------------
+    st.title("🗂️ Mes Projets Lean Six Sigma")
 
-with crane_principal.container():
-    if st.session_state["current_project_idx"] is None:
-        # ----------------------------------------------------
-        # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
-        # ----------------------------------------------------
-        st.title("🗂️ Mes Projets Lean Six Sigma")
+    # 1- Partie Initialisation un nouveau projet
+    with st.expander("➕ Initialiser un nouveau projet"):
+        nouveau_nom = st.text_input("Nom du projet", key="unique_creation_name_input")
+        if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
+            if nouveau_nom and nouveau_nom.strip().lower() != "none":
+                st.session_state.projects.append({
+                    "nom": nouveau_nom,
+                    "gantt_data": pd.DataFrame(),
+                    "mesure_data": pd.DataFrame()
+                })
+                st.rerun()
 
-        # 1- Partie Initialisation
-        with st.expander("➕ Initialiser un nouveau projet"):
-            nouveau_nom = st.text_input("Nom du projet", key="unique_creation_name_input")
-            if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
-                if nouveau_nom:
-                    st.session_state.projects.append({
-                        "nom": nouveau_nom,
-                        "gantt_data": pd.DataFrame(),
-                        "mesure_data": pd.DataFrame()
-                    })
+    st.divider()
+
+    # 2- Partie Affichage des projets valides uniquement
+    if len(st.session_state.projects) == 0:
+        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
+    else:
+        cols = st.columns(3)
+        for idx, projet in enumerate(st.session_state.projects):
+            with cols[idx % 3]:
+                st.markdown(f"""
+                <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
+                    <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"unique_btn_open_{idx}", use_container_width=True):
+                    st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-        st.divider()
-
-        # 2- Partie Affichage des projets (Créés ou Importés via la sauvegarde)
-        if len(st.session_state.projects) == 0:
-            st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
-        else:
-            cols = st.columns(3)
-            for idx, projet in enumerate(st.session_state.projects):
-                with cols[idx % 3]:
-                    st.markdown(f"""
-                    <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
-                        <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"unique_btn_open_{idx}", use_container_width=True):
-                        st.session_state["current_project_idx"] = idx
-                        st.rerun()
-
-    else:
-        # ----------------------------------------------------
-        # 📍 BLOC INTERNE DU PROJET ACCESSIBLE
-        # ----------------------------------------------------
-        projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
+else:
+    # ----------------------------------------------------
+    # 📍 BLOC INTERNE DU PROJET ACCESSIBLE
+    # ----------------------------------------------------
+    projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
+    
+    if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
+        st.session_state["current_project_idx"] = None
+        st.rerun()
         
-        if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
-            st.session_state["current_project_idx"] = None
-            st.rerun()
-            
-        st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
-        st.divider()
-        
-        # --- Vos outils DMAIC se chargent exclusivement ici ---
-        st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
+    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
+    st.divider()
+    
+    # --- Vos outils DMAIC se chargent exclusivement ici ---
+    st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
