@@ -34,10 +34,7 @@ def deep_deserialize(obj):
 # 🔄 SYSTÈME D'IMPORTATION INVISIBLE SANS CASSE
 # ==========================================
 def traiter_importation_json():
-    """ 
-    Restaure les données dans le state existant sans altérer, modifier 
-    ou contourner les composants graphiques et l'interface de l'application.
-    """
+    """ Restaure les données dans le state existant sans altérer l'interface """
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
@@ -76,12 +73,11 @@ def traiter_importation_json():
                 if projets_valides:
                     st.session_state.projects = projets_valides
                     st.session_state["current_project_idx"] = None
-                    st.session_state["import_success_msg"] = f"✅ {len(projets_valides)} projet(s) synchronisé(s) avec succès !"
                     st.rerun()
         except Exception as e:
-            st.session_state["import_error_msg"] = f"Erreur de mapping lors de la restauration : {e}"
+            st.sidebar.error(f"Erreur de restauration : {e}")
 
-# --- CONFIGURATION DE LA PAGE & STYLE ORIGINAL ---
+# --- CONFIGURATION DE LA PAGE & STYLE ---
 st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
 
 if 'primary_color' not in st.session_state:
@@ -102,13 +98,11 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- INITIALISATION DES VARIABLES DU STATE ---
+# --- INITIALISATION SÉCURISÉE DES VARIABLES ---
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
-
 if 'projects' not in st.session_state:
     st.session_state.projects = []
-
 if 'current_project_idx' not in st.session_state:
     st.session_state.current_project_idx = None
 
@@ -125,7 +119,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ==========================================
-# ⚙️ BARRE LATÉRALE
+# ⚙️ BARRE LATÉRALE MOTEUR
 # ==========================================
 with st.sidebar:
     st.title("⚙️ Paramètres & Sauvegarde")
@@ -133,7 +127,7 @@ with st.sidebar:
     st.session_state.primary_color = color
     st.divider()
 
-    # --- EXPORTATION ---
+    # Exportation
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         try:
@@ -150,7 +144,7 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION ---
+    # Importation
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     st.sidebar.file_uploader(
@@ -160,21 +154,15 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-    if "import_success_msg" in st.session_state:
-        st.sidebar.success(st.session_state["import_success_msg"])
-        del st.session_state["import_success_msg"]
-    if "import_error_msg" in st.session_state:
-        st.sidebar.error(st.session_state["import_error_msg"])
-        del st.session_state["import_error_msg"]
-
 # ==========================================
-# 🖼️ INTERFACE PRINCIPALE
+# 🖼️ ARCHITECTURE DE L'INTERFACE PRINCIPALE
 # ==========================================
 if st.session_state["current_project_idx"] is None:
-    # CORRECTION : Titre unique et épuré pour l'écran initial
+    # ----------------------------------------------------
+    # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
+    # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
-    # CORRECTION : Bouton d'initialisation unique
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -191,7 +179,7 @@ if st.session_state["current_project_idx"] is None:
 
     st.divider()
     
-    # Rendu dynamique des projets (affiche automatiquement les projets créés ou importés via JSON)
+    # Affichage dynamique des cartes projets importés ou créés
     if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
@@ -215,9 +203,9 @@ if st.session_state["current_project_idx"] is None:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
 
 else:
-    # ==========================================
-    # 📍 INTERFACE INTERNE DU PROJET SÉLECTIONNÉ (NON MODIFIÉE)
-    # ==========================================
+    # ----------------------------------------------------
+    # 📍 ESPACE DE TRAVAIL INTERNE (FONCTIONNEL & NON MODIFIÉ)
+    # ----------------------------------------------------
     projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
     
     if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
@@ -227,7 +215,8 @@ else:
     st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")    
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
+    
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
     if st.session_state.get('current_project_idx') is not None:
