@@ -64,16 +64,15 @@ if not st.session_state.authenticated:
 
 
 # ==========================================
-# ⚙️ LOGIQUE D'IMPORTATION DIRECTE ET ROBUSTE
+# ⚙️ FONCTION DE CHARGEMENT SÉCURISÉE (CALLBACK)
 # ==========================================
-# On vérifie si un fichier vient d'être déposé dans le uploader (via sa clé d'état)
-if "sidebar_uploader_file" in st.session_state and st.session_state["sidebar_uploader_file"] is not None:
-    fichier_charge = st.session_state["sidebar_uploader_file"]
-    
-    # On vérifie si on ne l'a pas déjà importé pour éviter les boucles infinies au rerun
-    nom_cle_cache = f"deja_lu_{fichier_charge.name}_{fichier_charge.size}"
-    if nom_cle_cache not in st.session_state:
+def importer_sauvegarde_callback():
+    fichier_charge = st.session_state.get("sidebar_uploader_file")
+    if fichier_charge is not None:
         try:
+            # 🔄 CRUCIAL : On remet le pointeur de lecture au début du fichier
+            fichier_charge.seek(0)
+            
             restored_data = json.load(fichier_charge)
             if isinstance(restored_data, list):
                 projets_nettoyes = []
@@ -90,10 +89,9 @@ if "sidebar_uploader_file" in st.session_state and st.session_state["sidebar_upl
                     st.session_state.projects = projets_nettoyes
                     st.session_state["current_project_idx"] = None
                     
-            st.session_state[nom_cle_cache] = True
-            st.rerun()
         except Exception as e:
-            st.error(f"Erreur lors du chargement automatique : {e}")
+            # On stocke l'erreur temporairement pour l'afficher proprement dans l'interface
+            st.session_state["erreur_import"] = str(e)
 
 
 # ==========================================
@@ -140,12 +138,18 @@ with st.sidebar:
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     
-    # Le composant met à jour directement st.session_state["sidebar_uploader_file"]
+    # Utilisation du callback natif on_change pour exécuter l'import proprement
     st.sidebar.file_uploader(
         "Importer un fichier de sauvegarde", 
         type="json", 
-        key="sidebar_uploader_file"
+        key="sidebar_uploader_file",
+        on_change=importer_sauvegarde_callback
     )
+    
+    # Affichage de l'erreur dans la sidebar si elle survient
+    if "erreur_import" in st.session_state:
+        st.sidebar.error(f"Erreur fichier : {st.session_state['erreur_import']}")
+        del st.session_state["erreur_import"]
 
 # ==========================================
 # 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
