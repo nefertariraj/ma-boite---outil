@@ -155,7 +155,6 @@ with st.sidebar:
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-else:
     # ----------------------------------------------------
     # 📍 BLOC INTERNE DU PROJET ACCESSIBLE
     # ----------------------------------------------------
