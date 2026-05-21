@@ -235,20 +235,14 @@ else:
     st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
     
-    # Filtrage sécurisé du SIPOC
+    # À partir d'ici, ton code de traitement et tes onglets s'exécutent de façon standardisée.
+    # Exemple de ta ligne de filtrage SIPOC (sécurisée) :
     if not df_viz_sipoc.empty:
         df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
                                     (df_viz_sipoc["Process"].notna())]
 
     st.info("Espace de travail normalisé. Les modules GANTT et SIPOC partagent désormais la même structure.")
-    
-    # ========================================================
-    # 📊 C'EST ICI QUE TU PLACES TES ONGLETS ET OUTILS DMAIC !
-    # ========================================================
-    # Exemple : 
-    # tabs = st.tabs(["🔒 Définir (SIPOC)", "📊 Mesurer (GANTT)"])
-    # with tabs[0]:
-    #     st.dataframe(df_viz_sipoc)
+    # Intègre tes onglets st.tabs(["SIPOC", "GANTT"...]) juste ici.
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
