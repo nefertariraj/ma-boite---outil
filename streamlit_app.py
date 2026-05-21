@@ -9,7 +9,6 @@ import json
 # 🛠️ FONCTIONS DE SÉRIALISATION / DÉSÉRIALISATION
 # ==========================================
 def deep_serialize(obj):
-    """ Convertit récursivement les objets complexes (DataFrames, dates) en types JSON de base """
     if isinstance(obj, pd.DataFrame):
         return {"_type_df_": True, "data": obj.to_dict(orient="records")}
     if isinstance(obj, dict):
@@ -21,7 +20,6 @@ def deep_serialize(obj):
     return obj
 
 def deep_deserialize(obj):
-    """ Parcourt récursivement le JSON pour reconstruire à l'identique les DataFrames originaux """
     if isinstance(obj, dict):
         if obj.get("_type_df_") is True:
             return pd.DataFrame(obj.get("data", []))
@@ -31,10 +29,9 @@ def deep_deserialize(obj):
     return obj
 
 # ==========================================
-# 🔄 CALLBACK D'IMPORTATION INSTATANÉE (ANTI-BUG)
+# 🔄 CALLBACK D'IMPORTATION DIRECTE AVEC RERUN FORCE
 # ==========================================
 def traiter_importation_json():
-    """ Fonction exécutée immédiatement par Streamlit dès qu'un fichier est déposé """
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
@@ -54,10 +51,14 @@ def traiter_importation_json():
                         if phase not in p_item["dmaic"]:
                             p_item["dmaic"][phase] = {}
 
-                # Injection directe et écrasement propre du state global
+                # Mise à jour absolue du State global
                 st.session_state.projects = restored_data
                 st.session_state["current_project_idx"] = None
                 st.session_state["import_success_msg"] = "✅ Projets restaurés avec succès !"
+                
+                # REFRESH FORCÉ DE L'INTERFACE : Résout le problème du blocage visuel
+                st.rerun()
+                
         except Exception as e:
             st.session_state["import_error_msg"] = f"Erreur lors du parsing : {e}"
 
@@ -148,11 +149,10 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION DIRECTE PAR CALLBACK ---
+    # --- IMPORTATION DIRECTE ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     
-    # L'astuce est ici : on lie le uploader directement à la fonction de rappel 'traiter_importation_json'
     st.sidebar.file_uploader(
         "Importer un fichier de sauvegarde", 
         type="json", 
@@ -160,26 +160,49 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-    # Affichage des messages de statut persistants après le rerun du callback
+    # Affichage des statuts après rafraîchissement
     if "import_success_msg" in st.session_state:
         st.sidebar.success(st.session_state["import_success_msg"])
-        del st.session_state["import_success_msg"] # Nettoyage du message au prochain cycle
+        del st.session_state["import_success_msg"]
         
     if "import_error_msg" in st.session_state:
         st.sidebar.error(st.session_state["import_error_msg"])
         del st.session_state["import_error_msg"]
 
 # ==========================================
-# 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE ÉTANCHÉIFIÉE
+# 🖼️ BLOC D'AFFICHAGE ET BOUCLE DE RENDU DES CARTES
 # ==========================================
 zone_principale = st.container()
 
 if st.session_state["current_project_idx"] is None:
-    # ----------------------------------------------------
-    # 🏠 BLOC ACCUEIL
-    # ----------------------------------------------------
     with zone_principale:
         st.title("🗂️ Mes Projets Lean Six Sigma")
+
+        # --- CODE D'AFFICHAGE DE VOS CARTES DE PROJETS ---
+        # Si la liste contient des projets, on les affiche sous forme de grille ou de liste interactive
+        if len(st.session_state.projects) > 0:
+            st.subheader("Sélectionner un projet existant :")
+            
+            # Affichage dynamique sous forme de boutons / cartes d'accès
+            for idx, p in enumerate(st.session_state.projects):
+                nom_du_projet = p.get("nom", f"Projet anonyme #{idx+1}")
+                
+                with st.container(border=True):
+                    col_txt, col_btn = st.columns([4, 1])
+                    with col_txt:
+                        st.markdown(f"### 📊 {nom_du_projet}")
+                        # Petit résumé des billes du projet pour valider visuellement la présence des données
+                        gantt_status = "Configuré" if "gantt_data" in p and not p["gantt_data"].empty else "Vide"
+                        st.caption(f"Statut des données : GANTT [{gantt_status}]")
+                    with col_btn:
+                        # Ce bouton change l'index actif et recharge l'outil correspondant
+                        if st.button(f"Ouvrir", key=f"ouvrir_projet_btn_{idx}"):
+                            st.session_state["current_project_idx"] = idx
+                            st.rerun()
+        else:
+            st.warning("⚠️ Aucun projet en cours. Créez-en un nouveau ou importez votre fichier JSON de sauvegarde dans la barre latérale.")
+
+        st.divider()
 
         with st.expander("➕ Initialiser un nouveau projet"):
             nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
@@ -190,22 +213,16 @@ if st.session_state["current_project_idx"] is None:
                         "gantt_data": pd.DataFrame(),
                         "mesure_data": pd.DataFrame(),
                         "dmaic": {
-                            "define": {},
-                            "measure": {},
-                            "analyze": {},
-                            "improve": {},
-                            "control": {}
+                            "define": {}, "measure": {}, "analyze": {}, "improve": {}, "control": {}
                         }
                     })
                     st.rerun()
-
-        st.divider()
                         
     st.stop()
 
 else:
     # ----------------------------------------------------
-    # 📍 BLOC INTERNE DU PROJET
+    # 📍 BLOC INTERNE DU PROJET ACTIF
     # ----------------------------------------------------
     with zone_principale:
         projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
