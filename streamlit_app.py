@@ -74,7 +74,7 @@ with st.sidebar:
     
     st.divider()
 
-    # --- EXPORTATION ---
+    # --- EXPORTATION (CORRIGÉE : S'exécute au bon moment) ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         def clean_for_json(obj):
@@ -88,8 +88,17 @@ with st.sidebar:
             return str(obj)
 
         try:
-            data_json = json.dumps(clean_for_json(st.session_state.projects), indent=4, ensure_ascii=False, default=force_serialize_dates)
-            st.sidebar.download_button("📤 Télécharger la sauvegarde (.json)", data=data_json, file_name="sauvegarde_boite_outils.json", mime="application/json", key="sidebar_download_btn")
+            # On extrait directement depuis le session_state tout frais
+            projets_propres = clean_for_json(st.session_state.projects)
+            data_json = json.dumps(projets_propres, indent=4, ensure_ascii=False, default=force_serialize_dates)
+            
+            st.sidebar.download_button(
+                label="📤 Télécharger la sauvegarde (.json)", 
+                data=data_json, 
+                file_name="sauvegarde_boite_outils.json", 
+                mime="application/json", 
+                key="sidebar_download_btn"
+            )
         except Exception as e:
             st.sidebar.error(f"Erreur export : {e}")
     else:
@@ -118,69 +127,60 @@ with st.sidebar:
 
 
 # ==========================================
-# 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE ÉTANCHÉIFIÉE
+# 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE
 # ==========================================
 
-# Conteneur principal unique pour verrouiller l'injection visuelle
-zone_principale = st.container()
-
+# Utilisation d'un bloc conditionnel strict sans st.stop() pour laisser filer le script jusqu'aux boutons
 if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
-    # 🏠 BLOC ACCUEIL (S'affiche si aucun projet n'est ouvert)
+    # 🏠 BLOC ACCUEIL
     # ----------------------------------------------------
-    with zone_principale:
-        st.title("🗂️ Mes Projets Lean Six Sigma")
+    st.title("🗂️ Mes Projets Lean Six Sigma")
 
-        with st.expander("➕ Initialiser un nouveau projet"):
-            nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-            if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-                if nouveau_nom:
-                    st.session_state.projects.append({
-                        "nom": nouveau_nom,
-                        "gantt_data": pd.DataFrame(),
-                        "mesure_data": pd.DataFrame()
-                    })
+    with st.expander("➕ Initialiser un nouveau projet"):
+        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
+        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
+            if nouveau_nom:
+                st.session_state.projects.append({
+                    "nom": nouveau_nom,
+                    "gantt_data": pd.DataFrame(),
+                    "mesure_data": pd.DataFrame()
+                })
+                st.rerun()
+
+    st.divider()
+
+    if len(st.session_state.projects) == 0:
+        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
+    else:
+        cols = st.columns(3)
+        for idx, projet in enumerate(st.session_state.projects):
+            with cols[idx % 3]:
+                st.markdown(f"""
+                <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
+                    <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_open_card_{idx}", use_container_width=True):
+                    st.session_state["current_project_idx"] = idx
                     st.rerun()
-
-        st.divider()
-
-        if len(st.session_state.projects) == 0:
-            st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
-        else:
-            cols = st.columns(3)
-            for idx, projet in enumerate(st.session_state.projects):
-                with cols[idx % 3]:
-                    st.markdown(f"""
-                    <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
-                        <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_open_card_{idx}", use_container_width=True):
-                        st.session_state["current_project_idx"] = idx
-                        st.rerun()
-                        
-    # Sécurité finale pour empêcher Streamlit de relire le script en boucle fermée
-    st.stop()
 
 else:
     # ----------------------------------------------------
     # 📍 BLOC INTERNE DU PROJET
     # ----------------------------------------------------
-    with zone_principale:
-        projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
+    projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
+    
+    if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
+        st.session_state["current_project_idx"] = None
+        st.rerun()
         
-        if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
-            st.session_state["current_project_idx"] = None
-            st.rerun()
-            
-        st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
-        st.divider()
-        
-        # --- Vos outils DMAIC se chargent exclusivement ici ---
-        st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
-        
-    st.stop()
+    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
+    st.divider()
+    
+    # --- Vos outils DMAIC se chargent exclusivement ici ---
+    st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
