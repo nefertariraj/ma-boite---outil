@@ -75,60 +75,82 @@ with st.sidebar:
     
     st.divider()
 
-    # --- EXPORTATION COMPLÈTE ---
+    # --- EXPORTATION JSON ET SÉRIALISATION AVANCÉE ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
-        def clean_for_json(obj):
-            if isinstance(obj, pd.DataFrame): 
-                return obj.to_dict(orient="records")
-            if isinstance(obj, dict): 
-                return {str(k): clean_for_json(v) for k, v in obj.items()}
-            if isinstance(obj, list): 
-                return [clean_for_json(i) for i in obj]
-            if hasattr(obj, 'strftime'): 
+        def deep_serialize(obj):
+            """ Convertit récursivement les objets complexes (DataFrames, dates) en types JSON de base """
+            if isinstance(obj, pd.DataFrame):
+                # Ajout d'un marqueur de type pour reconnaître le DataFrame à la restauration
+                return {"_type_df_": True, "data": obj.to_dict(orient="records")}
+            if isinstance(obj, dict):
+                return {str(k): deep_serialize(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [deep_serialize(i) for i in obj]
+            if hasattr(obj, 'strftime'):
                 return obj.strftime('%Y-%m-%d')
             return obj
 
         try:
-            data_json = json.dumps(clean_for_json(st.session_state.projects), indent=4, ensure_ascii=False)
-            st.sidebar.download_button("📤 Télécharger la sauvegarde (.json)", data=data_json, file_name="sauvegarde_boite_outils.json", mime="application/json", key="sidebar_download_btn")
+            # Sérialisation profonde sans perte de structure
+            data_json = json.dumps(deep_serialize(st.session_state.projects), indent=4, ensure_ascii=False)
+            st.sidebar.download_button(
+                label="📤 Télécharger la sauvegarde (.json)",
+                data=data_json,
+                file_name="sauvegarde_boite_outils.json",
+                mime="application/json",
+                key="sidebar_download_btn"
+            )
         except Exception as e:
             st.sidebar.error(f"Erreur export : {e}")
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION ET REFRESH IMMÉDIAT ---
+    # --- IMPORTATION JSON ET PARSING RÉCURSIF ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json", key="sidebar_uploader_file")
 
     if uploaded_file is not None:
-        try:
-            restored_data = json.load(uploaded_file)
-            if isinstance(restored_data, list):
-                for p_item in restored_data:
-                    # Restauration des structures tabulaires de base si présentes
-                    p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
-                    p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
-                    
-                    # Sécurisation de l'arborescence des phases DMAIC à l'import
-                    if "dmaic" not in p_item:
-                        p_item["dmaic"] = {}
-                    
-                    for phase in ["define", "measure", "analyze", "improve", "control"]:
-                        if phase not in p_item["dmaic"]:
-                            p_item["dmaic"][phase] = {}
-                        # Conversion récursive des structures de données internes des phases si nécessaire
-                        for key, val in p_item["dmaic"][phase].items():
-                            if isinstance(val, list):
-                                p_item["dmaic"][phase][key] = val
+        def deep_deserialize(obj):
+            """ Parcourt récursivement le JSON pour reconstruire à l'identique les DataFrames originaux """
+            if isinstance(obj, dict):
+                if obj.get("_type_df_") is True:
+                    return pd.DataFrame(obj.get("data", []))
+                return {k: deep_deserialize(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [deep_deserialize(i) for i in obj]
+            return obj
 
-                st.session_state.projects = restored_data
-                st.session_state["current_project_idx"] = None
-                st.sidebar.success("✅ Données chargées !")
-                st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"Erreur : {e}")
+        # Utilisation d'un identifiant unique de session pour éviter que Streamlit n'importe en boucle à chaque clic
+        file_id = f"processed_{uploaded_file.name}_{uploaded_file.size}"
+        if file_id not in st.session_state:
+            try:
+                raw_data = json.load(uploaded_file)
+                restored_data = deep_deserialize(raw_data)
+                
+                if isinstance(restored_data, list):
+                    for p_item in restored_data:
+                        # Rétrocompatibilité : conversion des anciens formats de tableaux si existants
+                        if "gantt_data" in p_item and not isinstance(p_item["gantt_data"], pd.DataFrame):
+                            p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+                        if "mesure_data" in p_item and not isinstance(p_item["mesure_data"], pd.DataFrame):
+                            p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+                        
+                        # Sécurisation systématique de l'arborescence DMAIC complète
+                        if "dmaic" not in p_item:
+                            p_item["dmaic"] = {}
+                        for phase in ["define", "measure", "analyze", "improve", "control"]:
+                            if phase not in p_item["dmaic"]:
+                                p_item["dmaic"][phase] = {}
+
+                    st.session_state.projects = restored_data
+                    st.session_state["current_project_idx"] = None
+                    st.session_state[file_id] = True
+                    st.sidebar.success("✅ Données chargées !")
+                    st.rerun()
+            except Exception as e:
+                st.sidebar.error(f"Erreur lors du parsing : {e}")
 
 # ==========================================
 # 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE ÉTANCHÉIFIÉE
@@ -137,7 +159,7 @@ zone_principale = st.container()
 
 if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
-    # 🏠 BLOC ACCUEIL
+    # 🏠 BLOC ACCUEIL (Verrouillé, aucune modification visuelle)
     # ----------------------------------------------------
     with zone_principale:
         st.title("🗂️ Mes Projets Lean Six Sigma")
@@ -178,7 +200,7 @@ else:
         st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
         st.divider()
         
-        # --- Structure de stockage DMAIC prête à l'emploi ---
+        # Injection et sécurité de la structure DMAIC globale persistante
         if "dmaic" not in projet_actuel:
             st.session_state.projects[st.session_state["current_project_idx"]]["dmaic"] = {
                 "define": {}, "measure": {}, "analyze": {}, "improve": {}, "control": {}
