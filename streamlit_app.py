@@ -161,7 +161,6 @@ with st.sidebar:
     # ----------------------------------------------------
     # 📍 ESPACE DE TRAVAIL INTERNE (FONCTIONNEL & NON MODIFIÉ)
     # ----------------------------------------------------
-    projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
     
     if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
         st.session_state["current_project_idx"] = None
