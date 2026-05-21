@@ -154,55 +154,10 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-# ==========================================
-# 🖼️ ARCHITECTURE DE L'INTERFACE PRINCIPALE
-# ==========================================
-if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
-
-    with st.expander("➕ Initialiser un nouveau projet", expanded=False):
-        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-            if nouveau_nom:
-                st.session_state.projects.append({
-                    "nom": nouveau_nom,
-                    "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame(),
-                    "dmaic": {
-                        "define": {}, "measure": {}, "analyze": {}, "improve": {}, "control": {}
-                    }
-                })
-                st.rerun()
-
-    st.divider()
-    
-    # Affichage dynamique des cartes projets importés ou créés
-    if len(st.session_state.projects) > 0:
-        nombre_colonnes = 3
-        cols_grille = st.columns(nombre_colonnes)
-        
-        for idx, p in enumerate(st.session_state.projects):
-            nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
-            col_cible = cols_grille[idx % nombre_colonnes]
-            
-            with col_cible:
-                st.markdown(f"""
-                <div class="project-card">
-                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button("Ouvrir le projet", key=f"ouvrir_projet_btn_{idx}", use_container_width=True):
-                    st.session_state["current_project_idx"] = idx
-                    st.rerun()
-                st.write("") 
-    else:
-        st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
-
-else:
     # ----------------------------------------------------
     # 📍 ESPACE DE TRAVAIL INTERNE (FONCTIONNEL & NON MODIFIÉ)
     # ----------------------------------------------------
