@@ -132,7 +132,7 @@ with st.sidebar:
             except Exception as e:
                 st.sidebar.error(f"Erreur : {e}")
 
-    # ==========================================
+# ==========================================
 # 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
 # ==========================================
 
@@ -140,6 +140,7 @@ if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
     # ----------------------------------------------------
+    st.title("🗂️ Mes Projets Lean Six Sigma")
     
     with st.expander("➕ Initialiser un nouveau projet"):
         nouveau_nom = st.text_input("Nom du projet", key="unique_creation_name_input")
@@ -166,7 +167,9 @@ if st.session_state["current_project_idx"] is None:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"unique_btn_open_{idx}", use_container_width=True):
+                # Clé sécurisée avec le nom du projet pour éviter le plantage StreamlitDuplicateElementKey
+                nom_cle = str(projet.get('nom', '')).strip().replace(" ", "_")
+                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_op_{idx}_{nom_cle}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
@@ -212,7 +215,6 @@ else:
     st.divider()
     
     # À partir d'ici, ton code de traitement et tes onglets s'exécutent de façon standardisée.
-    # Exemple de ta ligne de filtrage SIPOC (sécurisée) :
     if not df_viz_sipoc.empty:
         df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
                                     (df_viz_sipoc["Process"].notna())]
