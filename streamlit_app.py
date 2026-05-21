@@ -158,7 +158,6 @@ with st.sidebar:
     # ----------------------------------------------------
     # 📍 BLOC INTERNE DU PROJET ACCESSIBLE
     # ----------------------------------------------------
-    projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
     
     if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
         st.session_state["current_project_idx"] = None
