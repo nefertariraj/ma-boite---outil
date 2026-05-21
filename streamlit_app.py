@@ -140,8 +140,7 @@ if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
     # ----------------------------------------------------
-    st.title("🗂️ Mes Projets Lean Six Sigma")
-
+    
     with st.expander("➕ Initialiser un nouveau projet"):
         nouveau_nom = st.text_input("Nom du projet", key="unique_creation_name_input")
         if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
