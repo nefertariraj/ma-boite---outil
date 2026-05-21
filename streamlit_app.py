@@ -9,7 +9,6 @@ import json
 # 🛠️ FONCTIONS DE SÉRIALISATION / DÉSÉRIALISATION
 # ==========================================
 def deep_serialize(obj):
-    """ Convertit les objets complexes pour le format JSON """
     if isinstance(obj, pd.DataFrame):
         return {"_type_df_": True, "data": obj.to_dict(orient="records")}
     if isinstance(obj, dict):
@@ -21,7 +20,6 @@ def deep_serialize(obj):
     return obj
 
 def deep_deserialize(obj):
-    """ Reconstruit fidèlement l'intégralité des structures et types de données """
     if isinstance(obj, dict):
         if obj.get("_type_df_") is True:
             return pd.DataFrame(obj.get("data", []))
@@ -31,10 +29,10 @@ def deep_deserialize(obj):
     return obj
 
 # ==========================================
-# 🔄 CALLBACK D'IMPORTATION INTEGRAL (ZÉRO PERTE)
+# 🔄 CALLBACK D'IMPORTATION ET RECONSTRUCTION INTERACTIVE
 # ==========================================
 def traiter_importation_json():
-    """ Importation brute miroir : restaure l'intégralité des variables sans aucun filtre """
+    """ Désérialise et mappe proprement les données pour alimenter les composants interactifs """
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
@@ -47,27 +45,56 @@ def traiter_importation_json():
                     if not isinstance(p_item, dict):
                         continue
                     
-                    # CORRECTION : On prend une copie miroir totale de l'objet JSON.
-                    # N'importe quel champ, dictionnaire DMAIC complexe, état de progression,
-                    # paramètres ou texte libre saisi est préservé à 100%.
-                    projet_reconstruit = p_item.copy()
+                    # 1. Extraction et sécurisation des fondations du projet
+                    nom_projet = p_item.get("nom") or p_item.get("name") or "Projet Spécifique"
                     
-                    # Convertit en DataFrame uniquement si la clé existe et contient des données tabulaires
-                    for cle, valeur in projet_reconstruit.items():
-                        if isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
-                            # Si l'élément ressemble à un tableau exporté, on s'assure qu'il garde son type DataFrame
-                            if cle in ["gantt_data", "mesure_data"] or "data" in cle:
-                                projet_reconstruit[cle] = pd.DataFrame(valeur)
+                    # 2. Reconstitution stricte des DataFrames (essentiels pour st.data_editor)
+                    gantt = p_item.get("gantt_data")
+                    if gantt is None or (isinstance(gantt, list) and len(gantt) == 0):
+                        gantt = pd.DataFrame()
+                    elif not isinstance(gantt, pd.DataFrame):
+                        gantt = pd.DataFrame(gantt)
+                        
+                    mesure = p_item.get("mesure_data")
+                    if mesure is None or (isinstance(mesure, list) and len(mesure) == 0):
+                        mesure = pd.DataFrame()
+                    elif not isinstance(mesure, pd.DataFrame):
+                        mesure = pd.DataFrame(mesure)
+                    
+                    # 3. Récupération profonde de l'arbre DMAIC pour ré-alimenter les formulaires
+                    dmaic_originel = p_item.get("dmaic", {})
+                    dmaic_structure = {}
+                    
+                    # On s'assure que chaque phase est un dictionnaire exploitable par les champs de saisie
+                    for phase in ["define", "measure", "analyze", "improve", "innovate", "control"]:
+                        donnees_phase = dmaic_originel.get(phase, {})
+                        if isinstance(donnees_phase, dict):
+                            dmaic_structure[phase] = donnees_phase.copy()
+                        else:
+                            dmaic_structure[phase] = {}
+
+                    # 4. Nettoyage des anciennes clés Streamlit internes pour éviter les conflits de rendu React
+                    projet_reconstruit = {
+                        "nom": nom_projet,
+                        "gantt_data": gantt,
+                        "mesure_data": mesure,
+                        "dmaic": dmaic_structure
+                    }
+                    
+                    # On conserve les autres variables métiers globales (ex: métriques, objectifs) hors clés Streamlit natives
+                    for k, v in p_item.items():
+                        if k not in ["nom", "gantt_data", "mesure_data", "dmaic"] and not k.startswith("FormSubmitter"):
+                            projet_reconstruit[k] = v
 
                     projets_valides.append(projet_reconstruit)
 
                 if projets_valides:
                     st.session_state.projects = projets_valides
                     st.session_state["current_project_idx"] = None
-                    st.session_state["import_success_msg"] = f"✅ {len(projets_valides)} projet(s) restauré(s) intégralement !"
+                    st.session_state["import_success_msg"] = f"✅ {len(projets_valides)} projet(s) chargé(s) à 100% !"
                     st.rerun()
         except Exception as e:
-            st.session_state["import_error_msg"] = f"Erreur chargement : {e}"
+            st.session_state["import_error_msg"] = f"Erreur lors de la reconnexion des modules : {e}"
 
 # --- CONFIGURATION DE LA PAGE & STYLE ---
 st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
@@ -90,7 +117,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- INITIALISATION SÉCURISÉE SANS ÉCRASEMENT ---
+# --- INITIALISATION SÉCURISÉE ---
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
@@ -162,10 +189,8 @@ zone_principale = st.container()
 
 if st.session_state["current_project_idx"] is None:
     with zone_principale:
-        # 1. Le Titre Principal
         st.title("🗂️ Mes Projets Lean Six Sigma")
 
-        # 2. Bouton d'initialisation
         with st.expander("➕ Initialiser un nouveau projet", expanded=False):
             nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
             if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -182,7 +207,7 @@ if st.session_state["current_project_idx"] is None:
 
         st.divider()
         
-        # 3. Affichage sous forme de Grille de Cartes Minimalistes (Sans sous-titre global)
+        # Grille de Cartes épurée
         if len(st.session_state.projects) > 0:
             nombre_colonnes = 3
             cols_grille = st.columns(nombre_colonnes)
@@ -192,18 +217,15 @@ if st.session_state["current_project_idx"] is None:
                 col_cible = cols_grille[idx % nombre_colonnes]
                 
                 with col_cible:
-                    # CORRECTION VISUELLE : Uniquement le nom du projet dans la carte
                     st.markdown(f"""
                     <div class="project-card">
                         <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Uniquement le bouton "Ouvrir le projet" juste en dessous
                     if st.button("Ouvrir le projet", key=f"ouvrir_projet_btn_{idx}", use_container_width=True):
                         st.session_state["current_project_idx"] = idx
                         st.rerun()
-                        
                     st.write("") 
         else:
             st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
@@ -212,10 +234,12 @@ if st.session_state["current_project_idx"] is None:
 
 else:
     # ----------------------------------------------------
-    # 📍 ESPACE DE TRAVAIL INTERNE DU PROJET SÉLECTIONNÉ
+    # 📍 ESPACE DE TRAVAIL INTERACTIF RECONSTRUIT
     # ----------------------------------------------------
     with zone_principale:
-        projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
+        # Récupération en temps réel des données du state
+        p_idx = st.session_state["current_project_idx"]
+        projet_actuel = st.session_state.projects[p_idx]
         
         if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
             st.session_state["current_project_idx"] = None
@@ -224,21 +248,105 @@ else:
         st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
         st.divider()
         
-        # Démonstration technique de la présence de TOUT l'arbre de données
-        st.subheader("Inspection des modules chargés")
+        # ==========================================
+        # 🟢 COMPOSANT INTERACTIF 1 : FORMULAIRES DMAIC
+        # ==========================================
+        st.header("🔄 Gestion des Phases DMAIC")
         
-        # Rendu dynamique basé sur l'intégralité des clés réellement présentes dans le projet
-        cles_disponibles = [cle for cle in projet_actuel.keys() if cle != "nom"]
+        # Onglets interactifs natifs réinjectés avec les valeurs du JSON importé
+        tabs = st.tabs(["🎯 Define", "📊 Measure", "🔍 Analyze", "💡 Improve", "🎛️ Control"])
+        phases_cles = ["define", "measure", "analyze", "improve", "control"]
         
-        if cles_disponibles:
-            for cle in cles_disponibles:
-                with st.expander(f"📦 Données du module : {cle.upper()}", expanded=False):
-                    st.write(projet_actuel[cle])
-        else:
-            st.caption("Le dictionnaire de ce projet ne contient pas encore de données secondaires.")
+        for i, phase in enumerate(phases_cles):
+            with tabs[i]:
+                st.subheader(f"Données de la phase {phase.upper()}")
+                
+                # Récupération sécurisée du contenu du JSON
+                contenu_phase = projet_actuel.get("dmaic", {}).get(phase, {})
+                
+                # Formulaire connecté au State global du projet
+                champs_description = st.text_area(
+                    "Description et livrables de la phase",
+                    value=contenu_phase.get("description", ""),
+                    key=f"input_desc_{phase}_{p_idx}"
+                )
+                
+                champs_responsable = st.text_input(
+                    "Responsable de Phase",
+                    value=contenu_phase.get("responsable", ""),
+                    key=f"input_resp_{phase}_{p_idx}"
+                )
+                
+                # Bouton de sauvegarde interactif pour valider les modifications en cours de route
+                if st.button(f"Mettre à jour {phase.capitalize()}", key=f"save_btn_{phase}_{p_idx}"):
+                    st.session_state.projects[p_idx]["dmaic"][phase]["description"] = champs_description
+                    st.session_state.projects[p_idx]["dmaic"][phase]["responsable"] = champs_responsable
+                    st.success("Données de la phase synchronisées dans le modèle !")
+                    st.rerun()
 
-        st.success("✨ L'intégralité de vos configurations, analyses DMAIC et tableaux a été injectée dans l'environnement de travail.")
+        st.divider()
+
+        # ==========================================
+        # 🔵 COMPOSANT INTERACTIF 2 : DIAGRAMME DE GANTT / TABLEAUX
+        # ==========================================
+        st.header("📋 Tableaux de Bord & Planification")
         
+        col_gantt, col_mesure = st.columns(2)
+        
+        with col_gantt:
+            st.subheader("📅 Diagramme de Gantt (Éditeur Interactif)")
+            df_gantt = projet_actuel.get("gantt_data", pd.DataFrame())
+            
+            # Si le DataFrame importé est vide, on l'initialise avec une structure propre pour l'éditeur
+            if df_gantt.empty:
+                df_gantt = pd.DataFrame(columns=["Tâche", "Début", "Fin", "Avancement (%)"])
+                
+            # st.data_editor reconnecte instantanément le tableau JSON importé à l'interface modifiable
+            edited_gantt = st.data_editor(
+                df_gantt,
+                num_rows="dynamic",
+                key=f"gantt_editor_active_{p_idx}",
+                use_container_width=True
+            )
+            # Sauvegarde en temps réel lors de la modification des cellules du tableau
+            st.session_state.projects[p_idx]["gantt_data"] = edited_gantt
+
+        with col_mesure:
+            st.subheader("📈 Collecte des Mesures (Données Métiers)")
+            df_mesure = projet_actuel.get("mesure_data", pd.DataFrame())
+            
+            if df_mesure.empty:
+                df_mesure = pd.DataFrame(columns=["Échantillon", "Valeur Mesurée", "Spécification Inf", "Spécification Sup"])
+                
+            edited_mesure = st.data_editor(
+                df_mesure,
+                num_rows="dynamic",
+                key=f"mesure_editor_active_{p_idx}",
+                use_container_width=True
+            )
+            st.session_state.projects[p_idx]["mesure_data"] = edited_mesure
+
+        # ==========================================
+        # 🟡 COMPOSANT INTERACTIF 3 : GRAPHIQUES ET ANALYSES DYNAMIQUES
+        # ==========================================
+        if not edited_mesure.empty and "Valeur Mesurée" in edited_mesure.columns:
+            st.divider()
+            st.subheader("📊 Graphique de Contrôle Continu (Généré en Temps Réel)")
+            try:
+                # Reconstruction du graphique dynamique Plotly à partir des données réelles importées
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(y=edited_mesure["Valeur Mesurée"], mode='lines+markers', name='Mesures', line=dict(color='#1E3A8A')))
+                
+                if "Spécification Inf" in edited_mesure.columns:
+                    fig.add_trace(go.Scatter(y=edited_mesure["Spécification Inf"], mode='lines', name='LSL', line=dict(color='red', dash='dash')))
+                if "Spécification Sup" in edited_mesure.columns:
+                    fig.add_trace(go.Scatter(y=edited_mesure["Spécification Sup"], mode='lines', name='USL', line=dict(color='red', dash='dash')))
+                    
+                fig.update_layout(title="Suivi de la performance Six Sigma", margin=dict(l=20, r=20, t=40, b=20), height=300)
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.caption(f"Le graphique s'affichera dès que les colonnes numériques du tableau seront complétées ({e}).")
+
     st.stop()
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
