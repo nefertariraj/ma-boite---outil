@@ -9,6 +9,7 @@ import json
 # 🛠️ FONCTIONS DE SÉRIALISATION / DÉSÉRIALISATION
 # ==========================================
 def deep_serialize(obj):
+    """ Convertit les objets complexes pour le format JSON """
     if isinstance(obj, pd.DataFrame):
         return {"_type_df_": True, "data": obj.to_dict(orient="records")}
     if isinstance(obj, dict):
@@ -20,6 +21,7 @@ def deep_serialize(obj):
     return obj
 
 def deep_deserialize(obj):
+    """ Reconstruit fidèlement les types natifs (DataFrames, structures imbriquées) """
     if isinstance(obj, dict):
         if obj.get("_type_df_") is True:
             return pd.DataFrame(obj.get("data", []))
@@ -29,62 +31,62 @@ def deep_deserialize(obj):
     return obj
 
 # ==========================================
-# 🔄 CALLBACK D'IMPORTATION DIRECTE AVEC RERUN FORCE
+# 🔄 CALLBACK D'IMPORTATION SÉCURISÉ
 # ==========================================
 def traiter_importation_json():
+    """ Importation stricte et typée de l'intégralité du projet sans perte de données """
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
             raw_data = json.load(fichier_charge)
             restored_data = deep_deserialize(raw_data)
             
+            # Validation de la structure importée
             if isinstance(restored_data, list):
+                projets_valides = []
                 for p_item in restored_data:
-                    if "gantt_data" in p_item and not isinstance(p_item["gantt_data"], pd.DataFrame):
-                        p_item["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
-                    if "mesure_data" in p_item and not isinstance(p_item["mesure_data"], pd.DataFrame):
-                        p_item["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+                    if not isinstance(p_item, dict):
+                        continue
+                        
+                    # Restauration stricte du nom d'origine (fallback si absent)
+                    nom_projet = p_item.get("nom") or p_item.get("name") or "Projet Restauré sans nom"
                     
-                    if "dmaic" not in p_item:
-                        p_item["dmaic"] = {}
+                    # Restauration et typage des DataFrames
+                    gantt = p_item.get("gantt_data", pd.DataFrame())
+                    if not isinstance(gantt, pd.DataFrame):
+                        gantt = pd.DataFrame(gantt)
+                        
+                    mesure = p_item.get("mesure_data", pd.DataFrame())
+                    if not isinstance(mesure, pd.DataFrame):
+                        mesure = pd.DataFrame(mesure)
+                    
+                    # Restauration complète des données DMAIC
+                    dmaic_originel = p_item.get("dmaic", {})
+                    dmaic_structure = {}
                     for phase in ["define", "measure", "analyze", "improve", "control"]:
-                        if phase not in p_item["dmaic"]:
-                            p_item["dmaic"][phase] = {}
+                        dmaic_structure[phase] = dmaic_originel.get(phase, {})
 
-                # Mise à jour absolue du State global
-                st.session_state.projects = restored_data
-                st.session_state["current_project_idx"] = None
-                st.session_state["import_success_msg"] = "✅ Projets restaurés avec succès !"
-                
-                # REFRESH FORCÉ DE L'INTERFACE : Résout le problème du blocage visuel
-                st.rerun()
-                
+                    # Reconstruction de l'objet projet complet en conservant tout champ additionnel
+                    projet_reconstruit = p_item.copy()
+                    projet_reconstruit.update({
+                        "nom": nom_projet,
+                        "gantt_data": gantt,
+                        "mesure_data": mesure,
+                        "dmaic": dmaic_structure
+                    })
+                    projets_valides.append(projet_reconstruit)
+
+                if projets_valides:
+                    # Injection directe avec verrouillage pour empêcher l'écrasement au démarrage
+                    st.session_state.projects = projets_valides
+                    st.session_state["projects_loaded_from_json"] = True
+                    st.session_state["current_project_idx"] = None
+                    st.session_state["import_success_msg"] = f"✅ {len(projets_valides)} projet(s) restauré(s) avec succès !"
+                    st.rerun()
+                else:
+                    st.session_state["import_error_msg"] = "Le fichier JSON ne contient aucun projet valide."
         except Exception as e:
-            st.session_state["import_error_msg"] = f"Erreur lors du parsing : {e}"
-
-# ==========================================
-# 🛠️ FONCTION DE SYNCHRONISATION EN TEMPS RÉEL
-# ==========================================
-def synchroniser_gantt(p_idx, key_editeur):
-    if key_editeur in st.session_state and "projects" in st.session_state:
-        etat_editeur = st.session_state[key_editeur]
-        p_cible = st.session_state["projects"][p_idx]
-        
-        if "gantt_data" in p_cible and isinstance(p_cible["gantt_data"], pd.DataFrame):
-            df_actuel = p_cible["gantt_data"].copy()
-            
-            for row_idx, changes in etat_editeur.get("edited_rows", {}).items():
-                for col, val in changes.items():
-                    df_actuel.iloc[row_idx, df_actuel.columns.get_loc(col)] = val
-            
-            for new_row in etat_editeur.get("added_rows", []):
-                df_actuel = pd.concat([df_actuel, pd.DataFrame([new_row])], ignore_index=True)
-            
-            indices_a_supprimer = etat_editeur.get("deleted_rows", [])
-            if indices_a_supprimer:
-                df_actuel = df_actuel.drop(indices_a_supprimer).reset_index(drop=True)
-                
-            st.session_state["projects"][p_idx]["gantt_data"] = df_actuel
+            st.session_state["import_error_msg"] = f"Erreur lors de la désérialisation : {e}"
 
 # --- CONFIGURATION DE LA PAGE & STYLE ---
 st.set_page_config(page_title="LSS - Personal Toolbox", layout="wide")
@@ -99,10 +101,11 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- GESTION DES DONNÉES SÉCURISÉES ---
+# --- GESTION DES DONNÉES SÉCURISÉES (ANTI-ÉCRASEMENT COHÉRENT) ---
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
+# Sécurité : On initialise à vide UNIQUEMENT si aucun fichier JSON n'a injecté de données au préalable
 if 'projects' not in st.session_state:
     st.session_state.projects = []
 
@@ -122,17 +125,15 @@ if not st.session_state.authenticated:
     st.stop()
 
 # ==========================================
-# ⚙️ CONSTRUCTION DE LA BARRE LATÉRALE
+# ⚙️ BARRE LATÉRALE
 # ==========================================
 with st.sidebar:
     st.title("⚙️ Paramètres & Sauvegarde")
-    
     color = st.color_picker("Couleur de l'outil", st.session_state.primary_color, key="sidebar_color_picker")
     st.session_state.primary_color = color
-    
     st.divider()
 
-    # --- EXPORTATION JSON ---
+    # --- EXPORTATION ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         try:
@@ -149,10 +150,9 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION DIRECTE ---
+    # --- IMPORTATION ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
-    
     st.sidebar.file_uploader(
         "Importer un fichier de sauvegarde", 
         type="json", 
@@ -160,51 +160,25 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-    # Affichage des statuts après rafraîchissement
     if "import_success_msg" in st.session_state:
         st.sidebar.success(st.session_state["import_success_msg"])
         del st.session_state["import_success_msg"]
-        
     if "import_error_msg" in st.session_state:
         st.sidebar.error(st.session_state["import_error_msg"])
         del st.session_state["import_error_msg"]
 
 # ==========================================
-# 🖼️ BLOC D'AFFICHAGE ET BOUCLE DE RENDU DES CARTES
+# 🖼️ RENDU DE L'INTERFACE PRINCIPALE
 # ==========================================
 zone_principale = st.container()
 
 if st.session_state["current_project_idx"] is None:
     with zone_principale:
+        # 1. Le Titre Principal
         st.title("🗂️ Mes Projets Lean Six Sigma")
 
-        # --- CODE D'AFFICHAGE DE VOS CARTES DE PROJETS ---
-        # Si la liste contient des projets, on les affiche sous forme de grille ou de liste interactive
-        if len(st.session_state.projects) > 0:
-            st.subheader("Sélectionner un projet existant :")
-            
-            # Affichage dynamique sous forme de boutons / cartes d'accès
-            for idx, p in enumerate(st.session_state.projects):
-                nom_du_projet = p.get("nom", f"Projet anonyme #{idx+1}")
-                
-                with st.container(border=True):
-                    col_txt, col_btn = st.columns([4, 1])
-                    with col_txt:
-                        st.markdown(f"### 📊 {nom_du_projet}")
-                        # Petit résumé des billes du projet pour valider visuellement la présence des données
-                        gantt_status = "Configuré" if "gantt_data" in p and not p["gantt_data"].empty else "Vide"
-                        st.caption(f"Statut des données : GANTT [{gantt_status}]")
-                    with col_btn:
-                        # Ce bouton change l'index actif et recharge l'outil correspondant
-                        if st.button(f"Ouvrir", key=f"ouvrir_projet_btn_{idx}"):
-                            st.session_state["current_project_idx"] = idx
-                            st.rerun()
-        else:
-            st.warning("⚠️ Aucun projet en cours. Créez-en un nouveau ou importez votre fichier JSON de sauvegarde dans la barre latérale.")
-
-        st.divider()
-
-        with st.expander("➕ Initialiser un nouveau projet"):
+        # 2. Bouton "Initialiser un nouveau projet" placé juste en dessous
+        with st.expander("➕ Initialiser un nouveau projet", expanded=False):
             nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
             if st.button("Confirmer la création", key="creation_project_confirm_btn"):
                 if nouveau_nom:
@@ -217,12 +191,41 @@ if st.session_state["current_project_idx"] is None:
                         }
                     })
                     st.rerun()
+
+        st.divider()
+        
+        # 3. Affichage de la liste des projets enregistrés/importés
+        st.subheader("Projets enregistrés")
+        if len(st.session_state.projects) > 0:
+            for idx, p in enumerate(st.session_state.projects):
+                # Récupération sécurisée du nom réel sans génération de doublon anonyme
+                nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
+                
+                with st.container(border=True):
+                    col_txt, col_btn = st.columns([4, 1])
+                    with col_txt:
+                        st.markdown(f"### 📊 {nom_du_projet}")
                         
+                        # Indicateurs de complétude des phases DMAIC chargées pour vérification visuelle
+                        phases_remplies = [phase.capitalize() for phase, data in p.get("dmaic", {}).items() if data]
+                        txt_phases = ", ".join(phases_remplies) if phases_remplies else "Aucune phase documentée"
+                        st.caption(f"**Phases actives** : {txt_phases}")
+                        
+                        gantt_status = "Données présentes" if "gantt_data" in p and not p["gantt_data"].empty else "Gantt vide"
+                        st.caption(f"**Statut technique** : {gantt_status}")
+                        
+                    with col_btn:
+                        if st.button(f"Ouvrir", key=f"ouvrir_projet_btn_{idx}"):
+                            st.session_state["current_project_idx"] = idx
+                            st.rerun()
+        else:
+            st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
+
     st.stop()
 
 else:
     # ----------------------------------------------------
-    # 📍 BLOC INTERNE DU PROJET ACTIF
+    # 📍 ESPACE DE TRAVAIL INTERNE DU PROJET SELECTIONNÉ
     # ----------------------------------------------------
     with zone_principale:
         projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
@@ -234,12 +237,20 @@ else:
         st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
         st.divider()
         
-        if "dmaic" not in projet_actuel:
-            st.session_state.projects[st.session_state["current_project_idx"]]["dmaic"] = {
-                "define": {}, "measure": {}, "analyze": {}, "improve": {}, "control": {}
-            }
+        # Exemple de rendu dynamique pour valider que les dictionnaires DMAIC ne sautent pas
+        st.subheader("Statut du déploiement DMAIC")
+        cols_dmaic = st.columns(5)
+        phases = ["define", "measure", "analyze", "improve", "control"]
         
-        st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
+        for i, phase in enumerate(phases):
+            with cols_dmaic[i]:
+                contenu_phase = projet_actuel.get("dmaic", {}).get(phase, {})
+                if contenu_phase:
+                    st.success(f"**{phase.upper()}**\n\nDonnées chargées")
+                else:
+                    st.warning(f"**{phase.upper()}**\n\nNon renseigné")
+                    
+        st.info("Les outils spécifiques (SIPOC, Matrice, etc.) s'interfaceront directement avec ces structures de données.")
         
     st.stop()
     
