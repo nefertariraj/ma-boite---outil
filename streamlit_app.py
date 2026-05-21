@@ -74,7 +74,7 @@ with st.sidebar:
     
     st.divider()
 
-    # --- EXPORTATION (CORRIGÉE : S'exécute au bon moment) ---
+    # --- EXPORTATION ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         def clean_for_json(obj):
@@ -88,7 +88,6 @@ with st.sidebar:
             return str(obj)
 
         try:
-            # On extrait directement depuis le session_state tout frais
             projets_propres = clean_for_json(st.session_state.projects)
             data_json = json.dumps(projets_propres, indent=4, ensure_ascii=False, default=force_serialize_dates)
             
@@ -127,13 +126,12 @@ with st.sidebar:
 
 
 # ==========================================
-# 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE
+# 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE COHÉRENTE
 # ==========================================
 
-# Utilisation d'un bloc conditionnel strict sans st.stop() pour laisser filer le script jusqu'aux boutons
 if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
-    # 🏠 BLOC ACCUEIL
+    # 🏠 BLOC ACCUEIL UNIQUE
     # ----------------------------------------------------
     st.title("🗂️ Mes Projets Lean Six Sigma")
 
