@@ -166,7 +166,7 @@ with st.sidebar:
     # --- Vos outils DMAIC se chargent exclusivement ici ---
     st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
 
-    else:
+else:
     # ----------------------------------------------------
     # 📍 CONFIGURATION ET VÉRIFICATION STRICTE DU PROJET ACTIF
     # ----------------------------------------------------
