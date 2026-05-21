@@ -73,14 +73,14 @@ def importer_sauvegarde_callback():
             fichier_charge.seek(0)
             raw_data = json.load(fichier_charge)
             
-            # 🩺 Tolérance structurelle : Si le JSON racine est un dictionnaire au lieu d'une liste
+            # Tolérance structurelle : Si le JSON racine est un dictionnaire au lieu d'une liste
             if isinstance(raw_data, dict):
                 if "projects" in raw_data:
                     liste_projets = raw_data["projects"]
                 elif "projets" in raw_data:
                     liste_projets = raw_data["projets"]
                 else:
-                    liste_projets = [raw_data] # On traite le dictionnaire comme un projet unique
+                    liste_projets = [raw_data] 
             elif isinstance(raw_data, list):
                 liste_projets = raw_data
             else:
@@ -92,8 +92,8 @@ def importer_sauvegarde_callback():
                 if not isinstance(p_item, dict) or p_item == {}:
                     continue
                 
-                # 🏷️ Récupération ultra-souple du nom du projet
-                nom_trouve = p_item.get("nom") or p_item.get("nom_projet") or p_item.get("name") or f"Projet Importé #{i+1}"
+                # 🏷️ Alignement strict : On cherche toutes les clés possibles mais on stocke impérativement dans "name"
+                nom_trouve = p_item.get("name") or p_item.get("nom") or p_item.get("nom_projet") or f"Projet Importé #{i+1}"
                 nom_projet = str(nom_trouve).strip()
                 
                 if nom_projet.lower() == "none" or not nom_projet:
@@ -104,7 +104,7 @@ def importer_sauvegarde_callback():
                 mesure_raw = p_item.get("mesure_data", []) or p_item.get("sipoc_data", [])
                 
                 projets_nettoyes.append({
-                    "nom": nom_projet,
+                    "name": nom_projet, # 💡 Clé harmonisée en "name" pour éviter le KeyError
                     "gantt_data": pd.DataFrame(gantt_raw if isinstance(gantt_raw, list) else []),
                     "mesure_data": pd.DataFrame(mesure_raw if isinstance(mesure_raw, list) else [])
                 })
@@ -171,7 +171,6 @@ with st.sidebar:
         on_change=importer_sauvegarde_callback
     )
     
-    # Retours d'information visuels immédiats dans la barre latérale
     if "erreur_import" in st.session_state:
         st.sidebar.error(f"❌ Erreur : {st.session_state['erreur_import']}")
         del st.session_state["erreur_import"]
@@ -195,7 +194,7 @@ if st.session_state["current_project_idx"] is None:
         if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
             if nouveau_nom and nouveau_nom.strip().lower() != "none":
                 st.session_state.projects.append({
-                    "nom": nouveau_nom.strip(),
+                    "name": nouveau_nom.strip(), # Enregistré avec "name"
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame()
                 })
@@ -209,14 +208,15 @@ if st.session_state["current_project_idx"] is None:
         cols = st.columns(3)
         for idx, projet in enumerate(st.session_state.projects):
             with cols[idx % 3]:
+                # Utilisation de la clé .get('name') pour l'affichage des cartes d'accueil
                 st.markdown(f"""
                 <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
-                    <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('nom')}</h3>
+                    <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('name')}</h3>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                nom_cle = str(projet.get('nom', '')).strip().replace(" ", "_")
-                if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_op_{idx}_{nom_cle}", use_container_width=True):
+                nom_cle = str(projet.get('name', '')).strip().replace(" ", "_")
+                if st.button(f"🚀 Entrer dans {projet.get('name')}", key=f"btn_op_{idx}_{nom_cle}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
@@ -231,7 +231,6 @@ else:
     COLONNES_GANTT = ["Tâche", "Début", "Fin", "Responsable", "Avancement"]
     COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
     
-    # Vérification et injection pour GANTT
     if not isinstance(projet_actuel.get("gantt_data"), pd.DataFrame):
         st.session_state.projects[idx_actif]["gantt_data"] = pd.DataFrame(columns=COLONNES_GANTT)
     else:
@@ -239,7 +238,6 @@ else:
             if col not in st.session_state.projects[idx_actif]["gantt_data"].columns:
                 st.session_state.projects[idx_actif]["gantt_data"][col] = None
 
-    # Vérification et injection pour SIPOC (mesure_data)
     if not isinstance(projet_actuel.get("mesure_data"), pd.DataFrame):
         st.session_state.projects[idx_actif]["mesure_data"] = pd.DataFrame(columns=COLONNES_SIPOC)
     else:
@@ -247,7 +245,6 @@ else:
             if col not in st.session_state.projects[idx_actif]["mesure_data"].columns:
                 st.session_state.projects[idx_actif]["mesure_data"][col] = None
 
-    # Re-déclaration locale après sécurisation pour exécution fluide du reste du script
     projet_actuel = st.session_state.projects[idx_actif]
     df_viz_sipoc = projet_actuel["mesure_data"]
 
@@ -258,7 +255,8 @@ else:
         st.session_state["current_project_idx"] = None
         st.rerun()
         
-    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
+    # Ici, proj["name"] (ou projet_actuel.get('name')) fonctionnera parfaitement sans KeyError
+    st.title(f"📍 Projet actif : {projet_actuel.get('name')}")
     st.divider()
     
     if not df_viz_sipoc.empty:
