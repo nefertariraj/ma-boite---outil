@@ -143,21 +143,7 @@ if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     st.title("🗂️ Mes Projets Lean Six Sigma")
 
-    # 1- Partie Initialisation un nouveau projet
-    with st.expander("➕ Initialiser un nouveau projet"):
-        nouveau_nom = st.text_input("Nom du projet", key="unique_creation_name_input")
-        if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
-            if nouveau_nom and nouveau_nom.strip().lower() != "none":
-                st.session_state.projects.append({
-                    "nom": nouveau_nom,
-                    "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame()
-                })
-                st.rerun()
-
-    st.divider()
-
-    # 2- Partie Affichage des projets valides uniquement
+    # 1- Partie Affichage des projets valides uniquement
     if len(st.session_state.projects) == 0:
         st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
     else:
