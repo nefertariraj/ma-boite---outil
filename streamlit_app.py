@@ -225,7 +225,6 @@ with st.sidebar:
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-else:
     # ----------------------------------------------------
     # 📍 CONFIGURATION ET VÉRIFICATION STRICTE DU PROJET ACTIF
     # ----------------------------------------------------
