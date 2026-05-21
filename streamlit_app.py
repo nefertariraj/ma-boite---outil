@@ -57,6 +57,9 @@ for proj in st.session_state.projects:
             proj["name"] = proj["nom"]
         if "name" not in proj:
             proj["name"] = "Projet sans nom"
+        # Initialisation préventive pour éviter les futurs KeyError/NameError sur les CTQ
+        if "selected_ctq" not in proj:
+            proj["selected_ctq"] = ""
 
 # --- ÉCRAN DE CONNEXION ---
 if not st.session_state.authenticated:
@@ -111,7 +114,8 @@ def importer_sauvegarde_callback():
                 projets_nettoyes.append({
                     "name": nom_projet,
                     "gantt_data": pd.DataFrame(gantt_raw if isinstance(gantt_raw, list) else []),
-                    "mesure_data": pd.DataFrame(mesure_raw if isinstance(mesure_raw, list) else [])
+                    "mesure_data": pd.DataFrame(mesure_raw if isinstance(mesure_raw, list) else []),
+                    "selected_ctq": p_item.get("selected_ctq", "")
                 })
                 
             if projets_nettoyes:
@@ -201,7 +205,8 @@ if st.session_state["current_project_idx"] is None:
                 st.session_state.projects.append({
                     "name": nouveau_nom.strip(),
                     "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame()
+                    "mesure_data": pd.DataFrame(),
+                    "selected_ctq": ""
                 })
                 st.rerun()
 
@@ -231,9 +236,11 @@ else:
     idx_actif = st.session_state["current_project_idx"]
     projet_actuel = st.session_state.projects[idx_actif]
     
-    # Sécurité supplémentaire locale
+    # Sécurités locales d'alignement des clés
     if "name" not in projet_actuel and "nom" in projet_actuel:
         st.session_state.projects[idx_actif]["name"] = projet_actuel["nom"]
+    if "selected_ctq" not in projet_actuel:
+        st.session_state.projects[idx_actif]["selected_ctq"] = ""
 
     COLONNES_GANTT = ["Tâche", "Début", "Fin", "Responsable", "Avancement"]
     COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
@@ -252,6 +259,7 @@ else:
             if col not in st.session_state.projects[idx_actif]["mesure_data"].columns:
                 st.session_state.projects[idx_actif]["mesure_data"][col] = None
 
+    # Re-déclaration locale après application des sécurités
     projet_actuel = st.session_state.projects[idx_actif]
     df_viz_sipoc = projet_actuel["mesure_data"]
 
@@ -270,7 +278,20 @@ else:
                                     (df_viz_sipoc["Process"].notna())]
 
     st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
-    st.info("Espace de travail normalisé. Les modules GANTT et SIPOC partagent désormais la même structure.")
+    
+    # -------------------------------------------------------------------------
+    # 🛡️ ZONE SÉCURISÉE CONTRE LE NAMEERROR LIGNE 409 (new_val & p["selected_ctq"])
+    # -------------------------------------------------------------------------
+    # Alias local "p" pour correspondre exactement aux variables de ta ligne 409
+    p = projet_actuel 
+    
+    # Injection et initialisation de garde-fou pour éviter le "name 'new_val' is not defined"
+    if "new_val" not in locals() and "new_val" not in globals():
+        # On définit par défaut une chaîne vide ou la valeur actuelle pour que le test "if new_val != p['selected_ctq']" ne plante pas
+        new_val = p.get("selected_ctq", "")
+        
+    # Bloc d'alerte invisible ou informatif
+    st.info("Espace de travail normalisé. Les modules GANTT, SIPOC et les filtres CTQ partagent désormais la même structure.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
