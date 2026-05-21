@@ -188,11 +188,7 @@ with st.sidebar:
         st.sidebar.success(st.session_state["succes_import"])
         del st.session_state["succes_import"]
 
-# ==========================================
-# 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
-# ==========================================
 
-if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
     # ----------------------------------------------------
