@@ -9,20 +9,29 @@ import json
 # 🛠️ FONCTION DE SYNCHRONISATION EN TEMPS RÉEL
 # ==========================================
 def synchroniser_gantt(p_idx, key_editeur):
+    """ Calback pour synchroniser les modifications du data_editor dans le session_state """
     if key_editeur in st.session_state and "projects" in st.session_state:
         etat_editeur = st.session_state[key_editeur]
+        
+        # Sécurité index
+        if p_idx >= len(st.session_state["projects"]):
+            return
+            
         p_cible = st.session_state["projects"][p_idx]
         
         if "gantt_data" in p_cible and isinstance(p_cible["gantt_data"], pd.DataFrame):
             df_actuel = p_cible["gantt_data"].copy()
             
+            # 1. Lignes modifiées
             for row_idx, changes in etat_editeur.get("edited_rows", {}).items():
                 for col, val in changes.items():
                     df_actuel.iloc[row_idx, df_actuel.columns.get_loc(col)] = val
             
+            # 2. Lignes ajoutées
             for new_row in etat_editeur.get("added_rows", []):
                 df_actuel = pd.concat([df_actuel, pd.DataFrame([new_row])], ignore_index=True)
             
+            # 3. Lignes supprimées
             indices_a_supprimer = etat_editeur.get("deleted_rows", [])
             if indices_a_supprimer:
                 df_actuel = df_actuel.drop(indices_a_supprimer).reset_index(drop=True)
@@ -45,8 +54,10 @@ st.markdown(f"""
 # --- GESTION DES DONNÉES SÉCURISÉES ---
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
+
 if 'projects' not in st.session_state:
     st.session_state.projects = []
+
 if 'current_project_idx' not in st.session_state:
     st.session_state.current_project_idx = None
 
@@ -61,7 +72,6 @@ if not st.session_state.authenticated:
                 st.session_state.authenticated = True
                 st.rerun()
     st.stop()
-
 
 # ==========================================
 # ⚙️ CONSTRUCTION DE LA BARRE LATÉRALE
@@ -106,6 +116,9 @@ with st.sidebar:
                 restored_data = json.load(uploaded_file)
                 if isinstance(restored_data, list):
                     for p_item in restored_data:
+                        # Harmonisation systématique sur la clé "nom"
+                        if "name" in p_item and "nom" not in p_item:
+                            p_item["nom"] = p_item.pop("name")
                         p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
                         p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
                     st.session_state.projects = restored_data
@@ -116,12 +129,9 @@ with st.sidebar:
             except Exception as e:
                 st.sidebar.error(f"Erreur : {e}")
 
-
 # ==========================================
-# 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE ÉTANCHÉIFIÉE
+# 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE
 # ==========================================
-
-# Conteneur principal unique pour verrouiller l'injection visuelle
 zone_principale = st.container()
 
 if st.session_state["current_project_idx"] is None:
@@ -134,11 +144,11 @@ if st.session_state["current_project_idx"] is None:
         with st.expander("➕ Initialiser un nouveau projet"):
             nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
             if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-                if nouveau_nom:
+                if nouveau_nom and nouveau_nom.strip():
                     st.session_state.projects.append({
-                        "nom": nouveau_nom,
-                        "gantt_data": pd.DataFrame(),
-                        "mesure_data": pd.DataFrame()
+                        "nom": nouveau_nom.strip(),
+                        "gantt_data": pd.DataFrame(columns=["Tâche", "Début", "Fin", "Responsable", "Avancement"]),
+                        "mesure_data": pd.DataFrame(columns=["Supplier", "Input", "Process", "Output", "Customer"])
                     })
                     st.rerun()
 
@@ -160,14 +170,16 @@ if st.session_state["current_project_idx"] is None:
                         st.session_state["current_project_idx"] = idx
                         st.rerun()
                         
-    # Sécurité finale pour empêcher Streamlit de relire le script en boucle fermée
-    st.stop()
-
 else:
     # ----------------------------------------------------
     # 📍 BLOC INTERNE DU PROJET
     # ----------------------------------------------------
     with zone_principale:
+        # Sécurité si l'index stocké est hors limite
+        if st.session_state["current_project_idx"] >= len(st.session_state.projects):
+            st.session_state["current_project_idx"] = None
+            st.rerun()
+            
         projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
         
         if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
@@ -180,7 +192,9 @@ else:
         # --- Vos outils DMAIC se chargent exclusivement ici ---
         st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
         
-    st.stop()
+        # Exemple d'implémentation de ton éditeur de Gantt avec le callback de synchronisation :
+        # key_gantt = f"gantt_editor_{st.session_state['current_project_idx']}"
+        # st.data_editor(projet_actuel["gantt_data"], key=key_gantt, on_change=synchroniser_gantt, args=(st.session_state['current_project_idx'], key_gantt))
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
