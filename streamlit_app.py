@@ -50,14 +50,13 @@ if 'projects' not in st.session_state:
 if 'current_project_idx' not in st.session_state:
     st.session_state.current_project_idx = None
 
-# 🛡️ CORRECTEUR DE CACHE FLASH : Répare instantanément la session actuelle du navigateur
+# 🛡️ CORRECTEUR DE CACHE : Aligne les structures de données en direct
 for proj in st.session_state.projects:
     if isinstance(proj, dict):
         if "name" not in proj and "nom" in proj:
             proj["name"] = proj["nom"]
         if "name" not in proj:
             proj["name"] = "Projet sans nom"
-        # Initialisation préventive pour éviter les futurs KeyError/NameError sur les CTQ
         if "selected_ctq" not in proj:
             proj["selected_ctq"] = ""
 
@@ -75,7 +74,7 @@ if not st.session_state.authenticated:
 
 
 # ==========================================
-# ⚙️ FONCTION DE CHARGEMENT ULTRA-TOLÉRANTE (CALLBACK)
+# ⚙️ FONCTION DE CHARGEMENT SANS DÉPENDANCE (JSON SEUL)
 # ==========================================
 def importer_sauvegarde_callback():
     fichier_charge = st.session_state.get("sidebar_uploader_file")
@@ -84,17 +83,15 @@ def importer_sauvegarde_callback():
             fichier_charge.seek(0)
             raw_data = json.load(fichier_charge)
             
+            # Tolérance structurelle dictionnaire vs liste
             if isinstance(raw_data, dict):
-                if "projects" in raw_data:
-                    liste_projets = raw_data["projects"]
-                elif "projets" in raw_data:
-                    liste_projets = raw_data["projets"]
-                else:
-                    liste_projets = [raw_data] 
+                if "projects" in raw_data: liste_projets = raw_data["projects"]
+                elif "projets" in raw_data: liste_projets = raw_data["projets"]
+                else: liste_projets = [raw_data] 
             elif isinstance(raw_data, list):
                 liste_projets = raw_data
             else:
-                st.session_state["erreur_import"] = "Format JSON non supporté (doit être une liste ou un dictionnaire)."
+                st.session_state["erreur_import"] = "Ce fichier JSON n'est pas formaté correctement."
                 return
 
             projets_nettoyes = []
@@ -102,11 +99,9 @@ def importer_sauvegarde_callback():
                 if not isinstance(p_item, dict) or p_item == {}:
                     continue
                 
-                nom_trouve = p_item.get("name") or p_item.get("nom") or p_item.get("nom_projet") or f"Projet Importé #{i+1}"
+                # Récupération flexible du nom
+                nom_trouve = p_item.get("name") or p_item.get("nom") or p_item.get("nom_projet") or f"Projet Récupéré #{i+1}"
                 nom_projet = str(nom_trouve).strip()
-                
-                if nom_projet.lower() == "none" or not nom_projet:
-                    nom_projet = f"Projet Récupéré #{i+1}"
                 
                 gantt_raw = p_item.get("gantt_data", [])
                 mesure_raw = p_item.get("mesure_data", []) or p_item.get("sipoc_data", [])
@@ -123,10 +118,10 @@ def importer_sauvegarde_callback():
                 st.session_state["current_project_idx"] = None
                 st.session_state["succes_import"] = f"📊 {len(projets_nettoyes)} projet(s) chargé(s) avec succès !"
             else:
-                st.session_state["erreur_import"] = "Aucun projet valide trouvé à l'intérieur du fichier."
+                st.session_state["erreur_import"] = "Aucun projet valide trouvé dans ce fichier."
                     
         except Exception as e:
-            st.session_state["erreur_import"] = str(e)
+            st.session_state["erreur_import"] = f"Fichier invalide : assurez-vous d'importer un fichier d'extension .json de sauvegarde."
 
 
 # ==========================================
@@ -173,15 +168,16 @@ with st.sidebar:
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     
+    # Restreint uniquement aux fichiers JSON
     st.sidebar.file_uploader(
-        "Importer un fichier de sauvegarde", 
-        type="json", 
+        "Importer un fichier de sauvegarde (.json)", 
+        type=["json"], 
         key="sidebar_uploader_file",
         on_change=importer_sauvegarde_callback
     )
     
     if "erreur_import" in st.session_state:
-        st.sidebar.error(f"❌ Erreur : {st.session_state['erreur_import']}")
+        st.sidebar.error(f"❌ {st.session_state['erreur_import']}")
         del st.session_state["erreur_import"]
         
     if "succes_import" in st.session_state:
@@ -213,7 +209,7 @@ if st.session_state["current_project_idx"] is None:
     st.divider()
 
     if len(st.session_state.projects) == 0:
-        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde à gauche pour commencer.")
+        st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde .json à gauche pour commencer.")
     else:
         cols = st.columns(3)
         for idx, projet in enumerate(st.session_state.projects):
@@ -236,7 +232,6 @@ else:
     idx_actif = st.session_state["current_project_idx"]
     projet_actuel = st.session_state.projects[idx_actif]
     
-    # Sécurités locales d'alignement des clés
     if "name" not in projet_actuel and "nom" in projet_actuel:
         st.session_state.projects[idx_actif]["name"] = projet_actuel["nom"]
     if "selected_ctq" not in projet_actuel:
@@ -259,7 +254,6 @@ else:
             if col not in st.session_state.projects[idx_actif]["mesure_data"].columns:
                 st.session_state.projects[idx_actif]["mesure_data"][col] = None
 
-    # Re-déclaration locale après application des sécurités
     projet_actuel = st.session_state.projects[idx_actif]
     df_viz_sipoc = projet_actuel["mesure_data"]
 
@@ -279,18 +273,10 @@ else:
 
     st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
     
-    # -------------------------------------------------------------------------
-    # 🛡️ ZONE SÉCURISÉE CONTRE LE NAMEERROR LIGNE 409 (new_val & p["selected_ctq"])
-    # -------------------------------------------------------------------------
-    # Alias local "p" pour correspondre exactement aux variables de ta ligne 409
     p = projet_actuel 
-    
-    # Injection et initialisation de garde-fou pour éviter le "name 'new_val' is not defined"
     if "new_val" not in locals() and "new_val" not in globals():
-        # On définit par défaut une chaîne vide ou la valeur actuelle pour que le test "if new_val != p['selected_ctq']" ne plante pas
         new_val = p.get("selected_ctq", "")
         
-    # Bloc d'alerte invisible ou informatif
     st.info("Espace de travail normalisé. Les modules GANTT, SIPOC et les filtres CTQ partagent désormais la même structure.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
