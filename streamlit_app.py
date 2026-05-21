@@ -166,7 +166,6 @@ with st.sidebar:
         st.session_state["current_project_idx"] = None
         st.rerun()
         
-    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
     st.divider()
     
     st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
