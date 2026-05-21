@@ -228,9 +228,7 @@ else:
     # ----------------------------------------------------
     # 🖼️ RENDU DE L'INTERFACE INTERNE DU PROJET
     # ----------------------------------------------------
-    # Correction ici : clé rendue unique avec le nom du projet pour éviter le conflit Streamlit
-    nom_projet_securise = str(projet_actuel.get('nom', 'projet')).strip().replace(" ", "_")
-    if st.button("⬅️ Retourner à l'accueil", key=f"unique_back_to_home_btn_{nom_projet_securise}"):
+    if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
         st.session_state["current_project_idx"] = None
         st.rerun()
         
@@ -243,6 +241,9 @@ else:
         df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
                                     (df_viz_sipoc["Process"].notna())]
 
+    # --- Vos outils DMAIC se chargent exclusivement ici ---
+    st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
+    
     st.info("Espace de travail normalisé. Les modules GANTT et SIPOC partagent désormais la même structure.")
     # Intègre tes onglets st.tabs(["SIPOC", "GANTT"...]) juste ici.
     
