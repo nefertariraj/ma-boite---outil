@@ -64,6 +64,31 @@ if not st.session_state.authenticated:
 
 
 # ==========================================
+# ⚙️ FONCTION LOGIQUE DU CHARGEMENT DE FICHIER
+# ==========================================
+def traiter_fichier_sauvegarde():
+    fichier = st.session_state.get("sidebar_uploader_file")
+    if fichier is not None:
+        try:
+            restored_data = json.load(fichier)
+            if isinstance(restored_data, list):
+                projets_nettoyes = []
+                for p_item in restored_data:
+                    nom_projet = str(p_item.get("nom", "")).strip().lower()
+                    if not nom_projet or nom_projet == "none" or p_item == {}:
+                        continue
+                        
+                    p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
+                    p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
+                    projets_nettoyes.append(p_item)
+                    
+                if projets_nettoyes:
+                    st.session_state.projects = projets_nettoyes
+                    st.session_state["current_project_idx"] = None
+        except Exception as e:
+            st.toast(f"❌ Erreur lors de la lecture du fichier : {e}")
+
+# ==========================================
 # ⚙️ CONSTRUCTION DE LA BARRE LATÉRALE
 # ==========================================
 with st.sidebar:
@@ -103,36 +128,17 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION AVEC NETTOYAGE ANTI-DOUBLON/NONE ---
+    # --- IMPORTATION DIRECTE VIA ACTIONS ÉVÉNEMENTIELLES ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
-    uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json", key="sidebar_uploader_file")
-
-    if uploaded_file is not None:
-        if f"loaded_{uploaded_file.name}" not in st.session_state:
-            try:
-                restored_data = json.load(uploaded_file)
-                if isinstance(restored_data, list):
-                    projets_nettoyes = []
-                    for p_item in restored_data:
-                        # 🧹 SÉCURITÉ : On ignore le projet s'il est vide, s'il n'a pas de nom ou s'il s'appelle "none"
-                        nom_projet = str(p_item.get("nom", "")).strip().lower()
-                        if not nom_projet or nom_projet == "none" or p_item == {}:
-                            continue
-                            
-                        p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
-                        p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
-                        projets_nettoyes.append(p_item)
-                        
-                    # Correction ici : On ne remplace la session QUE si on a trouvé des projets valides
-                    if projets_nettoyes:
-                        st.session_state.projects = projets_nettoyes
-                    st.session_state["current_project_idx"] = None
-                    st.session_state[f"loaded_{uploaded_file.name}"] = True
-                    st.sidebar.success("✅ Données nettoyées et chargées !")
-                    st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Erreur : {e}")
+    
+    # Correction : Utilisation d'un déclencheur on_change pour charger directement la donnée en mémoire vive
+    st.sidebar.file_uploader(
+        "Importer un fichier de sauvegarde", 
+        type="json", 
+        key="sidebar_uploader_file",
+        on_change=traiter_fichier_sauvegarde
+    )
 
 # ==========================================
 # 🖼️ BLOC UNIQUE DE NAVIGATION CENTRAL
@@ -169,7 +175,6 @@ if st.session_state["current_project_idx"] is None:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Clé sécurisée avec le nom du projet pour éviter le plantage StreamlitDuplicateElementKey
                 nom_cle = str(projet.get('nom', '')).strip().replace(" ", "_")
                 if st.button(f"🚀 Entrer dans {projet.get('nom')}", key=f"btn_op_{idx}_{nom_cle}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
