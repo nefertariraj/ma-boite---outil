@@ -64,13 +64,17 @@ if not st.session_state.authenticated:
 
 
 # ==========================================
-# ⚙️ FONCTION LOGIQUE DU CHARGEMENT DE FICHIER
+# ⚙️ LOGIQUE D'IMPORTATION DIRECTE ET ROBUSTE
 # ==========================================
-def traiter_fichier_sauvegarde():
-    fichier = st.session_state.get("sidebar_uploader_file")
-    if fichier is not None:
+# On vérifie si un fichier vient d'être déposé dans le uploader (via sa clé d'état)
+if "sidebar_uploader_file" in st.session_state and st.session_state["sidebar_uploader_file"] is not None:
+    fichier_charge = st.session_state["sidebar_uploader_file"]
+    
+    # On vérifie si on ne l'a pas déjà importé pour éviter les boucles infinies au rerun
+    nom_cle_cache = f"deja_lu_{fichier_charge.name}_{fichier_charge.size}"
+    if nom_cle_cache not in st.session_state:
         try:
-            restored_data = json.load(fichier)
+            restored_data = json.load(fichier_charge)
             if isinstance(restored_data, list):
                 projets_nettoyes = []
                 for p_item in restored_data:
@@ -85,8 +89,12 @@ def traiter_fichier_sauvegarde():
                 if projets_nettoyes:
                     st.session_state.projects = projets_nettoyes
                     st.session_state["current_project_idx"] = None
+                    
+            st.session_state[nom_cle_cache] = True
+            st.rerun()
         except Exception as e:
-            st.toast(f"❌ Erreur lors de la lecture du fichier : {e}")
+            st.error(f"Erreur lors du chargement automatique : {e}")
+
 
 # ==========================================
 # ⚙️ CONSTRUCTION DE LA BARRE LATÉRALE
@@ -128,16 +136,15 @@ with st.sidebar:
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION DIRECTE VIA ACTIONS ÉVÉNEMENTIELLES ---
+    # --- IMPORTATION ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     
-    # Correction : Utilisation d'un déclencheur on_change pour charger directement la donnée en mémoire vive
+    # Le composant met à jour directement st.session_state["sidebar_uploader_file"]
     st.sidebar.file_uploader(
         "Importer un fichier de sauvegarde", 
         type="json", 
-        key="sidebar_uploader_file",
-        on_change=traiter_fichier_sauvegarde
+        key="sidebar_uploader_file"
     )
 
 # ==========================================
