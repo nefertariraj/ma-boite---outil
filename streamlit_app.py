@@ -50,6 +50,14 @@ if 'projects' not in st.session_state:
 if 'current_project_idx' not in st.session_state:
     st.session_state.current_project_idx = None
 
+# 🛡️ CORRECTEUR DE CACHE FLASH : Répare instantanément la session actuelle du navigateur
+for proj in st.session_state.projects:
+    if isinstance(proj, dict):
+        if "name" not in proj and "nom" in proj:
+            proj["name"] = proj["nom"]
+        if "name" not in proj:
+            proj["name"] = "Projet sans nom"
+
 # --- ÉCRAN DE CONNEXION ---
 if not st.session_state.authenticated:
     st.title("🔐 Lean Six Sigma - Personal Toolbox")
@@ -73,7 +81,6 @@ def importer_sauvegarde_callback():
             fichier_charge.seek(0)
             raw_data = json.load(fichier_charge)
             
-            # Tolérance structurelle : Si le JSON racine est un dictionnaire au lieu d'une liste
             if isinstance(raw_data, dict):
                 if "projects" in raw_data:
                     liste_projets = raw_data["projects"]
@@ -92,19 +99,17 @@ def importer_sauvegarde_callback():
                 if not isinstance(p_item, dict) or p_item == {}:
                     continue
                 
-                # 🏷️ Alignement strict : On cherche toutes les clés possibles mais on stocke impérativement dans "name"
                 nom_trouve = p_item.get("name") or p_item.get("nom") or p_item.get("nom_projet") or f"Projet Importé #{i+1}"
                 nom_projet = str(nom_trouve).strip()
                 
                 if nom_projet.lower() == "none" or not nom_projet:
                     nom_projet = f"Projet Récupéré #{i+1}"
                 
-                # Extraction et conversion sécurisée des DataFrames
                 gantt_raw = p_item.get("gantt_data", [])
                 mesure_raw = p_item.get("mesure_data", []) or p_item.get("sipoc_data", [])
                 
                 projets_nettoyes.append({
-                    "name": nom_projet, # 💡 Clé harmonisée en "name" pour éviter le KeyError
+                    "name": nom_projet,
                     "gantt_data": pd.DataFrame(gantt_raw if isinstance(gantt_raw, list) else []),
                     "mesure_data": pd.DataFrame(mesure_raw if isinstance(mesure_raw, list) else [])
                 })
@@ -194,7 +199,7 @@ if st.session_state["current_project_idx"] is None:
         if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
             if nouveau_nom and nouveau_nom.strip().lower() != "none":
                 st.session_state.projects.append({
-                    "name": nouveau_nom.strip(), # Enregistré avec "name"
+                    "name": nouveau_nom.strip(),
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame()
                 })
@@ -208,7 +213,6 @@ if st.session_state["current_project_idx"] is None:
         cols = st.columns(3)
         for idx, projet in enumerate(st.session_state.projects):
             with cols[idx % 3]:
-                # Utilisation de la clé .get('name') pour l'affichage des cartes d'accueil
                 st.markdown(f"""
                 <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
                     <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('name')}</h3>
@@ -227,7 +231,10 @@ else:
     idx_actif = st.session_state["current_project_idx"]
     projet_actuel = st.session_state.projects[idx_actif]
     
-    # 🛠️ SÉCURITÉ UNIVERSELLE : Garantit que la structure est STRICTEMENT IDENTIQUE pour TOUS les projets
+    # Sécurité supplémentaire locale
+    if "name" not in projet_actuel and "nom" in projet_actuel:
+        st.session_state.projects[idx_actif]["name"] = projet_actuel["nom"]
+
     COLONNES_GANTT = ["Tâche", "Début", "Fin", "Responsable", "Avancement"]
     COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
     
@@ -255,7 +262,6 @@ else:
         st.session_state["current_project_idx"] = None
         st.rerun()
         
-    # Ici, proj["name"] (ou projet_actuel.get('name')) fonctionnera parfaitement sans KeyError
     st.title(f"📍 Projet actif : {projet_actuel.get('name')}")
     st.divider()
     
