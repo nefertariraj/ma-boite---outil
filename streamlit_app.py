@@ -189,11 +189,24 @@ with st.sidebar:
         del st.session_state["succes_import"]
 
 
-    # ----------------------------------------------------
-    # 🏠 ACCUEIL UNIQUE : MES PROJETS LEAN SIX SIGMA
-    # ----------------------------------------------------
+   # ----------------------------------------------------
+# ⚙️ INITIALIZATION DU SESSION STATE (Sécurité)
+# ----------------------------------------------------
+if "projects" not in st.session_state:
+    st.session_state.projects = []
+
+if "current_project_idx" not in st.session_state:
+    st.session_state["current_project_idx"] = None
+
+
+# ====================================================
+# 🏠 ÉCRAN 1 : ACCUEIL (Si aucun projet n'est actif)
+# ====================================================
+if st.session_state["current_project_idx"] is None:
+
     st.title("🗂️ Mes Projets Lean Six Sigma")
     
+    # Formulaire de création
     with st.expander("➕ Initialiser un nouveau projet"):
         nouveau_nom = st.text_input("Nom du projet", key="unique_creation_name_input")
         if st.button("Confirmer la création", key="unique_creation_confirm_btn"):
@@ -208,29 +221,41 @@ with st.sidebar:
 
     st.divider()
 
+    # Liste des projets sous forme de grille
     if len(st.session_state.projects) == 0:
         st.info("💡 Aucun projet en mémoire. Utilisez le bouton ci-dessus ou importez votre fichier de sauvegarde .json à gauche pour commencer.")
     else:
         cols = st.columns(3)
         for idx, projet in enumerate(st.session_state.projects):
             with cols[idx % 3]:
+                # Rendu visuel de la carte
                 st.markdown(f"""
                 <div style="border: 1px solid #dcdfe6; padding: 18px; border-radius: 8px; background-color: #ffffff; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 12px;">
                     <h3 style="margin: 0 0 10px 0; color: #1E3A8A; font-size: 1.15em;">📋 {projet.get('name')}</h3>
                 </div>
                 """, unsafe_allow_html=True)
                 
+                # Bouton d'action unique par projet
                 nom_cle = str(projet.get('name', '')).strip().replace(" ", "_")
                 if st.button(f"🚀 Entrer dans {projet.get('name')}", key=f"btn_op_{idx}_{nom_cle}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
 
-    # ----------------------------------------------------
-    # 📍 CONFIGURATION ET VÉRIFICATION STRICTE DU PROJET ACTIF
-    # ----------------------------------------------------
+
+# ====================================================
+# 📍 ÉCRAN 2 : INTERFACE INTERNE DU PROJET ACTIF
+# ====================================================
+else:
     idx_actif = st.session_state["current_project_idx"]
+    
+    # Sécurité anti-crash si l'index n'existe plus
+    if idx_actif >= len(st.session_state.projects):
+        st.session_state["current_project_idx"] = None
+        st.rerun()
+
     projet_actuel = st.session_state.projects[idx_actif]
     
+    # 📍 Vérification et normalisation des structures de données
     if "name" not in projet_actuel and "nom" in projet_actuel:
         st.session_state.projects[idx_actif]["name"] = projet_actuel["nom"]
     if "selected_ctq" not in projet_actuel:
@@ -239,6 +264,7 @@ with st.sidebar:
     COLONNES_GANTT = ["Tâche", "Début", "Fin", "Responsable", "Avancement"]
     COLONNES_SIPOC = ["Supplier", "Input", "Process", "Output", "Customer"]
     
+    # Normalisation du DataFrame GANTT
     if not isinstance(projet_actuel.get("gantt_data"), pd.DataFrame):
         st.session_state.projects[idx_actif]["gantt_data"] = pd.DataFrame(columns=COLONNES_GANTT)
     else:
@@ -246,6 +272,7 @@ with st.sidebar:
             if col not in st.session_state.projects[idx_actif]["gantt_data"].columns:
                 st.session_state.projects[idx_actif]["gantt_data"][col] = None
 
+    # Normalisation du DataFrame SIPOC
     if not isinstance(projet_actuel.get("mesure_data"), pd.DataFrame):
         st.session_state.projects[idx_actif]["mesure_data"] = pd.DataFrame(columns=COLONNES_SIPOC)
     else:
@@ -253,12 +280,11 @@ with st.sidebar:
             if col not in st.session_state.projects[idx_actif]["mesure_data"].columns:
                 st.session_state.projects[idx_actif]["mesure_data"][col] = None
 
+    # Re-capturation des données mises à jour
     projet_actuel = st.session_state.projects[idx_actif]
     df_viz_sipoc = projet_actuel["mesure_data"]
 
-    # ----------------------------------------------------
-    # 🖼️ RENDU DE L'INTERFACE INTERNE DU PROJET
-    # ----------------------------------------------------
+    # 🖼️ RENDU DE L'INTERFACE
     if st.button("⬅️ Retourner à l'accueil", key="unique_back_to_home_btn"):
         st.session_state["current_project_idx"] = None
         st.rerun()
@@ -266,17 +292,17 @@ with st.sidebar:
     st.title(f"📍 Projet actif : {projet_actuel.get('name')}")
     st.divider()
     
+    # Nettoyage à la volée pour l'affichage du SIPOC si nécessaire
     if not df_viz_sipoc.empty:
         df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
                                     (df_viz_sipoc["Process"].notna())]
 
     st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
     
-    p = projet_actuel 
-    if "new_val" not in locals() and "new_val" not in globals():
-        new_val = p.get("selected_ctq", "")
-        
-    st.info("Espace de travail normalisé. Les modules GANTT, SIPOC et les filtres CTQ partagent désormais la même structure.")
+    # Gestion de la valeur CTQ sélectionnée
+    new_val = projet_actuel.get("selected_ctq", "")
+    
+    st.success("Espace de travail normalisé. Les modules GANTT, SIPOC et les filtres CTQ partagent désormais la même structure.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
