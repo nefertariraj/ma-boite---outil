@@ -75,47 +75,60 @@ with st.sidebar:
     
     st.divider()
 
-    # --- EXPORTATION ---
+    # --- EXPORTATION COMPLÈTE ---
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         def clean_for_json(obj):
-            if isinstance(obj, pd.DataFrame): return obj.to_dict(orient="records")
-            if isinstance(obj, dict): return {str(k): clean_for_json(v) for k, v in obj.items()}
-            if isinstance(obj, list): return [clean_for_json(i) for i in obj]
+            if isinstance(obj, pd.DataFrame): 
+                return obj.to_dict(orient="records")
+            if isinstance(obj, dict): 
+                return {str(k): clean_for_json(v) for k, v in obj.items()}
+            if isinstance(obj, list): 
+                return [clean_for_json(i) for i in obj]
+            if hasattr(obj, 'strftime'): 
+                return obj.strftime('%Y-%m-%d')
             return obj
 
-        def force_serialize_dates(obj):
-            if hasattr(obj, 'strftime'): return obj.strftime('%Y-%m-%d')
-            return str(obj)
-
         try:
-            data_json = json.dumps(clean_for_json(st.session_state.projects), indent=4, ensure_ascii=False, default=force_serialize_dates)
+            data_json = json.dumps(clean_for_json(st.session_state.projects), indent=4, ensure_ascii=False)
             st.sidebar.download_button("📤 Télécharger la sauvegarde (.json)", data=data_json, file_name="sauvegarde_boite_outils.json", mime="application/json", key="sidebar_download_btn")
         except Exception as e:
             st.sidebar.error(f"Erreur export : {e}")
     else:
         st.sidebar.info("Aucun projet à sauvegarder.")
 
-    # --- IMPORTATION ---
+    # --- IMPORTATION ET REFRESH IMMÉDIAT ---
     st.sidebar.divider()
     st.sidebar.subheader("📥 Reprendre mon travail")
     uploaded_file = st.sidebar.file_uploader("Importer un fichier de sauvegarde", type="json", key="sidebar_uploader_file")
 
     if uploaded_file is not None:
-        if f"loaded_{uploaded_file.name}" not in st.session_state:
-            try:
-                restored_data = json.load(uploaded_file)
-                if isinstance(restored_data, list):
-                    for p_item in restored_data:
-                        p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
-                        p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
-                    st.session_state.projects = restored_data
-                    st.session_state["current_project_idx"] = None
-                    st.session_state[f"loaded_{uploaded_file.name}"] = True
-                    st.sidebar.success("✅ Données chargées !")
-                    st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Erreur : {e}")
+        try:
+            restored_data = json.load(uploaded_file)
+            if isinstance(restored_data, list):
+                for p_item in restored_data:
+                    # Restauration des structures tabulaires de base si présentes
+                    p_item["gantt_data"] = pd.DataFrame(p_item.get("gantt_data", []))
+                    p_item["mesure_data"] = pd.DataFrame(p_item.get("mesure_data", []))
+                    
+                    # Sécurisation de l'arborescence des phases DMAIC à l'import
+                    if "dmaic" not in p_item:
+                        p_item["dmaic"] = {}
+                    
+                    for phase in ["define", "measure", "analyze", "improve", "control"]:
+                        if phase not in p_item["dmaic"]:
+                            p_item["dmaic"][phase] = {}
+                        # Conversion récursive des structures de données internes des phases si nécessaire
+                        for key, val in p_item["dmaic"][phase].items():
+                            if isinstance(val, list):
+                                p_item["dmaic"][phase][key] = val
+
+                st.session_state.projects = restored_data
+                st.session_state["current_project_idx"] = None
+                st.sidebar.success("✅ Données chargées !")
+                st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"Erreur : {e}")
 
 # ==========================================
 # 🖼️ STRUCTURE DE NAVIGATION PRINCIPALE ÉTANCHÉIFIÉE
@@ -124,7 +137,7 @@ zone_principale = st.container()
 
 if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
-    # 🏠 BLOC ACCUEIL (Épuré selon vos critères)
+    # 🏠 BLOC ACCUEIL
     # ----------------------------------------------------
     with zone_principale:
         st.title("🗂️ Mes Projets Lean Six Sigma")
@@ -136,13 +149,19 @@ if st.session_state["current_project_idx"] is None:
                     st.session_state.projects.append({
                         "nom": nouveau_nom,
                         "gantt_data": pd.DataFrame(),
-                        "mesure_data": pd.DataFrame()
+                        "mesure_data": pd.DataFrame(),
+                        "dmaic": {
+                            "define": {},
+                            "measure": {},
+                            "analyze": {},
+                            "improve": {},
+                            "control": {}
+                        }
                     })
                     st.rerun()
 
         st.divider()
                         
-    # Sécurité finale pour empêcher Streamlit de relire le script en boucle fermée
     st.stop()
 
 else:
@@ -159,7 +178,12 @@ else:
         st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
         st.divider()
         
-        # --- Vos outils DMAIC se chargent exclusivement ici ---
+        # --- Structure de stockage DMAIC prête à l'emploi ---
+        if "dmaic" not in projet_actuel:
+            st.session_state.projects[st.session_state["current_project_idx"]]["dmaic"] = {
+                "define": {}, "measure": {}, "analyze": {}, "improve": {}, "control": {}
+            }
+        
         st.info("Espace de travail chargé. Vos outils (SIPOC, GANTT, Collecte de données) vont s'afficher ici.")
         
     st.stop()
