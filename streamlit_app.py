@@ -146,27 +146,91 @@ with st.sidebar:
     st.session_state.primary_color = color
     st.divider()
 
-    # Exportation complète de la session
-    st.sidebar.subheader("💾 Sauvegarder mon travail")
+    # ------------------------------------------------
+    # 📥 OPTIONS D'EXPORT DU PROJET ACTIF (NOUVEAU)
+    # ------------------------------------------------
+    if st.session_state.get('current_project_idx') is not None:
+        st.subheader("📥 Options d'export du projet")
+        
+        p_exp = st.session_state.projects[st.session_state.current_project_idx]
+        project_name = p_exp.get('nom', 'Projet')
+        import io
+
+        # --- Export Excel ---
+        try:
+            buffer_xlsx = io.BytesIO()
+            with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
+                pd.DataFrame([{
+                    "Projet": project_name, 
+                    "Statut": p_exp.get('status', 'En cours'), 
+                    "Définition": p_exp.get('problem', '')
+                }]).to_excel(writer, sheet_name='Synthèse', index=False)
+                
+                if p_exp.get('sipoc_data'):
+                    pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
+                if p_exp.get('stakeholders'):
+                    pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
+
+            st.download_button(
+                label="📊 Exporter en Excel", 
+                data=buffer_xlsx.getvalue(), 
+                file_name=f"{project_name}.xlsx", 
+                mime="application/vnd.ms-excel",
+                use_container_width=True,
+                key="sidebar_export_excel_btn"
+            )            
+        except Exception as e:
+            st.error("Erreur Excel (Vérifiez openpyxl)")
+
+        # --- Export PowerPoint ---
+        try:
+            from pptx import Presentation
+            def create_pptx(data_proj):
+                prs = Presentation()
+                slide = prs.slides.add_slide(prs.slide_layouts[0])
+                slide.shapes.title.text = data_proj.get('nom', 'Projet')
+                slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}"
+                buffer = io.BytesIO()
+                prs.save(buffer)
+                return buffer.getvalue()
+
+            pptx_bytes = create_pptx(p_exp)
+            st.download_button(
+                label="📽️ Exporter en PowerPoint", 
+                data=pptx_bytes, 
+                file_name=f"{project_name}.pptx", 
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                use_container_width=True,
+                key="sidebar_export_pptx_btn"
+            )
+        except Exception as e:
+            st.info("Erreur PPTX (Vérifiez python-pptx)")
+            
+        st.divider()
+
+    # ------------------------------------------------
+    # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
+    # ------------------------------------------------
+    st.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         try:
             data_json = json.dumps(deep_serialize(st.session_state.projects), indent=4, ensure_ascii=False)
-            st.sidebar.download_button(
+            st.download_button(
                 label="📤 Télécharger la sauvegarde (.json)",
                 data=data_json,
                 file_name="sauvegarde_boite_outils.json",
                 mime="application/json",
-                key="sidebar_download_btn"
+                key="sidebar_download_btn",
+                use_container_width=True
             )
         except Exception as e:
-            st.sidebar.error(f"Erreur export : {e}")
+            st.error(f"Erreur export : {e}")
     else:
-        st.sidebar.info("Aucun projet à sauvegarder.")
+        st.info("Aucun projet à sauvegarder.")
 
-    # Importation
-    st.sidebar.divider()
-    st.sidebar.subheader("📥 Reprendre mon travail")
-    st.sidebar.file_uploader(
+    st.divider()
+    st.subheader("📥 Reprendre mon travail")
+    st.file_uploader(
         "Importer un fichier de sauvegarde", 
         type="json", 
         key="sidebar_uploader_file",
