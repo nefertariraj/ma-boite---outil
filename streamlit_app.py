@@ -178,28 +178,39 @@ with st.sidebar:
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
-    # --- 1. ZONE DE SUPPRESSION (À COCHER) ---
-    if len(st.session_state.projects) > 0:
-        # On crée une liste de cases à cocher dans un petit espace dédié
-        with st.expander("🗑️ Supprimer un ou plusieurs projets", expanded=False):
-            st.write("Cochez les projets à éliminer :")
+    # FONCTION DE SÉCURITÉ : Supprime le projet directement à la source
+    def executer_suppression(index_du_projet):
+        if "projects" in st.session_state and len(st.session_state.projects) > index_du_projet:
+            st.session_state.projects.pop(index_du_projet)
+            # Si on supprime le projet ouvert, on nettoie l'index actif
+            if st.session_state.get("current_project_idx") == index_du_projet:
+                st.session_state["current_project_idx"] = None
+
+    # --- 1. SÉLECTEUR DE SUPPRESSION DIRECT (SANS EXPANDER, IMPOSSIBLE À LOUPER) ---
+    if "projects" in st.session_state and len(st.session_state.projects) > 0:
+        # On crée une liste propre des noms de projets existants
+        liste_noms = [p.get("nom", f"Projet #{i+1}") for i, p in enumerate(st.session_state.projects)]
+        
+        # Un menu déroulant simple pour choisir le projet à éliminer
+        projet_selectionne = st.selectbox(
+            "🗑️ Choisir un projet à supprimer :", 
+            options=["-- Choisir un projet --"] + liste_noms,
+            key="select_project_to_delete"
+        )
+        
+        if projet_selectionne != "-- Choisir un projet --":
+            # On retrouve l'index du projet choisi
+            idx_cible = liste_noms.index(projet_selectionne)
             
-            # On stocke les index des projets cochés
-            projets_a_supprimer = []
-            for idx, p in enumerate(st.session_state.projects):
-                nom_p = p.get("nom", f"Projet #{idx+1}")
-                # Chaque case à cocher a son propre nom
-                if st.checkbox(f"Supprimer : {nom_p}", key=f"delete_checkbox_{idx}"):
-                    projets_a_supprimer.append(idx)
-            
-            # Si au moins un projet est coché, on affiche le bouton d'action
-            if projets_a_supprimer:
-                st.write("")
-                if st.button("💥 Confirmer la suppression", key="execute_delete_btn", use_container_width=True):
-                    # On supprime en partant de la fin pour ne pas décaler les index
-                    for idx in sorted(projets_a_supprimer, reverse=True):
-                        st.session_state.projects.pop(idx)
-                    st.rerun()
+            # Le bouton de confirmation appelle directement notre fonction de sécurité
+            st.button(
+                f"💥 Supprimer définitivement : {projet_selectionne}", 
+                key="btn_confirm_delete_final",
+                on_click=executer_suppression,
+                args=(idx_cible,),
+                use_container_width=True
+            )
+            st.write("") # Petit espace
 
     # --- 2. CRÉATION DE PROJET ---
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
@@ -219,8 +230,8 @@ with st.sidebar:
 
     st.divider()
 
-    # --- 3. AFFICHAGE DES CARTES ---
-    if len(st.session_state.projects) > 0:
+    # --- 3. AFFICHAGE DES CARTES (NET ET COMPACT) ---
+    if "projects" in st.session_state and len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
     
