@@ -295,9 +295,6 @@ if st.session_state.get('current_project_idx') is not None:
             st.info("Erreur PPTX : Vérifiez python-pptx")
 
     st.divider()
-    if st.button("🚪 Déconnexion"):
-        st.session_state.authenticated = False
-        st.rerun()
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
