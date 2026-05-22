@@ -178,13 +178,12 @@ with st.sidebar:
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
-    # FONCTION DE SUPPRESSION DIRECTE (SÉCURISÉE ET IMMÉDIATE)
-    def supprimer_projet_source(index_cible):
-        if "projects" in st.session_state and len(st.session_state.projects) > index_cible:
-            st.session_state.projects.pop(index_cible)
-            # Réinitialisation de l'index actif si on supprime le projet ouvert
-            if st.session_state.get("current_project_idx") == index_cible:
-                st.session_state["current_project_idx"] = None
+    # BOUTON D'URGENCE ROUGE - PLACÉ TOUT EN HAUT DU SCRIPT
+    # Il supprime le TOUT DERNIER projet de la liste à chaque clic
+    if st.button("🚨 SUPPRIMER LE DERNIER PROJET", key="bouton_urgence_delete_ultra", use_container_width=True):
+        if "projects" in st.session_state and len(st.session_state.projects) > 0:
+            st.session_state.projects.pop() # Enlève le dernier élément directement
+            st.rerun()
 
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
@@ -194,7 +193,10 @@ with st.sidebar:
                     "nom": nouveau_nom,
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
-                    "dmaic": {"define": {}, "measure": {}, "analyze": {}, "improve": {}, "innovate": {}, "control": {}},
+                    "dmaic": {
+                        "define": {}, "measure": {}, "analyze": {},
+                        "improve": {}, "innovate": {}, "control": {}
+                    },
                     "parametres": {},
                     "progression": 0
                 }
@@ -202,43 +204,30 @@ with st.sidebar:
                 st.rerun()
 
     st.divider()
-
-    # AFFICHAGE DE LA GRILLE DES PROJETS
-    if "projects" in st.session_state and len(st.session_state.projects) > 0:
+    
+    # Affichage classique des cartes projets
+    if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
     
         for idx, p in enumerate(st.session_state.projects):
             nom_du_projet = p.get("nom", f"Projet #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
-            cle_unique = f"card_direct_{idx}_{str(nom_du_projet).replace(' ', '_')}"
+            cle_unique = f"carte_brute_{idx}"
         
             with col_cible:
-                # Bloc projet compact
                 st.markdown(f"""
-                <div class="project-card" style="padding: 15px; border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF; margin-bottom: 5px;">
-                    <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B; display: block;">📊 {nom_du_projet}</span>
+                <div class="project-card" style="padding: 20px; border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF;">
+                    <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
-                # Bouton 1 : Ouvrir
-                if st.button("Ouvrir", key=f"btn_open_{cle_unique}", use_container_width=True):
+                if st.button("Ouvrir le projet", key=f"ouvrir_brut_{cle_unique}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
-                
-                # Bouton 2 : Supprimer (Appelle directement la fonction avant le re-calcul de Streamlit)
-                st.button(
-                    "❌ Supprimer", 
-                    key=f"btn_del_{cle_unique}", 
-                    use_container_width=True,
-                    on_click=supprimer_projet_source,
-                    args=(idx,)
-                )
                 st.write("") 
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
-    
-    st.info("🛠️ Vos composants graphiques originaux se ré-exécutent automatiquement en utilisant les données fidèlement restaurées.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
