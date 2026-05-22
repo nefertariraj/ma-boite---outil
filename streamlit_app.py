@@ -182,7 +182,6 @@ with st.sidebar:
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
             if nouveau_nom:
-                # Création avec duplication stricte de la structure de référence complète
                 nouveau_projet = {
                     "nom": nouveau_nom,
                     "gantt_data": pd.DataFrame(),
@@ -201,49 +200,61 @@ with st.sidebar:
                 st.session_state.projects.append(nouveau_projet)
                 st.rerun()
 
-    # --- L'EXPANDER EST FERMÉ ICI ---
     st.divider()
     
-    # Variable temporaire pour exécuter la suppression après la boucle de rendu
+    # Variable temporaire pour stocker l'index à supprimer après la boucle
     projet_a_supprimer = None
-    
-    # Affichage et gestion dynamique des cartes projets au premier plan
+
+    # Affichage et gestion dynamique des cartes projets
     if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
-        
+    
         for idx, p in enumerate(st.session_state.projects):
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
             cle_unique = f"{idx}_{nom_du_projet.replace(' ', '_')}"
             
+            # Méthode d'interception par clic natif ou bouton d'urgence
+            action_suppression = st.sidebar.checkbox(f"❌ Supprimer : {nom_du_projet}", value=False, key=f"check_del_{cle_unique}")
+            if action_suppression:
+                projet_a_supprimer = idx
+        
             with col_cible:
+                # Création d'une carte HTML avec une croix de fermeture intégrée visuellement
                 st.markdown(f"""
-                <div class="project-card">
-                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
+                <div class="project-card" style="
+                    position: relative; 
+                    padding: 20px; 
+                    margin-bottom: 10px; 
+                    border: 1px solid #E2E8F0; 
+                    border-radius: 8px;
+                    background-color: #FFFFFF;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+                ">
+                    <div style="position: absolute; top: 10px; right: 10px; color: #EF4444; font-weight: bold; font-size: 0.9rem;">
+                        (cocher à gauche pour supprimer)
+                    </div>
+                    <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B; display: block; padding-right: 25px;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
+            
+                # Un seul bouton Streamlit par bloc (pour éviter tout contournement par vos règles CSS)
+                if st.button("Ouvrir le projet", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
+                    st.session_state["current_project_idx"] = idx
+                    st.rerun()
                 
-                # Alignement des boutons de gestion côte à côte sous la carte
-                btn_col1, btn_col2 = st.columns([2, 1])
-                with btn_col1:
-                    if st.button("Ouvrir", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
-                        st.session_state["current_project_idx"] = idx
-                        st.rerun()
-                with btn_col2:
-                    # Bouton de suppression d'urgence à l'italienne, visible et fonctionnel
-                    if st.button("🗑️", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
-                        projet_a_supprimer = idx
                 st.write("") 
-                
-        # Traitement de la suppression hors-boucle
+        
+        # Exécution de la suppression en toute sécurité
         if projet_a_supprimer is not None:
             st.session_state.projects.pop(projet_a_supprimer)
             st.rerun()
+            
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
