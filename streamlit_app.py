@@ -245,41 +245,39 @@ with st.sidebar:
             if st.session_state.get("current_project_idx") == index_a_retirer:
                 st.session_state["current_project_idx"] = None
 
-    # Gestion et suppression via liste déroulante
+    # Section de suppression propre des projets
     if len(st.session_state.projects) > 0:
-        st.write("### 📁 Gestion des projets")
+        st.write("### 🗑️ Suppression de projet")
         
-        # Liste des index disponibles [0, 1, 2...]
+        # Liste des index réels de la session
         indices_projets = list(range(len(st.session_state.projects)))
         
-        # Fonction interne pour extraire et afficher uniquement le nom exact du projet
-        def recuperer_nom_exact(idx):
-            p = st.session_state.projects[idx]
-            return p.get('nom', f"Projet sans titre #{idx+1}")
+        # Extraction sécurisée et stricte du vrai nom du projet
+        def extraire_nom_reel(idx):
+            projet = st.session_state.projects[idx]
+            # On vérifie si la clé 'nom' existe et contient une valeur valide
+            if "nom" in projet and projet["nom"]:
+                return str(projet["nom"])
+            # Fallback de secours technique uniquement si la structure est corrompue
+            return f"Projet anonyme #{idx + 1}"
         
-        # Liste déroulante affichant les noms parfaits
+        # Liste déroulante affichant les vrais noms identifiables
         idx_selectionne = st.selectbox(
-            "Sélectionner un projet pour l'ouvrir ou le supprimer :", 
+            "Sélectionner le projet à supprimer définitivement :", 
             options=indices_projets,
-            format_func=recuperer_nom_exact,
-            key="selectbox_gestion_projets"
+            format_func=extraire_nom_reel,
+            key="selectbox_suppression_projets"
         )
         
-        col_actions1, col_actions2 = st.columns([1, 1])
-        with col_actions1:
-            if st.button("🚀 Ouvrir le projet sélectionné", use_container_width=True, key="ouvrir_btn_select"):
-                st.session_state["current_project_idx"] = idx_selectionne
-                st.rerun()
-                
-        with col_actions2:
-            st.button(
-                "🗑️ Supprimer le projet sélectionné", 
-                use_container_width=True, 
-                key="suppr_btn_select",
-                help="Supprimer définitivement ce projet de la liste",
-                on_click=action_supprimer_projet,
-                args=(idx_selectionne,)
-            )
+        # Bouton unique de suppression calé sur toute la largeur
+        st.button(
+            "🗑️ Supprimer le projet sélectionné", 
+            use_container_width=True, 
+            key="suppr_btn_select_unique",
+            help="Supprimer définitivement ce projet de la liste",
+            on_click=action_supprimer_projet,
+            args=(idx_selectionne,)
+        )
             
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
