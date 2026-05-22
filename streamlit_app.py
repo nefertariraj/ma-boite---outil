@@ -177,7 +177,6 @@ with st.sidebar:
 # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
 # ----------------------------------------------------
 st.title("Mes projets Lean Six Sigma")
-
 with st.expander("➕ Initialiser un nouveau projet", expanded=False):
     nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
     if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -202,14 +201,6 @@ with st.expander("➕ Initialiser un nouveau projet", expanded=False):
             st.rerun()
 
 st.divider()
-
-# --- FONCTION DE SUPPRESSION FORCEE SUR LA PAGE PRINCIPALE ---
-def action_supprimer_projet(index_a_retirer):
-    if "projects" in st.session_state and len(st.session_state.projects) > index_a_retirer:
-        st.session_state.projects.pop(index_a_retirer)
-        # Si on supprime le projet actuellement ouvert, on réinitialise l'index
-        if st.session_state.get("current_project_idx") == index_a_retirer:
-            st.session_state["current_project_idx"] = None
 
 # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
 # FIX : Cette ligne est maintenant calée tout à gauche (zéro espace au début)
