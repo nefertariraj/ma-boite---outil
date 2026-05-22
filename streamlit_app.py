@@ -6,29 +6,10 @@ from datetime import datetime, date
 import json
 
 # ==========================================
-# 📋 MODÈLE DE RÉFÉRENCE UNIQUE POUR CHAQUE PROJET
-# ==========================================
-PROJET_MODELE_REFERENCE = {
-    "nom": "",
-    "gantt_data": pd.DataFrame(),
-    "mesure_data": pd.DataFrame(),  # Structure pour la phase Mesure
-    "dmaic": {
-        "define": {},
-        "measure": {},  # Stockage complet pour la phase Mesure
-        "analyze": {},
-        "improve": {},
-        "innovate": {},
-        "control": {}
-    },
-    "parametres": {},
-    "progression": 0
-}
-
-# ==========================================
 # 🛠️ FONCTIONS DE SÉRIALISATION / DÉSÉRIALISATION
 # ==========================================
 def deep_serialize(obj):
-    """ Préparation récursive de tous les états, tables, phases et champs utilisateurs """
+    """ Préparation récursive des objets pour l'export JSON standard """
     if isinstance(obj, pd.DataFrame):
         return {"_type_df_": True, "data": obj.to_dict(orient="records")}
     if isinstance(obj, dict):
@@ -37,8 +18,6 @@ def deep_serialize(obj):
         return [deep_serialize(i) for i in obj]
     if hasattr(obj, 'strftime'):
         return obj.strftime('%Y-%m-%d')
-    if isinstance(obj, (date, datetime)):
-        return obj.isoformat()
     return obj
 
 def deep_deserialize(obj):
@@ -55,7 +34,7 @@ def deep_deserialize(obj):
 # 🔄 SYSTÈME D'IMPORTATION INVISIBLE SANS CASSE
 # ==========================================
 def traiter_importation_json():
-    """ Restaure l'intégralité des données dans le state existant sans altérer l'interface """
+    """ Restaure les données dans le state existant sans altérer l'interface """
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
@@ -68,26 +47,27 @@ def traiter_importation_json():
                     if not isinstance(p_item, dict):
                         continue
                     
-                    # On fusionne avec le modèle de référence pour combler d'éventuels manques d'anciennes versions
-                    projet_reconstruit = PROJET_MODELE_REFERENCE.copy()
-                    projet_reconstruit.update(p_item)
+                    projet_reconstruit = p_item.copy()
                     
-                    # Vérification stricte des conteneurs de données critiques
-                    if not isinstance(projet_reconstruit["gantt_data"], pd.DataFrame):
-                        projet_reconstruit["gantt_data"] = pd.DataFrame(projet_reconstruit["gantt_data"])
+                    if "gantt_data" in p_item and not isinstance(p_item["gantt_data"], pd.DataFrame):
+                        projet_reconstruit["gantt_data"] = pd.DataFrame(p_item["gantt_data"])
+                    elif "gantt_data" not in p_item:
+                        projet_reconstruit["gantt_data"] = pd.DataFrame()
                         
-                    if not isinstance(projet_reconstruit["mesure_data"], pd.DataFrame):
-                        projet_reconstruit["mesure_data"] = pd.DataFrame(projet_reconstruit["mesure_data"])
+                    if "mesure_data" in p_item and not isinstance(p_item["mesure_data"], pd.DataFrame):
+                        projet_reconstruit["mesure_data"] = pd.DataFrame(p_item["mesure_data"])
+                    elif "mesure_data" not in p_item:
+                        projet_reconstruit["mesure_data"] = pd.DataFrame()
 
-                    # Re-mapping sécurisé de l'arbre DMAIC complet
                     dmaic_originel = p_item.get("dmaic", {})
-                    dmaic_structure = {k: v.copy() if isinstance(v, dict) else v for k, v in PROJET_MODELE_REFERENCE["dmaic"].items()}
-                    
+                    dmaic_structure = {}
                     for phase in ["define", "measure", "analyze", "improve", "innovate", "control"]:
                         if phase in dmaic_originel:
                             dmaic_structure[phase] = dmaic_originel[phase]
                     
-                    projet_reconstruit["dmaic"] = dmaic_structure
+                    if dmaic_structure:
+                        projet_reconstruit["dmaic"] = dmaic_structure
+                        
                     projets_valides.append(projet_reconstruit)
 
                 if projets_valides:
@@ -147,7 +127,7 @@ with st.sidebar:
     st.session_state.primary_color = color
     st.divider()
 
-    # Exportation complète de la session
+    # Exportation
     st.sidebar.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         try:
@@ -174,76 +154,13 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-# ==========================================
-# 🖼 arrow_right INTERFACE PRINCIPALE
-# ==========================================
-if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
-
-    with st.expander("➕ Initialiser un nouveau projet", expanded=False):
-        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-            if nouveau_nom:
-                # Création avec duplication stricte de la structure de référence complète
-                nouveau_projet = {
-                    "nom": nouveau_nom,
-                    "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame(),
-                    "dmaic": {
-                        "define": {},
-                        "measure": {},
-                        "analyze": {},
-                        "improve": {},
-                        "innovate": {},
-                        "control": {}
-                    },
-                    "parametres": {},
-                    "progression": 0
-                }
-                st.session_state.projects.append(nouveau_projet)
-                st.rerun()
-
-    st.divider()
-    
-    # Affichage et gestion dynamique des cartes projets
-    if len(st.session_state.projects) > 0:
-        nombre_colonnes = 3
-        cols_grille = st.columns(nombre_colonnes)
-        
-        for idx, p in enumerate(st.session_state.projects):
-            nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
-            col_cible = cols_grille[idx % nombre_colonnes]
-            
-            with col_cible:
-                st.markdown(f"""
-                <div class="project-card">
-                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Alignement des boutons de gestion côte à côte sous la carte
-                btn_col1, btn_col2 = st.columns([2, 1])
-                with btn_col1:
-                    if st.button("Ouvrir", key=f"ouvrir_projet_btn_{idx}", use_container_width=True):
-                        st.session_state["current_project_idx"] = idx
-                        st.rerun()
-                with btn_col2:
-                    # Action claire de suppression du projet
-                    if st.button("🗑️", key=f"supprimer_projet_btn_{idx}", use_container_width=True, help="Supprimer définitivement ce projet"):
-                        st.session_state.projects.pop(idx)
-                        st.rerun()
-                st.write("") 
-    else:
-        st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
-
-else:
     # ----------------------------------------------------
-    # 📍 ESPACE DE TRAVAIL INTERNE (FONCTIONNEL & SÉCURISÉ)
+    # 📍 ESPACE DE TRAVAIL INTERNE (FONCTIONNEL & NON MODIFIÉ)
     # ----------------------------------------------------
-    projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
     
     if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
         st.session_state["current_project_idx"] = None
