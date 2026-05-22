@@ -93,7 +93,6 @@ def traiter_importation_json():
                 if projets_valides:
                     st.session_state.projects = projets_valides
                     st.session_state["current_project_idx"] = None
-                    st.rerun()
         except Exception as e:
             st.sidebar.error(f"Erreur de restauration : {e}")
 
