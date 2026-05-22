@@ -178,63 +178,63 @@ with st.sidebar:
 # ----------------------------------------------------
 st.title("Mes projets Lean Six Sigma")
 
-    with st.expander("➕ Initialiser un nouveau projet", expanded=False):
-        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-            if nouveau_nom:
-                # Création avec duplication stricte de la structure de référence complète
-                nouveau_projet = {
-                    "nom": nouveau_nom,
-                    "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame(),
-                    "dmaic": {
-                        "define": {},
-                        "measure": {},
-                        "analyze": {},
-                        "improve": {},
-                        "innovate": {},
-                        "control": {}
-                    },
-                    "parametres": {},
-                    "progression": 0
-                }
-                st.session_state.projects.append(nouveau_projet)
-                st.rerun()
+with st.expander("➕ Initialiser un nouveau projet", expanded=False):
+    nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
+    if st.button("Confirmer la création", key="creation_project_confirm_btn"):
+        if nouveau_nom:
+            # Création avec duplication stricte de la structure de référence complète
+            nouveau_projet = {
+                "nom": nouveau_nom,
+                "gantt_data": pd.DataFrame(),
+                "mesure_data": pd.DataFrame(),
+                "dmaic": {
+                    "define": {},
+                    "measure": {},
+                    "analyze": {},
+                    "improve": {},
+                    "innovate": {},
+                    "control": {}
+                },
+                "parametres": {},
+                "progression": 0
+            }
+            st.session_state.projects.append(nouveau_projet)
+            st.rerun()
 
-    st.divider()
+st.divider()
     
-    # Affichage et gestion dynamique des cartes projets (sorti de l'expander)
-    if len(st.session_state.projects) > 0:
-        nombre_colonnes = 3
-        cols_grille = st.columns(nombre_colonnes)
+# Affichage et gestion dynamique des cartes projets (sorti de l'expander)
+if len(st.session_state.projects) > 0:
+    nombre_colonnes = 3
+    cols_grille = st.columns(nombre_colonnes)
     
-        for idx, p in enumerate(st.session_state.projects):
-            nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
-            col_cible = cols_grille[idx % nombre_colonnes]
+    for idx, p in enumerate(st.session_state.projects):
+        nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
+        col_cible = cols_grille[idx % nombre_colonnes]
         
-            with col_cible:
-                st.markdown(f"""
-                <div class="project-card">
-                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
-                </div>
-                """, unsafe_allow_html=True)
+        with col_cible:
+            st.markdown(f"""
+            <div class="project-card">
+                <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
+            </div>
+            """, unsafe_allow_html=True)
             
-                # Alignement des boutons de gestion côte à côte sous la carte
-                btn_col1, btn_col2 = st.columns([2, 1])
-                with btn_col1:
-                    if st.button("Ouvrir", key=f"ouvrir_projet_btn_{idx}", use_container_width=True):
-                        st.session_state["current_project_idx"] = idx
-                        st.rerun()
-                with btn_col2:
-                    # Action claire de suppression du projet
-                    if st.button("🗑️", key=f"supprimer_projet_btn_{idx}", use_container_width=True, help="Supprimer définitivement ce projet"):
-                        st.session_state.projects.pop(idx)
-                        st.rerun()
-                st.write("") 
-    else:
-        st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
+            # Alignement des boutons de gestion côte à côte sous la carte
+            btn_col1, btn_col2 = st.columns([2, 1])
+            with btn_col1:
+                if st.button("Ouvrir", key=f"ouvrir_projet_btn_{idx}", use_container_width=True):
+                    st.session_state["current_project_idx"] = idx
+                    st.rerun()
+            with btn_col2:
+                # Action claire de suppression du projet
+                if st.button("🗑️", key=f"supprimer_projet_btn_{idx}", use_container_width=True, help="Supprimer définitivement ce projet"):
+                    st.session_state.projects.pop(idx)
+                    st.rerun()
+            st.write("") 
+else:
+    st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
+st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
 
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
