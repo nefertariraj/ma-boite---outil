@@ -252,14 +252,29 @@ with st.sidebar:
         # Liste des index réels de la session
         indices_projets = list(range(len(st.session_state.projects)))
         
-        # Extraction sécurisée et stricte du vrai nom du projet
+        # Extraction intelligente du vrai nom saisi à l'initialisation
         def extraire_nom_reel(idx):
             projet = st.session_state.projects[idx]
-            # On vérifie si la clé 'nom' existe et contient une valeur valide
-            if "nom" in projet and projet["nom"]:
-                return str(projet["nom"])
-            # Fallback de secours technique uniquement si la structure est corrompue
-            return f"Projet anonyme #{idx + 1}"
+            
+            # 1. On liste les clés possibles utilisées lors de la création
+            cles_possibles = ["nom", "nom_projet", "name", "project_name", "Nom du projet"]
+            
+            for cle in cles_possibles:
+                if cle in projet and projet[cle]:
+                    # Si la valeur est elle-même un dictionnaire (cas rare), on cherche dedans
+                    if isinstance(projet[cle], dict):
+                        continue
+                    return str(projet[cle]).strip()
+            
+            # 2. Si aucune clé classique n'a fonctionné, on cherche n'importe quelle chaîne de texte non vide 
+            # au premier niveau du projet pour essayer de capturer le titre
+            for cle, valeur in projet.items():
+                if isinstance(valeur, str) and valeur.strip() and cle not in ["status", "id", "description", "problem"]:
+                    if len(valeur) < 100: # Un titre de projet fait rarement plus de 100 caractères
+                        return valeur.strip()
+                        
+            # Fallback ultime indexé si vraiment le dictionnaire est vide
+            return f"Projet sans nom enregistré #{idx + 1}"
         
         # Liste déroulante affichant les vrais noms identifiables
         idx_selectionne = st.selectbox(
