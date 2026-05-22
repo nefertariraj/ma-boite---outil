@@ -249,22 +249,26 @@ with st.sidebar:
     if len(st.session_state.projects) > 0:
         st.write("### 📁 Gestion des projets")
         
-        # 1. Option pour ouvrir un projet existant rapidement
-        options_projets = [f"{idx} - {p.get('nom', f'Projet #{idx+1}')}" for idx, p in enumerate(st.session_state.projects)]
+        # Liste des index disponibles [0, 1, 2...]
+        indices_projets = list(range(len(st.session_state.projects)))
         
-        projet_selectionne = st.selectbox(
+        # Fonction interne pour extraire et afficher uniquement le nom exact du projet
+        def recuperer_nom_exact(idx):
+            p = st.session_state.projects[idx]
+            return p.get('nom', f"Projet sans titre #{idx+1}")
+        
+        # Liste déroulante affichant les noms parfaits
+        idx_selectionne = st.selectbox(
             "Sélectionner un projet pour l'ouvrir ou le supprimer :", 
-            options=options_projets,
+            options=indices_projets,
+            format_func=recuperer_nom_exact,
             key="selectbox_gestion_projets"
         )
-        
-        # Récupération de l'index réel du projet choisi
-        idx_proche = int(projet_selectionne.split(" - ")[0])
         
         col_actions1, col_actions2 = st.columns([1, 1])
         with col_actions1:
             if st.button("🚀 Ouvrir le projet sélectionné", use_container_width=True, key="ouvrir_btn_select"):
-                st.session_state["current_project_idx"] = idx_proche
+                st.session_state["current_project_idx"] = idx_selectionne
                 st.rerun()
                 
         with col_actions2:
@@ -274,14 +278,14 @@ with st.sidebar:
                 key="suppr_btn_select",
                 help="Supprimer définitivement ce projet de la liste",
                 on_click=action_supprimer_projet,
-                args=(idx_proche,)
+                args=(idx_selectionne,)
             )
             
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
     st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
-
+    
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
