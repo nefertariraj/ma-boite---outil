@@ -191,12 +191,12 @@ with st.sidebar:
         # On crée une liste propre des noms de projets existants
         liste_noms = [p.get("nom", f"Projet #{i+1}") for i, p in enumerate(st.session_state.projects)]
         
-        # Un menu déroulant simple pour choisir le projet à éliminer
-        projet_selectionne = st.selectbox(
-            "🗑️ Choisir un projet à supprimer :", 
-            options=["-- Choisir un projet --"] + liste_noms,
-            key="select_project_to_delete"
-        )
+    # Un menu déroulant simple pour choisir le projet à éliminer
+    projet_selectionne = st.selectbox(
+        "🗑️ Choisir un projet à supprimer :", 
+        options=["-- Choisir un projet --"] + liste_noms,
+        key="select_project_to_delete"
+    )
         
         if projet_selectionne != "-- Choisir un projet --":
             # On retrouve l'index du projet choisi
