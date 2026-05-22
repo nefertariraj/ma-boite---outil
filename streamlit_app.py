@@ -214,14 +214,9 @@ with st.sidebar:
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
             cle_unique = f"{idx}_{nom_du_projet.replace(' ', '_')}"
-            
-            # Méthode d'interception par clic natif ou bouton d'urgence
-            action_suppression = st.sidebar.checkbox(f"❌ Supprimer : {nom_du_projet}", value=False, key=f"check_del_{cle_unique}")
-            if action_suppression:
-                projet_a_supprimer = idx
         
             with col_cible:
-                # Création d'une carte HTML avec une croix de fermeture intégrée visuellement
+                # 1. Structure de la carte avec un style d'affichage moderne et épuré
                 st.markdown(f"""
                 <div class="project-card" style="
                     position: relative; 
@@ -230,20 +225,20 @@ with st.sidebar:
                     border: 1px solid #E2E8F0; 
                     border-radius: 8px;
                     background-color: #FFFFFF;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
                 ">
-                    <div style="position: absolute; top: 10px; right: 10px; color: #EF4444; font-weight: bold; font-size: 0.9rem;">
-                        (cocher à gauche pour supprimer)
-                    </div>
                     <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B; display: block; padding-right: 25px;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
-                # Un seul bouton Streamlit par bloc (pour éviter tout contournement par vos règles CSS)
+                # 2. Deux boutons simples et distincts, empilés verticalement (Pas de sous-colonnes conflictuelles)
                 if st.button("Ouvrir le projet", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
                 
+                # Le bouton de suppression prend toute la largeur juste en dessous, impossible à rater ou masquer
+                if st.button("Supprimer ce projet", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
+                    projet_a_supprimer = idx
+                    
                 st.write("") 
         
         # Exécution de la suppression en toute sécurité
@@ -254,7 +249,7 @@ with st.sidebar:
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées.")
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
