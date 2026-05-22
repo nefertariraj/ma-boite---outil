@@ -202,15 +202,15 @@ with st.sidebar:
             # On retrouve l'index du projet choisi
             idx_cible = liste_noms.index(projet_selectionne)
             
-            # Le bouton de confirmation appelle directement notre fonction de sécurité
-            st.button(
-                f"💥 Supprimer définitivement : {projet_selectionne}", 
-                key="btn_confirm_delete_final",
-                on_click=executer_suppression,
-                args=(idx_cible,),
-                use_container_width=True
-            )
-            st.write("") # Petit espace
+        # Le bouton de confirmation appelle directement notre fonction de sécurité
+        st.button(
+            f"💥 Supprimer définitivement : {projet_selectionne}", 
+            key="btn_confirm_delete_final",
+            on_click=executer_suppression,
+            args=(idx_cible,),
+            use_container_width=True
+        )
+        st.write("") # Petit espace
 
     # --- 2. CRÉATION DE PROJET ---
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
