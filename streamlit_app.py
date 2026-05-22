@@ -245,47 +245,42 @@ with st.sidebar:
             if st.session_state.get("current_project_idx") == index_a_retirer:
                 st.session_state["current_project_idx"] = None
 
-    # Affichage et gestion dynamique des cartes projets
+    # Gestion et suppression via liste déroulante
     if len(st.session_state.projects) > 0:
-        nombre_colonnes = 3
-        cols_grille = st.columns(nombre_colonnes)
-    
-        for idx, p in enumerate(st.session_state.projects):
-            nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
-            col_cible = cols_grille[idx % nombre_colonnes]
-            
-            # Clé unique pour éviter les conflits Streamlit
-            cle_projet = f"id_{idx}_{nom_du_projet.replace(' ', '_')}"
+        st.write("### 📁 Gestion des projets")
         
-            with col_cible:
-                st.markdown(f"""
-                <div class="project-card">
-                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
-                </div>
-                """, unsafe_allow_html=True)
-            
-                # Alignement des boutons de gestion côte à côte sous la carte
-                btn_col1, btn_col2 = st.columns([2, 1])
-                with btn_col1:
-                    if st.button("Ouvrir", key=f"ouvrir_btn_{cle_projet}", use_container_width=True):
-                        st.session_state["current_project_idx"] = idx
-                        st.rerun()
-                with btn_col2:
-                    # Le bouton appelle directement la fonction principale au clic
-                    st.button(
-                        "🗑️", 
-                        key=f"suppr_btn_{cle_projet}", 
-                        use_container_width=True, 
-                        help="Supprimer définitivement ce projet",
-                        on_click=action_supprimer_projet,
-                        args=(idx,)
-                    )
-                st.write("") 
+        # 1. Option pour ouvrir un projet existant rapidement
+        options_projets = [f"{idx} - {p.get('nom', f'Projet #{idx+1}')}" for idx, p in enumerate(st.session_state.projects)]
+        
+        projet_selectionne = st.selectbox(
+            "Sélectionner un projet pour l'ouvrir ou le supprimer :", 
+            options=options_projets,
+            key="selectbox_gestion_projets"
+        )
+        
+        # Récupération de l'index réel du projet choisi
+        idx_proche = int(projet_selectionne.split(" - ")[0])
+        
+        col_actions1, col_actions2 = st.columns([1, 1])
+        with col_actions1:
+            if st.button("🚀 Ouvrir le projet sélectionné", use_container_width=True, key="ouvrir_btn_select"):
+                st.session_state["current_project_idx"] = idx_proche
+                st.rerun()
+                
+        with col_actions2:
+            st.button(
+                "🗑️ Supprimer le projet sélectionné", 
+                use_container_width=True, 
+                key="suppr_btn_select",
+                help="Supprimer définitivement ce projet de la liste",
+                on_click=action_supprimer_projet,
+                args=(idx_proche,)
+            )
             
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
