@@ -173,10 +173,10 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-    # ----------------------------------------------------
-    # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
-    # ----------------------------------------------------
-    st.title("Mes projets Lean Six Sigma")
+# ----------------------------------------------------
+# 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
+# ----------------------------------------------------
+st.title("Mes projets Lean Six Sigma")
 
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
@@ -203,10 +203,7 @@ with st.sidebar:
 
     st.divider()
     
-    # Variable temporaire pour stocker l'index à supprimer après la boucle
-    projet_a_supprimer = None
-
-    # Affichage et gestion dynamique des cartes projets
+    # Affichage et gestion dynamique des cartes projets (sorti de l'expander)
     if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
@@ -214,13 +211,10 @@ with st.sidebar:
         for idx, p in enumerate(st.session_state.projects):
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
-            
-            # Nettoyage du nom pour créer une clé unique sans caractères spéciaux
-            cle_unique = f"{idx}_{nom_du_projet.replace(' ', '_')}"
         
             with col_cible:
                 st.markdown(f"""
-                <div class="project-card" style="margin-bottom: 10px;">
+                <div class="project-card">
                     <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -228,25 +222,20 @@ with st.sidebar:
                 # Alignement des boutons de gestion côte à côte sous la carte
                 btn_col1, btn_col2 = st.columns([2, 1])
                 with btn_col1:
-                    if st.button("Ouvrir", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
+                    if st.button("Ouvrir", key=f"ouvrir_projet_btn_{idx}", use_container_width=True):
                         st.session_state["current_project_idx"] = idx
                         st.rerun()
                 with btn_col2:
-                    # Utilisation de la clé unique robuste basée sur le nom + l'index
-                    if st.button("🗑️", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
-                        projet_a_supprimer = idx
+                    # Action claire de suppression du projet
+                    if st.button("🗑️", key=f"supprimer_projet_btn_{idx}", use_container_width=True, help="Supprimer définitivement ce projet"):
+                        st.session_state.projects.pop(idx)
+                        st.rerun()
                 st.write("") 
-        
-        # Exécution de la suppression en toute sécurité hors de la boucle de rendu
-        if projet_a_supprimer is not None:
-            st.session_state.projects.pop(projet_a_supprimer)
-            st.rerun()
-            
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
     st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
-    
+
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
     if st.session_state.get('current_project_idx') is not None:
