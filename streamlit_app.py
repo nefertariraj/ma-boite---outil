@@ -191,7 +191,7 @@ with st.sidebar:
                 if p_exp.get('stakeholders'):
                     pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
             
-            st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")
+            st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")            
         except Exception as e:
             st.error("Erreur Excel : Vérifiez openpyxl")
 
