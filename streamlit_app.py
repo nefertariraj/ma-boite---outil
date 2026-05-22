@@ -182,7 +182,6 @@ with st.sidebar:
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
             if nouveau_nom:
-                # Création avec duplication stricte de la structure de référence complète
                 nouveau_projet = {
                     "nom": nouveau_nom,
                     "gantt_data": pd.DataFrame(),
@@ -201,49 +200,57 @@ with st.sidebar:
                 st.session_state.projects.append(nouveau_projet)
                 st.rerun()
 
-    # --- L'EXPANDER EST FERMÉ ICI ---
     st.divider()
     
-    # Variable temporaire pour exécuter la suppression après la boucle de rendu
-    projet_a_supprimer = None
-    
-    # Affichage et gestion dynamique des cartes projets au premier plan
+    # Liste pour suivre quel projet l'utilisateur souhaite supprimer
+    projets_selectionnes_pour_suppression = []
+
+    # Affichage et gestion dynamique des cartes projets
     if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
-        
+    
         for idx, p in enumerate(st.session_state.projects):
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
-            cle_unique = f"{idx}_{nom_du_projet.replace(' ', '_')}"
-            
+            cle_unique = f"id_{idx}_{nom_du_projet.replace(' ', '_')}"
+        
             with col_cible:
+                # La carte visuelle
                 st.markdown(f"""
-                <div class="project-card">
-                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
+                <div class="project-card" style="margin-bottom: 10px; padding: 15px; border: 1px solid #E2E8F0; border-radius: 8px;">
+                    <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
+            
+                # 1. L'unique gros bouton d'ouverture (qui fonctionne déjà très bien)
+                if st.button("Ouvrir le projet", key=f"ouvrir_btn_{cle_unique}", use_container_width=True):
+                    st.session_state["current_project_idx"] = idx
+                    st.rerun()
                 
-                # Alignement des boutons de gestion côte à côte sous la carte
-                btn_col1, btn_col2 = st.columns([2, 1])
-                with btn_col1:
-                    if st.button("Ouvrir", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
-                        st.session_state["current_project_idx"] = idx
-                        st.rerun()
-                with btn_col2:
-                    # Bouton de suppression d'urgence à l'italienne, visible et fonctionnel
-                    if st.button("🗑️", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
-                        projet_a_supprimer = idx
+                # 2. Une case à cocher discrète et élégante juste en dessous pour marquer le projet
+                coche_supprimer = st.checkbox("Marquer pour suppression", key=f"check_delete_{cle_unique}")
+                if coche_supprimer:
+                    projets_selectionnes_pour_suppression.append(idx)
+                
                 st.write("") 
-                
-        # Traitement de la suppression hors-boucle
-        if projet_a_supprimer is not None:
-            st.session_state.projects.pop(projet_a_supprimer)
-            st.rerun()
+        
+        # Si au moins une case est cochée, on affiche un bandeau de confirmation global en bas de la grille
+        if projets_selectionnes_pour_suppression:
+            st.write("---")
+            st.warning(f"⚠️ Vous avez sélectionné {len(projets_selectionnes_pour_suppression)} projet(s) à supprimer.")
+            
+            # Ce bouton d'action global est en dehors de la boucle, il s'affichera à 100%
+            if st.button("💥 Confirmer la suppression définitive", key="global_delete_btn_execution", use_container_width=True):
+                # On trie à l'envers pour ne pas décaler les index pendant qu'on pop()
+                for idx in sorted(projets_selectionnes_pour_suppression, reverse=True):
+                    st.session_state.projects.pop(idx)
+                st.rerun()
+            
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
