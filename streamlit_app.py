@@ -178,13 +178,41 @@ with st.sidebar:
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
-    # BOUTON D'URGENCE ROUGE - PLACÉ TOUT EN HAUT DU SCRIPT
-    # Il supprime le TOUT DERNIER projet de la liste à chaque clic
-    if st.button("🚨 SUPPRIMER LE DERNIER PROJET", key="bouton_urgence_delete_ultra", use_container_width=True):
-        if "projects" in st.session_state and len(st.session_state.projects) > 0:
-            st.session_state.projects.pop() # Enlève le dernier élément directement
-            st.rerun()
+    # FONCTION DE SÉCURITÉ : Supprime le projet directement à la source
+    def executer_suppression(index_du_projet):
+        if "projects" in st.session_state and len(st.session_state.projects) > index_du_projet:
+            st.session_state.projects.pop(index_du_projet)
+            # Si on supprime le projet ouvert, on nettoie l'index actif
+            if st.session_state.get("current_project_idx") == index_du_projet:
+                st.session_state["current_project_idx"] = None
 
+    # --- 1. SÉLECTEUR DE SUPPRESSION DIRECT (SANS EXPANDER, IMPOSSIBLE À LOUPER) ---
+    if "projects" in st.session_state and len(st.session_state.projects) > 0:
+        # On crée une liste propre des noms de projets existants
+        liste_noms = [p.get("nom", f"Projet #{i+1}") for i, p in enumerate(st.session_state.projects)]
+        
+        # Un menu déroulant simple pour choisir le projet à éliminer
+        projet_selectionne = st.selectbox(
+            "🗑️ Choisir un projet à supprimer :", 
+            options=["-- Choisir un projet --"] + liste_noms,
+            key="select_project_to_delete"
+        )
+        
+        if projet_selectionne != "-- Choisir un projet --":
+            # On retrouve l'index du projet choisi
+            idx_cible = liste_noms.index(projet_selectionne)
+            
+            # Le bouton de confirmation appelle directement notre fonction de sécurité
+            st.button(
+                f"💥 Supprimer définitivement : {projet_selectionne}", 
+                key="btn_confirm_delete_final",
+                on_click=executer_suppression,
+                args=(idx_cible,),
+                use_container_width=True
+            )
+            st.write("") # Petit espace
+
+    # --- 2. CRÉATION DE PROJET ---
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -193,10 +221,7 @@ with st.sidebar:
                     "nom": nouveau_nom,
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
-                    "dmaic": {
-                        "define": {}, "measure": {}, "analyze": {},
-                        "improve": {}, "innovate": {}, "control": {}
-                    },
+                    "dmaic": {"define": {}, "measure": {}, "analyze": {}, "improve": {}, "innovate": {}, "control": {}},
                     "parametres": {},
                     "progression": 0
                 }
@@ -204,16 +229,16 @@ with st.sidebar:
                 st.rerun()
 
     st.divider()
-    
-    # Affichage classique des cartes projets
-    if len(st.session_state.projects) > 0:
+
+    # --- 3. AFFICHAGE DES CARTES (NET ET COMPACT) ---
+    if "projects" in st.session_state and len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
     
         for idx, p in enumerate(st.session_state.projects):
             nom_du_projet = p.get("nom", f"Projet #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
-            cle_unique = f"carte_brute_{idx}"
+            cle_unique = f"card_{idx}_{str(nom_du_projet).replace(' ', '_')}"
         
             with col_cible:
                 st.markdown(f"""
@@ -222,7 +247,7 @@ with st.sidebar:
                 </div>
                 """, unsafe_allow_html=True)
             
-                if st.button("Ouvrir le projet", key=f"ouvrir_brut_{cle_unique}", use_container_width=True):
+                if st.button("Ouvrir le projet", key=f"btn_open_{cle_unique}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
                 st.write("") 
