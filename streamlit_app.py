@@ -254,11 +254,11 @@ else:
 st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
 
 # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
-    # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
-if st.session_state.get('current_project_idx') is not None:
+        # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
+    if st.session_state.get('current_project_idx') is not None:
         st.divider()
         st.subheader("📥 Exporter le projet complet")
-        
+
         p_exp = st.session_state.projects[st.session_state.current_project_idx]
         project_name = p_exp['name']
         import io
@@ -272,7 +272,7 @@ if st.session_state.get('current_project_idx') is not None:
                     pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
                 if p_exp.get('stakeholders'):
                     pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
-            
+
             st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")            
         except Exception as e:
             st.error("Erreur Excel : Vérifiez openpyxl")
@@ -295,6 +295,9 @@ if st.session_state.get('current_project_idx') is not None:
             st.info("Erreur PPTX : Vérifiez python-pptx")
 
     st.divider()
+    if st.button("🚪 Déconnexion"):
+        st.session_state.authenticated = False
+        st.rerun()
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
