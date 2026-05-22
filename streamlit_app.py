@@ -211,48 +211,6 @@ def action_supprimer_projet(index_a_retirer):
         if st.session_state.get("current_project_idx") == index_a_retirer:
             st.session_state["current_project_idx"] = None
 
-# Affichage et gestion dynamique des cartes projets
-if len(st.session_state.projects) > 0:
-    nombre_colonnes = 3
-    cols_grille = st.columns(nombre_colonnes)
-
-    for idx, p in enumerate(st.session_state.projects):
-        nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
-        col_cible = cols_grille[idx % nombre_colonnes]
-        
-        # Clé unique pour éviter les conflits Streamlit
-        cle_projet = f"id_{idx}_{nom_du_projet.replace(' ', '_')}"
-        
-        with col_cible:
-            st.markdown(f"""
-            <div class="project-card">
-                <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Alignement des boutons de gestion côte à côte sous la carte
-            btn_col1, btn_col2 = st.columns([2, 1])
-            with btn_col1:
-                if st.button("Ouvrir", key=f"ouvrir_btn_{cle_projet}", use_container_width=True):
-                    st.session_state["current_project_idx"] = idx
-                    st.rerun()
-            with btn_col2:
-                # Le bouton appelle directement la fonction principale au clic
-                st.button(
-                    "🗑️", 
-                    key=f"suppr_btn_{cle_projet}", 
-                    use_container_width=True, 
-                    help="Supprimer définitivement ce projet",
-                    on_click=action_supprimer_projet,
-                    args=(idx,)
-                )
-            st.write("") 
-        
-else:
-    st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
-
-st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
-
 # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
 # FIX : Cette ligne est maintenant calée tout à gauche (zéro espace au début)
 if st.session_state.get('current_project_idx') is not None:
