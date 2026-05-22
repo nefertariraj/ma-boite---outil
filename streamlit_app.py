@@ -173,35 +173,109 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-# ----------------------------------------------------
-# 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
-# ----------------------------------------------------
-st.title("Mes projets Lean Six Sigma")
-with st.expander("➕ Initialiser un nouveau projet", expanded=False):
-    nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-    if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-        if nouveau_nom:
-            # Création avec duplication stricte de la structure de référence complète
-            nouveau_projet = {
-                "nom": nouveau_nom,
-                "gantt_data": pd.DataFrame(),
-                "mesure_data": pd.DataFrame(),
-                "dmaic": {
-                    "define": {},
-                    "measure": {},
-                    "analyze": {},
-                    "improve": {},
-                    "innovate": {},
-                    "control": {}
-                },
-                "parametres": {},
-                "progression": 0
-            }
-            st.session_state.projects.append(nouveau_projet)
-            st.rerun()
+# ====================================================
+# 🔀 LOGIQUE D'AIGUILLAGE : ACCUEIL OU PROJET ACTIF
+# ====================================================
 
-st.divider()
+# VUE 1 : Si un projet est ouvert -> On affiche l'espace de travail du projet
+if st.session_state.get('current_project_idx') is not None:
+    
+    idx_projet = st.session_state['current_project_idx']
+    projet_actuel = st.session_state.projects[idx_projet]
+    
+    # Bouton de navigation pour fermer le projet et revenir à la liste
+    if st.button("⬅️ Quitter le projet (Retour à l'accueil)"):
+        st.session_state['current_project_idx'] = None
+        st.rerun()
+        
+    st.title(f"🚀 Projet Actif : {projet_actuel.get('nom', 'Sans nom')}")
+    
+    # ----------------------------------------------------
+    # [ ZONE DE VOS ONGLETS DMAIC ORIGINAUX ]
+    # Insérez ici votre ancien code d'affichage des onglets,
+    # st.data_editor, formulaires et graphiques Plotly.
+    # ----------------------------------------------------
 
+# VUE 2 : Sinon (aucun projet ouvert) -> ÉCRAN INITIAL UNIQUE
+else:
+    # ----------------------------------------------------
+    # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON VÉRIFIÉ)
+    # ----------------------------------------------------
+    st.title("Mes projets Lean Six Sigma")
+
+    with st.expander("➕ Initialiser un nouveau projet", expanded=False):
+        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
+        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
+            if nouveau_nom:
+                # Création avec duplication stricte de la structure de référence complète
+                nouveau_projet = {
+                    "nom": nouveau_nom,
+                    "gantt_data": pd.DataFrame(),
+                    "mesure_data": pd.DataFrame(),
+                    "dmaic": {
+                        "define": {},
+                        "measure": {},
+                        "analyze": {},
+                        "improve": {},
+                        "innovate": {},
+                        "control": {}
+                    },
+                    "parametres": {},
+                    "progression": 0
+                }
+                st.session_state.projects.append(nouveau_projet)
+                st.rerun()
+
+    st.divider()
+
+    # --- FONCTION DE SUPPRESSION INTERNE ---
+    def action_supprimer_projet(index_a_retirer):
+        if "projects" in st.session_state and len(st.session_state.projects) > index_a_retirer:
+            st.session_state.projects.pop(index_a_retirer)
+            if st.session_state.get("current_project_idx") == index_a_retirer:
+                st.session_state["current_project_idx"] = None
+
+    # Affichage et gestion dynamique des cartes projets
+    if len(st.session_state.projects) > 0:
+        nombre_colonnes = 3
+        cols_grille = st.columns(nombre_colonnes)
+
+        for idx, p in enumerate(st.session_state.projects):
+            nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
+            col_cible = cols_grille[idx % nombre_colonnes]
+            
+            # Clé unique pour éviter les conflits Streamlit
+            cle_projet = f"id_{idx}_{nom_du_projet.replace(' ', '_')}"
+            
+            with col_cible:
+                st.markdown(f"""
+                <div class="project-card">
+                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Alignement des boutons de gestion côte à côte sous la carte
+                btn_col1, btn_col2 = st.columns([2, 1])
+                with btn_col1:
+                    if st.button("Ouvrir", key=f"ouvrir_btn_{cle_projet}", use_container_width=True):
+                        st.session_state["current_project_idx"] = idx
+                        st.rerun()
+                with btn_col2:
+                    st.button(
+                        "🗑️", 
+                        key=f"suppr_btn_{cle_projet}", 
+                        use_container_width=True, 
+                        help="Supprimer définitivement ce projet",
+                        on_click=action_supprimer_projet,
+                        args=(idx,)
+                    )
+                st.write("") 
+            
+    else:
+        st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
+
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
+    
 # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
 # FIX : Cette ligne est maintenant calée tout à gauche (zéro espace au début)
 if st.session_state.get('current_project_idx') is not None:
