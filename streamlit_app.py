@@ -178,34 +178,47 @@ with st.sidebar:
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
-    with st.expander("➕ Initialiser un nouveau projet", expanded=False):
-        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-            if nouveau_nom:
-                nouveau_projet = {
-                    "nom": nouveau_nom,
-                    "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame(),
-                    "dmaic": {
-                        "define": {},
-                        "measure": {},
-                        "analyze": {},
-                        "improve": {},
-                        "innovate": {},
-                        "control": {}
-                    },
-                    "parametres": {},
-                    "progression": 0
-                }
-                st.session_state.projects.append(nouveau_projet)
-                st.rerun()
+    # 1. Zone d'actions principales (Création / Suppression)
+    col_actions_1, col_actions_2 = st.columns(2)
+
+    with col_actions_1:
+        with st.expander("➕ Initialiser un nouveau projet", expanded=False):
+            nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
+            if st.button("Confirmer la création", key="creation_project_confirm_btn"):
+                if nouveau_nom:
+                    nouveau_projet = {
+                        "nom": nouveau_nom,
+                        "gantt_data": pd.DataFrame(),
+                        "mesure_data": pd.DataFrame(),
+                        "dmaic": {
+                            "define": {},
+                            "measure": {},
+                            "analyze": {},
+                            "improve": {},
+                            "innovate": {},
+                            "control": {}
+                        },
+                        "parametres": {},
+                        "progression": 0
+                    }
+                    st.session_state.projects.append(nouveau_projet)
+                    st.rerun()
+
+    with col_actions_2:
+        if len(st.session_state.projects) > 0:
+            with st.expander("🗑️ Zone de suppression de projet", expanded=False):
+                options_projets = {p.get("nom", f"Projet #{i+1}"): i for i, p in enumerate(st.session_state.projects)}
+                projet_cible = st.selectbox("Sélectionnez le projet à détruire :", options=list(options_projets.keys()), key="select_project_to_delete")
+                
+                # Ce bouton est en dehors de la grille CSS, il s'affichera obligatoirement
+                if st.button("❌ Supprimer définitivement", key="exec_delete_project_btn", use_container_width=True):
+                    idx_a_supprimer = options_projets[projet_cible]
+                    st.session_state.projects.pop(idx_a_supprimer)
+                    st.rerun()
 
     st.divider()
     
-    # Variable temporaire pour stocker l'index à supprimer après la boucle
-    projet_a_supprimer = None
-
-    # Affichage et gestion dynamique des cartes projets
+    # 2. Affichage de la grille de cartes (Contient UNIQUEMENT le bouton Ouvrir)
     if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
@@ -214,17 +227,11 @@ with st.sidebar:
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
             cle_unique = f"{idx}_{nom_du_projet.replace(' ', '_')}"
-            
-            # Méthode d'interception par clic natif ou bouton d'urgence
-            action_suppression = st.sidebar.checkbox(f"❌ Supprimer : {nom_du_projet}", value=False, key=f"check_del_{cle_unique}")
-            if action_suppression:
-                projet_a_supprimer = idx
         
             with col_cible:
-                # Création d'une carte HTML avec une croix de fermeture intégrée visuellement
+                # La carte HTML pure, ultra-propre
                 st.markdown(f"""
                 <div class="project-card" style="
-                    position: relative; 
                     padding: 20px; 
                     margin-bottom: 10px; 
                     border: 1px solid #E2E8F0; 
@@ -232,24 +239,16 @@ with st.sidebar:
                     background-color: #FFFFFF;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
                 ">
-                    <div style="position: absolute; top: 10px; right: 10px; color: #EF4444; font-weight: bold; font-size: 0.9rem;">
-                        (cocher à gauche pour supprimer)
-                    </div>
-                    <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B; display: block; padding-right: 25px;">📊 {nom_du_projet}</span>
+                    <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B; display: block;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
-                # Un seul bouton Streamlit par bloc (pour éviter tout contournement par vos règles CSS)
+                # L'unique bouton autorisé par bloc par vos règles CSS
                 if st.button("Ouvrir le projet", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
                 
                 st.write("") 
-        
-        # Exécution de la suppression en toute sécurité
-        if projet_a_supprimer is not None:
-            st.session_state.projects.pop(projet_a_supprimer)
-            st.rerun()
             
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
