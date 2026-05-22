@@ -219,17 +219,17 @@ if len(st.session_state.projects) > 0:
     for idx, p in enumerate(st.session_state.projects):
         nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
         col_cible = cols_grille[idx % nombre_colonnes]
-    
+        
         # Clé unique pour éviter les conflits Streamlit
         cle_projet = f"id_{idx}_{nom_du_projet.replace(' ', '_')}"
-    
+        
         with col_cible:
             st.markdown(f"""
             <div class="project-card">
                 <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
             </div>
             """, unsafe_allow_html=True)
-        
+            
             # Alignement des boutons de gestion côte à côte sous la carte
             btn_col1, btn_col2 = st.columns([2, 1])
             with btn_col1:
@@ -251,7 +251,7 @@ if len(st.session_state.projects) > 0:
 else:
     st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
 
-st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
+st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
 
 # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
         # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
