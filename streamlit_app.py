@@ -176,7 +176,7 @@ with st.sidebar:
 # ----------------------------------------------------
 # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
 # ----------------------------------------------------
-    st.title("Mes projets Lean Six Sigma")
+st.title("Mes projets Lean Six Sigma")
 
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
