@@ -237,36 +237,6 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-    # ----------------------------------------------------
-    # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON VÉRIFIÉ)
-    # ----------------------------------------------------
-    st.title("Mes projets Lean Six Sigma")
-
-    with st.expander("➕ Initialiser un nouveau projet", expanded=False):
-        nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
-        if st.button("Confirmer la création", key="creation_project_confirm_btn"):
-            if nouveau_nom:
-                # Création avec duplication stricte de la structure de référence complète
-                nouveau_projet = {
-                    "nom": nouveau_nom,
-                    "gantt_data": pd.DataFrame(),
-                    "mesure_data": pd.DataFrame(),
-                    "dmaic": {
-                        "define": {},
-                        "measure": {},
-                        "analyze": {},
-                        "improve": {},
-                        "innovate": {},
-                        "control": {}
-                    },
-                    "parametres": {},
-                    "progression": 0
-                }
-                st.session_state.projects.append(nouveau_projet)
-                st.rerun()
-
-    st.divider()
-
     # --- FONCTION DE SUPPRESSION FORCEE SUR LA PAGE PRINCIPALE ---
     def action_supprimer_projet(index_a_retirer):
         if "projects" in st.session_state and len(st.session_state.projects) > index_a_retirer:
