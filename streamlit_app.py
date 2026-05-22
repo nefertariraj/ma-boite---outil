@@ -316,56 +316,6 @@ with st.sidebar:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
     st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
-    
-# --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
-# FIX : Cette ligne est maintenant calée tout à gauche (zéro espace au début)
-if st.session_state.get('current_project_idx') is not None:
-    st.divider()
-    st.subheader("📥 Exporter le projet complet")
-
-    p_exp = st.session_state.projects[st.session_state.current_project_idx]
-    # Sécurité pour éviter le KeyError si 'name' ou 'nom' est utilisé
-    project_name = p_exp.get('nom', p_exp.get('name', 'Projet Sans Nom'))
-    import io
-
-    # --- 1. EXPORT EXCEL ---
-    try:
-        buffer_xlsx = io.BytesIO()
-        with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
-            pd.DataFrame([{"Projet": project_name, "Statut": p_exp.get('status', 'En cours'), "Définition": p_exp.get('problem', '')}]).to_excel(writer, sheet_name='Synthèse', index=False)
-            if p_exp.get('sipoc_data'):
-                pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
-            if p_exp.get('stakeholders'):
-                pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
-
-        st.download_button(label="📊 Télécharger en Excel", data=buffer_xlsx.getvalue(), file_name=f"{project_name}.xlsx", mime="application/vnd.ms-excel")            
-    except Exception as e:
-        st.error("Erreur Excel : Vérifiez openpyxl")
-
-    # --- 2. EXPORT POWERPOINT ---
-    try:
-        from pptx import Presentation
-        def create_pptx(data_proj):
-            prs = Presentation()
-            slide = prs.slides.add_slide(prs.slide_layouts[0])
-            # Utilise 'nom' ou 'name' de manière sécurisée
-            slide.shapes.title.text = data_proj.get('nom', data_proj.get('name', 'Projet Sans Nom'))
-            slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}"
-            buffer = io.BytesIO()
-            prs.save(buffer)
-            return buffer.getvalue()
-
-        pptx_bytes = create_pptx(p_exp)
-        st.download_button(label="📽️ Télécharger en PowerPoint", data=pptx_bytes, file_name=f"{project_name}.pptx", mime="application/vnd.openxmlformats-officedocument.presentationml.presentation")
-    except Exception as e:
-        st.info("Erreur PPTX : Vérifiez python-pptx")
-
-st.divider()
-
-# FIX : Ce bloc est lui aussi calé tout à gauche maintenant
-if st.button("🚪 Déconnexion"):
-    st.session_state.authenticated = False
-    st.rerun()
 
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
