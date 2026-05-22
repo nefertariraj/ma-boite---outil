@@ -174,45 +174,14 @@ with st.sidebar:
     )
 
     # ----------------------------------------------------
-    # 🏠 ÉCRAN INITIAL UNIQUE (VUE EN GRILLE DE CARTES)
+    # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
-    # FONCTION DE SÉCURITÉ : Supprime le projet directement à la source
-    def executer_suppression(index_du_projet):
-        if "projects" in st.session_state and len(st.session_state.projects) > index_du_projet:
-            st.session_state.projects.pop(index_du_projet)
-            # Si on supprime le projet ouvert, on nettoie l'index actif
-            if st.session_state.get("current_project_idx") == index_du_projet:
-                st.session_state["current_project_idx"] = None
+    # Initialisation de secours si la liste n'existe pas du tout
+    if "projects" not in st.session_state:
+        st.session_state.projects = []
 
-    # --- 1. SÉLECTEUR DE SUPPRESSION DIRECT (SANS EXPANDER, IMPOSSIBLE À LOUPER) ---
-    if "projects" in st.session_state and len(st.session_state.projects) > 0:
-        # On crée une liste propre des noms de projets existants
-        liste_noms = [p.get("nom", f"Projet #{i+1}") for i, p in enumerate(st.session_state.projects)]
-        
-        # Un menu déroulant simple pour choisir le projet à éliminer
-        projet_selectionne = st.selectbox(
-            "🗑️ Choisir un projet à supprimer :", 
-            options=["-- Choisir un projet --"] + liste_noms,
-            key="select_project_to_delete"
-        )
-        
-        if projet_selectionne != "-- Choisir un projet --":
-            # On retrouve l'index du projet choisi
-            idx_cible = liste_noms.index(projet_selectionne)
-            
-            # Le bouton de confirmation appelle directement notre fonction de sécurité
-            st.button(
-                f"💥 Supprimer définitivement : {projet_selectionne}", 
-                key="btn_confirm_delete_final",
-                on_click=executer_suppression,
-                args=(idx_cible,),
-                use_container_width=True
-            )
-            st.write("") # Petit espace
-
-    # --- 2. CRÉATION DE PROJET ---
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -221,7 +190,10 @@ with st.sidebar:
                     "nom": nouveau_nom,
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
-                    "dmaic": {"define": {}, "measure": {}, "analyze": {}, "improve": {}, "innovate": {}, "control": {}},
+                    "dmaic": {
+                        "define": {}, "measure": {}, "analyze": {}, 
+                        "improve": {}, "innovate": {}, "control": {}
+                    },
                     "parametres": {},
                     "progression": 0
                 }
@@ -229,30 +201,60 @@ with st.sidebar:
                 st.rerun()
 
     st.divider()
+    
+    # Variable de sécurité pour la suppression
+    projet_a_supprimer = None
 
-    # --- 3. AFFICHAGE DES CARTES (NET ET COMPACT) ---
-    if "projects" in st.session_state and len(st.session_state.projects) > 0:
+    # VÉRIFICATION ET NETTOYAGE DES DONNÉES SÉCURISÉ
+    try:
+        nombre_de_projets = len(st.session_state.projects)
+    except Exception:
+        st.session_state.projects = []
+        nombre_de_projets = 0
+
+    if nombre_de_projets > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
     
         for idx, p in enumerate(st.session_state.projects):
-            nom_du_projet = p.get("nom", f"Projet #{idx+1}")
+            # Sécurité anti-plantage si 'p' n'est pas un dictionnaire ou s'il est vide
+            if not isinstance(p, dict):
+                continue
+                
+            nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
-            cle_unique = f"card_{idx}_{str(nom_du_projet).replace(' ', '_')}"
+            cle_unique = f"safe_id_{idx}_{str(nom_du_projet).replace(' ', '_')}"
         
             with col_cible:
+                # Affichage de la carte
                 st.markdown(f"""
-                <div class="project-card" style="padding: 20px; border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF;">
+                <div class="project-card" style="margin-bottom: 10px; padding: 15px; border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF;">
                     <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
-                if st.button("Ouvrir le projet", key=f"btn_open_{cle_unique}", use_container_width=True):
+                # LE BOUTON OUVRIR ET LE BOUTON SUPPRIMER SONT SÉPARÉS POUR ÉVITER TOUT CONFLIT
+                if st.button("Ouvrir le projet", key=f"op_{cle_unique}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
+                
+                if st.button("🗑️ Supprimer", key=f"del_{cle_unique}", use_container_width=True):
+                    projet_a_supprimer = idx
+                
                 st.write("") 
+        
+        # Traitement de la suppression en dehors de la boucle de rendu pour éviter de casser les index
+        if projet_a_supprimer is not None:
+            st.session_state.projects.pop(projet_a_supprimer)
+            # Si on supprime le projet en cours d'ouverture, on réinitialise l'index actif
+            if st.session_state.get("current_project_idx") == projet_a_supprimer:
+                st.session_state["current_project_idx"] = None
+            st.rerun()
+            
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
+    
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine) se ré-exécutent automatiquement en utilisant les données restaurées.")
     
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
