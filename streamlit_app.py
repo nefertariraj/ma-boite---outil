@@ -174,7 +174,7 @@ with st.sidebar:
     )
 
     # ----------------------------------------------------
-    # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
+    # 🏠 ÉCRAN INITIAL UNIQUE (VUE EN GRILLE DE CARTES)
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
