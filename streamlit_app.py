@@ -204,12 +204,12 @@ with st.expander("➕ Initialiser un nouveau projet", expanded=False):
 st.divider()
 
     # --- FONCTION DE SUPPRESSION ---
-    def action_supprimer_projet(index_a_retirer):
-        if "projects" in st.session_state and len(st.session_state.projects) > index_a_retirer:
-            st.session_state.projects.pop(index_a_retirer)
-            # Si on supprime le projet actuellement ouvert, on réinitialise l'index
-            if st.session_state.get("current_project_idx") == index_a_retirer:
-                st.session_state["current_project_idx"] = None
+        def action_supprimer_projet(index_a_retirer):
+            if "projects" in st.session_state and len(st.session_state.projects) > index_a_retirer:
+                st.session_state.projects.pop(index_a_retirer)
+                # Si on supprime le projet actuellement ouvert, on réinitialise l'index
+                if st.session_state.get("current_project_idx") == index_a_retirer:
+                    st.session_state["current_project_idx"] = None
 
     # Affichage et gestion dynamique des cartes projets
     if len(st.session_state.projects) > 0:
