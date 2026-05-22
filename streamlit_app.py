@@ -182,6 +182,7 @@ with st.sidebar:
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
             if nouveau_nom:
+                # Création avec duplication stricte de la structure de référence complète
                 nouveau_projet = {
                     "nom": nouveau_nom,
                     "gantt_data": pd.DataFrame(),
@@ -213,35 +214,30 @@ with st.sidebar:
         for idx, p in enumerate(st.session_state.projects):
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
+            
+            # Nettoyage du nom pour créer une clé unique sans caractères spéciaux
             cle_unique = f"{idx}_{nom_du_projet.replace(' ', '_')}"
         
             with col_cible:
-                # 1. Structure de la carte avec un style d'affichage moderne et épuré
                 st.markdown(f"""
-                <div class="project-card" style="
-                    position: relative; 
-                    padding: 20px; 
-                    margin-bottom: 10px; 
-                    border: 1px solid #E2E8F0; 
-                    border-radius: 8px;
-                    background-color: #FFFFFF;
-                ">
-                    <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B; display: block; padding-right: 25px;">📊 {nom_du_projet}</span>
+                <div class="project-card" style="margin-bottom: 10px;">
+                    <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
-                # 2. Deux boutons simples et distincts, empilés verticalement (Pas de sous-colonnes conflictuelles)
-                if st.button("Ouvrir le projet", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
-                    st.session_state["current_project_idx"] = idx
-                    st.rerun()
-                
-                # Le bouton de suppression prend toute la largeur juste en dessous, impossible à rater ou masquer
-                if st.button("Supprimer ce projet", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
-                    projet_a_supprimer = idx
-                    
+                # Alignement des boutons de gestion côte à côte sous la carte
+                btn_col1, btn_col2 = st.columns([2, 1])
+                with btn_col1:
+                    if st.button("Ouvrir", key=f"ouvrir_projet_btn_{cle_unique}", use_container_width=True):
+                        st.session_state["current_project_idx"] = idx
+                        st.rerun()
+                with btn_col2:
+                    # Utilisation de la clé unique robuste basée sur le nom + l'index
+                    if st.button("🗑️", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
+                        projet_a_supprimer = idx
                 st.write("") 
         
-        # Exécution de la suppression en toute sécurité
+        # Exécution de la suppression en toute sécurité hors de la boucle de rendu
         if projet_a_supprimer is not None:
             st.session_state.projects.pop(projet_a_supprimer)
             st.rerun()
