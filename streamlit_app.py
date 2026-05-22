@@ -176,29 +176,6 @@ with st.sidebar:
 # ----------------------------------------------------
 # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
 # ----------------------------------------------------
-
-# Initialisation de la liste des projets si elle n'existe pas
-if "projects" not in st.session_state:
-    st.session_state.projects = []
-
-# --- FONCTION DE SUPPRESSION SUR LA PAGE PRINCIPALE ---
-def action_supprimer_projet(index_a_retirer):
-    if "projects" in st.session_state and len(st.session_state.projects) > index_a_retirer:
-        st.session_state.projects.pop(index_a_retirer)
-        if st.session_state.get("current_project_idx") == index_a_retirer:
-            st.session_state["current_project_idx"] = None
-
-# ---- LOGIQUE D'AIGUILLAGE DE L'APPLICATION ----
-# On vérifie si un projet est en cours d'affichage
-if st.session_state.get('current_project_idx') is not None:
-    
-    # 📊 ICI : Place tout ton code qui affiche le projet ouvert (onglets DMAIC, etc.)
-    st.write(f"Projet actif : {st.session_state.projects[st.session_state.current_project_idx]['nom']}")
-    if st.button("⬅️ Retour à l'accueil"):
-        st.session_state["current_project_idx"] = None
-        st.rerun()
-
-else:
     # 🏠 ICI : Écran d'accueil principal (quand aucun projet n'est ouvert)
     st.title("Mes projets Lean Six Sigma")
 
