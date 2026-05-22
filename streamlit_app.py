@@ -173,31 +173,6 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-# ====================================================
-# 🔀 LOGIQUE D'AIGUILLAGE : ACCUEIL OU PROJET ACTIF
-# ====================================================
-
-# VUE 1 : Si un projet est ouvert -> On affiche l'espace de travail du projet
-if st.session_state.get('current_project_idx') is not None:
-    
-    idx_projet = st.session_state['current_project_idx']
-    projet_actuel = st.session_state.projects[idx_projet]
-    
-    # Bouton de navigation pour fermer le projet et revenir à la liste
-    if st.button("⬅️ Quitter le projet (Retour à l'accueil)"):
-        st.session_state['current_project_idx'] = None
-        st.rerun()
-        
-    st.title(f"🚀 Projet Actif : {projet_actuel.get('nom', 'Sans nom')}")
-    
-    # ----------------------------------------------------
-    # [ ZONE DE VOS ONGLETS DMAIC ORIGINAUX ]
-    # Insérez ici votre ancien code d'affichage des onglets,
-    # st.data_editor, formulaires et graphiques Plotly.
-    # ----------------------------------------------------
-
-# VUE 2 : Sinon (aucun projet ouvert) -> ÉCRAN INITIAL UNIQUE
-else:
     # ----------------------------------------------------
     # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON VÉRIFIÉ)
     # ----------------------------------------------------
@@ -228,10 +203,11 @@ else:
 
     st.divider()
 
-    # --- FONCTION DE SUPPRESSION INTERNE ---
+    # --- FONCTION DE SUPPRESSION FORCEE SUR LA PAGE PRINCIPALE ---
     def action_supprimer_projet(index_a_retirer):
         if "projects" in st.session_state and len(st.session_state.projects) > index_a_retirer:
             st.session_state.projects.pop(index_a_retirer)
+            # Si on supprime le projet actuellement ouvert, on réinitialise l'index
             if st.session_state.get("current_project_idx") == index_a_retirer:
                 st.session_state["current_project_idx"] = None
 
@@ -239,21 +215,21 @@ else:
     if len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
-
+    
         for idx, p in enumerate(st.session_state.projects):
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
             
             # Clé unique pour éviter les conflits Streamlit
             cle_projet = f"id_{idx}_{nom_du_projet.replace(' ', '_')}"
-            
+        
             with col_cible:
                 st.markdown(f"""
                 <div class="project-card">
                     <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
-                
+            
                 # Alignement des boutons de gestion côte à côte sous la carte
                 btn_col1, btn_col2 = st.columns([2, 1])
                 with btn_col1:
@@ -261,6 +237,7 @@ else:
                         st.session_state["current_project_idx"] = idx
                         st.rerun()
                 with btn_col2:
+                    # Le bouton appelle directement la fonction principale au clic
                     st.button(
                         "🗑️", 
                         key=f"suppr_btn_{cle_projet}", 
@@ -273,8 +250,8 @@ else:
             
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
-
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
+    
+    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
     
 # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
 # FIX : Cette ligne est maintenant calée tout à gauche (zéro espace au début)
