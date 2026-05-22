@@ -174,10 +174,6 @@ with st.sidebar:
         on_change=traiter_importation_json
     )
 
-# ==========================================
-# 🖼 arrow_right INTERFACE PRINCIPALE
-# ==========================================
-if st.session_state["current_project_idx"] is None:
     # ----------------------------------------------------
     # 🏠 ÉCRAN INITIAL UNIQUE (ZÉRO DOUBLON)
     # ----------------------------------------------------
@@ -238,19 +234,6 @@ if st.session_state["current_project_idx"] is None:
                 st.write("") 
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
-
-else:
-    # ----------------------------------------------------
-    # 📍 ESPACE DE TRAVAIL INTERNE (FONCTIONNEL & SÉCURISÉ)
-    # ----------------------------------------------------
-    projet_actuel = st.session_state.projects[st.session_state["current_project_idx"]]
-    
-    if st.button("⬅️ Retourner à l'accueil", key="back_to_dashboard_home_btn"):
-        st.session_state["current_project_idx"] = None
-        st.rerun()
-        
-    st.title(f"📍 Projet actif : {projet_actuel.get('nom')}")
-    st.divider()
     
     st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.") 
     
