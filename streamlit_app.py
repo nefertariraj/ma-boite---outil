@@ -215,12 +215,13 @@ with st.sidebar:
             nom_du_projet = p.get("nom", f"Projet sans titre #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
             
-            # Nettoyage du nom pour créer une clé unique sans caractères spéciaux
+            # Identifiant unique strict
             cle_unique = f"{idx}_{nom_du_projet.replace(' ', '_')}"
         
             with col_cible:
+                # Ajout d'un overflow: auto pour empêcher la carte de déborder sur les boutons
                 st.markdown(f"""
-                <div class="project-card" style="margin-bottom: 10px;">
+                <div class="project-card" style="margin-bottom: 15px; overflow: auto;">
                     <span style="font-size: 1.2rem; font-weight: bold; color: #1E293B;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -232,8 +233,8 @@ with st.sidebar:
                         st.session_state["current_project_idx"] = idx
                         st.rerun()
                 with btn_col2:
-                    # Utilisation de la clé unique robuste basée sur le nom + l'index
-                    if st.button("🗑️", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
+                    # Remplacement de l'émoji par du texte brut "Suppr." pour contourner le conflit de couleur CSS blanc sur blanc
+                    if st.button("Suppr.", key=f"supprimer_projet_btn_{cle_unique}", use_container_width=True, help="Supprimer définitivement ce projet"):
                         projet_a_supprimer = idx
                 st.write("") 
         
