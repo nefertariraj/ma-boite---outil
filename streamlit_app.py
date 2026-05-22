@@ -255,7 +255,7 @@ st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes 
 
 # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
-    if st.session_state.get('current_project_idx') is not None:
+if st.session_state.get('current_project_idx') is not None:
         st.divider()
         st.subheader("📥 Exporter le projet complet")
         
