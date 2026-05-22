@@ -178,52 +178,14 @@ with st.sidebar:
     # ----------------------------------------------------
     st.title("Mes projets Lean Six Sigma")
 
-    # --- 1. SÉCURITÉ : INITIALISATION DU STOCKAGE ---
-    if "projects" not in st.session_state:
-        st.session_state.projects = []
+    # FONCTION DE SUPPRESSION DIRECTE (SÉCURISÉE ET IMMÉDIATE)
+    def supprimer_projet_source(index_cible):
+        if "projects" in st.session_state and len(st.session_state.projects) > index_cible:
+            st.session_state.projects.pop(index_cible)
+            # Réinitialisation de l'index actif si on supprime le projet ouvert
+            if st.session_state.get("current_project_idx") == index_cible:
+                st.session_state["current_project_idx"] = None
 
-    # --- 2. NOUVEAU COMPOSANT DE SÉLECTION ET SUPPRESSION BLINDÉ ---
-    if len(st.session_state.projects) > 0:
-        # Un espace dédié et isolé pour la gestion des projets
-        with st.form(key="formulaire_gestion_suppression_projet"):
-            st.subheader("🗑️ Gestion et suppression de projet")
-            
-            # Création d'une liste textuelle propre pour identifier chaque projet individuellement
-            options_projets = {
-                f"📊 {p.get('nom', 'Projet sans titre')} (Index #{idx+1})": idx 
-                for idx, p in enumerate(st.session_state.projects) if isinstance(p, dict)
-            }
-            
-            # Sélection claire du projet à cibler
-            projet_selectionne_label = st.selectbox(
-                "Sélectionnez le projet à identifier :",
-                options=["-- Choisir un projet à supprimer --"] + list(options_projets.keys())
-            )
-            
-            # Case de confirmation obligatoire (Sécurité anti-erreur)
-            confirmation_securite = st.checkbox("Êtes-vous sûr de vouloir supprimer définitivement ce projet ?")
-            
-            # Bouton de soumission du formulaire
-            bouton_soumission = st.form_submit_button("Supprimer le projet sélectionné", use_container_width=True)
-            
-            if bouton_soumission:
-                if projet_selectionne_label == "-- Choisir un projet à supprimer --":
-                    st.error("⚠️ Veuillez sélectionner un projet valide dans la liste ci-dessus.")
-                elif not confirmation_securite:
-                    st.error("🔒 Veuillez cocher la case de confirmation avant de procéder à la suppression.")
-                else:
-                    # Exécution de la suppression réelle dans le local state
-                    index_a_retirer = options_projets[projet_selectionne_label]
-                    st.session_state.projects.pop(index_a_retirer)
-                    
-                    # Sécurité si le projet supprimé était celui en cours d'édition
-                    if st.session_state.get("current_project_idx") == index_a_retirer:
-                        st.session_state["current_project_idx"] = None
-                        
-                    st.success("✅ Le projet a été retiré du stockage avec succès !")
-                    st.rerun()
-
-    # --- 3. CRÉATION DE PROJET (FONCTIONNEMENT ACTUEL CONSERVÉ) ---
     with st.expander("➕ Initialiser un nouveau projet", expanded=False):
         nouveau_nom = st.text_input("Nom du projet", key="creation_project_name_input")
         if st.button("Confirmer la création", key="creation_project_confirm_btn"):
@@ -232,10 +194,7 @@ with st.sidebar:
                     "nom": nouveau_nom,
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
-                    "dmaic": {
-                        "define": {}, "measure": {}, "analyze": {},
-                        "improve": {}, "innovate": {}, "control": {}
-                    },
+                    "dmaic": {"define": {}, "measure": {}, "analyze": {}, "improve": {}, "innovate": {}, "control": {}},
                     "parametres": {},
                     "progression": 0
                 }
@@ -244,34 +203,43 @@ with st.sidebar:
 
     st.divider()
 
-    # --- 4. AFFICHAGE DE LA GRILLE (FONCTIONNEMENT ACTUEL CONSERVÉ) ---
-    if len(st.session_state.projects) > 0:
+    # AFFICHAGE DE LA GRILLE DES PROJETS
+    if "projects" in st.session_state and len(st.session_state.projects) > 0:
         nombre_colonnes = 3
         cols_grille = st.columns(nombre_colonnes)
     
         for idx, p in enumerate(st.session_state.projects):
-            if not isinstance(p, dict):
-                continue
             nom_du_projet = p.get("nom", f"Projet #{idx+1}")
             col_cible = cols_grille[idx % nombre_colonnes]
-            cle_unique = f"carte_grille_accueil_{idx}_{str(nom_du_projet).replace(' ', '_')}"
+            cle_unique = f"card_direct_{idx}_{str(nom_du_projet).replace(' ', '_')}"
         
             with col_cible:
+                # Bloc projet compact
                 st.markdown(f"""
-                <div class="project-card" style="padding: 20px; border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF; margin-bottom: 10px;">
+                <div class="project-card" style="padding: 15px; border: 1px solid #E2E8F0; border-radius: 8px; background-color: #FFFFFF; margin-bottom: 5px;">
                     <span style="font-size: 1.1rem; font-weight: bold; color: #1E293B; display: block;">📊 {nom_du_projet}</span>
                 </div>
                 """, unsafe_allow_html=True)
             
-                if st.button("Ouvrir le projet", key=f"btn_ouvrir_{cle_unique}", use_container_width=True):
+                # Bouton 1 : Ouvrir
+                if st.button("Ouvrir", key=f"btn_open_{cle_unique}", use_container_width=True):
                     st.session_state["current_project_idx"] = idx
                     st.rerun()
+                
+                # Bouton 2 : Supprimer (Appelle directement la fonction avant le re-calcul de Streamlit)
+                st.button(
+                    "❌ Supprimer", 
+                    key=f"btn_del_{cle_unique}", 
+                    use_container_width=True,
+                    on_click=supprimer_projet_source,
+                    args=(idx,)
+                )
                 st.write("") 
     else:
         st.info("💡 Aucun projet disponible. Créez un nouveau projet ou importez un fichier JSON depuis le menu latéral.")
     
-    st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
-        
+    st.info("🛠️ Vos composants graphiques originaux se ré-exécutent automatiquement en utilisant les données fidèlement restaurées.")
+    
     # --- SECTION EXPORT DU PROJET COMPLET (EXCEL, PPTX) ---
     # On vérifie si un projet est sélectionné pour afficher les boutons d'export spécifiques
     if st.session_state.get('current_project_idx') is not None:
