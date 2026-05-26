@@ -338,7 +338,10 @@ if st.session_state.current_project_idx is None:
     for idx, proj in enumerate(st.session_state.projects):
         with cols[idx % 3]:
             with st.container(border=True):
-                st.subheader(proj.get("nom", proj.get("name", f"Projet #{idx+1}")))
+                # CORRECTION : Cherche 'nom', si absent cherche 'name', sinon met un nom par défaut
+                nom_carte = proj.get("nom", proj.get("name", f"Projet #{idx+1}"))
+                st.subheader(nom_carte)
+                
                 if st.button("Ouvrir", key=f"open_{idx}"):
                     st.session_state.current_project_idx = idx
                     st.rerun()
