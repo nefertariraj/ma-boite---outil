@@ -214,19 +214,23 @@ with st.sidebar:
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
     # ------------------------------------------------
     st.subheader("💾 Sauvegarder mon travail")
-    if len(st.session_state.projects) > 0:
+    
+    # On vérifie s'il y a des projets dans la session
+    un_projet_au_moins = "projects" in st.session_state and len(st.session_state.projects) > 0
+
+    if un_projet_au_moins:
         try:
-            # Sécurité absolue : on force la conversion en texte de TOUTES les dates
-            # juste avant l'écriture du JSON, sans modifier tes données de travail.
+            # Sécurité absolue pour les dates cachées
             def encodeur_secours(obj):
                 if isinstance(obj, (date, datetime)):
                     return obj.isoformat()
                 raise TypeError(f"Type non sérialisable: {type(obj)}")
 
-            # Application de la sérialisation avec notre encodeur de secours
+            # Préparation et sérialisation
             donnies_preparees = deep_serialize(st.session_state.projects)
             data_json = json.dumps(donnies_preparees, indent=4, ensure_ascii=False, default=encodeur_secours)
             
+            # Le bouton de téléchargement, bien visible
             st.download_button(
                 label="📤 Télécharger la sauvegarde (.json)",
                 data=data_json,
@@ -238,7 +242,16 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur export : {e}")
     else:
-        st.info("Aucun projet à sauvegarder.")
+        st.info("💡 Aucun projet en mémoire. Créez un projet ou importez un JSON pour afficher le bouton de téléchargement.")
+
+    st.divider()
+    st.subheader("📥 Reprendre mon travail")
+    st.file_uploader(
+        "Importer un fichier de sauvegarde", 
+        type="json", 
+        key="sidebar_uploader_file",
+        on_change=traiter_importation_json
+    )
 
     # --- FONCTION DE SUPPRESSION FORCEE SUR LA PAGE PRINCIPALE ---
     def action_supprimer_projet(index_a_retirer):
