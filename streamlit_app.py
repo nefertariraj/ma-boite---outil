@@ -13,6 +13,8 @@ PROJET_MODELE_REFERENCE = {
     "name": "",
     "gantt_data": pd.DataFrame(),
     "mesure_data": pd.DataFrame(),
+    "voc_raw_data": pd.DataFrame(columns=["client", "question", "réponse brute"]), # RECONNU PAR L'IMPORTATEUR
+    "voc_questions": ["Temps perdu ?", "Retouches ?", "Pénibilité ?", "Irritants ?", "Changement unique ?"], # RECONNU PAR L'IMPORTATEUR
     "dmaic": {
         "define": {},
         "measure": {},
@@ -62,7 +64,6 @@ def traiter_importation_json():
     if fichier_charge is not None:
         try:
             raw_data = json.load(fichier_charge)
-            # Appel sécurisé : la fonction est bien déclarée juste au-dessus !
             restored_data = deep_deserialize(raw_data) 
             
             if isinstance(restored_data, list):
@@ -71,20 +72,33 @@ def traiter_importation_json():
                     if not isinstance(p_item, dict):
                         continue
                     
+                    # On crée la base vierge
                     projet_reconstruit = PROJET_MODELE_REFERENCE.copy()
+                    # On y injecte tout ce que le JSON contient (y compris le voc_raw_data sauvé !)
                     projet_reconstruit.update(p_item)
                     
-                    # Alignement et rétrocompatibilité des noms de projets
+                    # Alignement des noms de projets
                     if "name" in p_item and not p_item.get("nom"):
                         projet_reconstruit["nom"] = p_item["name"]
                     if "nom" in p_item and not p_item.get("name"):
                         projet_reconstruit["name"] = p_item["nom"]
                     
+                    # Sécurisation des DataFrames restaurés
                     if not isinstance(projet_reconstruit["gantt_data"], pd.DataFrame):
                         projet_reconstruit["gantt_data"] = pd.DataFrame(projet_reconstruit["gantt_data"])
                         
                     if not isinstance(projet_reconstruit["mesure_data"], pd.DataFrame):
                         projet_reconstruit["mesure_data"] = pd.DataFrame(projet_reconstruit["mesure_data"])
+                    
+                    # CORRECTION : On s'assure que le voc_raw_data redevienne un vrai DataFrame exploitable
+                    if "voc_raw_data" in p_item:
+                        if isinstance(p_item["voc_raw_data"], list):
+                            projet_reconstruit["voc_raw_data"] = pd.DataFrame(p_item["voc_raw_data"])
+                        elif isinstance(p_item["voc_raw_data"], dict) and "data" in p_item["voc_raw_data"]:
+                            # Gestion du format encodé par deep_serialize
+                            projet_reconstruit["voc_raw_data"] = pd.DataFrame(p_item["voc_raw_data"]["data"])
+                        else:
+                            projet_reconstruit["voc_raw_data"] = pd.DataFrame(p_item["voc_raw_data"])
 
                     dmaic_originel = p_item.get("dmaic", {})
                     dmaic_structure = {k: v.copy() if isinstance(v, dict) else v for k, v in PROJET_MODELE_REFERENCE["dmaic"].items()}
