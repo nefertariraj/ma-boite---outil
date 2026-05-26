@@ -307,14 +307,28 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet")
         if st.button("Créer le projet"):
             if p_name:
+                # Structure complète calquée sur le projet modèle d'origine pour éviter les KeyErrors
                 new_p = {
+                    "nom": p_name,
                     "name": p_name,
                     "status": "Define",
-                    "problem": "",         # Corrigé : ajouté pour éviter KeyError
-                    "sipoc_data": [{"Fournisseur": "", "Entrée": "", "Processus": "", "Sortie": "", "Client": ""}],
+                    "problem": "",
+                    "gantt_data": pd.DataFrame(),
+                    "mesure_data": pd.DataFrame(),
+                    "dmaic": {
+                        "define": {},
+                        "measure": {},
+                        "analyze": {},
+                        "improve": {},
+                        "innovate": {},
+                        "control": {}
+                    },
+                    "sipoc_data": [{"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}],
                     "voc_data": [{"Client": "", "Verbatim": "", "Besoin": ""}],
                     "selected_ctq": "Qualité",
-                    "team": pd.DataFrame(columns=["Poste", "Nom"]) # Corrigé : ajouté
+                    "team_data": [{"Poste": "", "Nom": ""}],
+                    "parametres": {},
+                    "progression": 0
                 }
                 st.session_state.projects.append(new_p)
                 st.success("Projet créé !")
@@ -324,7 +338,7 @@ if st.session_state.current_project_idx is None:
     for idx, proj in enumerate(st.session_state.projects):
         with cols[idx % 3]:
             with st.container(border=True):
-                st.subheader(proj["name"])
+                st.subheader(proj.get("nom", proj.get("name", f"Projet #{idx+1}")))
                 if st.button("Ouvrir", key=f"open_{idx}"):
                     st.session_state.current_project_idx = idx
                     st.rerun()
