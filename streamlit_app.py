@@ -10,11 +10,12 @@ import json
 # ==========================================
 PROJET_MODELE_REFERENCE = {
     "nom": "",
+    "name": "",
     "gantt_data": pd.DataFrame(),
-    "mesure_data": pd.DataFrame(),  # Structure pour la phase Mesure
+    "mesure_data": pd.DataFrame(),
     "dmaic": {
         "define": {},
-        "measure": {},  # Stockage complet pour la phase Mesure
+        "measure": {},
         "analyze": {},
         "improve": {},
         "innovate": {},
@@ -24,45 +25,45 @@ PROJET_MODELE_REFERENCE = {
     "progression": 0
 }
 
-# ==========================================
 # 🛠️ FONCTIONS DE SÉRIALISATION / DÉSÉRIALISATION
-# ==========================================
 def deep_serialize(obj):
     """ Préparation récursive de tous les états, tables, phases et champs utilisateurs """
-    # SÉCURITÉ DATE : On convertit immédiatement si c'est une date ou un datetime
     if isinstance(obj, (date, datetime)):
         return obj.isoformat()
     if hasattr(obj, 'strftime'):
-        try:
-            return obj.strftime('%Y-%m-%d')
-        except:
-            pass
-            
+        try: return obj.strftime('%Y-%m-%d')
+        except: pass
     if isinstance(obj, pd.DataFrame):
-        # On nettoie aussi les dates cachées dans les DataFrames avant conversion
         df_clean = obj.copy()
         for col in df_clean.columns:
             if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
                 df_clean[col] = df_clean[col].dt.strftime('%Y-%m-%d')
         return {"_type_df_": True, "data": df_clean.to_dict(orient="records")}
-        
     if isinstance(obj, dict):
         return {str(k): deep_serialize(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [deep_serialize(i) for i in obj]
-        
     return obj
 
-# ==========================================
+def deep_deserialize(obj):
+    """ Reconstruction à l'identique des types d'origine (DataFrames, dicts...) """
+    if isinstance(obj, dict):
+        if obj.get("_type_df_") is True:
+            return pd.DataFrame(obj.get("data", []))
+        return {k: deep_deserialize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [deep_deserialize(i) for i in obj]
+    return obj
+
 # 🔄 SYSTÈME D'IMPORTATION INVISIBLE SANS CASSE
-# ==========================================
 def traiter_importation_json():
     """ Restaure l'intégralité des données dans le state existant sans altérer l'interface """
     fichier_charge = st.session_state.get("sidebar_uploader_file")
     if fichier_charge is not None:
         try:
             raw_data = json.load(fichier_charge)
-            restored_data = deep_deserialize(raw_data)
+            # Appel sécurisé : la fonction est bien déclarée juste au-dessus !
+            restored_data = deep_deserialize(raw_data) 
             
             if isinstance(restored_data, list):
                 projets_valides = []
@@ -70,18 +71,21 @@ def traiter_importation_json():
                     if not isinstance(p_item, dict):
                         continue
                     
-                    # On fusionne avec le modèle de référence pour combler d'éventuels manques d'anciennes versions
                     projet_reconstruit = PROJET_MODELE_REFERENCE.copy()
                     projet_reconstruit.update(p_item)
                     
-                    # Vérification stricte des conteneurs de données critiques
+                    # Alignement et rétrocompatibilité des noms de projets
+                    if "name" in p_item and not p_item.get("nom"):
+                        projet_reconstruit["nom"] = p_item["name"]
+                    if "nom" in p_item and not p_item.get("name"):
+                        projet_reconstruit["name"] = p_item["nom"]
+                    
                     if not isinstance(projet_reconstruit["gantt_data"], pd.DataFrame):
                         projet_reconstruit["gantt_data"] = pd.DataFrame(projet_reconstruit["gantt_data"])
                         
                     if not isinstance(projet_reconstruit["mesure_data"], pd.DataFrame):
                         projet_reconstruit["mesure_data"] = pd.DataFrame(projet_reconstruit["mesure_data"])
 
-                    # Re-mapping sécurisé de l'arbre DMAIC complet
                     dmaic_originel = p_item.get("dmaic", {})
                     dmaic_structure = {k: v.copy() if isinstance(v, dict) else v for k, v in PROJET_MODELE_REFERENCE["dmaic"].items()}
                     
