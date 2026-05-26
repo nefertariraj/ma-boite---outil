@@ -553,17 +553,21 @@ else:
             st.rerun()
 
         df_viz_sipoc = pd.DataFrame(p["sipoc_data"])
-        df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
-                                (df_viz_sipoc["Customer"].astype(str).str.strip() != "")]
+        
+        # SÉCURISATION ABSOLUE : On force la présence des colonnes requises
+        for c_req in COLONNES_SIPOC:
+            if c_req not in df_viz_sipoc.columns:
+                df_viz_sipoc[c_req] = ""
+
+        # Nettoyage et filtrage sans risque de KeyError
+        if not df_viz_sipoc.empty:
+            df_viz_sipoc = df_viz_sipoc[(df_viz_sipoc["Process"].astype(str).str.strip() != "") & 
+                                        (df_viz_sipoc["Customer"].astype(str).str.strip() != "")]
     
         if not df_viz_sipoc.empty:
             st.write("---")
             acteurs = df_viz_sipoc["Customer"].unique().tolist()
             cols_act = st.columns(len(acteurs))
-        
-            for i, acteur in enumerate(acteurs):
-                cols_act[i].markdown(f"<p style='font-weight:bold; font-size:14px; margin-bottom:0;'>{acteur.upper()}</p>", unsafe_allow_html=True)
-                cols_act[i].divider()
 
             # Rendu des tâches
             for idx, row in df_viz_sipoc.iterrows():
