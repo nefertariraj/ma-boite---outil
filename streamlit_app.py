@@ -216,7 +216,17 @@ with st.sidebar:
     st.subheader("💾 Sauvegarder mon travail")
     if len(st.session_state.projects) > 0:
         try:
-            data_json = json.dumps(deep_serialize(st.session_state.projects), indent=4, ensure_ascii=False)
+            # Sécurité absolue : on force la conversion en texte de TOUTES les dates
+            # juste avant l'écriture du JSON, sans modifier tes données de travail.
+            def encodeur_secours(obj):
+                if isinstance(obj, (date, datetime)):
+                    return obj.isoformat()
+                raise TypeError(f"Type non sérialisable: {type(obj)}")
+
+            # Application de la sérialisation avec notre encodeur de secours
+            donnies_preparees = deep_serialize(st.session_state.projects)
+            data_json = json.dumps(donnies_preparees, indent=4, ensure_ascii=False, default=encodeur_secours)
+            
             st.download_button(
                 label="📤 Télécharger la sauvegarde (.json)",
                 data=data_json,
@@ -229,15 +239,6 @@ with st.sidebar:
             st.error(f"Erreur export : {e}")
     else:
         st.info("Aucun projet à sauvegarder.")
-
-    st.divider()
-    st.subheader("📥 Reprendre mon travail")
-    st.file_uploader(
-        "Importer un fichier de sauvegarde", 
-        type="json", 
-        key="sidebar_uploader_file",
-        on_change=traiter_importation_json
-    )
 
     # --- FONCTION DE SUPPRESSION FORCEE SUR LA PAGE PRINCIPALE ---
     def action_supprimer_projet(index_a_retirer):
