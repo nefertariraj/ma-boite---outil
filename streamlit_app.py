@@ -625,7 +625,7 @@ else:
                         else:
                             st.write("")
 
-        # 6. VOICE OF CUSTOMER (VOC) - INTEGRATION DE LA PERSISTANCE SANS PERTE
+        # 6. VOICE OF CUSTOMER (VOC) - INTEGRATION DE LA PERSISTANCE AVEC SÉCURITÉ TYPE
         st.divider()
         st.header("6. Voice of Customer (VOC) - Flux Black Belt")
 
@@ -633,9 +633,13 @@ else:
         if "voc_questions" not in p:
             p["voc_questions"] = ["Temps perdu ?", "Retouches ?", "Pénibilité ?", "Irritants ?", "Changement unique ?"]
         
-        # CORRECTION SÉCURITÉ : Le DataFrame est maintenant initialisé et stocké dans le projet p pour persister au JSON
-        if "voc_raw_data" not in p:
+        # SÉCURITÉ ULTRA-ROBUSTE : Si voc_raw_data est un texte 'str' (issu d'un ancien JSON), on le force en DataFrame
+        if "voc_raw_data" not in p or isinstance(p["voc_raw_data"], str):
             p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute"])
+            
+        # Si c'est un dictionnaire brut (chargé depuis le JSON), on le convertit proprement en DataFrame
+        if isinstance(p["voc_raw_data"], dict):
+            p["voc_raw_data"] = pd.DataFrame(p["voc_raw_data"])
 
         st.subheader("1. Élaboration du Questionnaire")
         with st.expander("📝 Configurer les questions"):
@@ -664,16 +668,17 @@ else:
                     "réponse brute": df_imp[r_col].astype(str)
                 })
                 
-                # CORRECTION : Comparaison et stockage directement basés sur les données du projet p["voc_raw_data"]
-                if p["voc_raw_data"].empty or not (p["voc_raw_data"]["réponse brute"].equals(new_rows["réponse brute"])):
-                    p["voc_raw_data"] = new_rows
-                    st.session_state.voc_results = None  # Réinitialise les résultats pour faire réapparaître le bouton d'analyse
-                    st.rerun()
+                # Vérification de sécurité avant comparaison
+                if isinstance(p["voc_raw_data"], pd.DataFrame):
+                    if p["voc_raw_data"].empty or not (p["voc_raw_data"]["réponse brute"].equals(new_rows["réponse brute"])):
+                        p["voc_raw_data"] = new_rows
+                        st.session_state.voc_results = None
+                        st.rerun()
                     
             except Exception as e:
                 st.error(f"Erreur lors de l'import : {e}")
 
-        # CORRECTION : L'éditeur lit et écrit directement dans les données persistantes du projet
+        # L'éditeur lit désormais un DataFrame garanti à 100%
         edited_voc_df = st.data_editor(
             p["voc_raw_data"],
             num_rows="dynamic",
@@ -686,11 +691,9 @@ else:
         st.write("---")
         st.subheader("3. Analyse Thématique & CTQ")
     
-        # Le bouton s'affiche systématiquement si aucune analyse n'est encore enregistrée pour ce fichier
         if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
-            # CORRECTION : L'analyse s'exécute sur le tableau du projet
             df_to_analyze = p["voc_raw_data"]
-            if not df_to_analyze.empty:
+            if isinstance(df_to_analyze, pd.DataFrame) and not df_to_analyze.empty:
                 verbatims = df_to_analyze.iloc[:, -1].astype(str).str.lower().tolist()
                 total = len(verbatims)
                 mapping = [
