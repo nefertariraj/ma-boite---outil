@@ -29,26 +29,28 @@ PROJET_MODELE_REFERENCE = {
 # ==========================================
 def deep_serialize(obj):
     """ Préparation récursive de tous les états, tables, phases et champs utilisateurs """
+    # SÉCURITÉ DATE : On convertit immédiatement si c'est une date ou un datetime
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    if hasattr(obj, 'strftime'):
+        try:
+            return obj.strftime('%Y-%m-%d')
+        except:
+            pass
+            
     if isinstance(obj, pd.DataFrame):
-        return {"_type_df_": True, "data": obj.to_dict(orient="records")}
+        # On nettoie aussi les dates cachées dans les DataFrames avant conversion
+        df_clean = obj.copy()
+        for col in df_clean.columns:
+            if pd.api.types.is_datetime64_any_dtype(df_clean[col]):
+                df_clean[col] = df_clean[col].dt.strftime('%Y-%m-%d')
+        return {"_type_df_": True, "data": df_clean.to_dict(orient="records")}
+        
     if isinstance(obj, dict):
         return {str(k): deep_serialize(v) for k, v in obj.items()}
     if isinstance(obj, list):
         return [deep_serialize(i) for i in obj]
-    if hasattr(obj, 'strftime'):
-        return obj.strftime('%Y-%m-%d')
-    if isinstance(obj, (date, datetime)):
-        return obj.isoformat()
-    return obj
-
-def deep_deserialize(obj):
-    """ Reconstruction à l'identique des types d'origine (DataFrames, dicts...) """
-    if isinstance(obj, dict):
-        if obj.get("_type_df_") is True:
-            return pd.DataFrame(obj.get("data", []))
-        return {k: deep_deserialize(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [deep_deserialize(i) for i in obj]
+        
     return obj
 
 # ==========================================
@@ -307,7 +309,6 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet")
         if st.button("Créer le projet"):
             if p_name:
-                # Structure complète calquée sur le projet modèle d'origine pour éviter les KeyErrors
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -334,14 +335,19 @@ if st.session_state.current_project_idx is None:
                 st.success("Projet créé !")
                 st.rerun()
 
+    # Affichage des cartes projets
     cols = st.columns(3)
     for idx, proj in enumerate(st.session_state.projects):
         with cols[idx % 3]:
             with st.container(border=True):
-                # CORRECTION : Cherche 'nom', si absent cherche 'name', sinon met un nom par défaut
-                nom_carte = proj.get("nom", proj.get("name", f"Projet #{idx+1}"))
-                st.subheader(nom_carte)
+                # SÉCURITÉ ULTRA-LARGE : On teste absolument toutes les clés possibles pour le premier projet
+                nom_final = "Projet sans nom"
+                for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                    if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                        nom_final = str(proj[cle_test]).strip()
+                        break
                 
+                st.subheader(nom_final)
                 if st.button("Ouvrir", key=f"open_{idx}"):
                     st.session_state.current_project_idx = idx
                     st.rerun()
