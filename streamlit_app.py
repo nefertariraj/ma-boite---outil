@@ -1530,138 +1530,138 @@ else:
                     st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
 
         # 4. MEASUREMENT SYSTEM ANALYSIS (MSA) - PLAN DE VALIDATION
-        # ==========================================================
         st.divider()
         st.header("7. Plan de Validation du Système de Mesure (MSA)")
         st.caption("Objectif Black Belt : Garantir que vos données sont fiables, cohérentes, répétables et exploitables avant de lancer l'analyse.")
 
-        # 1. INITIALISATION DES DONNÉES DANS LE PROJET (PERSISTANCE)
-        if "msa_data" not in p:
-            # Données par défaut orientées Flux / Services / SI pour initialiser proprement le tableau
-            p["msa_data"] = [
-                {
-                    "Variable": "Lead Time Global (Horodatage Système)",
-                    "Type de donnée": "Système / Log IT",
-                    "Méthode de mesure": "Extraction automatique de la base de données (Date fin - Date début)",
-                    "Risques de biais": "Désynchronisation des horloges serveurs, mauvaise gestion des week-ends/heures non ouvrées.",
-                    "Type de MSA": "Stabilité & Exactitude Système",
-                    "Méthode de validation": "Audit de 30 tickets : double calcul manuel vs calcul système sur les fuseaux horaires.",
-                    "Opérateurs": "1 (Expert IT)",
-                    "Répétitions": "2 extractions décalées",
-                    "Critères d'acceptation": "Écart = 0 min | 100% de conformité sur les règles de calcul",
-                    "Actions Préventives / Correctives": "Calculer le temps en heures ouvrées via une formule SQL standardisée. Recalibrer les NTP."
-                },
-                {
-                    "Variable": "Type d'irritant (Verbatim Client)",
-                    "Type de donnée": "Attributaire (Qualitatif)",
-                    "Méthode de mesure": "Classification manuelle par l'équipe support selon la grille thématique",
-                    "Risques de biais": "Subjectivité de l'opérateur, fatigue, définitions des thèmes ambiguës.",
-                    "Type de MSA": "Attribute Agreement Analysis (Kappa)",
-                    "Méthode de validation": "Test de concordance : 3 opérateurs qualifient deux fois le même échantillon de 30 verbatims.",
-                    "Opérateurs": "3 agents support",
-                    "Répétitions": "2 passages (à 1 semaine d'intervalle)",
-                    "Critères d'acceptation": "Taux de concordance global >= 80% | Coefficient Fleiss Kappa >= 0.70",
-                    "Actions Préventives / Correctives": "Créer un dictionnaire des verbatims avec exemples types. Former l'équipe lors d'un atelier d'alignement."
-                },
-                {
-                    "Variable": "Temps de traitement unitaire (Chrono)",
-                    "Type de donnée": "Continue (Quantitative)",
-                    "Méthode de mesure": "Chronométrage manuel ou auto-déclaration par l'opérateur",
-                    "Risques de biais": "Effet Hawthorne (l'opérateur accélère car il se sait observé), oubli de déclencher le chrono.",
-                    "Type de MSA": "Gage R&R Simplifié",
-                    "Méthode de validation": "2 opérateurs chronomètrent de manière indépendante 10 dossiers standards enregistrés en vidéo.",
-                    "Opérateurs": "2 gestionnaires",
-                    "Répétitions": "3 essais par dossier",
-                    "Critères d'acceptation": "Variation du système de mesure (R&R) < 10% (Excellent), acceptable si < 30%.",
-                    "Actions Préventives / Correctives": "Remplacer le chrono manuel par un timestamp applicatif au clic sur 'Terminer'."
+            # 1. INITIALISATION DES DONNÉES DANS LE PROJET (PERSISTANCE)
+            if "msa_data" not in p:
+                # Données par défaut orientées Flux / Services / SI pour initialiser proprement le tableau
+                p["msa_data"] = [
+                    {
+                        "Variable": "Lead Time Global (Horodatage Système)",
+                        "Type de donnée": "Système / Log IT",
+                        "Méthode de mesure": "Extraction automatique de la base de données (Date fin - Date début)",
+                        "Risques de biais": "Désynchronisation des horloges serveurs, mauvaise gestion des week-ends/heures non ouvrées.",
+                        "Type de MSA": "Stabilité & Exactitude Système",
+                        "Méthode de validation": "Audit de 30 tickets : double calcul manuel vs calcul système sur les fuseaux horaires.",
+                        "Opérateurs": "1 (Expert IT)",
+                        "Répétitions": "2 extractions décalées",
+                        "Critères d'acceptation": "Écart = 0 min | 100% de conformité sur les règles de calcul",
+                        "Actions Préventives / Correctives": "Calculer le temps en heures ouvrées via une formule SQL standardisée. Recalibrer les NTP."
+                    },
+                    {
+                        "Variable": "Type d'irritant (Verbatim Client)",
+                        "Type de donnée": "Attributaire (Qualitatif)",
+                        "Méthode de mesure": "Classification manuelle par l'équipe support selon la grille thématique",
+                        "Risques de biais": "Subjectivité de l'opérateur, fatigue, définitions des thèmes ambiguës.",
+                        "Type de MSA": "Attribute Agreement Analysis (Kappa)",
+                        "Méthode de validation": "Test de concordance : 3 opérateurs qualifient deux fois le même échantillon de 30 verbatims.",
+                        "Opérateurs": "3 agents support",
+                        "Répétitions": "2 passages (à 1 semaine d'intervalle)",
+                        "Critères d'acceptation": "Taux de concordance global >= 80% | Coefficient Fleiss Kappa >= 0.70",
+                        "Actions Préventives / Correctives": "Créer un dictionnaire des verbatims avec exemples types. Former l'équipe lors d'un atelier d'alignement."
+                    },
+                    {
+                        "Variable": "Temps de traitement unitaire (Chrono)",
+                        "Type de donnée": "Continue (Quantitative)",
+                        "Méthode de mesure": "Chronométrage manuel ou auto-déclaration par l'opérateur",
+                        "Risques de biais": "Effet Hawthorne (l'opérateur accélère car il se sait observé), oubli de déclencher le chrono.",
+                        "Type de MSA": "Gage R&R Simplifié",
+                        "Méthode de validation": "2 opérateurs chronomètrent de manière indépendante 10 dossiers standards enregistrés en vidéo.",
+                        "Opérateurs": "2 gestionnaires",
+                        "Répétitions": "3 essais par dossier",
+                        "Critères d'acceptation": "Variation du système de mesure (R&R) < 10% (Excellent), acceptable si < 30%.",
+                        "Actions Préventives / Correctives": "Remplacer le chrono manuel par un timestamp applicatif au clic sur 'Terminer'."
+                    }
+                ]
+
+            # 2. ANALYSE STRATÉGIQUE DES RISQUES MSA (RAPPEL DES RÈGLES BLACK BELT)
+            with st.expander("🧠 Logique Décisionnelle MSA & Critères d'Acceptation (Master Black Belt)", expanded=False):
+                st.markdown("""
+                ### 🎯 Règles d'Or pour le choix du MSA
+                * **Donnée Continue (Temps, coûts...) :** On évalue la **Répétabilité** (capacité d'un opérateur à retrouver la même valeur) et la **Reproductibilité** (capacité de 2 opérateurs à trouver la même valeur). *Outil : Gage R&R.*
+                * **Donnée Attributaire (Statut, choix, catégorie...) :** On évalue l'alignement des décisions. *Outil : Attribute Agreement Analysis (Taux d'accord / Kappa).*
+                * **Donnée Système (Logs, ERP...) :** On valide l'exactitude des requêtes et la synchronisation. *Outil : Audit de formules et test de charge.*
+            
+                ### 📉 Critères d'Acceptation Standards
+                """)
+                col_c1, col_c2, col_c3 = st.columns(3)
+                with col_c1:
+                    st.info("**Variables Continues**\n* **< 10% :** Système Excellent\n* **10% - 30% :** Acceptable (à surveiller)\n* **> 30% :** Système à rejeter")
+                with col_c2:
+                    st.success("**Variables Attributaires**\n* **Taux d'accord :** >= 80% minimum\n* **Coeff. Kappa :** > 0.70 (Bon), > 0.90 (Excellent)")
+                with col_c3:
+                    st.warning("**Variables Systèmes**\n* **Exactitude :** 100% de concordance des formules\n* **Horodatage :** Écart < 1 seconde entre serveurs")
+
+            # 3. AFFICHAGE ET ÉDITION DU TABLEAU MSA
+            st.subheader("📊 Matrice d'Analyse et Plan MSA")
+            st.caption("Modifiez, ajoutez ou adaptez les lignes directement dans le tableau ci-dessous pour coller parfaitement à votre projet.")
+
+            df_msa = pd.DataFrame(p["msa_data"])
+        
+            edited_msa_df = st.data_editor(
+                df_msa,
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"msa_editor_{p_idx}",
+                column_config={
+                    "Variable": st.column_config.TextColumn("Variable liée au Y", width="medium", required=True),
+                    "Type de donnée": st.column_config.SelectboxColumn("Type de donnée", options=["Continue (Quantitative)", "Attributaire (Qualitatif)", "Système / Log IT"], width="small", required=True),
+                    "Méthode de mesure": st.column_config.TextColumn("Méthode de collecte", width="medium"),
+                    "Risques de biais": st.column_config.TextColumn("Risques / Biais identifiés", width="medium"),
+                    "Type de MSA": st.column_config.SelectboxColumn("Type de MSA Recommandé", options=["Gage R&R Complet", "Gage R&R Simplifié", "Attribute Agreement Analysis (Kappa)", "Stabilité & Exactitude Système"], width="medium"),
+                    "Méthode de validation": st.column_config.TextColumn("Protocole terrain de validation", width="large"),
+                    "Opérateurs": st.column_config.TextColumn("Nb Opérateurs", width="small"),
+                    "Répétitions": st.column_config.TextColumn("Nb Répétitions / Échantillons", width="small"),
+                    "Critères d'acceptation": st.column_config.TextColumn("Critères de validation", width="medium"),
+                    "Actions Préventives / Correctives": st.column_config.TextColumn("Actions correctives si système défaillant", width="large"),
                 }
-            ]
-
-        # 2. ANALYSE STRATÉGIQUE DES RISQUES MSA (RAPPEL DES RÈGLES BLACK BELT)
-        with st.expander("🧠 Logique Décisionnelle MSA & Critères d'Acceptation (Master Black Belt)", expanded=False):
-            st.markdown("""
-            ### 🎯 Règles d'Or pour le choix du MSA
-            * **Donnée Continue (Temps, coûts...) :** On évalue la **Répétabilité** (capacité d'un opérateur à retrouver la même valeur) et la **Reproductibilité** (capacité de 2 opérateurs à trouver la même valeur). *Outil : Gage R&R.*
-            * **Donnée Attributaire (Statut, choix, catégorie...) :** On évalue l'alignement des décisions. *Outil : Attribute Agreement Analysis (Taux d'accord / Kappa).*
-            * **Donnée Système (Logs, ERP...) :** On valide l'exactitude des requêtes et la synchronisation. *Outil : Audit de formules et test de charge.*
-            
-            ### 📉 Critères d'Acceptation Standards
-            """)
-            col_c1, col_c2, col_c3 = st.columns(3)
-            with col_c1:
-                st.info("**Variables Continues**\n* **< 10% :** Système Excellent\n* **10% - 30% :** Acceptable (à surveiller)\n* **> 30% :** Système à rejeter")
-            with col_c2:
-                st.success("**Variables Attributaires**\n* **Taux d'accord :** >= 80% minimum\n* **Coeff. Kappa :** > 0.70 (Bon), > 0.90 (Excellent)")
-            with col_c3:
-                st.warning("**Variables Systèmes**\n* **Exactitude :** 100% de concordance des formules\n* **Horodatage :** Écart < 1 seconde entre serveurs")
-
-        # 3. AFFICHAGE ET ÉDITION DU TABLEAU MSA
-        st.subheader("📊 Matrice d'Analyse et Plan MSA")
-        st.caption("Modifiez, ajoutez ou adaptez les lignes directement dans le tableau ci-dessous pour coller parfaitement à votre projet.")
-
-        df_msa = pd.DataFrame(p["msa_data"])
-        
-        edited_msa_df = st.data_editor(
-            df_msa,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"msa_editor_{p_idx}",
-            column_config={
-                "Variable": st.column_config.TextColumn("Variable liée au Y", width="medium", required=True),
-                "Type de donnée": st.column_config.SelectboxColumn("Type de donnée", options=["Continue (Quantitative)", "Attributaire (Qualitatif)", "Système / Log IT"], width="small", required=True),
-                "Méthode de mesure": st.column_config.TextColumn("Méthode de collecte", width="medium"),
-                "Risques de biais": st.column_config.TextColumn("Risques / Biais identifiés", width="medium"),
-                "Type de MSA": st.column_config.SelectboxColumn("Type de MSA Recommandé", options=["Gage R&R Complet", "Gage R&R Simplifié", "Attribute Agreement Analysis (Kappa)", "Stabilité & Exactitude Système"], width="medium"),
-                "Méthode de validation": st.column_config.TextColumn("Protocole terrain de validation", width="large"),
-                "Opérateurs": st.column_config.TextColumn("Nb Opérateurs", width="small"),
-                "Répétitions": st.column_config.TextColumn("Nb Répétitions / Échantillons", width="small"),
-                "Critères d'acceptation": st.column_config.TextColumn("Critères de validation", width="medium"),
-                "Actions Préventives / Correctives": st.column_config.TextColumn("Actions correctives si système défaillant", width="large"),
-            }
-        )
-
-        # Sauvegarde immédiate dans le dictionnaire du projet pour le JSON
-        if edited_msa_df is not None:
-            p["msa_data"] = edited_msa_df.to_dict('records')
-
-        st.write("---")
-
-        # 4. RECOMMANDATIONS DE STANDARDISATION & PROCÉDURES TERRAIN
-        st.subheader("📋 Guide d'Exécution & Standardisation Terrain")
-        
-        tab1, tab2, tab3 = st.tabs(["👟 Procédure Terrain de Validation", "✅ Check-list Fiabilité", "🎯 Conclusion Robustesse"])
-        
-        with tab1:
-            st.markdown("""
-            ### 🏃‍♂️ Comment lancer votre campagne MSA sur le terrain ?
-            1. **Sélectionner les échantillons :** Prenez des cas réels (ex: verbatims clients, dossiers clients). Ils doivent couvrir la *variabilité totale* du processus (des cas très simples, des cas très complexes).
-            2. **Anonymiser les tests :** Les opérateurs ne doivent pas savoir quel échantillon ils évaluent, ni qu'il s'agit d'un test de répétabilité (mélangez l'ordre des dossiers lors du second passage).
-            3. **Mesurer en aveugle :** Les opérateurs ne doivent pas communiquer entre eux pendant le protocole de test.
-            4. **Enregistrer les données brutes :** Saisissez les résultats dans un tableau croisé pour calculer l'efficience du système de mesure.
-            """)
-            
-        with tab2:
-            st.markdown("### 📝 Check-list de Robustesse avant Analyse (Go / No-Go)")
-            c_ch1, c_ch2 = st.columns(2)
-            with c_ch1:
-                st.checkbox("Les définitions opérationnelles (ex: qu'est-ce qu'un dossier 'conforme') sont écrites et partagées.", value=True, key=f"chk_msa_1_{p_idx}")
-                st.checkbox("Les horloges de tous les systèmes informatiques utilisés pour les logs sont synchronisées (NTP).", value=False, key=f"chk_msa_2_{p_idx}")
-                st.checkbox("Les opérateurs terrain ont été formés à la méthode de collecte.", value=True, key=f"chk_msa_3_{p_idx}")
-            with c_ch2:
-                st.checkbox("Le volume d'échantillons de test est statistiquement représentatif pour le MSA.", value=False, key=f"chk_msa_4_{p_idx}")
-                st.checkbox("Le calcul des indicateurs (KPI) élimine explicitement les temps hors-contexte (week-ends, pauses).", value=True, key=f"chk_msa_5_{p_idx}")
-
-        with tab3:
-            # Calcul dynamique simple pour la conclusion
-            total_variables = len(p["msa_data"])
-            st.markdown(f"### 🏁 Diagnostic de Robustesse du Projet")
-            st.info(f"Votre plan de validation actuel couvre **{total_variables} variables clés** connectées à votre équation $Y = f(x)$.")
-            
-            p["msa_conclusion"] = st.text_area(
-                "✍️ Conclusion de l'expert Black Belt sur la capabilité globale du système :",
-                value="Le système de mesure présente des risques modérés sur la partie classification manuelle (Attributaire). Le déploiement de l'Attribute Agreement Analysis est prioritaire avant le gel de la phase Measure. Les données systèmes sont considérées comme robustes sous réserve de validation de la règle de gestion des heures ouvrées.",
-                key=f"msa_conclusion_text_{p_idx}"
             )
+
+            # Sauvegarde immédiate dans le dictionnaire du projet pour le JSON
+            if edited_msa_df is not None:
+                p["msa_data"] = edited_msa_df.to_dict('records')
+
+            st.write("---")
+
+            # 4. RECOMMANDATIONS DE STANDARDISATION & PROCÉDURES TERRAIN
+            st.subheader("📋 Guide d'Exécution & Standardisation Terrain")
+        
+            tab1, tab2, tab3 = st.tabs(["👟 Procédure Terrain de Validation", "✅ Check-list Fiabilité", "🎯 Conclusion Robustesse"])
+        
+            with tab1:
+                st.markdown("""
+                ### 🏃‍♂️ Comment lancer votre campagne MSA sur le terrain ?
+                1. **Sélectionner les échantillons :** Prenez des cas réels (ex: verbatims clients, dossiers clients). Ils doivent couvrir la *variabilité totale* du processus (des cas très simples, des cas très complexes).
+                2. **Anonymiser les tests :** Les opérateurs ne doivent pas savoir quel échantillon ils évaluent, ni qu'il s'agit d'un test de répétabilité (mélangez l'ordre des dossiers lors du second passage).
+                3. **Mesurer en aveugle :** Les opérateurs ne doivent pas communiquer entre eux pendant le protocole de test.
+                4. **Enregistrer les données brutes :** Saisissez les résultats dans un tableau croisé pour calculer l'efficience du système de mesure.
+                """)
+            
+            with tab2:
+                st.markdown("### 📝 Check-list de Robustesse avant Analyse (Go / No-Go)")
+                c_ch1, c_ch2 = st.columns(2)
+                with c_ch1:
+                    st.checkbox("Les définitions opérationnelles (ex: qu'est-ce qu'un dossier 'conforme') sont écrites et partagées.", value=True, key=f"chk_msa_1_{p_idx}")
+                    st.checkbox("Les horloges de tous les systèmes informatiques utilisés pour les logs sont synchronisées (NTP).", value=False, key=f"chk_msa_2_{p_idx}")
+                    st.checkbox("Les opérateurs terrain ont été formés à la méthode de collecte.", value=True, key=f"chk_msa_3_{p_idx}")
+                with c_ch2:
+                    st.checkbox("Le volume d'échantillons de test est statistiquement représentatif pour le MSA.", value=False, key=f"chk_msa_4_{p_idx}")
+                    st.checkbox("Le calcul des indicateurs (KPI) élimine explicitement les temps hors-contexte (week-ends, pauses).", value=True, key=f"chk_msa_5_{p_idx}")
+
+            with tab3:
+                # Calcul dynamique simple pour la conclusion
+                total_variables = len(p["msa_data"])
+                st.markdown(f"### 🏁 Diagnostic de Robustesse du Projet")
+                st.info(f"Votre plan de validation actuel couvre **{total_variables} variables clés** connectées à votre équation $Y = f(x)$.")
+            
+                p["msa_conclusion"] = st.text_area(
+                    "✍️ Conclusion de l'expert Black Belt sur la capabilité globale du système :",
+                    value="Le système de mesure présente des risques modérés sur la partie classification manuelle (Attributaire). Le déploiement de l'Attribute Agreement Analysis est prioritaire avant le gel de la phase Measure. Les données systèmes sont considérées comme robustes sous réserve de validation de la règle de gestion des heures ouvrées.",
+                    key=f"msa_conclusion_text_{p_idx}"
+                )
+                
         # 5. Data collection
         st.divider()
         st.subheader("6. Data collection")
