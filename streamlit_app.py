@@ -1528,7 +1528,7 @@ else:
                 with col_chk3:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
                     st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
-
+        
         # 4. Validate measurement system
         st.divider()
         st.subheader("5. Validate measurement system")
