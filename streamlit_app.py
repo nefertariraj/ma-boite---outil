@@ -1528,14 +1528,14 @@ else:
                 with col_chk3:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
                     st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
-        
+                
         # 4. Validate measurement system
         st.divider()
         st.subheader("5. Validate measurement system")
         st.write("Tests de fiabilité des données (Répétabilité & Reproductibilité).")
         with st.expander("Outils de validation (Type Minitab)"):
             st.info("Analyse Gage R&R : Vérifiez si la variation vient du processus ou du système de mesure.")
-                
+        
         # 5. Data collection
         st.divider()
         st.subheader("6. Data collection")
