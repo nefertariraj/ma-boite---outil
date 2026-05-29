@@ -1653,9 +1653,10 @@ else:
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
         
-        # Sécurisation de l'accès au tableau de classification avant extraction
-        if f"msa_classification_table_{p_idx}" in st.session_state:
-            df_msa_classif = st.session_state[f"msa_classification_table_{p_idx}"]
+        # Sécurisation totale de l'accès au tableau de classification avant extraction
+        msa_classif_key = f"msa_classification_table_{p_idx}"
+        if msa_classif_key in st.session_state and st.session_state[msa_classif_key] is not None:
+            df_msa_classif = st.session_state[msa_classif_key]
             list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist() if "Variable Critique" in df_msa_classif.columns else []
         else:
             list_variables_critiques = []
@@ -1671,14 +1672,18 @@ else:
             st.stop()
             
         # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
-        # Double sécurité : On s'assure que les tables existent en Session State juste avant l'affichage des éditeurs
-        if f"rep_table_{p_idx}" not in st.session_state:
-            st.session_state[f"rep_table_{p_idx}"] = pd.DataFrame([
+        rep_key = f"rep_table_{p_idx}"
+        reprod_key = f"reprod_table_{p_idx}"
+        
+        # Initialisation ultra-sécurisée si absentes du Session State
+        if st.session_state.get(rep_key) White is None or not isinstance(st.session_state.get(rep_key), pd.DataFrame):
+            st.session_state[rep_key] = pd.DataFrame([
                 {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
                 {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
             ])
-        if f"reprod_table_{p_idx}" not in st.session_state:
-            st.session_state[f"reprod_table_{p_idx}"] = pd.DataFrame([
+            
+        if st.session_state.get(reprod_key) is None or not isinstance(st.session_state.get(reprod_key), pd.DataFrame):
+            st.session_state[reprod_key] = pd.DataFrame([
                 {"Opérateur": "Opérateur 1", "Résultat": 12.1}, 
                 {"Opérateur": "Opérateur 2", "Résultat": 12.5}
             ])
@@ -1687,34 +1692,35 @@ else:
         
         with col_t1:
             st.markdown("**🔬 Test de Répétabilité (Intra-Opérateur)**")
+            # Utilisation du .get() pour immuniser l'éditeur contre le KeyError
             edited_rep = st.data_editor(
-                st.session_state[f"rep_table_{p_idx}"],
+                st.session_state.get(rep_key),
                 num_rows="dynamic",
                 use_container_width=True,
                 key=f"editor_rep_{p_idx}"
             )
             if edited_rep is not None:
-                st.session_state[f"rep_table_{p_idx}"] = edited_rep
+                st.session_state[rep_key] = edited_rep
 
         with col_t2:
             st.markdown("**👥 Test de Reproductibilité (Inter-Opérateurs)**")
+            # Utilisation du .get() pour immuniser l'éditeur contre le KeyError
             edited_reprod = st.data_editor(
-                st.session_state[f"reprod_table_{p_idx}"],
+                st.session_state.get(reprod_key),
                 num_rows="dynamic",
                 use_container_width=True,
                 key=f"editor_reprod_{p_idx}"
             )
             if edited_reprod is not None:
-                st.session_state[f"reprod_table_{p_idx}"] = edited_reprod
+                st.session_state[reprod_key] = edited_reprod
 
         # --- 4. DEUXIÈME LECTURE AUTOMATISÉE ET DÉTECTION DES BIAIS ---
         st.markdown("##### ⚠️ Analyse des Risques de Biais de Mesure")
         detected_biais = []
-        df_r1 = st.session_state[f"rep_table_{p_idx}"]
+        df_r1 = st.session_state.get(rep_key, pd.DataFrame())
         
         if not df_r1.empty and len(df_r1.columns) >= 3:
             try:
-                # Conversion propre en float pour s'assurer que les calculs mathématiques ne plantent pas
                 val_col1 = pd.to_numeric(df_r1.iloc[:, 1], errors='coerce')
                 val_col2 = pd.to_numeric(df_r1.iloc[:, 2], errors='coerce')
                 
@@ -1739,7 +1745,7 @@ else:
             except:
                 pass
 
-        df_r2 = st.session_state[f"reprod_table_{p_idx}"]
+        df_r2 = st.session_state.get(reprod_key, pd.DataFrame())
         if not df_r2.empty and "Résultat" in df_r2.columns:
             try:
                 vals_reprod = pd.to_numeric(df_r2["Résultat"], errors='coerce').dropna()
