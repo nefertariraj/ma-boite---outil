@@ -1661,6 +1661,7 @@ else:
         else:
             list_variables_critiques = []
         
+        # Saisie ou sélection de la variable à tester
         if list_variables_critiques:
             selected_var_to_test = st.selectbox(
                 "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
@@ -1668,15 +1669,15 @@ else:
                 key=f"msa_selected_var_{p_idx}"
             )
         else:
-            st.warning("⚠️ Aucune variable critique disponible. Ajoutez-en une dans le tableau ci-dessus pour continuer.")
-            st.stop()
+            st.info("💡 Le tableau de classification ci-dessus est en cours d'analyse ou vide. Ajoutez une ligne pour activer la suite du protocole terrain.")
+            selected_var_to_test = "Aucune variable sélectionnée"
             
         # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
         rep_key = f"rep_table_{p_idx}"
         reprod_key = f"reprod_table_{p_idx}"
         
-        # Initialisation ultra-sécurisée si absentes du Session State
-        if st.session_state.get(rep_key) White is None or not isinstance(st.session_state.get(rep_key), pd.DataFrame):
+        # Initialisation ultra-sécurisée
+        if st.session_state.get(rep_key) is None or not isinstance(st.session_state.get(rep_key), pd.DataFrame):
             st.session_state[rep_key] = pd.DataFrame([
                 {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
                 {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
@@ -1692,7 +1693,6 @@ else:
         
         with col_t1:
             st.markdown("**🔬 Test de Répétabilité (Intra-Opérateur)**")
-            # Utilisation du .get() pour immuniser l'éditeur contre le KeyError
             edited_rep = st.data_editor(
                 st.session_state.get(rep_key),
                 num_rows="dynamic",
@@ -1704,7 +1704,6 @@ else:
 
         with col_t2:
             st.markdown("**👥 Test de Reproductibilité (Inter-Opérateurs)**")
-            # Utilisation du .get() pour immuniser l'éditeur contre le KeyError
             edited_reprod = st.data_editor(
                 st.session_state.get(reprod_key),
                 num_rows="dynamic",
