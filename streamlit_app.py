@@ -1671,6 +1671,18 @@ else:
             st.stop()
             
         # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
+        # Double sécurité : On s'assure que les tables existent en Session State juste avant l'affichage des éditeurs
+        if f"rep_table_{p_idx}" not in st.session_state:
+            st.session_state[f"rep_table_{p_idx}"] = pd.DataFrame([
+                {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
+                {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
+            ])
+        if f"reprod_table_{p_idx}" not in st.session_state:
+            st.session_state[f"reprod_table_{p_idx}"] = pd.DataFrame([
+                {"Opérateur": "Opérateur 1", "Résultat": 12.1}, 
+                {"Opérateur": "Opérateur 2", "Résultat": 12.5}
+            ])
+
         col_t1, col_t2 = st.columns(2)
         
         with col_t1:
