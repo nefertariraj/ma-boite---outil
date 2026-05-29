@@ -1791,7 +1791,7 @@ else:
         col_t1, col_t2 = st.columns(2)
         
         with col_t1:
-            st.markdown("**🔬 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?)**")
+            st.markdown("**🔬 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?1 opérateur, même situation, plusieurs mesures)**")
             edited_rep = st.data_editor(
                 st.session_state.get(rep_key, pd.DataFrame()),
                 num_rows="dynamic",
@@ -1802,7 +1802,7 @@ else:
                 st.session_state[rep_key] = edited_rep
 
         with col_t2:
-            st.markdown("**👥 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires?)**")
+            st.markdown("**👥 Test de Reproductibilité (Différentes personnes obtiennent-elles les mêmes résultats?même situation/produit, plusieurs opérateurs)**")
             edited_reprod = st.data_editor(
                 st.session_state.get(reprod_key, pd.DataFrame()),
                 num_rows="dynamic",
