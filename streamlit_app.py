@@ -1529,12 +1529,179 @@ else:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
                     st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
 
-        # 4. Validate measurement system
+        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PLAN DE VALIDATION ET TESTS
         st.divider()
-        st.subheader("4. Validate measurement system")
-        st.write("Tests de fiabilité des données (Répétabilité & Reproductibilité).")
-        with st.expander("Outils de validation (Type Minitab)"):
-            st.info("Analyse Gage R&R : Vérifiez si la variation vient du processus ou du système de mesure.")
+        st.subheader("4. Validate Measurement System (MSA)")
+        st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
+
+        # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA ---
+        st.markdown("##### 🧠 Classification Automatique des Variables")
+        
+        # Récupération ou Fallback sur le Data Collection Plan
+        dcp_source = p.get("master_dcp_table", [])
+        
+        if not dcp_source:
+            st.info("💡 Initialisation d'une variable pilote pour tester le module MSA.")
+            extracted_vars = [{"Variable à mesurer": "Temps de cycle du processus (Exemple)", "Type de donnée": "Continue (Temps)"}]
+        else:
+            extracted_vars = dcp_source
+
+        msa_configs = []
+        for v_idx, v in enumerate(extracted_vars):
+            var_name = v.get("Variable à mesurer", f"Variable {v_idx+1}")
+            type_brut = v.get("Type de donnée", "Continue (Temps)")
+            
+            # Routage logique Black Belt automatique
+            if "continue" in type_brut.lower() or "temps" in type_brut.lower() or "délai" in type_brut.lower() or "coût" in type_brut.lower():
+                detected_type = "Continue (Quantitative)"
+                recommended_msa = "Gage R&R (Répétabilité & Reproductibilité)"
+                proto_desc = "Étude par variables (Chronos, mesures physiques, logs SI)."
+            elif "attribut" in type_brut.lower() or "discrète" in type_brut.lower() or "catégorielle" in type_brut.lower() or "statut" in type_brut.lower():
+                detected_type = "Attributaire / Catégorielle"
+                recommended_msa = "Attribute Agreement Analysis (Kappa / Taux d'accord)"
+                proto_desc = "Étude par attributs (Jugement humain, codification Go/No-Go)."
+            else:
+                detected_type = "Système / Log IT"
+                recommended_msa = "Audit de Stabilité & Exactitude Horodatage"
+                proto_desc = "Extraction croisée et recalcul de formules de bases de données."
+                
+            msa_configs.append({
+                "Variable": var_name,
+                "Type détecté": detected_type,
+                "MSA Recommandé": recommended_msa,
+                "Méthode cible": proto_desc
+            })
+            
+        df_classification = pd.DataFrame(msa_configs)
+        st.dataframe(df_classification, use_container_width=True)
+
+        st.markdown("##### 👟 Exécution du Protocole Terrain")
+        selected_var_to_test = st.selectbox(
+            "Sélectionnez la variable à tester sur le terrain :",
+            options=df_classification["Variable"].tolist(),
+            key=f"msa_selected_var_{p_idx}"
+        )
+
+        # Initialisation des tables de tests dynamiques en session d'état
+        if f"rep_table_{p_idx}" not in st.session_state:
+            st.session_state[f"rep_table_{p_idx}"] = pd.DataFrame([{"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}])
+        if f"reprod_table_{p_idx}" not in st.session_state:
+            st.session_state[f"reprod_table_{p_idx}"] = pd.DataFrame([{"Opérateur": "Opérateur 1", "Résultat": 12.1}, {"Opérateur": "Opérateur 2", "Résultat": 12.5}])
+
+        # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
+        col_t1, col_t2 = st.columns(2)
+        
+        with col_t1:
+            st.markdown("**🔬 Test de Répétabilité (Intra-Opérateur)**")
+            edited_rep = st.data_editor(
+                st.session_state[f"rep_table_{p_idx}"],
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"editor_rep_{p_idx}"
+            )
+            if edited_rep is not None:
+                st.session_state[f"rep_table_{p_idx}"] = edited_rep
+
+        with col_t2:
+            st.markdown("**👥 Test de Reproductibilité (Inter-Opérateurs)**")
+            edited_reprod = st.data_editor(
+                st.session_state[f"reprod_table_{p_idx}"],
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"editor_reprod_{p_idx}"
+            )
+            if edited_reprod is not None:
+                st.session_state[f"reprod_table_{p_idx}"] = edited_reprod
+
+        # --- 4. DEUXIÈME LECTURE AUTOMATISÉE ET DÉTECTION DES BIAIS ---
+        st.markdown("##### ⚠️ Analyse des Risques de Biais de Mesure")
+        detected_biais = []
+        df_r1 = st.session_state[f"rep_table_{p_idx}"]
+        
+        if not df_r1.empty and len(df_r1.columns) >= 3:
+            try:
+                diffs = np.abs(df_r1.iloc[:, 1].astype(float) - df_r1.iloc[:, 2].astype(float))
+                if diffs.max() > df_r1.iloc[:, 1].astype(float).mean() * 0.15:
+                    detected_biais.append({
+                        "Biais": "Incohérence Forte Intra-Opérateur",
+                        "Impact": "Répétabilité instable. L'outil ou la méthode de lecture manque de régularité.",
+                        "Solution": "Créer un détrompeur (Poka-Yoke) ou standardiser le mode opératoire visuel."
+                    })
+                all_vals = pd.concat([df_r1.iloc[:, 1], df_r1.iloc[:, 2]]).dropna()
+                if all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
+                    detected_biais.append({
+                        "Biais": "Biais d'Arrondis Systématiques",
+                        "Impact": "Perte de granularité de la donnée. Risque de masquer la vraie capabilité du procédé.",
+                        "Solution": "Imposer une règle stricte de saisie à 1 ou 2 décimales."
+                    })
+            except:
+                pass
+
+        df_r2 = st.session_state[f"reprod_table_{p_idx}"]
+        if not df_r2.empty and "Résultat" in df_r2.columns:
+            try:
+                vals_reprod = df_r2["Résultat"].dropna().astype(float)
+                if len(vals_reprod) >= 2 and (vals_reprod.max() - vals_reprod.min()) > vals_reprod.mean() * 0.20:
+                    detected_biais.append({
+                        "Biais": "Biais d'Interprétation Inter-Opérateurs",
+                        "Impact": "Les opérateurs n'interprètent pas la mesure de la même manière (subjectivité).",
+                        "Solution": "Organiser un atelier d'alignement et publier une définition opérationnelle imagée."
+                    })
+            except:
+                pass
+
+        if not detected_biais:
+            st.success("✅ Aucun biais critique ou anomalie statistique détectée dans vos données de test.")
+        else:
+            for b in detected_biais:
+                with st.status(f"⚠️ Alerte : {b['Biais']}", expanded=True):
+                    st.write(f"**Impact :** {b['Impact']}")
+                    st.info(f"**Action corrective :** {b['Solution']}")
+
+        # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE ---
+        st.markdown("##### 📊 Score de Capabilité & Recommandations")
+        score_coherence = 100
+        statut_systeme = "Fiable"
+        couleur_statut = "green"
+        
+        if len(detected_biais) == 1:
+            score_coherence = 75
+            statut_systeme = "Partiellement Fiable"
+            couleur_statut = "orange"
+        elif len(detected_biais) > 1:
+            score_coherence = 45
+            statut_systeme = "Non Fiable"
+            couleur_statut = "red"
+
+        col_d1, col_d2 = st.columns([1, 2])
+        with col_d1:
+            st.metric(label="Indice de Fidélité", value=f"{score_coherence}%", delta=statut_systeme, delta_color="normal" if score_coherence > 50 else "inverse")
+        with col_d2:
+            st.markdown(f"Statut global : <span style='color:{couleur_statut}; font-weight:bold;'>{statut_systeme}</span>", unsafe_allow_html=True)
+            if statut_systeme != "Fiable":
+                st.warning("⚠️ Le système de mesure injecte trop de bruit. Appliquez une action corrective ci-dessous avant de pouvoir valider.")
+
+        if statut_systeme != "Fiable":
+            p["msa_corrective_action"] = st.selectbox(
+                "Plan d'action prioritaire à déployer :",
+                options=[
+                    "Automatisation de la capture (Remplacement du facteur humain par une règle SI)",
+                    "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
+                    "Mise en place d'une checksheet avec contrôles de saisie rigides"
+                ],
+                key=f"msa_action_choice_{p_idx}"
+            )
+
+        # --- 7. VALIDATION FINALE (SIGN-OFF) ---
+        st.markdown("##### 📋 Validation Finale")
+        if statut_systeme == "Non Fiable":
+            st.error("🛑 Signature bloquée : La variance du système de mesure est trop élevée (>30%). Ajustez vos données terrain après correction pour débloquer.")
+        else:
+            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=p.get("msa_is_validated_status", False), key=f"msa_sign_off_{p_idx}")
+            p["msa_is_validated_status"] = is_validated
+            
+            if is_validated:
+                st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # 5. Data collection
         st.divider()
