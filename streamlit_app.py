@@ -5,6 +5,54 @@ import plotly.graph_objects as go
 from datetime import datetime, date
 import json
 
+def synchroniser_et_capturer_tout(projet_en_cours, index_projet):
+    """
+    Cette fonction aspire automatiquement tous les tableaux et cases modifiés 
+    à l'écran pour les verrouiller dans le fichier de sauvegarde.
+    """
+    if not isinstance(projet_en_cours, dict):
+        return projet_en_cours
+        
+    cle_unique = str(index_projet)
+    
+    # 1. Capture du Plan de Collecte (DCP)
+    cles_dcp = [f"master_dcp_table_{cle_unique}", f"dcp_editor_{cle_unique}", "master_dcp_table"]
+    for cle in cles_dcp:
+        if cle in st.session_state:
+            donnees = st.session_state[cle]
+            projet_en_cours["master_dcp_table"] = donnees.to_dict(orient="records") if isinstance(donnees, pd.DataFrame) else donnees
+            break
+
+    # 2. Capture des tableaux du module MSA
+    cle_msa = f"msa_classification_table_{cle_unique}"
+    if cle_msa in st.session_state:
+        donnees_msa = st.session_state[cle_msa]
+        projet_en_cours["msa_classification_table"] = donnees_msa.to_dict(orient="records") if isinstance(donnees_msa, pd.DataFrame) else donnees_msa
+
+    cle_rep = f"rep_table_{cle_unique}"
+    if cle_rep in st.session_state:
+        donnees_rep = st.session_state[cle_rep]
+        projet_en_cours["rep_table_data"] = donnees_rep.to_dict(orient="records") if isinstance(donnees_rep, pd.DataFrame) else donnees_rep
+
+    cle_reprod = f"reprod_table_{cle_unique}"
+    if cle_reprod in st.session_state:
+        donnees_reprod = st.session_state[cle_reprod]
+        projet_en_cours["reprod_table_data"] = donnees_reprod.to_dict(orient="records") if isinstance(donnees_reprod, pd.DataFrame) else donnees_reprod
+
+    # 3. Capture des choix, boutons et validations de la page
+    projet_en_cours["msa_selected_var"] = st.session_state.get(f"msa_selected_var_{cle_unique}", "")
+    projet_en_cours["msa_action_choice"] = st.session_state.get(f"msa_action_choice_{cle_unique}", "")
+    projet_en_cours["msa_is_validated_status"] = st.session_state.get(f"msa_sign_off_{cle_unique}", False)
+
+    # 4. Capture automatique de tous les autres champs de saisie de ce projet
+    for cle_interne in st.session_state.keys():
+        if cle_interne.endswith(f"_{cle_unique}"):
+            nom_propre_du_champ = cle_interne.replace(f"_{cle_unique}", "")
+            if "table" not in cle_interne and "editor" not in cle_interne:
+                projet_en_cours[nom_propre_du_champ] = st.session_state[cle_interne]
+
+    return projet_en_cours
+
 # ==========================================
 # 📋 MODÈLE DE RÉFÉRENCE UNIQUE POUR CHAQUE PROJET
 # ==========================================
@@ -238,6 +286,11 @@ with st.sidebar:
 
     if un_projet_au_moins:
         try:
+            # 🟢 LIGNE AJOUTÉE : On force la capture complète du projet actif avant la sauvegarde
+            # On vérifie que 'p' et 'p_idx' existent bien à ce moment-là du code
+            if 'p' in locals() and 'p_idx' in locals():
+                st.session_state.projects[p_idx] = synchroniser_et_capturer_tout(p, p_idx)
+
             # Sécurité absolue pour les dates cachées
             def encodeur_secours(obj):
                 if isinstance(obj, (date, datetime)):
@@ -1450,6 +1503,12 @@ else:
         # --------------------------------------------------
         # ETAPE 2 : LE TABLEAU OFFICIEL DU DATA COLLECTION PLAN (16 COLONNES)
         # --------------------------------------------------
+        # 🔄 RECHARGE INTELLIGENTE DU FICHIER SI EXISTANT (Correction pour importer le travail)
+        if "master_dcp_table" not in st.session_state or not st.session_state["master_dcp_table"]:
+            saved_dcp = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
+            if saved_dcp:
+                st.session_state["master_dcp_table"] = saved_dcp
+
         if "master_dcp_table" in st.session_state and st.session_state["master_dcp_table"]:
             st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
             st.caption("Cette matrice constitue le livrable réglementaire pour votre jalon de validation DMAIC. Modifiez les cellules pour affiner les paramètres terrain.")
@@ -1483,7 +1542,7 @@ else:
 
             if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{p_idx}"):
                 st.session_state["master_dcp_table"] = edited_dcp_df.to_dict('records')
-                p["final_mbb_dcp"] = st.session_state["master_dcp_table"]
+                p["master_dcp_table"] = st.session_state["master_dcp_table"]
                 st.success("🎯 Spécifications de collecte terrain enregistrées avec succès.")
 
             st.markdown("---")
@@ -1498,9 +1557,9 @@ else:
                 with st.container(border=True):
                     st.markdown("#### 🚨 Maîtrise des Risques de Subjectivité & Interprétation")
                     st.markdown("""
-                    *   **Suppression des définitions ambiguës :** Pour les données discrètes/attributaires (ex. Dossier non conforme), publiez un *catalogue des défauts* visuel. Si deux opérateurs interprètent un défaut différemment, votre système de mesure est inutile.
-                    *   **Lutte contre l'Effet Hawthorne :** Lorsque les équipes se savent observées ou chronométrées, les performances s'améliorent artificiellement de 10 à 15%. Privilégiez les collectes en tâche de fond (système) ou automatisez l'enregistrement sans présence physique pesante du Black Belt.
-                    *   **Procédures de Contrôle Qualité :** Réalisez un audit complet des données dès le deuxième jour (*Day-2 Review*). Comparez les 20 premières lignes saisies avec la réalité pour corriger immédiatement les dérives de compréhension.
+                    * **Suppression des définitions ambiguës :** Pour les données discrètes/attributaires (ex. Dossier non conforme), publiez un *catalogue des défauts* visuel. Si deux opérateurs interprètent un défaut différemment, votre système de mesure est inutile.
+                    * **Lutte contre l'Effet Hawthorne :** Lorsque les équipes se savent observées ou chronométrées, les performances s'améliorent artificiellement de 10 à 15%. Privilégiez les collectes en tâche de fond (système) ou automatisez l'enregistrement sans présence physique pesante du Black Belt.
+                    * **Procédures de Contrôle Qualité :** Réalisez un audit complet des données dès le deuxième jour (*Day-2 Review*). Comparez les 20 premières lignes saisies avec la réalité pour corriger immédiatement les dérives de compréhension.
                     """)
             
             with c_rec2:
@@ -1508,8 +1567,8 @@ else:
                     st.markdown("#### 📐 Validation de la Fiabilité (Rigueur Master Black Belt)")
                     st.markdown("""
                     Avant d'utiliser ces données pour des tests statistiques avancés dans la phase *Analyze*, vous devez obligatoirement valider la capabilité de votre système de mesure :
-                    *   **Pour les Données Continues (Temps de cycle, délais) :** Réalisez une étude **Gage R&R (Répétabilité & Reproductibilité)**. La variance de votre outil de mesure doit représenter moins de 10% de la tolérance totale du processus.
-                    *   **Pour les Données Attributaires (Conforme / Non conforme) :** Déployez un **Test d'accord d'attributs (Attribute Agreement Analysis)** en calculant le coefficient **Kappa de Fleiss**. Un score inférieur à **0.70** indique un besoin immédiat de standardisation et de requalification des contrôleurs.
+                    * **Pour les Données Continues (Temps de cycle, délais) :** Réalisez une étude **Gage R&R (Répétabilité & Reproductibilité)**. La variance de votre outil de mesure doit représenter moins de 10% de la tolérance totale du processus.
+                    * **Pour les Données Attributaires (Conforme / Non conforme) :** Déployez un **Test d'accord d'attributs (Attribute Agreement Analysis)** en calculant le coefficient **Kappa de Fleiss**. Un score inférieur à **0.70** indique un besoin immédiat de standardisation et de requalification des contrôleurs.
                     """)
 
             # --------------------------------------------------
@@ -1528,7 +1587,7 @@ else:
                 with col_chk3:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
                     st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
-
+                    
         # =========================================================================
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PLAN DE VALIDATION ET TESTS
         # =========================================================================
