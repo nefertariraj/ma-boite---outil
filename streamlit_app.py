@@ -1536,7 +1536,6 @@ else:
         with st.expander("Outils de validation (Type Minitab)"):
             st.info("Analyse Gage R&R : Vérifiez si la variation vient du processus ou du système de mesure.")
 
-        
         # 5. Data collection
         st.divider()
         st.subheader("6. Data collection")
