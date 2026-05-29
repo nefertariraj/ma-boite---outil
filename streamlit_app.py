@@ -1652,7 +1652,13 @@ else:
 
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
-        list_variables_critiques = st.session_state[f"msa_classification_table_{p_idx}"]["Variable Critique"].dropna().tolist()
+        
+        # Sécurisation de l'accès au tableau de classification avant extraction
+        if f"msa_classification_table_{p_idx}" in st.session_state:
+            df_msa_classif = st.session_state[f"msa_classification_table_{p_idx}"]
+            list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist() if "Variable Critique" in df_msa_classif.columns else []
+        else:
+            list_variables_critiques = []
         
         if list_variables_critiques:
             selected_var_to_test = st.selectbox(
@@ -1661,7 +1667,7 @@ else:
                 key=f"msa_selected_var_{p_idx}"
             )
         else:
-            st.warning("⚠️ Aucune variable critique disponible. Ajoutez-en une pour continuer.")
+            st.warning("⚠️ Aucune variable critique disponible. Ajoutez-en une dans le tableau ci-dessus pour continuer.")
             st.stop()
             
         # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
@@ -1696,15 +1702,23 @@ else:
         
         if not df_r1.empty and len(df_r1.columns) >= 3:
             try:
-                diffs = np.abs(df_r1.iloc[:, 1].astype(float) - df_r1.iloc[:, 2].astype(float))
-                if diffs.max() > df_r1.iloc[:, 1].astype(float).mean() * 0.15:
-                    detected_biais.append({
-                        "Biais": "Incohérence Forte Intra-Opérateur",
-                        "Impact": "Répétabilité instable. L'outil ou la méthode de lecture manque de régularité.",
-                        "Solution": "Créer un détrompeur (Poka-Yoke) ou standardiser le mode opératoire visuel."
-                    })
-                all_vals = pd.concat([df_r1.iloc[:, 1], df_r1.iloc[:, 2]]).dropna()
-                if all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
+                # Conversion propre en float pour s'assurer que les calculs mathématiques ne plantent pas
+                val_col1 = pd.to_numeric(df_r1.iloc[:, 1], errors='coerce')
+                val_col2 = pd.to_numeric(df_r1.iloc[:, 2], errors='coerce')
+                
+                diffs = np.abs(val_col1 - val_col2)
+                mean_val = val_col1.mean()
+                
+                if not diffs.dropna().empty and mean_val > 0:
+                    if diffs.max() > mean_val * 0.15:
+                        detected_biais.append({
+                            "Biais": "Incohérence Forte Intra-Opérateur",
+                            "Impact": "Répétabilité instable. L'outil ou la méthode de lecture manque de régularité.",
+                            "Solution": "Créer un détrompeur (Poka-Yoke) ou standardiser le mode opératoire visuel."
+                        })
+                
+                all_vals = pd.concat([val_col1, val_col2]).dropna()
+                if not all_vals.empty and all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
                     detected_biais.append({
                         "Biais": "Biais d'Arrondis Systématiques",
                         "Impact": "Perte de granularité de la donnée. Risque de masquer la vraie capabilité du procédé.",
@@ -1716,13 +1730,14 @@ else:
         df_r2 = st.session_state[f"reprod_table_{p_idx}"]
         if not df_r2.empty and "Résultat" in df_r2.columns:
             try:
-                vals_reprod = df_r2["Résultat"].dropna().astype(float)
-                if len(vals_reprod) >= 2 and (vals_reprod.max() - vals_reprod.min()) > vals_reprod.mean() * 0.20:
-                    detected_biais.append({
-                        "Biais": "Biais d'Interprétation Inter-Opérateurs",
-                        "Impact": "Les opérateurs n'interprètent pas la mesure de la même manière (subjectivité).",
-                        "Solution": "Organiser un atelier d'alignement et publier une définition opérationnelle imagée."
-                    })
+                vals_reprod = pd.to_numeric(df_r2["Résultat"], errors='coerce').dropna()
+                if len(vals_reprod) >= 2 and vals_reprod.mean() > 0:
+                    if (vals_reprod.max() - vals_reprod.min()) > vals_reprod.mean() * 0.20:
+                        detected_biais.append({
+                            "Biais": "Biais d'Interprétation Inter-Opérateurs",
+                            "Impact": "Les opérateurs n'interprètent pas la mesure de la même manière (subjectivité).",
+                            "Solution": "Organiser un atelier d'alignement et publier une définition opérationnelle imagée."
+                        })
             except:
                 pass
 
