@@ -1561,7 +1561,7 @@ else:
         
         # 1ère passe : Vérification des clés de premier niveau
         for k in primary_keys:
-            if p.get(k):
+            if isinstance(p, dict) and p.get(k):
                 project_y = p.get(k)
                 break
         
@@ -1592,12 +1592,12 @@ else:
             if deep_search_result:
                 project_y = deep_search_result
 
-        dcp_source = p.get("master_dcp_table", [])
+        dcp_source = p.get("master_dcp_table", []) if isinstance(p, dict) else []
         
         # 3ème passe : Extraction directe depuis dcp_source si non trouvé par récursivité
         if project_y == "Indéterminé" and dcp_source:
             for v in dcp_source:
-                if str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
+                if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
                     project_y = v.get("Variable à mesurer")
                     break
 
@@ -1609,35 +1609,36 @@ else:
             
             if dcp_source:
                 for v in dcp_source:
-                    var_name = v.get("Variable à mesurer", "")
-                    type_brut = v.get("Type de donnée", "Continue")
-                    role = v.get("Rôle", "X (Influent)")
-                    
-                    if var_name:
-                        if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
-                            det_type = "Continue (Quantitative)"
-                            rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
-                        else:
-                            det_type = "Attributaire / Catégorielle"
-                            rec_msa = "Attribute Agreement Analysis (Kappa)"
+                    if isinstance(v, dict):
+                        var_name = v.get("Variable à mesurer", "")
+                        type_brut = v.get("Type de donnée", "Continue")
+                        role = v.get("Rôle", "X (Influent)")
                         
-                        ai_analyzed_rows.append({
-                            "Variable Critique": var_name,
-                            "Type de Donnée": det_type,
-                            "MSA Recommandé": rec_msa,
-                            "Criticité par rapport au Y": "Haute (Lien Direct)" if str(role).strip().upper() == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
-                        })
+                        if var_name:
+                            if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
+                                det_type = "Continue (Quantitative)"
+                                rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
+                            else:
+                                det_type = "Attributaire / Catégorielle"
+                                rec_msa = "Attribute Agreement Analysis (Kappa)"
+                            
+                            ai_analyzed_rows.append({
+                                "Variable Critique": var_name,
+                                "Type de Donnée": det_type,
+                                "MSA Recommandé": rec_msa,
+                                "Criticité par rapport au Y": "Haute (Lien Direct)" if str(role).strip().upper() == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
+                            })
                 
                 ai_analyzed_rows = sorted(ai_analyzed_rows, key=lambda k: k["Criticité par rapport au Y"], reverse=True)[:4]
 
             if not ai_analyzed_rows:
-                if "temps" in project_y.lower() or "délai" in project_y.lower() or "lead time" in project_y.lower():
+                if "temps" in str(project_y).lower() or "délai" in str(project_y).lower() or "lead time" in str(project_y).lower():
                     ai_analyzed_rows = [
                         {"Variable Critique": "Temps de traitement unitaire (Cycle Time)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
                         {"Variable Critique": "Horodatage de début/fin de tâche", "Type de Donnée": "Système / Log IT", "MSA Recommandé": "Audit de Stabilité & Exactitude", "Criticité par rapport au Y": "Haute (Source de la donnée)"},
                         {"Variable Critique": "Statut de mise en attente du dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Moyenne (Bruit potentiel)"}
                     ]
-                elif "qualité" in project_y.lower() or "erreur" in project_y.lower() or "rebut" in project_y.lower() or "conform" in project_y.lower():
+                elif "qualité" in str(project_y).lower() or "erreur" in str(project_y).lower() or "rebut" in str(project_y).lower() or "conform" in str(project_y).lower():
                     ai_analyzed_rows = [
                         {"Variable Critique": "Verdict de conformité de la pièce (Go / No-Go)", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
                         {"Variable Critique": "Code défaut saisi par l'opérateur", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute (Fiabilité du Pareto)"},
@@ -1652,12 +1653,15 @@ else:
             st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
         if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{p_idx}"):
-            del st.session_state[msa_classif_key]
+            if msa_classif_key in st.session_state:
+                del st.session_state[msa_classif_key]
             st.rerun()
 
         st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
+        
+        df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
         edited_classification = st.data_editor(
-            st.session_state[msa_classif_key],
+            df_classification_current,
             num_rows="dynamic",
             use_container_width=True,
             column_config={
@@ -1675,14 +1679,14 @@ else:
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
         
-        # Récupération sécurisée des variables pour la selectbox
-        if msa_classif_key in st.session_state and st.session_state[msa_classif_key] is not None:
-            df_msa_classif = st.session_state[msa_classif_key]
-            list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist() if "Variable Critique" in df_msa_classif.columns else []
+        # Récupération sécurisée avec .get() pour immuniser contre le KeyError
+        df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
+        if df_msa_classif is not None and not df_msa_classif.empty and "Variable Critique" in df_msa_classif.columns:
+            list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist()
         else:
             list_variables_critiques = []
         
-        # Saisie ou sélection de la variable à tester (Pas de st.stop() pour éviter le KeyError)
+        # Sélection sécurisée
         if list_variables_critiques:
             selected_var_to_test = st.selectbox(
                 "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
@@ -1794,7 +1798,7 @@ else:
             if statut_systeme != "Fiable":
                 st.warning("⚠️ Le système de mesure injecte trop de bruit. Appliquez une action corrective ci-dessous avant de pouvoir valider.")
 
-        if statut_systeme != "Fiable":
+        if statut_systeme != "Fiable" and isinstance(p, dict):
             p["msa_corrective_action"] = st.selectbox(
                 "Plan d'action prioritaire à déployer :",
                 options=[
@@ -1810,8 +1814,10 @@ else:
         if statut_systeme == "Non Fiable":
             st.error("🛑 Signature bloquée : La variance du système de mesure est trop élevée (>30%). Ajustez vos données terrain après correction pour débloquer.")
         else:
-            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=p.get("msa_is_validated_status", False), key=f"msa_sign_off_{p_idx}")
-            p["msa_is_validated_status"] = is_validated
+            saved_status = p.get("msa_is_validated_status", False) if isinstance(p, dict) else False
+            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{p_idx}")
+            if isinstance(p, dict):
+                p["msa_is_validated_status"] = is_validated
             
             if is_validated:
                 st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
