@@ -1602,20 +1602,54 @@ else:
         reprod_key = f"reprod_table_{safe_idx}"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
-        # Initialisation stricte en amont
-        if rep_key not in st.session_state:
-            st.session_state[rep_key] = pd.DataFrame([
-                {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
-                {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
-            ])
-        if reprod_key not in st.session_state:
-            st.session_state[reprod_key] = pd.DataFrame([
-                {"Opérateur": "Opérateur 1", "Résultat": 12.1}, 
-                {"Opérateur": "Opérateur 2", "Résultat": 12.5}
-            ])
+        # 🛑 VERROU RIGOUREUX LSS : On vérifie si le Plan de Collecte a été validé et généré
+        plan_de_collecte_existe = "master_dcp_table" in st.session_state and len(st.session_state["master_dcp_table"]) > 0
 
-        # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
-        st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
+        if not plan_de_collecte_existe:
+            st.warning("⚠️ **Jalon requis :** Veuillez d'abord valider votre **Plan de Collecte (Section 3)** en cliquant sur le bouton rouge *'⚙️ Valider la pertinence & Générer le Data Collection Plan Master'*. Le module MSA se débloquera automatiquement avec vos variables validées.")
+        else:
+            # 🔄 Si le plan existe, on extrait la liste des vraies variables validées
+            liste_variables_valides = [row["Variable à mesurer"] for row in st.session_state["master_dcp_table"] if "Variable à mesurer" in row]
+
+            # Initialisation de la table MSA à partir du Plan de Collecte
+            if msa_classif_key not in st.session_state:
+                saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
+                if saved_classif:
+                    st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
+                else:
+                    nouvelle_table_msa = []
+                    for var in liste_variables_valides:
+                        est_temps = any(kw in var.lower() for kw in ["temps", "délai", "durée", "stagnation"])
+                        nouvelle_table_msa.append({
+                            "Variable Critique (liée au Y)": var,
+                            "Nature de la Donnée": "Continue (Chronomètre/SI)" if est_temps else "Attributaire (Humain/Saisie)",
+                            "Méthodologie MSA Requise": "Gage R&R (Variance < 10%)" if est_temps else "Attribute Agreement Analysis (Kappa > 0.70)",
+                            "Statut Validation": "En attente de test"
+                        })
+                    st.session_state[msa_classif_key] = pd.DataFrame(nouvelle_table_msa)
+
+            # Initialisation des tables d'essais terrain
+            if rep_key not in st.session_state:
+                saved_rep = p.get("rep_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
+                if saved_rep:
+                    st.session_state[rep_key] = pd.DataFrame(saved_rep)
+                else:
+                    st.session_state[rep_key] = pd.DataFrame([
+                        {"Essai": 1, "Répétition A": 0.0, "Répétition B": 0.0}
+                    ])
+                    
+            if reprod_key not in st.session_state:
+                saved_reprod = p.get("reprod_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
+                if saved_reprod:
+                    st.session_state[reprod_key] = pd.DataFrame(saved_reprod)
+                else:
+                    st.session_state[reprod_key] = pd.DataFrame([
+                        {"Opérateur": "Opérateur 1", "Résultat": 0.0}, 
+                        {"Opérateur": "Opérateur 2", "Résultat": 0.0}
+                    ])
+
+            # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
+            st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
         
         # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ AVEC LA CLÉ CTQ INTÉGRÉE
         project_y = "Indéterminé"
@@ -1757,7 +1791,7 @@ else:
         col_t1, col_t2 = st.columns(2)
         
         with col_t1:
-            st.markdown("**🔬 Test de Répétabilité (Intra-Opérateur)**")
+            st.markdown("**🔬 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?)**")
             edited_rep = st.data_editor(
                 st.session_state.get(rep_key, pd.DataFrame()),
                 num_rows="dynamic",
@@ -1768,7 +1802,7 @@ else:
                 st.session_state[rep_key] = edited_rep
 
         with col_t2:
-            st.markdown("**👥 Test de Reproductibilité (Inter-Opérateurs)**")
+            st.markdown("**👥 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires?)**")
             edited_reprod = st.data_editor(
                 st.session_state.get(reprod_key, pd.DataFrame()),
                 num_rows="dynamic",
