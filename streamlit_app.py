@@ -1537,7 +1537,6 @@ else:
         st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
 
         # ⚙️ SÉCURISATION ET NETTOYAGE DES INDEX ET CLÉS GLOBALES
-        # Crée un identifiant unique et stable pour éviter les KeyError asynchrones
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
         
         rep_key = f"rep_table_{safe_idx}"
@@ -1559,23 +1558,23 @@ else:
         # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
         st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
         
-        # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ POUR RETROUVER LE Y ENREGISTRÉ
+        # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ AVEC LA CLÉ CTQ INTÉGRÉE
         project_y = "Indéterminé"
-        primary_keys = ["project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
+        primary_keys = ["selected_ctq", "project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
         
-        # Passe 1 : Analyse directe du dictionnaire de projet
+        # Passe 1 : Analyse directe du dictionnaire de projet (Trouvera "selected_ctq" en priorité)
         if 'p' in locals() and isinstance(p, dict):
             for k in primary_keys:
                 if p.get(k):
                     project_y = p.get(k)
                     break
         
-        # Passe 2 : Scan récursif profond (Détection automatique)
+        # Passe 2 : Scan récursif profond (Détection automatique de secours)
         if project_y == "Indéterminé" and 'p' in locals() and isinstance(p, dict):
             def find_y_recursive(data):
                 if isinstance(data, dict):
                     for k, v in data.items():
-                        if any(x in k.lower() for x in ["y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
+                        if any(x in k.lower() for x in ["selected_ctq", "y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
                             return v
                     if "master_dcp_table" in data and isinstance(data["master_dcp_table"], list):
                         for row in data["master_dcp_table"]:
@@ -1594,7 +1593,7 @@ else:
             if deep_search_result:
                 project_y = deep_search_result
 
-        # Passe 3 : Vérification directe au sein de la table DCP source
+        # Passe 3 : Vérification au sein de la table DCP source
         dcp_source = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
         if project_y == "Indéterminé" and dcp_source:
             for v in dcp_source:
@@ -1659,7 +1658,6 @@ else:
 
         st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
         
-        # Utilisation systématique de la méthode .get() ultra-sécurisée pour l'éditeur principal
         df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
         edited_classification = st.data_editor(
             df_classification_current,
@@ -1811,7 +1809,7 @@ else:
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
         st.markdown("##### 📋 Validation Finale")
         if statut_systeme == "Non Fiable":
-            st.error("🛑 Signature bloquée : La variance du système de mesure est trop élevée (>30%). Ajustez vos données terrain après correction pour débloquer.")
+            st.error("🛑 Signature bloquée : La variance du système de mesure is trop élevée (>30%). Ajustez vos données terrain après correction pour débloquer.")
         else:
             saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
             is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
