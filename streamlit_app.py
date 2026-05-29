@@ -1537,8 +1537,22 @@ else:
         # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
         st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
         
-        # Récupération du Y du projet et du Data Collection Plan
-        project_y = p.get("project_y_objective", "Indéterminé (Objectif principal non défini)")
+        # 🔍 RECHERCHE MULTI-CLÉS DU Y (Pour lier dynamiquement les étapes précédentes)
+        project_y = p.get("project_y_objective") or \
+                    p.get("project_y") or \
+                    p.get("y_objective") or \
+                    p.get("objective") or \
+                    p.get("objectifs") or \
+                    p.get("charter_objective") or \
+                    "Indéterminé"
+
+        # Recherche fallback par balayage sémantique si toujours indéterminé
+        if project_y == "Indéterminé":
+            for key, val in p.items():
+                if isinstance(val, str) and ("objective" in key.lower() or key.lower() == "y" or "but_projet" in key.lower()):
+                    project_y = val
+                    break
+
         dcp_source = p.get("master_dcp_table", [])
         
         st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
@@ -1552,9 +1566,8 @@ else:
                 for v in dcp_source:
                     var_name = v.get("Variable à mesurer", "")
                     type_brut = v.get("Type de donnée", "Continue")
-                    role = v.get("Rôle", "X (Influent)") # Si ton DCP a une colonne Rôle
+                    role = v.get("Rôle", "X (Influent)")
                     
-                    # Nettoyage et filtrage intelligent (On cherche la corrélation sémantique avec le Y)
                     if var_name:
                         # Détermination du type exact
                         if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
@@ -1576,7 +1589,6 @@ else:
 
             # Mode de secours IA si le plan de collecte est vide : Génération contextuelle basée sur le Y réel
             if not ai_analyzed_rows:
-                # Analyse sémantique simplifiée du Y pour générer des variables ultra-cohérentes
                 if "temps" in project_y.lower() or "délai" in project_y.lower() or "lead time" in project_y.lower():
                     ai_analyzed_rows = [
                         {"Variable Critique": "Temps de traitement unitaire (Cycle Time)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
@@ -1590,9 +1602,8 @@ else:
                         {"Variable Critique": "Dimension ou écart mesuré au pied à coulisse", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Moyenne (Physique)"}
                     ]
                 else:
-                    # Génération générique contextualisée par défaut
                     ai_analyzed_rows = [
-                        {f"Variable Critique": f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique"},
+                        {"Variable Critique": f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique"},
                         {"Variable Critique": "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute"}
                     ]
             
