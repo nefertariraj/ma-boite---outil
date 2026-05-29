@@ -1535,59 +1535,80 @@ else:
         st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
 
         # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA ---
-        st.markdown("##### 🧠 Classification Automatique des Variables")
+        st.markdown("##### 🧠 Classification & Sélection des Variables Critiques")
+        st.write("Voici la liste des variables critiques identifiées pour le protocole MSA. Vous pouvez ajouter ou supprimer des lignes directement dans le tableau.")
         
-        # Récupération ou Fallback sur le Data Collection Plan
+        # 1. Extraction et analyse automatique depuis le Data Collection Plan
         dcp_source = p.get("master_dcp_table", [])
         
-        if not dcp_source:
-            st.info("💡 Initialisation d'une variable pilote pour tester le module MSA.")
-            extracted_vars = [{"Variable à mesurer": "Temps de cycle du processus (Exemple)", "Type de donnée": "Continue (Temps)"}]
-        else:
-            extracted_vars = dcp_source
-
-        msa_configs = []
-        for v_idx, v in enumerate(extracted_vars):
-            var_name = v.get("Variable à mesurer", f"Variable {v_idx+1}")
-            type_brut = v.get("Type de donnée", "Continue (Temps)")
+        # Initialisation du tableau MSA si non existant en session
+        if f"msa_classification_table_{p_idx}" not in st.session_state:
+            initial_rows = []
             
-            # Routage logique Black Belt automatique
-            if "continue" in type_brut.lower() or "temps" in type_brut.lower() or "délai" in type_brut.lower() or "coût" in type_brut.lower():
-                detected_type = "Continue (Quantitative)"
-                recommended_msa = "Gage R&R (Répétabilité & Reproductibilité)"
-                proto_desc = "Étude par variables (Chronos, mesures physiques, logs SI)."
-            elif "attribut" in type_brut.lower() or "discrète" in type_brut.lower() or "catégorielle" in type_brut.lower() or "statut" in type_brut.lower():
-                detected_type = "Attributaire / Catégorielle"
-                recommended_msa = "Attribute Agreement Analysis (Kappa / Taux d'accord)"
-                proto_desc = "Étude par attributs (Jugement humain, codification Go/No-Go)."
-            else:
-                detected_type = "Système / Log IT"
-                recommended_msa = "Audit de Stabilité & Exactitude Horodatage"
-                proto_desc = "Extraction croisée et recalcul de formules de bases de données."
+            # Si le DCP contient des données, on extrait les 4 premières (ou toutes si moins de 4)
+            if dcp_source:
+                for v_idx, v in enumerate(dcp_source[:4]):
+                    var_name = v.get("Variable à mesurer", f"Variable {v_idx+1}")
+                    type_brut = v.get("Type de donnée", "Continue (Temps)")
+                    
+                    # Logique de routage Black Belt
+                    if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure"]):
+                        det_type = "Continue (Quantitative)"
+                        rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
+                    elif any(x in type_brut.lower() for x in ["attribut", "discrète", "catégorielle", "statut", "erreur"]):
+                        det_type = "Attributaire / Catégorielle"
+                        rec_msa = "Attribute Agreement Analysis (Kappa)"
+                    else:
+                        det_type = "Continue (Quantitative)"
+                        rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
+                        
+                    initial_rows.append({
+                        "Variable Critique": var_name,
+                        "Type de Donnée": det_type,
+                        "MSA Recommandé": rec_msa
+                    })
+            
+            # Fallback expert si le DCP est vide (Scénario Standard Processus/Atelier)
+            if not initial_rows:
+                initial_rows = [
+                    {"Variable Critique": "Temps de cycle total (Lead Time)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)"},
+                    {"Variable Critique": "Conformité du livrable (Go / No-Go)", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)"},
+                    {"Variable Critique": "Précision de la saisie (Taux d'erreur)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)"}
+                ]
                 
-            msa_configs.append({
-                "Variable": var_name,
-                "Type détecté": detected_type,
-                "MSA Recommandé": recommended_msa,
-                "Méthode cible": proto_desc
-            })
-            
-        df_classification = pd.DataFrame(msa_configs)
-        st.dataframe(df_classification, use_container_width=True)
+            st.session_state[f"msa_classification_table_{p_idx}"] = pd.DataFrame(initial_rows)
 
-        st.markdown("##### 👟 Exécution du Protocole Terrain")
-        selected_var_to_test = st.selectbox(
-            "Sélectionnez la variable à tester sur le terrain :",
-            options=df_classification["Variable"].tolist(),
-            key=f"msa_selected_var_{p_idx}"
+        # 2. Affichage du tableau DYNAMIQUE (Ajout/Suppression autorisés)
+        edited_classification = st.data_editor(
+            st.session_state[f"msa_classification_table_{p_idx}"],
+            num_rows="dynamic", # Active l'ajout et la suppression de lignes (+ et poubelle)
+            use_container_width=True,
+            column_config={
+                "Variable Critique": st.column_config.TextColumn("Variable Critique", help="Nom de la variable clé à qualifier", required=True),
+                "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
+                "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True)
+            },
+            key=f"classification_editor_{p_idx}"
         )
+        
+        # Sauvegarde immédiate des modifications du tableau
+        if edited_classification is not None:
+            st.session_state[f"msa_classification_table_{p_idx}"] = edited_classification
 
-        # Initialisation des tables de tests dynamiques en session d'état
-        if f"rep_table_{p_idx}" not in st.session_state:
-            st.session_state[f"rep_table_{p_idx}"] = pd.DataFrame([{"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}])
-        if f"reprod_table_{p_idx}" not in st.session_state:
-            st.session_state[f"reprod_table_{p_idx}"] = pd.DataFrame([{"Opérateur": "Opérateur 1", "Résultat": 12.1}, {"Opérateur": "Opérateur 2", "Résultat": 12.5}])
-
+        # 3. Sélection de la variable active pour la suite des tests terrain
+        st.markdown("##### 👟 Exécution du Protocole Terrain")
+        list_variables_critiques = st.session_state[f"msa_classification_table_{p_idx}"]["Variable Critique"].dropna().tolist()
+        
+        if list_variables_critiques:
+            selected_var_to_test = st.selectbox(
+                "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
+                options=list_variables_critiques,
+                key=f"msa_selected_var_{p_idx}"
+            )
+        else:
+            st.warning("⚠️ Veuillez ajouter au moins une variable critique dans le tableau ci-dessus.")
+            st.stop()
+            
         # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
         col_t1, col_t2 = st.columns(2)
         
