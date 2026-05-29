@@ -1529,33 +1529,42 @@ else:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
                     st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
 
+        # =========================================================================
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PLAN DE VALIDATION ET TESTS
+        # =========================================================================
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
         st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
+
+        # ⚙️ INITIALISATION AVANCÉE DES SESSIONS (Évite le KeyError au premier chargement)
+        if f"rep_table_{p_idx}" not in st.session_state:
+            st.session_state[f"rep_table_{p_idx}"] = pd.DataFrame([
+                {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
+                {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
+            ])
+        if f"reprod_table_{p_idx}" not in st.session_state:
+            st.session_state[f"reprod_table_{p_idx}"] = pd.DataFrame([
+                {"Opérateur": "Opérateur 1", "Résultat": 12.1}, 
+                {"Opérateur": "Opérateur 2", "Résultat": 12.5}
+            ])
 
         # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
         st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
         
         # 🔍 ALGORITHME DE SCAN TOTAL POUR RETROUVER LE Y ENREGISTRÉ
         project_y = "Indéterminé"
-        
-        # Étape A: Recherche directe dans les clés principales
         primary_keys = ["project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective"]
         for k in primary_keys:
             if p.get(k):
                 project_y = p.get(k)
                 break
         
-        # Étape B: Si introuvable, scan récursif de TOUT le dictionnaire du projet (recherche dans les sous-étapes et tables)
         if project_y == "Indéterminé":
             def find_y_recursive(data):
                 if isinstance(data, dict):
-                    # On cherche d'abord dans les clés du dictionnaire actuel
                     for k, v in data.items():
                         if any(x in k.lower() for x in ["y_obj", "objective", "charter", "definition"]) and isinstance(v, str) and len(v) > 5:
                             return v
-                    # Sinon on descend d'un niveau
                     for v in data.values():
                         res = find_y_recursive(v)
                         if res: return res
@@ -1570,7 +1579,6 @@ else:
                 project_y = deep_search_result
 
         dcp_source = p.get("master_dcp_table", [])
-        
         st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
         # Initialisation du tableau MSA intelligent en Session State
@@ -1578,14 +1586,12 @@ else:
             ai_analyzed_rows = []
             
             if dcp_source:
-                # L'IA filtre et classe les variables du DCP en fonction de leur proximité avec le Y
                 for v in dcp_source:
                     var_name = v.get("Variable à mesurer", "")
                     type_brut = v.get("Type de donnée", "Continue")
                     role = v.get("Rôle", "X (Influent)")
                     
                     if var_name:
-                        # Détermination du type exact
                         if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
                             det_type = "Continue (Quantitative)"
                             rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
@@ -1600,10 +1606,8 @@ else:
                             "Criticité par rapport au Y": "Haute (Lien Direct)" if role == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
                         })
                 
-                # Tri automatique par niveau de criticité pour ne garder que le Top 4 des variables d'impact
                 ai_analyzed_rows = sorted(ai_analyzed_rows, key=lambda k: k["Criticité par rapport au Y"], reverse=True)[:4]
 
-            # Mode de secours IA si le plan de collecte est vide : Génération contextuelle basée sur le Y réel trouvé
             if not ai_analyzed_rows:
                 if "temps" in project_y.lower() or "délai" in project_y.lower() or "lead time" in project_y.lower():
                     ai_analyzed_rows = [
@@ -1625,12 +1629,10 @@ else:
             
             st.session_state[f"msa_classification_table_{p_idx}"] = pd.DataFrame(ai_analyzed_rows)
 
-        # Bouton permettant de forcer une ré-analyse IA en cas de modification du Plan de Collecte
         if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{p_idx}"):
             del st.session_state[f"msa_classification_table_{p_idx}"]
             st.rerun()
 
-        # Affichage du tableau d'analyse IA DYNAMIQUE (Ajout/Suppression autorisés)
         st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
         edited_classification = st.data_editor(
             st.session_state[f"msa_classification_table_{p_idx}"],
