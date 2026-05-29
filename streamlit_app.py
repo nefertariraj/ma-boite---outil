@@ -1536,11 +1536,15 @@ else:
         st.subheader("4. Validate Measurement System (MSA)")
         st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
 
-        # ⚙️ INITIALISATION AVANCÉE DES SESSIONS (Évite le KeyError au premier chargement)
-        rep_key = f"rep_table_{p_idx}"
-        reprod_key = f"reprod_table_{p_idx}"
-        msa_classif_key = f"msa_classification_table_{p_idx}"
+        # ⚙️ SÉCURISATION ET NETTOYAGE DES INDEX ET CLÉS GLOBALES
+        # Crée un identifiant unique et stable pour éviter les KeyError asynchrones
+        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
+        
+        rep_key = f"rep_table_{safe_idx}"
+        reprod_key = f"reprod_table_{safe_idx}"
+        msa_classif_key = f"msa_classification_table_{safe_idx}"
 
+        # Initialisation stricte en amont
         if rep_key not in st.session_state:
             st.session_state[rep_key] = pd.DataFrame([
                 {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
@@ -1559,26 +1563,24 @@ else:
         project_y = "Indéterminé"
         primary_keys = ["project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
         
-        # 1ère passe : Vérification des clés de premier niveau
-        for k in primary_keys:
-            if isinstance(p, dict) and p.get(k):
-                project_y = p.get(k)
-                break
+        # Passe 1 : Analyse directe du dictionnaire de projet
+        if 'p' in locals() and isinstance(p, dict):
+            for k in primary_keys:
+                if p.get(k):
+                    project_y = p.get(k)
+                    break
         
-        # 2ème passe : Scan récursif profond si toujours indéterminé
-        if project_y == "Indéterminé":
+        # Passe 2 : Scan récursif profond (Détection automatique)
+        if project_y == "Indéterminé" and 'p' in locals() and isinstance(p, dict):
             def find_y_recursive(data):
                 if isinstance(data, dict):
-                    # Vérification des clés évocatrices d'un objectif ou d'un Y
                     for k, v in data.items():
                         if any(x in k.lower() for x in ["y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
                             return v
-                    # Vérification spécifique dans le Master DCP si une ligne est tagguée comme rôle Y
                     if "master_dcp_table" in data and isinstance(data["master_dcp_table"], list):
                         for row in data["master_dcp_table"]:
                             if isinstance(row, dict) and str(row.get("Rôle", "")).strip().upper() == "Y":
                                 return row.get("Variable à mesurer", "")
-                    # Parcours en profondeur
                     for v in data.values():
                         res = find_y_recursive(v)
                         if res: return res
@@ -1592,9 +1594,8 @@ else:
             if deep_search_result:
                 project_y = deep_search_result
 
-        dcp_source = p.get("master_dcp_table", []) if isinstance(p, dict) else []
-        
-        # 3ème passe : Extraction directe depuis dcp_source si non trouvé par récursivité
+        # Passe 3 : Vérification directe au sein de la table DCP source
+        dcp_source = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
         if project_y == "Indéterminé" and dcp_source:
             for v in dcp_source:
                 if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
@@ -1603,10 +1604,9 @@ else:
 
         st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-        # Initialisation du tableau MSA intelligent en Session State
+        # Initialisation sécurisée du tableau d'analyse MSA
         if msa_classif_key not in st.session_state:
             ai_analyzed_rows = []
-            
             if dcp_source:
                 for v in dcp_source:
                     if isinstance(v, dict):
@@ -1652,13 +1652,14 @@ else:
             
             st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
-        if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{p_idx}"):
+        if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
             if msa_classif_key in st.session_state:
                 del st.session_state[msa_classif_key]
             st.rerun()
 
         st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
         
+        # Utilisation systématique de la méthode .get() ultra-sécurisée pour l'éditeur principal
         df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
         edited_classification = st.data_editor(
             df_classification_current,
@@ -1670,7 +1671,7 @@ else:
                 "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
                 "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", disabled=True)
             },
-            key=f"classification_editor_{p_idx}"
+            key=f"classification_editor_widget_{safe_idx}"
         )
         
         if edited_classification is not None:
@@ -1679,19 +1680,17 @@ else:
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
         
-        # Récupération sécurisée avec .get() pour immuniser contre le KeyError
         df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
         if df_msa_classif is not None and not df_msa_classif.empty and "Variable Critique" in df_msa_classif.columns:
             list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist()
         else:
             list_variables_critiques = []
         
-        # Sélection sécurisée
         if list_variables_critiques:
             selected_var_to_test = st.selectbox(
                 "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
                 options=list_variables_critiques,
-                key=f"msa_selected_var_{p_idx}"
+                key=f"msa_selected_var_{safe_idx}"
             )
         else:
             st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
@@ -1706,7 +1705,7 @@ else:
                 st.session_state.get(rep_key, pd.DataFrame()),
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_rep_{p_idx}"
+                key=f"editor_rep_{safe_idx}"
             )
             if edited_rep is not None:
                 st.session_state[rep_key] = edited_rep
@@ -1717,7 +1716,7 @@ else:
                 st.session_state.get(reprod_key, pd.DataFrame()),
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_reprod_{p_idx}"
+                key=f"editor_reprod_{safe_idx}"
             )
             if edited_reprod is not None:
                 st.session_state[reprod_key] = edited_reprod
@@ -1798,7 +1797,7 @@ else:
             if statut_systeme != "Fiable":
                 st.warning("⚠️ Le système de mesure injecte trop de bruit. Appliquez une action corrective ci-dessous avant de pouvoir valider.")
 
-        if statut_systeme != "Fiable" and isinstance(p, dict):
+        if statut_systeme != "Fiable" and 'p' in locals() and isinstance(p, dict):
             p["msa_corrective_action"] = st.selectbox(
                 "Plan d'action prioritaire à déployer :",
                 options=[
@@ -1806,7 +1805,7 @@ else:
                     "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
                     "Mise en place d'une checksheet avec contrôles de saisie rigides"
                 ],
-                key=f"msa_action_choice_{p_idx}"
+                key=f"msa_action_choice_{safe_idx}"
             )
 
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
@@ -1814,9 +1813,9 @@ else:
         if statut_systeme == "Non Fiable":
             st.error("🛑 Signature bloquée : La variance du système de mesure est trop élevée (>30%). Ajustez vos données terrain après correction pour débloquer.")
         else:
-            saved_status = p.get("msa_is_validated_status", False) if isinstance(p, dict) else False
-            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{p_idx}")
-            if isinstance(p, dict):
+            saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
+            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
+            if 'p' in locals() and isinstance(p, dict):
                 p["msa_is_validated_status"] = is_validated
             
             if is_validated:
