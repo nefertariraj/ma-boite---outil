@@ -1529,140 +1529,84 @@ else:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
                     st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
 
-        # =========================================================================
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PLAN DE VALIDATION ET TESTS
-        # =========================================================================
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
         st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
 
-        # ⚙️ SÉCURISATION ET NETTOYAGE DES INDEX ET CLÉS GLOBALES
-        # Crée un identifiant unique et stable pour éviter les KeyError asynchrones
-        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
-        
-        rep_key = f"rep_table_{safe_idx}"
-        reprod_key = f"reprod_table_{safe_idx}"
-        msa_classif_key = f"msa_classification_table_{safe_idx}"
-
-        # Initialisation stricte en amont
-        if rep_key not in st.session_state:
-            st.session_state[rep_key] = pd.DataFrame([
-                {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
-                {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
-            ])
-        if reprod_key not in st.session_state:
-            st.session_state[reprod_key] = pd.DataFrame([
-                {"Opérateur": "Opérateur 1", "Résultat": 12.1}, 
-                {"Opérateur": "Opérateur 2", "Résultat": 12.5}
-            ])
-
         # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
         st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
         
-        # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ POUR RETROUVER LE Y ENREGISTRÉ
-        project_y = "Indéterminé"
-        primary_keys = ["project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
+        # Récupération du Y du projet et du Data Collection Plan
+        project_y = p.get("project_y_objective", "Indéterminé (Objectif principal non défini)")
+        dcp_source = p.get("master_dcp_table", [])
         
-        # Passe 1 : Analyse directe du dictionnaire de projet
-        if 'p' in locals() and isinstance(p, dict):
-            for k in primary_keys:
-                if p.get(k):
-                    project_y = p.get(k)
-                    break
-        
-        # Passe 2 : Scan récursif profond (Détection automatique)
-        if project_y == "Indéterminé" and 'p' in locals() and isinstance(p, dict):
-            def find_y_recursive(data):
-                if isinstance(data, dict):
-                    for k, v in data.items():
-                        if any(x in k.lower() for x in ["y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
-                            return v
-                    if "master_dcp_table" in data and isinstance(data["master_dcp_table"], list):
-                        for row in data["master_dcp_table"]:
-                            if isinstance(row, dict) and str(row.get("Rôle", "")).strip().upper() == "Y":
-                                return row.get("Variable à mesurer", "")
-                    for v in data.values():
-                        res = find_y_recursive(v)
-                        if res: return res
-                elif isinstance(data, list):
-                    for item in data:
-                        res = find_y_recursive(item)
-                        if res: return res
-                return None
-            
-            deep_search_result = find_y_recursive(p)
-            if deep_search_result:
-                project_y = deep_search_result
-
-        # Passe 3 : Vérification directe au sein de la table DCP source
-        dcp_source = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
-        if project_y == "Indéterminé" and dcp_source:
-            for v in dcp_source:
-                if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
-                    project_y = v.get("Variable à mesurer")
-                    break
-
         st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-        # Initialisation sécurisée du tableau d'analyse MSA
-        if msa_classif_key not in st.session_state:
+        # Initialisation du tableau MSA intelligent en Session State
+        if f"msa_classification_table_{p_idx}" not in st.session_state:
             ai_analyzed_rows = []
+            
             if dcp_source:
+                # L'IA filtre et classe les variables du DCP en fonction de leur proximité avec le Y
                 for v in dcp_source:
-                    if isinstance(v, dict):
-                        var_name = v.get("Variable à mesurer", "")
-                        type_brut = v.get("Type de donnée", "Continue")
-                        role = v.get("Rôle", "X (Influent)")
+                    var_name = v.get("Variable à mesurer", "")
+                    type_brut = v.get("Type de donnée", "Continue")
+                    role = v.get("Rôle", "X (Influent)") # Si ton DCP a une colonne Rôle
+                    
+                    # Nettoyage et filtrage intelligent (On cherche la corrélation sémantique avec le Y)
+                    if var_name:
+                        # Détermination du type exact
+                        if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
+                            det_type = "Continue (Quantitative)"
+                            rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
+                        else:
+                            det_type = "Attributaire / Catégorielle"
+                            rec_msa = "Attribute Agreement Analysis (Kappa)"
                         
-                        if var_name:
-                            if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
-                                det_type = "Continue (Quantitative)"
-                                rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
-                            else:
-                                det_type = "Attributaire / Catégorielle"
-                                rec_msa = "Attribute Agreement Analysis (Kappa)"
-                            
-                            ai_analyzed_rows.append({
-                                "Variable Critique": var_name,
-                                "Type de Donnée": det_type,
-                                "MSA Recommandé": rec_msa,
-                                "Criticité par rapport au Y": "Haute (Lien Direct)" if str(role).strip().upper() == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
-                            })
+                        ai_analyzed_rows.append({
+                            "Variable Critique": var_name,
+                            "Type de Donnée": det_type,
+                            "MSA Recommandé": rec_msa,
+                            "Criticité par rapport au Y": "Haute (Lien Direct)" if role == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
+                        })
                 
+                # Tri automatique par niveau de criticité pour ne garder que le Top 4 des variables d'impact
                 ai_analyzed_rows = sorted(ai_analyzed_rows, key=lambda k: k["Criticité par rapport au Y"], reverse=True)[:4]
 
+            # Mode de secours IA si le plan de collecte est vide : Génération contextuelle basée sur le Y réel
             if not ai_analyzed_rows:
-                if "temps" in str(project_y).lower() or "délai" in str(project_y).lower() or "lead time" in str(project_y).lower():
+                # Analyse sémantique simplifiée du Y pour générer des variables ultra-cohérentes
+                if "temps" in project_y.lower() or "délai" in project_y.lower() or "lead time" in project_y.lower():
                     ai_analyzed_rows = [
                         {"Variable Critique": "Temps de traitement unitaire (Cycle Time)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
                         {"Variable Critique": "Horodatage de début/fin de tâche", "Type de Donnée": "Système / Log IT", "MSA Recommandé": "Audit de Stabilité & Exactitude", "Criticité par rapport au Y": "Haute (Source de la donnée)"},
                         {"Variable Critique": "Statut de mise en attente du dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Moyenne (Bruit potentiel)"}
                     ]
-                elif "qualité" in str(project_y).lower() or "erreur" in str(project_y).lower() or "rebut" in str(project_y).lower() or "conform" in str(project_y).lower():
+                elif "qualité" in project_y.lower() or "erreur" in project_y.lower() or "rebut" in project_y.lower() or "conform" in project_y.lower():
                     ai_analyzed_rows = [
                         {"Variable Critique": "Verdict de conformité de la pièce (Go / No-Go)", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
                         {"Variable Critique": "Code défaut saisi par l'opérateur", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute (Fiabilité du Pareto)"},
                         {"Variable Critique": "Dimension ou écart mesuré au pied à coulisse", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Moyenne (Physique)"}
                     ]
                 else:
+                    # Génération générique contextualisée par défaut
                     ai_analyzed_rows = [
-                        {"Variable Critique": f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique"},
+                        {f"Variable Critique": f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique"},
                         {"Variable Critique": "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute"}
                     ]
             
-            st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
+            st.session_state[f"msa_classification_table_{p_idx}"] = pd.DataFrame(ai_analyzed_rows)
 
-        if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
-            if msa_classif_key in st.session_state:
-                del st.session_state[msa_classif_key]
+        # Bouton permettant de forcer une ré-analyse IA en cas de modification du Plan de Collecte
+        if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{p_idx}"):
+            del st.session_state[f"msa_classification_table_{p_idx}"]
             st.rerun()
 
+        # Affichage du tableau d'analyse IA DYNAMIQUE (Ajout/Suppression autorisés)
         st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
-        
-        # Utilisation systématique de la méthode .get() ultra-sécurisée pour l'éditeur principal
-        df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
         edited_classification = st.data_editor(
-            df_classification_current,
+            st.session_state[f"msa_classification_table_{p_idx}"],
             num_rows="dynamic",
             use_container_width=True,
             column_config={
@@ -1671,30 +1615,25 @@ else:
                 "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
                 "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", disabled=True)
             },
-            key=f"classification_editor_widget_{safe_idx}"
+            key=f"classification_editor_{p_idx}"
         )
         
         if edited_classification is not None:
-            st.session_state[msa_classif_key] = edited_classification
+            st.session_state[f"msa_classification_table_{p_idx}"] = edited_classification
 
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
-        
-        df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
-        if df_msa_classif is not None and not df_msa_classif.empty and "Variable Critique" in df_msa_classif.columns:
-            list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist()
-        else:
-            list_variables_critiques = []
+        list_variables_critiques = st.session_state[f"msa_classification_table_{p_idx}"]["Variable Critique"].dropna().tolist()
         
         if list_variables_critiques:
             selected_var_to_test = st.selectbox(
                 "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
                 options=list_variables_critiques,
-                key=f"msa_selected_var_{safe_idx}"
+                key=f"msa_selected_var_{p_idx}"
             )
         else:
-            st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
-            selected_var_to_test = "Aucune variable sélectionnée"
+            st.warning("⚠️ Aucune variable critique disponible. Ajoutez-en une pour continuer.")
+            st.stop()
             
         # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
         col_t1, col_t2 = st.columns(2)
@@ -1702,48 +1641,41 @@ else:
         with col_t1:
             st.markdown("**🔬 Test de Répétabilité (Intra-Opérateur)**")
             edited_rep = st.data_editor(
-                st.session_state.get(rep_key, pd.DataFrame()),
+                st.session_state[f"rep_table_{p_idx}"],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_rep_{safe_idx}"
+                key=f"editor_rep_{p_idx}"
             )
             if edited_rep is not None:
-                st.session_state[rep_key] = edited_rep
+                st.session_state[f"rep_table_{p_idx}"] = edited_rep
 
         with col_t2:
             st.markdown("**👥 Test de Reproductibilité (Inter-Opérateurs)**")
             edited_reprod = st.data_editor(
-                st.session_state.get(reprod_key, pd.DataFrame()),
+                st.session_state[f"reprod_table_{p_idx}"],
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"editor_reprod_{safe_idx}"
+                key=f"editor_reprod_{p_idx}"
             )
             if edited_reprod is not None:
-                st.session_state[reprod_key] = edited_reprod
+                st.session_state[f"reprod_table_{p_idx}"] = edited_reprod
 
         # --- 4. DEUXIÈME LECTURE AUTOMATISÉE ET DÉTECTION DES BIAIS ---
         st.markdown("##### ⚠️ Analyse des Risques de Biais de Mesure")
         detected_biais = []
-        df_r1 = st.session_state.get(rep_key, pd.DataFrame())
+        df_r1 = st.session_state[f"rep_table_{p_idx}"]
         
         if not df_r1.empty and len(df_r1.columns) >= 3:
             try:
-                val_col1 = pd.to_numeric(df_r1.iloc[:, 1], errors='coerce')
-                val_col2 = pd.to_numeric(df_r1.iloc[:, 2], errors='coerce')
-                
-                diffs = np.abs(val_col1 - val_col2)
-                mean_val = val_col1.mean()
-                
-                if not diffs.dropna().empty and mean_val > 0:
-                    if diffs.max() > mean_val * 0.15:
-                        detected_biais.append({
-                            "Biais": "Incohérence Forte Intra-Opérateur",
-                            "Impact": "Répétabilité instable. L'outil ou la méthode de lecture manque de régularité.",
-                            "Solution": "Créer un détrompeur (Poka-Yoke) ou standardiser le mode opératoire visuel."
-                        })
-                
-                all_vals = pd.concat([val_col1, val_col2]).dropna()
-                if not all_vals.empty and all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
+                diffs = np.abs(df_r1.iloc[:, 1].astype(float) - df_r1.iloc[:, 2].astype(float))
+                if diffs.max() > df_r1.iloc[:, 1].astype(float).mean() * 0.15:
+                    detected_biais.append({
+                        "Biais": "Incohérence Forte Intra-Opérateur",
+                        "Impact": "Répétabilité instable. L'outil ou la méthode de lecture manque de régularité.",
+                        "Solution": "Créer un détrompeur (Poka-Yoke) ou standardiser le mode opératoire visuel."
+                    })
+                all_vals = pd.concat([df_r1.iloc[:, 1], df_r1.iloc[:, 2]]).dropna()
+                if all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
                     detected_biais.append({
                         "Biais": "Biais d'Arrondis Systématiques",
                         "Impact": "Perte de granularité de la donnée. Risque de masquer la vraie capabilité du procédé.",
@@ -1752,17 +1684,16 @@ else:
             except:
                 pass
 
-        df_r2 = st.session_state.get(reprod_key, pd.DataFrame())
+        df_r2 = st.session_state[f"reprod_table_{p_idx}"]
         if not df_r2.empty and "Résultat" in df_r2.columns:
             try:
-                vals_reprod = pd.to_numeric(df_r2["Résultat"], errors='coerce').dropna()
-                if len(vals_reprod) >= 2 and vals_reprod.mean() > 0:
-                    if (vals_reprod.max() - vals_reprod.min()) > vals_reprod.mean() * 0.20:
-                        detected_biais.append({
-                            "Biais": "Biais d'Interprétation Inter-Opérateurs",
-                            "Impact": "Les opérateurs n'interprètent pas la mesure de la même manière (subjectivité).",
-                            "Solution": "Organiser un atelier d'alignement et publier une définition opérationnelle imagée."
-                        })
+                vals_reprod = df_r2["Résultat"].dropna().astype(float)
+                if len(vals_reprod) >= 2 and (vals_reprod.max() - vals_reprod.min()) > vals_reprod.mean() * 0.20:
+                    detected_biais.append({
+                        "Biais": "Biais d'Interprétation Inter-Opérateurs",
+                        "Impact": "Les opérateurs n'interprètent pas la mesure de la même manière (subjectivité).",
+                        "Solution": "Organiser un atelier d'alignement et publier une définition opérationnelle imagée."
+                    })
             except:
                 pass
 
@@ -1797,7 +1728,7 @@ else:
             if statut_systeme != "Fiable":
                 st.warning("⚠️ Le système de mesure injecte trop de bruit. Appliquez une action corrective ci-dessous avant de pouvoir valider.")
 
-        if statut_systeme != "Fiable" and 'p' in locals() and isinstance(p, dict):
+        if statut_systeme != "Fiable":
             p["msa_corrective_action"] = st.selectbox(
                 "Plan d'action prioritaire à déployer :",
                 options=[
@@ -1805,7 +1736,7 @@ else:
                     "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
                     "Mise en place d'une checksheet avec contrôles de saisie rigides"
                 ],
-                key=f"msa_action_choice_{safe_idx}"
+                key=f"msa_action_choice_{p_idx}"
             )
 
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
@@ -1813,10 +1744,8 @@ else:
         if statut_systeme == "Non Fiable":
             st.error("🛑 Signature bloquée : La variance du système de mesure est trop élevée (>30%). Ajustez vos données terrain après correction pour débloquer.")
         else:
-            saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
-            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
-            if 'p' in locals() and isinstance(p, dict):
-                p["msa_is_validated_status"] = is_validated
+            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=p.get("msa_is_validated_status", False), key=f"msa_sign_off_{p_idx}")
+            p["msa_is_validated_status"] = is_validated
             
             if is_validated:
                 st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
