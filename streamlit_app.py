@@ -1537,13 +1537,17 @@ else:
         st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
 
         # ⚙️ INITIALISATION AVANCÉE DES SESSIONS (Évite le KeyError au premier chargement)
-        if f"rep_table_{p_idx}" not in st.session_state:
-            st.session_state[f"rep_table_{p_idx}"] = pd.DataFrame([
+        rep_key = f"rep_table_{p_idx}"
+        reprod_key = f"reprod_table_{p_idx}"
+        msa_classif_key = f"msa_classification_table_{p_idx}"
+
+        if rep_key not in st.session_state:
+            st.session_state[rep_key] = pd.DataFrame([
                 {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
                 {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
             ])
-        if f"reprod_table_{p_idx}" not in st.session_state:
-            st.session_state[f"reprod_table_{p_idx}"] = pd.DataFrame([
+        if reprod_key not in st.session_state:
+            st.session_state[reprod_key] = pd.DataFrame([
                 {"Opérateur": "Opérateur 1", "Résultat": 12.1}, 
                 {"Opérateur": "Opérateur 2", "Résultat": 12.5}
             ])
@@ -1551,20 +1555,30 @@ else:
         # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
         st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
         
-        # 🔍 ALGORITHME DE SCAN TOTAL POUR RETROUVER LE Y ENREGISTRÉ
+        # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ POUR RETROUVER LE Y ENREGISTRÉ
         project_y = "Indéterminé"
-        primary_keys = ["project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective"]
+        primary_keys = ["project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
+        
+        # 1ère passe : Vérification des clés de premier niveau
         for k in primary_keys:
             if p.get(k):
                 project_y = p.get(k)
                 break
         
+        # 2ème passe : Scan récursif profond si toujours indéterminé
         if project_y == "Indéterminé":
             def find_y_recursive(data):
                 if isinstance(data, dict):
+                    # Vérification des clés évocatrices d'un objectif ou d'un Y
                     for k, v in data.items():
-                        if any(x in k.lower() for x in ["y_obj", "objective", "charter", "definition"]) and isinstance(v, str) and len(v) > 5:
+                        if any(x in k.lower() for x in ["y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
                             return v
+                    # Vérification spécifique dans le Master DCP si une ligne est tagguée comme rôle Y
+                    if "master_dcp_table" in data and isinstance(data["master_dcp_table"], list):
+                        for row in data["master_dcp_table"]:
+                            if isinstance(row, dict) and str(row.get("Rôle", "")).strip().upper() == "Y":
+                                return row.get("Variable à mesurer", "")
+                    # Parcours en profondeur
                     for v in data.values():
                         res = find_y_recursive(v)
                         if res: return res
@@ -1579,10 +1593,18 @@ else:
                 project_y = deep_search_result
 
         dcp_source = p.get("master_dcp_table", [])
+        
+        # 3ème passe : Extraction directe depuis dcp_source si non trouvé par récursivité
+        if project_y == "Indéterminé" and dcp_source:
+            for v in dcp_source:
+                if str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
+                    project_y = v.get("Variable à mesurer")
+                    break
+
         st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
         # Initialisation du tableau MSA intelligent en Session State
-        if f"msa_classification_table_{p_idx}" not in st.session_state:
+        if msa_classif_key not in st.session_state:
             ai_analyzed_rows = []
             
             if dcp_source:
@@ -1603,7 +1625,7 @@ else:
                             "Variable Critique": var_name,
                             "Type de Donnée": det_type,
                             "MSA Recommandé": rec_msa,
-                            "Criticité par rapport au Y": "Haute (Lien Direct)" if role == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
+                            "Criticité par rapport au Y": "Haute (Lien Direct)" if str(role).strip().upper() == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
                         })
                 
                 ai_analyzed_rows = sorted(ai_analyzed_rows, key=lambda k: k["Criticité par rapport au Y"], reverse=True)[:4]
@@ -1627,15 +1649,15 @@ else:
                         {"Variable Critique": "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute"}
                     ]
             
-            st.session_state[f"msa_classification_table_{p_idx}"] = pd.DataFrame(ai_analyzed_rows)
+            st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
         if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{p_idx}"):
-            del st.session_state[f"msa_classification_table_{p_idx}"]
+            del st.session_state[msa_classif_key]
             st.rerun()
 
         st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
         edited_classification = st.data_editor(
-            st.session_state[f"msa_classification_table_{p_idx}"],
+            st.session_state[msa_classif_key],
             num_rows="dynamic",
             use_container_width=True,
             column_config={
@@ -1648,20 +1670,19 @@ else:
         )
         
         if edited_classification is not None:
-            st.session_state[f"msa_classification_table_{p_idx}"] = edited_classification
+            st.session_state[msa_classif_key] = edited_classification
 
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
         
-        # Sécurisation totale de l'accès au tableau de classification avant extraction
-        msa_classif_key = f"msa_classification_table_{p_idx}"
+        # Récupération sécurisée des variables pour la selectbox
         if msa_classif_key in st.session_state and st.session_state[msa_classif_key] is not None:
             df_msa_classif = st.session_state[msa_classif_key]
             list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist() if "Variable Critique" in df_msa_classif.columns else []
         else:
             list_variables_critiques = []
         
-        # Saisie ou sélection de la variable à tester
+        # Saisie ou sélection de la variable à tester (Pas de st.stop() pour éviter le KeyError)
         if list_variables_critiques:
             selected_var_to_test = st.selectbox(
                 "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
@@ -1669,32 +1690,16 @@ else:
                 key=f"msa_selected_var_{p_idx}"
             )
         else:
-            st.info("💡 Le tableau de classification ci-dessus est en cours d'analyse ou vide. Ajoutez une ligne pour activer la suite du protocole terrain.")
+            st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
             selected_var_to_test = "Aucune variable sélectionnée"
             
         # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
-        rep_key = f"rep_table_{p_idx}"
-        reprod_key = f"reprod_table_{p_idx}"
-        
-        # Initialisation ultra-sécurisée
-        if st.session_state.get(rep_key) is None or not isinstance(st.session_state.get(rep_key), pd.DataFrame):
-            st.session_state[rep_key] = pd.DataFrame([
-                {"Essai": 1, "Répétition A": 10.0, "Répétition B": 10.2}, 
-                {"Essai": 2, "Répétition A": 14.5, "Répétition B": 14.4}
-            ])
-            
-        if st.session_state.get(reprod_key) is None or not isinstance(st.session_state.get(reprod_key), pd.DataFrame):
-            st.session_state[reprod_key] = pd.DataFrame([
-                {"Opérateur": "Opérateur 1", "Résultat": 12.1}, 
-                {"Opérateur": "Opérateur 2", "Résultat": 12.5}
-            ])
-
         col_t1, col_t2 = st.columns(2)
         
         with col_t1:
             st.markdown("**🔬 Test de Répétabilité (Intra-Opérateur)**")
             edited_rep = st.data_editor(
-                st.session_state.get(rep_key),
+                st.session_state.get(rep_key, pd.DataFrame()),
                 num_rows="dynamic",
                 use_container_width=True,
                 key=f"editor_rep_{p_idx}"
@@ -1705,7 +1710,7 @@ else:
         with col_t2:
             st.markdown("**👥 Test de Reproductibilité (Inter-Opérateurs)**")
             edited_reprod = st.data_editor(
-                st.session_state.get(reprod_key),
+                st.session_state.get(reprod_key, pd.DataFrame()),
                 num_rows="dynamic",
                 use_container_width=True,
                 key=f"editor_reprod_{p_idx}"
