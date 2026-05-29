@@ -1531,14 +1531,14 @@ else:
 
         # 4. Validate measurement system
         st.divider()
-        st.subheader("5. Validate measurement system")
+        st.subheader("4. Validate measurement system")
         st.write("Tests de fiabilité des données (Répétabilité & Reproductibilité).")
         with st.expander("Outils de validation (Type Minitab)"):
             st.info("Analyse Gage R&R : Vérifiez si la variation vient du processus ou du système de mesure.")
 
         # 5. Data collection
         st.divider()
-        st.subheader("6. Data collection")
+        st.subheader("5. Data collection")
         up_measure = st.file_uploader("Importer les données (Excel)", type=["xlsx", "xls"], key=f"up_m_{p_idx}")
         if up_measure:
             df_m = pd.read_excel(up_measure)
@@ -1552,12 +1552,12 @@ else:
 
         # 6. Baseline performance
         st.divider()
-        st.subheader("7. Baseline performance")
+        st.subheader("6. Baseline performance")
         st.write("*(En attente d'explications supplémentaires)*")
 
         # 7. Measure process capability
         st.divider()
-        st.subheader("8. Measure process capability")
+        st.subheader("7. Measure process capability")
         c1, c2 = st.columns(2)
         with c1:
             defects = st.number_input("Défauts", min_value=0, value=0)
