@@ -1783,34 +1783,61 @@ else:
                 options=list_variables_critiques,
                 key=f"msa_selected_var_{safe_idx}"
             )
+            
+            # 🧠 ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
+            # On nettoie le nom de la variable (ex: "Temps d'attente" devient "Tempsdattente") pour créer une clé unique
+            var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
+            
+            # On génère des clés uniques dans le session_state pour CHAQUE variable
+            dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
+            dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
+            
+            # Initialisation par défaut si c'est la première fois qu'on sélectionne cette variable
+            if dynamic_rep_key not in st.session_state:
+                st.session_state[dynamic_rep_key] = pd.DataFrame([
+                    {"Essai / Pièce": "Pièce 1", "Répétition A": 0.0, "Répétition B": 0.0},
+                    {"Essai / Pièce": "Pièce 2", "Répétition A": 0.0, "Répétition B": 0.0}
+                ])
+                
+            if dynamic_reprod_key not in st.session_state:
+                st.session_state[dynamic_reprod_key] = pd.DataFrame([
+                    {"Opérateur": "Opérateur 1", "Résultat": 0.0},
+                    {"Opérateur": "Opérateur 2", "Résultat": 0.0}
+                ])
+                
+            st.info(f"📋 **Saisie active** : Les deux tableaux ci-dessous enregistrent les données spécifiques de la variable : **{selected_var_to_test}**")
+            
+            # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN DYNAMISÉS ---
+            col_t1, col_t2 = st.columns(2)
+            
+            with col_t1:
+                st.markdown("**🔬 Test de Répétabilité (La même personne mesure-t-elle toujours pareil? 1 opérateur, même situation, plusieurs mesures)**")
+                edited_rep = st.data_editor(
+                    st.session_state[dynamic_rep_key],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"editor_rep_{var_clean_id}_{safe_idx}"
+                )
+                if edited_rep is not None:
+                    st.session_state[dynamic_rep_key] = edited_rep
+
+            with col_t2:
+                st.markdown("**👥 Test de Reproductibilité (Différentes personnes obtiennent-elles les mêmes résultats? même situation/produit, plusieurs opérateurs)**")
+                edited_reprod = st.data_editor(
+                    st.session_state[dynamic_reprod_key],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"editor_reprod_{var_clean_id}_{safe_idx}"
+                )
+                if edited_reprod is not None:
+                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    
+            # Petit indicateur visuel de succès lors de la saisie
+            st.caption(f"✨ Modifications mémorisées automatiquement en continu pour la variable **{selected_var_to_test}**.")
+            
         else:
             st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
             selected_var_to_test = "Aucune variable sélectionnée"
-            
-        # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) ---
-        col_t1, col_t2 = st.columns(2)
-        
-        with col_t1:
-            st.markdown("**🔬 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?1 opérateur, même situation, plusieurs mesures)**")
-            edited_rep = st.data_editor(
-                st.session_state.get(rep_key, pd.DataFrame()),
-                num_rows="dynamic",
-                use_container_width=True,
-                key=f"editor_rep_{safe_idx}"
-            )
-            if edited_rep is not None:
-                st.session_state[rep_key] = edited_rep
-
-        with col_t2:
-            st.markdown("**👥 Test de Reproductibilité (Différentes personnes obtiennent-elles les mêmes résultats?même situation/produit, plusieurs opérateurs)**")
-            edited_reprod = st.data_editor(
-                st.session_state.get(reprod_key, pd.DataFrame()),
-                num_rows="dynamic",
-                use_container_width=True,
-                key=f"editor_reprod_{safe_idx}"
-            )
-            if edited_reprod is not None:
-                st.session_state[reprod_key] = edited_reprod
 
         # --- 4. DEUXIÈME LECTURE AUTOMATISÉE ET DÉTECTION DES BIAIS ---
         st.markdown("##### ⚠️ Analyse des Risques de Biais de Mesure")
