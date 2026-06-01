@@ -1808,7 +1808,7 @@ else:
             validation_key = f"{selected_var_to_test}_{safe_idx}"
             
             # 📋 Liste des unités de mesure disponibles dans les listes déroulantes
-            liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "sec", "mm", "%", "€"]
+            liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
             
             # Initialisation par défaut des tableaux avec les nouvelles colonnes d'unités
             if dynamic_rep_key not in st.session_state:
