@@ -1784,7 +1784,7 @@ else:
             if "msa_validated_vars" not in st.session_state:
                 st.session_state["msa_validated_vars"] = {}
 
-            # Génération des options du sélecteur avec un indicateur de statut (Visuel Master Black Belt)
+            # Génération des options du sélecteur avec un indicateur de statut
             options_sélecteur = []
             for var in list_variables_critiques:
                 if st.session_state["msa_validated_vars"].get(f"{var}_{safe_idx}", False):
@@ -1798,7 +1798,6 @@ else:
                 key=f"msa_selected_var_{safe_idx}"
             )
             
-            # 🔥 CORRECTION SYNTAXE : Utilisation des crochets [] pour le slicing de l'émoji
             selected_var_to_test = selected_option[4:]  
             
             # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
@@ -1808,17 +1807,20 @@ else:
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
             validation_key = f"{selected_var_to_test}_{safe_idx}"
             
-            # Initialisation par défaut des tableaux
+            # 📋 Liste des unités de mesure disponibles dans les listes déroulantes
+            liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "sec", "mm", "%", "€"]
+            
+            # Initialisation par défaut des tableaux avec les nouvelles colonnes d'unités
             if dynamic_rep_key not in st.session_state:
                 st.session_state[dynamic_rep_key] = pd.DataFrame([
-                    {"Essai / Pièce": "Pièce 1", "Répétition A": 0.0, "Répétition B": 0.0},
-                    {"Essai / Pièce": "Pièce 2", "Répétition A": 0.0, "Répétition B": 0.0}
+                    {"Essai / Pièce": "Pièce 1", "Répétition A": 0.0, "Unité A": "unité", "Répétition B": 0.0, "Unité B": "unité"},
+                    {"Essai / Pièce": "Pièce 2", "Répétition A": 0.0, "Unité A": "unité", "Répétition B": 0.0, "Unité B": "unité"}
                 ])
                 
             if dynamic_reprod_key not in st.session_state:
                 st.session_state[dynamic_reprod_key] = pd.DataFrame([
-                    {"Opérateur": "Opérateur 1", "Résultat": 0.0},
-                    {"Opérateur": "Opérateur 2", "Résultat": 0.0}
+                    {"Opérateur": "Opérateur 1", "Résultat": 0.0, "Unité": "unité"},
+                    {"Opérateur": "Opérateur 2", "Résultat": 0.0, "Unité": "unité"}
                 ])
                 
             # Affichage du statut de la variable actuelle
@@ -1831,41 +1833,61 @@ else:
             col_t1, col_t2 = st.columns(2)
             
             with col_t1:
-                st.markdown("**🔬 Test de Répétabilité (la même personne mesure-t-elle toujours pareil? 1 opérateur, même situation, plusieurs mesures)**")
+                st.markdown("**🔬 Test de Répétabilité (1 opérateur, plusieurs mesures)**")
+                
+                # Configuration des listes déroulantes pour les colonnes d'unités du test A & B
                 edited_rep = st.data_editor(
                     st.session_state[dynamic_rep_key],
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"editor_rep_{var_clean_id}_{safe_idx}"
+                    key=f"editor_rep_{var_clean_id}_{safe_idx}",
+                    column_config={
+                        "Unité A": st.column_config.SelectboxColumn(
+                            "Unité de mesure",
+                            options=liste_unites,
+                            required=True,
+                        ),
+                        "Unité B": st.column_config.SelectboxColumn(
+                            "Unité de mesure",
+                            options=liste_unites,
+                            required=True,
+                        )
+                    }
                 )
 
             with col_t2:
-                st.markdown("**👥 Test de Reproductibilité (différentes personnes obtiennent-elles des résultats similaires? même situation/produit, plusieurs opérateurs)**")
+                st.markdown("**👥 Test de Reproductibilité (Plusieurs opérateurs)**")
+                
+                # Configuration de la liste déroulante pour la colonne d'unité globale
                 edited_reprod = st.data_editor(
                     st.session_state[dynamic_reprod_key],
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"editor_reprod_{var_clean_id}_{safe_idx}"
+                    key=f"editor_reprod_{var_clean_id}_{safe_idx}",
+                    column_config={
+                        "Unité": st.column_config.SelectboxColumn(
+                            "Unité de mesure",
+                            options=liste_unites,
+                            required=True,
+                        )
+                    }
                 )
             
             # 🔘 LE BOUTON DE VALIDATION FORMELLE
-            st.markdown("<br>", unsafe_allow_html=True) # Espacement
+            st.markdown("<br>", unsafe_allow_html=True)
             if st.button(
                 f"💾 Valider et verrouiller les données de test pour : {selected_var_to_test}", 
                 key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
                 type="primary", 
                 use_container_width=True
             ):
-                # 1. Sauvegarde définitive des modifications des tableaux dans la session
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
-                
-                # 2. Passage du statut à "Validé"
                 st.session_state["msa_validated_vars"][validation_key] = True
                 
-                st.balloons() # Petite célébration visuelle
+                st.balloons()
                 st.success(f"✅ Données terrain validées avec succès pour **{selected_var_to_test}** ! Vous pouvez maintenant choisir une autre variable dans la liste ci-dessus.")
-                st.rerun() # Force le rafraîchissement pour mettre à jour le ✅ dans le sélecteur
+                st.rerun()
             
         else:
             st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
