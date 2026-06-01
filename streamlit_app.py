@@ -1798,8 +1798,8 @@ else:
                 key=f"msa_selected_var_{safe_idx}"
             )
             
-            # On retrouve le vrai nom de la variable (sans le ✅ ou ⏳)
-            selected_var_to_test = selected_option (4:]  # Retire l'émoji et l'espace
+            # 🔥 CORRECTION SYNTAXE : Utilisation des crochets [] pour le slicing de l'émoji
+            selected_var_to_test = selected_option[4:]  
             
             # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
             var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
