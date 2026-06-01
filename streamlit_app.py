@@ -1772,8 +1772,12 @@ else:
         st.markdown("##### 👟 Exécution du Protocole Terrain")
         
         df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
-        if df_msa_classif is not None and not df_msa_classif.empty and "Variable Critique" in df_msa_classif.columns:
-            list_variables_critiques = df_msa_classif["Variable Critique"].dropna().tolist()
+        
+        # 🚨 ALIGNEMENT DE LA CLÉ DE COLONNE : "Variable Critique (liée au Y)" au lieu de "Variable Critique"
+        nom_colonne_variable = "Variable Critique (liée au Y)"
+        
+        if df_msa_classif is not None and not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
+            list_variables_critiques = df_msa_classif[nom_colonne_variable].dropna().tolist()
         else:
             list_variables_critiques = []
         
@@ -1785,10 +1789,8 @@ else:
             )
             
             # 🧠 ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
-            # On nettoie le nom de la variable (ex: "Temps d'attente" devient "Tempsdattente") pour créer une clé unique
             var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
             
-            # On génère des clés uniques dans le session_state pour CHAQUE variable
             dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
             
@@ -1832,7 +1834,6 @@ else:
                 if edited_reprod is not None:
                     st.session_state[dynamic_reprod_key] = edited_reprod
                     
-            # Petit indicateur visuel de succès lors de la saisie
             st.caption(f"✨ Modifications mémorisées automatiquement en continu pour la variable **{selected_var_to_test}**.")
             
         else:
