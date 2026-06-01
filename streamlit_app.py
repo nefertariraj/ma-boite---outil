@@ -1772,8 +1772,6 @@ else:
         st.markdown("##### 👟 Exécution du Protocole Terrain")
         
         df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
-        
-        # 🚨 ALIGNEMENT DE LA CLÉ DE COLONNE : "Variable Critique (liée au Y)" au lieu de "Variable Critique"
         nom_colonne_variable = "Variable Critique (liée au Y)"
         
         if df_msa_classif is not None and not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
@@ -1782,19 +1780,35 @@ else:
             list_variables_critiques = []
         
         if list_variables_critiques:
-            selected_var_to_test = st.selectbox(
+            # 🧠 Initialisation du dictionnaire de validation si non présent
+            if "msa_validated_vars" not in st.session_state:
+                st.session_state["msa_validated_vars"] = {}
+
+            # Génération des options du sélecteur avec un indicateur de statut (Visuel Master Black Belt)
+            options_sélecteur = []
+            for var in list_variables_critiques:
+                if st.session_state["msa_validated_vars"].get(f"{var}_{safe_idx}", False):
+                    options_sélecteur.append(f"✅ {var}")
+                else:
+                    options_sélecteur.append(f"⏳ {var}")
+
+            selected_option = st.selectbox(
                 "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
-                options=list_variables_critiques,
+                options=options_sélecteur,
                 key=f"msa_selected_var_{safe_idx}"
             )
             
-            # 🧠 ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
+            # On retrouve le vrai nom de la variable (sans le ✅ ou ⏳)
+            selected_var_to_test = selected_option (4:]  # Retire l'émoji et l'espace
+            
+            # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
             var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
             
             dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
+            validation_key = f"{selected_var_to_test}_{safe_idx}"
             
-            # Initialisation par défaut si c'est la première fois qu'on sélectionne cette variable
+            # Initialisation par défaut des tableaux
             if dynamic_rep_key not in st.session_state:
                 st.session_state[dynamic_rep_key] = pd.DataFrame([
                     {"Essai / Pièce": "Pièce 1", "Répétition A": 0.0, "Répétition B": 0.0},
@@ -1807,34 +1821,51 @@ else:
                     {"Opérateur": "Opérateur 2", "Résultat": 0.0}
                 ])
                 
-            st.info(f"📋 **Saisie active** : Les deux tableaux ci-dessous enregistrent les données spécifiques de la variable : **{selected_var_to_test}**")
+            # Affichage du statut de la variable actuelle
+            if st.session_state["msa_validated_vars"].get(validation_key, False):
+                st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
+            else:
+                st.warning(f"📋 **Statut : Saisie en cours** | Remplissez les mesures pour : **{selected_var_to_test}**")
             
-            # --- 2 & 3. SÉQUENCE DES TESTS TERRAIN DYNAMISÉS ---
+            # --- SÉQUENCE DES TESTS TERRAIN ---
             col_t1, col_t2 = st.columns(2)
             
             with col_t1:
-                st.markdown("**🔬 Test de Répétabilité (La même personne mesure-t-elle toujours pareil? 1 opérateur, même situation, plusieurs mesures)**")
+                st.markdown("**🔬 Test de Répétabilité (1 opérateur, plusieurs mesures)**")
                 edited_rep = st.data_editor(
                     st.session_state[dynamic_rep_key],
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_rep_{var_clean_id}_{safe_idx}"
                 )
-                if edited_rep is not None:
-                    st.session_state[dynamic_rep_key] = edited_rep
 
             with col_t2:
-                st.markdown("**👥 Test de Reproductibilité (Différentes personnes obtiennent-elles les mêmes résultats? même situation/produit, plusieurs opérateurs)**")
+                st.markdown("**👥 Test de Reproductibilité (Plusieurs opérateurs)**")
                 edited_reprod = st.data_editor(
                     st.session_state[dynamic_reprod_key],
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_reprod_{var_clean_id}_{safe_idx}"
                 )
-                if edited_reprod is not None:
-                    st.session_state[dynamic_reprod_key] = edited_reprod
-                    
-            st.caption(f"✨ Modifications mémorisées automatiquement en continu pour la variable **{selected_var_to_test}**.")
+            
+            # 🔘 LE BOUTON DE VALIDATION FORMELLE
+            st.markdown("<br>", unsafe_allow_html=True) # Espacement
+            if st.button(
+                f"💾 Valider et verrouiller les données de test pour : {selected_var_to_test}", 
+                key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
+                type="primary", 
+                use_container_width=True
+            ):
+                # 1. Sauvegarde définitive des modifications des tableaux dans la session
+                st.session_state[dynamic_rep_key] = edited_rep
+                st.session_state[dynamic_reprod_key] = edited_reprod
+                
+                # 2. Passage du statut à "Validé"
+                st.session_state["msa_validated_vars"][validation_key] = True
+                
+                st.balloons() # Petite célébration visuelle
+                st.success(f"✅ Données terrain validées avec succès pour **{selected_var_to_test}** ! Vous pouvez maintenant choisir une autre variable dans la liste ci-dessus.")
+                st.rerun() # Force le rafraîchissement pour mettre à jour le ✅ dans le sélecteur
             
         else:
             st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
