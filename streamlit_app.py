@@ -1833,7 +1833,7 @@ else:
             col_t1, col_t2 = st.columns(2)
             
             with col_t1:
-                st.markdown("**🔬 Test de Répétabilité (1 opérateur, plusieurs mesures)**")
+                st.markdown("**🔬 Test de Répétabilité (la même personne mesure-t-elle toujours pareil? 1 opérateur, même situation, plusieurs mesures)**")
                 
                 # Configuration des listes déroulantes pour les colonnes d'unités du test A & B
                 edited_rep = st.data_editor(
@@ -1856,7 +1856,7 @@ else:
                 )
 
             with col_t2:
-                st.markdown("**👥 Test de Reproductibilité (Plusieurs opérateurs)**")
+                st.markdown("**👥 Test de Reproductibilité (différentes personnes obtiennent-elles des résultats similaires? même situation/produit, plusieurs opérateurs)**")
                 
                 # Configuration de la liste déroulante pour la colonne d'unité globale
                 edited_reprod = st.data_editor(
