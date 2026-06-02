@@ -1780,7 +1780,7 @@ else:
             list_variables_critiques = []
         
         if list_variables_critiques:
-            # 🔒 INITIALISATION BLINDÉE DES DICTIONNAIRES (Pour éviter toute perte au refresh)
+            # 🔒 INITIALISATION BLINDÉE DES DICTIONNAIRES DE SESSION
             if "msa_validated_vars" not in st.session_state:
                 st.session_state["msa_validated_vars"] = {}
             if "msa_bias_history" not in st.session_state:
@@ -1811,19 +1811,21 @@ else:
                 with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=False):
                     for v_nom in variables_valides:
                         v_clean = "".join(e for e in v_nom if e.isalnum())
-                        v_rep_key = f"rep_data_{v_clean}_{safe_idx}"
-                        v_reprod_key = f"reprod_data_{v_clean}_{safe_idx}"
+                        
+                        # Récupération sécurisée depuis le dictionnaire projet 'p' pour l'historique visuel
+                        p_rep_key = f"save_rep_{v_clean}_{safe_idx}"
+                        p_reprod_key = f"save_reprod_{v_clean}_{safe_idx}"
                         
                         st.markdown(f"**🟢 Variable : {v_nom}**")
                         c1, c2 = st.columns(2)
                         with c1:
-                            if v_rep_key in st.session_state:
+                            if 'p' in locals() and isinstance(p, dict) and p_rep_key in p:
                                 st.caption("Données de Reproductibilité enregistrées (Inter-Opérateurs) :")
-                                st.dataframe(st.session_state[v_rep_key], use_container_width=True)
+                                st.dataframe(pd.DataFrame(p[p_rep_key]), use_container_width=True)
                         with c2:
-                            if v_reprod_key in st.session_state:
+                            if 'p' in locals() and isinstance(p, dict) and p_reprod_key in p:
                                 st.caption("Données de Répétabilité enregistrées (Intra-Opérateur) :")
-                                st.dataframe(st.session_state[v_reprod_key], use_container_width=True)
+                                st.dataframe(pd.DataFrame(p[p_reprod_key]), use_container_width=True)
                         st.markdown("---")
             else:
                 st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici au fur et à mesure.")
@@ -1834,18 +1836,30 @@ else:
             dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
             validation_key = f"{selected_var_to_test}_{safe_idx}"
-            
-            # Clé d'historique unique et totalement stable pour cette variable
             bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
             
-            # Garantir que la sous-liste de cette variable existe et ne sera JAMAIS écrasée
+            # Clés uniques de sauvegarde persistante dans le dictionnaire de projet 'p'
+            p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
+            p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
+            p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
+            
+            # 📥 PASSERELLE D'IMPORTATION : Si les données existent dans le fichier sauvegardé 'p', on les restaure en session
+            if 'p' in locals() and isinstance(p, dict):
+                if p_rep_save_key in p and dynamic_rep_key not in st.session_state:
+                    st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
+                if p_reprod_save_key in p and dynamic_reprod_key not in st.session_state:
+                    st.session_state[dynamic_reprod_key] = pd.DataFrame(p[p_reprod_save_key])
+                if p_bias_hist_save_key in p and bias_hist_key not in st.session_state["msa_bias_history"]:
+                    st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]
+            
+            # Garantir que la sous-liste d'historique existe en session
             if bias_hist_key not in st.session_state["msa_bias_history"]:
                 st.session_state["msa_bias_history"][bias_hist_key] = []
             
-            # Liste des unités de mesure disponibles dans les listes déroulantes
+            # Liste des unités de mesure disponibles
             liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
             
-            # Initialisation par défaut des tableaux avec les nouvelles colonnes d'unités
+            # Initialisation par défaut si aucune donnée passée ou présente
             if dynamic_rep_key not in st.session_state:
                 st.session_state[dynamic_rep_key] = pd.DataFrame([
                     {"Opérateur": "Opérateur 1", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"},
@@ -1869,7 +1883,6 @@ else:
             
             with col_t1:
                 st.markdown("**🔬 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires?)**")
-                
                 edited_rep = st.data_editor(
                     st.session_state[dynamic_rep_key],
                     num_rows="dynamic",
@@ -1883,7 +1896,6 @@ else:
 
             with col_t2:
                 st.markdown("**👥 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?)**")
-                
                 edited_reprod = st.data_editor(
                     st.session_state[dynamic_reprod_key],
                     num_rows="dynamic",
@@ -1908,25 +1920,20 @@ else:
             if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                 current_detected_biais = []
                 
-                # 1. Analyse Reproductibilité
                 if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
                     try:
                         val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
                         val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
                         diffs = np.abs(val_col1 - val_col2)
                         mean_val = val_col1.mean()
-                        
-                        if not diffs.dropna().empty and mean_val > 0:
-                            if diffs.max() > mean_val * 0.15:
-                                current_detected_biais.append("Incohérence Forte Inter-Opérateurs")
-                        
+                        if not diffs.dropna().empty and mean_val > 0 and diffs.max() > mean_val * 0.15:
+                            current_detected_biais.append("Incohérence Forte Inter-Opérateurs")
                         all_vals = pd.concat([val_col1, val_col2]).dropna()
                         if not all_vals.empty and all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
                             current_detected_biais.append("Biais d'Arrondis Systématiques")
                     except:
                         pass
 
-                # 2. Analyse Répétabilité
                 if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
                     try:
                         vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
@@ -1938,18 +1945,10 @@ else:
                     except:
                         pass
                 
-                # Calcul du score
-                if len(current_detected_biais) == 0:
-                    score = 100
-                    status = "Fiable"
-                elif len(current_detected_biais) == 1:
-                    score = 75
-                    status = "Partiellement Fiable"
-                else:
-                    score = 45
-                    status = "Non Fiable"
+                if len(current_detected_biais) == 0: score, status = 100, "Fiable"
+                elif len(current_detected_biais) == 1: score, status = 75, "Partiellement Fiable"
+                else: score, status = 45, "Non Fiable"
                 
-                # 🛠️ AJOUT SÉCURISÉ SANS ÉCRASEMENT DANS L'HISTORIQUE DE SESSION
                 run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
                 st.session_state["msa_bias_history"][bias_hist_key].append({
                     "Essai": f"Analyse #{run_number}",
@@ -1959,12 +1958,17 @@ else:
                     "Anomalies Détectées": ", ".join(current_detected_biais) if current_detected_biais else "Aucune (Système sain)"
                 })
                 
-                # Sauvegarde temporaire des saisies des tableaux pour éviter les sauts de données au rechargement
+                # 💾 SAUVEGARDE EN TEMPS RÉEL DANS LE DICTIONNAIRE PROJET DE L'APPLICATION (p)
+                if 'p' in locals() and isinstance(p, dict):
+                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 st.rerun()
 
-            # --- AFFICHAGE DE L'HISTORIQUE ENREGISTRÉ (Persistant) ---
+            # --- AFFICHAGE DE L'HISTORIQUE ENREGISTRÉ ---
             if st.session_state["msa_bias_history"][bias_hist_key]:
                 st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
                 df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
@@ -1977,9 +1981,17 @@ else:
                 type="primary", 
                 use_container_width=True
             ):
+                # Enregistrement final en session et synchro dictionnaire global de sauvegarde
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 st.session_state["msa_validated_vars"][validation_key] = True
+                
+                if 'p' in locals() and isinstance(p, dict):
+                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                    p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
+                
                 st.balloons()
                 st.success(f"✅ Données terrain validées et gelées avec succès pour **{selected_var_to_test}** !")
                 st.rerun()
@@ -2011,7 +2023,7 @@ else:
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
         st.markdown("##### 📋 Validation Finale")
         if last_score == 45:
-            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable'. Veuillez modifier vos données de test (après recalibrage machine) puis cliquez à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour l'historique.")
+            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable'. Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
         else:
             saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
             is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
