@@ -1913,7 +1913,7 @@ else:
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 st.session_state["msa_validated_vars"][validation_key] = True
             #               
-                🧮 ANALYSE STATISTIQUE LEAN SIX SIGMA (Calcul du Biais et R&R)
+                # --- ANALYSE STATISTIQUE LEAN SIX SIGMA (Calcul du Biais et R&R) ---
                 try:
                     df_rep = pd.DataFrame(edited_rep)
                     # Calcul de la Répétabilité (Écart-type des écarts entre Situation A et Situation B)
