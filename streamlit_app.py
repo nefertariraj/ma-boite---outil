@@ -1780,7 +1780,7 @@ else:
             list_variables_critiques = []
         
         if list_variables_critiques:
-            # Initialisation des dictionnaires de session si non présents
+            # 🔒 INITIALISATION BLINDÉE DES DICTIONNAIRES (Pour éviter toute perte au refresh)
             if "msa_validated_vars" not in st.session_state:
                 st.session_state["msa_validated_vars"] = {}
             if "msa_bias_history" not in st.session_state:
@@ -1834,7 +1834,13 @@ else:
             dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
             validation_key = f"{selected_var_to_test}_{safe_idx}"
-            bias_hist_key = f"bias_hist_{var_clean_id}_{safe_idx}"
+            
+            # Clé d'historique unique et totalement stable pour cette variable
+            bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
+            
+            # Garantir que la sous-liste de cette variable existe et ne sera JAMAIS écrasée
+            if bias_hist_key not in st.session_state["msa_bias_history"]:
+                st.session_state["msa_bias_history"][bias_hist_key] = []
             
             # Liste des unités de mesure disponibles dans les listes déroulantes
             liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
@@ -1862,7 +1868,7 @@ else:
             col_t1, col_t2 = st.columns(2)
             
             with col_t1:
-                st.markdown("**🔬 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires? même situation/produit, plusieurs opérateurs)**")
+                st.markdown("**🔬 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires?)**")
                 
                 edited_rep = st.data_editor(
                     st.session_state[dynamic_rep_key],
@@ -1870,21 +1876,13 @@ else:
                     use_container_width=True,
                     key=f"editor_rep_{var_clean_id}_{safe_idx}",
                     column_config={
-                        "Unité A": st.column_config.SelectboxColumn(
-                            "Unité de mesure",
-                            options=liste_unites,
-                            required=True,
-                        ),
-                        "Unité B": st.column_config.SelectboxColumn(
-                            "Unité de mesure",
-                            options=liste_unites,
-                            required=True,
-                        )
+                        "Unité A": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True),
+                        "Unité B": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
                     }
                 )
 
             with col_t2:
-                st.markdown("**👥 Test de Répétabilité (La même personne mesure-t-elle toujours pareil? 1 opérateur, même situation, plusieurs mesures)**")
+                st.markdown("**👥 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?)**")
                 
                 edited_reprod = st.data_editor(
                     st.session_state[dynamic_reprod_key],
@@ -1892,18 +1890,14 @@ else:
                     use_container_width=True,
                     key=f"editor_reprod_{var_clean_id}_{safe_idx}",
                     column_config={
-                        "Unité": st.column_config.SelectboxColumn(
-                            "Unité de mesure",
-                            options=liste_unites,
-                            required=True,
-                        )
+                        "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
                     }
                 )
             
             # --- CONFIGURATION DE LA VALEUR DE RÉFÉRENCE POUR L'ANALYSE DU BIAIS ---
             st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
             valeur_reference = st.number_input(
-                f"Saisissez la valeur théorique / standard attendue pour {selected_var_to_test} :",
+                f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
                 value=0.0,
                 step=0.1,
                 key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
@@ -1912,10 +1906,9 @@ else:
             # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
-                # Analyse à chaud sur les données actuelles des éditeurs
                 current_detected_biais = []
                 
-                # 1. Analyse Reproductibilité (Tableau de gauche)
+                # 1. Analyse Reproductibilité
                 if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
                     try:
                         val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
@@ -1925,7 +1918,7 @@ else:
                         
                         if not diffs.dropna().empty and mean_val > 0:
                             if diffs.max() > mean_val * 0.15:
-                                current_detected_biais.append("Incohérence Forte Inter-Opérateurs (Reproductibilité)")
+                                current_detected_biais.append("Incohérence Forte Inter-Opérateurs")
                         
                         all_vals = pd.concat([val_col1, val_col2]).dropna()
                         if not all_vals.empty and all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
@@ -1933,7 +1926,7 @@ else:
                     except:
                         pass
 
-                # 2. Analyse Répétabilité (Tableau de droite)
+                # 2. Analyse Répétabilité
                 if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
                     try:
                         vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
@@ -1945,7 +1938,7 @@ else:
                     except:
                         pass
                 
-                # Calcul du score à chaud
+                # Calcul du score
                 if len(current_detected_biais) == 0:
                     score = 100
                     status = "Fiable"
@@ -1956,10 +1949,7 @@ else:
                     score = 45
                     status = "Non Fiable"
                 
-                # Enregistrement chronologique dans l'historique de la session
-                if bias_hist_key not in st.session_state["msa_bias_history"]:
-                    st.session_state["msa_bias_history"][bias_hist_key] = []
-                
+                # 🛠️ AJOUT SÉCURISÉ SANS ÉCRASEMENT DANS L'HISTORIQUE DE SESSION
                 run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
                 st.session_state["msa_bias_history"][bias_hist_key].append({
                     "Essai": f"Analyse #{run_number}",
@@ -1968,13 +1958,17 @@ else:
                     "Statut Global": status,
                     "Anomalies Détectées": ", ".join(current_detected_biais) if current_detected_biais else "Aucune (Système sain)"
                 })
-                st.toast("Analyse de biais enregistrée dans l'historique !", icon="📈")
+                
+                # Sauvegarde temporaire des saisies des tableaux pour éviter les sauts de données au rechargement
+                st.session_state[dynamic_rep_key] = edited_rep
+                st.session_state[dynamic_reprod_key] = edited_reprod
+                st.rerun()
 
-            # --- AFFICHAGE COMPARATIF DE L'ÉVOLUTION DES ANALYSES ---
-            if bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
-                st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi des recalibrages)")
+            # --- AFFICHAGE DE L'HISTORIQUE ENREGISTRÉ (Persistant) ---
+            if st.session_state["msa_bias_history"][bias_hist_key]:
+                st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
                 df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
-                st.table(df_history) # Affichage sous forme de tableau fixe pour une lecture claire des gains Lean Six Sigma
+                st.table(df_history)
 
             # LE BOUTON DE VALIDATION FORMELLE
             if st.button(
@@ -1991,13 +1985,12 @@ else:
                 st.rerun()
             
         else:
-            st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
+            st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse.")
             selected_var_to_test = "Aucune variable sélectionnée"
 
         # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE SIMPLIFIÉE ---
         st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
         
-        # Récupération du dernier état connu dans l'historique pour l'affichage des alertes de blocage
         last_score = 100
         if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
             last_status_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Statut Global"]
@@ -2018,7 +2011,7 @@ else:
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
         st.markdown("##### 📋 Validation Finale")
         if last_score == 45:
-            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable'. Veuillez recalibrer vos machines, modifier vos données de test et ré-appuyer sur 'Lancer l'analyse des risques de biais'.")
+            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable'. Veuillez modifier vos données de test (après recalibrage machine) puis cliquez à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour l'historique.")
         else:
             saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
             is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
