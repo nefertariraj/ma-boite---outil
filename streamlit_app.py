@@ -1799,6 +1799,34 @@ else:
             )
             
             selected_var_to_test = selected_option[4:]  
+
+            # --- 📊 TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
+            st.markdown("##### 📈 Historique des protocoles validés")
+            
+            # On cherche s'il y a des variables validées
+            variables_valides = [v_key.replace(f"_{safe_idx}", "") for v_key, validated in st.session_state["msa_validated_vars"].items() if validated]
+            
+            if variables_valides:
+                # Création d'un résumé visuel sous forme d'onglets ou d'expander pour ne pas surcharger l'écran
+                with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=True):
+                    for v_nom in variables_valides:
+                        v_clean = "".join(e for e in v_nom if e.isalnum())
+                        v_rep_key = f"rep_data_{v_clean}_{safe_idx}"
+                        v_reprod_key = f"reprod_data_{v_clean}_{safe_idx}"
+                        
+                        st.markdown(f"**🟢 Variable : {v_nom}**")
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            if v_rep_key in st.session_state:
+                                st.caption("Données de Reproductibilité enregistrées :")
+                                st.dataframe(st.session_state[v_rep_key], use_container_width=True)
+                        with c2:
+                            if v_reprod_key in st.session_state:
+                                st.caption("Données de Répétabilité enregistrées :")
+                                st.dataframe(st.session_state[v_reprod_key], use_container_width=True)
+                        st.markdown("---")
+            else:
+                st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici au fur et à mesure.")
             
             # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
             var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
@@ -1884,6 +1912,28 @@ else:
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 st.session_state["msa_validated_vars"][validation_key] = True
+            #               
+                🧮 ANALYSE STATISTIQUE LEAN SIX SIGMA (Calcul du Biais et R&R)
+                try:
+                    df_rep = pd.DataFrame(edited_rep)
+                    # Calcul de la Répétabilité (Écart-type des écarts entre Situation A et Situation B)
+                    df_rep['Ecart'] = (df_rep['Situation A'] - df_rep['Situation B']).abs()
+                    avg_range = df_rep['Ecart'].mean()
+                    
+                    # Formule d'évaluation standardisée (D2 pour 2 essais = 1.128)
+                    ev = avg_range / 1.128  
+                    
+                    st.markdown("##### 🔬 Analyse de la Capabilité du Système de Mesure (MSA)")
+                    
+                    # Verdict LSS
+                    if ev == 0:
+                        st.success("🎯 **Analyse du Biais : Excellent.** Aucune capabilité de biais d'équipement détectée (Répétabilité parfaite).")
+                    elif ev < 0.1:
+                        st.success(f"✅ **Système de mesure Acceptable (LSS)** : Variabilité Équipement (EV) de {ev:.4f}. Le biais est sous contrôle.")
+                    else:
+                        st.error(f"❌ **Système de mesure REJETÉ (Biais trop élevé)** : Variabilité Équipement (EV) de {ev:.4f}. Votre instrument ou méthode de test n'est pas fiable.")
+                except Exception as e:
+                    st.caption("L'analyse statistique automatique nécessite des valeurs numériques valides dans les colonnes de Situation.")
                 
                 st.balloons()
                 st.success(f"✅ Données terrain validées avec succès pour **{selected_var_to_test}** ! Vous pouvez maintenant choisir une autre variable dans la liste ci-dessus.")
