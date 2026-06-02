@@ -1768,11 +1768,38 @@ else:
         if edited_classification is not None:
             st.session_state[msa_classif_key] = edited_classification
 
-        # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
-        st.markdown("##### 👟 Exécution du Protocole Terrain")
-        
+        # =====================================================================
+        # MISE À JOUR DYNAMIQUE DU TABLEAU DE CLASSIFICATION IA
+        # =====================================================================
         df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
         nom_colonne_variable = "Variable Critique (liée au Y)"
+
+        if not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
+            # On s'assure que la colonne de suivi existe dans le DataFrame
+            if "statut validation" not in df_msa_classif.columns:
+                df_msa_classif["statut validation"] = "en attente de test"
+            
+            # On vérifie en direct quelles variables ont été validées pour basculer le statut
+            for idx_row, row in df_msa_classif.iterrows():
+                var_nom = row[nom_colonne_variable]
+                v_c = "".join(e for e in var_nom if e.isalnum())
+                validation_key = f"{var_nom}_{safe_idx}"
+                
+                is_validated = st.session_state.get("msa_validated_vars", {}).get(validation_key, False)
+                if 'p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p:
+                    is_validated = True
+                
+                if is_validated:
+                    df_msa_classif.at[idx_row, "statut validation"] = "test effectué"
+                else:
+                    df_msa_classif.at[idx_row, "statut validation"] = "en attente de test"
+            
+            # Ré-enregistrement de l'état mis à jour dans la session
+            st.session_state[msa_classif_key] = df_msa_classif
+
+
+        # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
+        st.markdown("##### 👟 Exécution du Protocole Terrain")
         
         if df_msa_classif is not None and not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
             list_variables_critiques = df_msa_classif[nom_colonne_variable].dropna().tolist()
@@ -1789,7 +1816,8 @@ else:
             # Génération des options du sélecteur avec un indicateur de statut
             options_sélecteur = []
             for var in list_variables_critiques:
-                if st.session_state["msa_validated_vars"].get(f"{var}_{safe_idx}", False):
+                v_c = "".join(e for e in var if e.isalnum())
+                if st.session_state["msa_validated_vars"].get(f"{var}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
                     options_sélecteur.append(f"✅ {var}")
                 else:
                     options_sélecteur.append(f"⏳ {var}")
@@ -1918,54 +1946,81 @@ else:
             # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
-                current_detected_biais = []
                 
+                # 3️⃣ SOLUTION DU PROBLÈME DE STOCKAGE : Figer immédiatement les données modifiées dans l'état avant calculs
+                st.session_state[dynamic_rep_key] = edited_rep
+                st.session_state[dynamic_reprod_key] = edited_reprod
+                if 'p' in locals() and isinstance(p, dict):
+                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+
+                anomalies_mineures = []
+                anomalies_majeures = []
+                
+                # 2️⃣ AFFINEMENT DE L'ANALYSE MATHÉMATIQUE ET DE L'INCOHÉRENCE D'ENTRÉE
+                # Analyse Reproductibilité
                 if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
                     try:
                         val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
                         val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
                         diffs = np.abs(val_col1 - val_col2)
                         mean_val = val_col1.mean()
-                        if not diffs.dropna().empty and mean_val > 0 and diffs.max() > mean_val * 0.15:
-                            current_detected_biais.append("Incohérence Forte Inter-Opérateurs")
+                        
+                        if not diffs.dropna().empty and mean_val > 0:
+                            if diffs.max() > mean_val * 0.30:  # Incohérence massive volontaire
+                                anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
+                            elif diffs.max() > mean_val * 0.10:
+                                anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
+                        
                         all_vals = pd.concat([val_col1, val_col2]).dropna()
-                        if not all_vals.empty and all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
-                            current_detected_biais.append("Biais d'Arrondis Systématiques")
+                        if not all_vals.empty and all(v % 5 == 0 or v % 1 == 0 for v in all_vals if v > 0):
+                            anomalies_mineures.append("Biais d'Arrondis Systématiques")
                     except:
                         pass
 
+                # Analyse Répétabilité
                 if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
                     try:
                         vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
-                        if len(vals_reprod) >= 1:
-                            biais_centralisation = vals_reprod.mean() - valeur_reference
-                            seuil_tolerance = 0.05 if valeur_reference == 0 else abs(valeur_reference * 0.05)
-                            if abs(biais_centralisation) > seuil_tolerance:
-                                current_detected_biais.append("Biais d'Étalonnage / Justesse (Décalage du Master)")
+                        if len(vals_reprod) >= 2:
+                            std_dev = vals_reprod.std()
+                            if std_dev > (vals_reprod.mean() * 0.20):
+                                anomalies_majeures.append("Forte Instabilité Intra-Opérateur")
+                            
+                            if valeur_reference != 0.0:
+                                biais_justesse = abs(vals_reprod.mean() - valeur_reference)
+                                if biais_justesse > abs(valeur_reference * 0.08):
+                                    anomalies_majeures.append("Biais d'Étalonnage (Décalage / Master)")
                     except:
                         pass
                 
-                if len(current_detected_biais) == 0: score, status = 100, "Fiable"
-                elif len(current_detected_biais) == 1: score, status = 75, "Partiellement Fiable"
-                else: score, status = 45, "Non Fiable"
+                # 2️⃣ ARBRE DES 4 STATUTS DISPONIBLES APRÈS ANALYSE
+                if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
+                    score, status = "100%", "🟢 Système Fiable"
+                elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
+                    score, status = "75%", "🟡 Alerte : Biais Mineur"
+                elif len(anomalies_majeures) == 1:
+                    score, status = "50%", "🟠 Alerte : Biais Majeur"
+                else:
+                    score, status = "25%", "🔴 Système Non Fiable"
                 
+                toutes_anomalies = anomalies_majeures + anomalies_mineures
+                liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
+                
+                # Ajout chronologique dans l'historique sans destruction
                 run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
                 st.session_state["msa_bias_history"][bias_hist_key].append({
                     "Essai": f"Analyse #{run_number}",
                     "Date/Heure": pd.Timestamp.now().strftime("%H:%M:%S"),
-                    "Indice de Fidélité": f"{score}%",
+                    "Indice de Fidélité": score,
                     "Statut Global": status,
-                    "Anomalies Détectées": ", ".join(current_detected_biais) if current_detected_biais else "Aucune (Système sain)"
+                    "Anomalies Détectées": liste_anomalies_str
                 })
                 
-                # 💾 SAUVEGARDE EN TEMPS RÉEL DANS LE DICTIONNAIRE PROJET DE L'APPLICATION (p)
+                # Duplication de l'historique vers le dictionnaire persistant de sauvegarde 'p'
                 if 'p' in locals() and isinstance(p, dict):
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
                 
-                st.session_state[dynamic_rep_key] = edited_rep
-                st.session_state[dynamic_reprod_key] = edited_reprod
                 st.rerun()
 
             # --- AFFICHAGE DE L'HISTORIQUE ENREGISTRÉ ---
@@ -1981,7 +2036,6 @@ else:
                 type="primary", 
                 use_container_width=True
             ):
-                # Enregistrement final en session et synchro dictionnaire global de sauvegarde
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 st.session_state["msa_validated_vars"][validation_key] = True
@@ -2003,13 +2057,11 @@ else:
         # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE SIMPLIFIÉE ---
         st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
         
-        last_score = 100
+        last_score_str = "100%"
         if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
-            last_status_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Statut Global"]
-            if last_status_str == "Partiellement Fiable": last_score = 75
-            elif last_status_str == "Non Fiable": last_score = 45
+            last_score_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Indice de Fidélité"]
 
-        if last_score < 100 and 'p' in locals() and isinstance(p, dict):
+        if last_score_str in ["50%", "25%"] and 'p' in locals() and isinstance(p, dict):
             p["msa_corrective_action"] = st.selectbox(
                 "Plan d'action prioritaire déployé lors du recalibrage :",
                 options=[
@@ -2022,8 +2074,8 @@ else:
 
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
         st.markdown("##### 📋 Validation Finale")
-        if last_score == 45:
-            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable'. Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
+        if last_score_str == "25%":
+            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable' (25%). Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
         else:
             saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
             is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
