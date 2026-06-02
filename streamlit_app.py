@@ -1769,17 +1769,17 @@ else:
             st.session_state[msa_classif_key] = edited_classification
 
         # =====================================================================
-        # MISE À JOUR DYNAMIQUE DU TABLEAU DE CLASSIFICATION IA
+        # 1/ MISE À JOUR DYNAMIQUE DU TABLEAU DE CLASSIFICATION IA
         # =====================================================================
         df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
         nom_colonne_variable = "Variable Critique (liée au Y)"
 
         if not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
-            # On s'assure que la colonne de suivi existe dans le DataFrame
+            # Sécurité : On s'assure que la colonne demandée existe bien
             if "statut validation" not in df_msa_classif.columns:
                 df_msa_classif["statut validation"] = "en attente de test"
             
-            # On vérifie en direct quelles variables ont été validées pour basculer le statut
+            # On parcourt le tableau pour basculer le statut si validé
             for idx_row, row in df_msa_classif.iterrows():
                 var_nom = row[nom_colonne_variable]
                 v_c = "".join(e for e in var_nom if e.isalnum())
@@ -1789,6 +1789,7 @@ else:
                 if 'p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p:
                     is_validated = True
                 
+                # Modification stricte selon vos consignes : "test effectué" ou "en attente de test"
                 if is_validated:
                     df_msa_classif.at[idx_row, "statut validation"] = "test effectué"
                 else:
@@ -1947,7 +1948,6 @@ else:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                 
-                # 3️⃣ SOLUTION DU PROBLÈME DE STOCKAGE : Figer immédiatement les données modifiées dans l'état avant calculs
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 if 'p' in locals() and isinstance(p, dict):
@@ -1957,7 +1957,6 @@ else:
                 anomalies_mineures = []
                 anomalies_majeures = []
                 
-                # 2️⃣ AFFINEMENT DE L'ANALYSE MATHÉMATIQUE ET DE L'INCOHÉRENCE D'ENTRÉE
                 # Analyse Reproductibilité
                 if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
                     try:
@@ -1967,7 +1966,7 @@ else:
                         mean_val = val_col1.mean()
                         
                         if not diffs.dropna().empty and mean_val > 0:
-                            if diffs.max() > mean_val * 0.30:  # Incohérence massive volontaire
+                            if diffs.max() > mean_val * 0.30:
                                 anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
                             elif diffs.max() > mean_val * 0.10:
                                 anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
@@ -1994,7 +1993,6 @@ else:
                     except:
                         pass
                 
-                # 2️⃣ ARBRE DES 4 STATUTS DISPONIBLES APRÈS ANALYSE
                 if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
                     score, status = "100%", "🟢 Système Fiable"
                 elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
@@ -2007,17 +2005,18 @@ else:
                 toutes_anomalies = anomalies_majeures + anomalies_mineures
                 liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
                 
-                # Ajout chronologique dans l'historique sans destruction
+                # 2️⃣ CALCUL DE L'HEURE STRICTEMENT EN FUSEAU GMT+3 (EAT / Madagascar)
+                gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
+                
                 run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
                 st.session_state["msa_bias_history"][bias_hist_key].append({
                     "Essai": f"Analyse #{run_number}",
-                    "Date/Heure": pd.Timestamp.now().strftime("%H:%M:%S"),
+                    "Date/Heure": gmt3_time,
                     "Indice de Fidélité": score,
                     "Statut Global": status,
                     "Anomalies Détectées": liste_anomalies_str
                 })
                 
-                # Duplication de l'historique vers le dictionnaire persistant de sauvegarde 'p'
                 if 'p' in locals() and isinstance(p, dict):
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
                 
