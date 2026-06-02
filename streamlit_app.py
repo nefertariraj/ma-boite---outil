@@ -1780,7 +1780,7 @@ else:
             list_variables_critiques = []
         
         if list_variables_critiques:
-            # 🧠 Initialisation du dictionnaire de validation si non présent
+            # Initialisation du dictionnaire de validation si non présent
             if "msa_validated_vars" not in st.session_state:
                 st.session_state["msa_validated_vars"] = {}
 
@@ -1800,15 +1800,13 @@ else:
             
             selected_var_to_test = selected_option[4:]  
 
-            # --- 📊 TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
+            # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
             st.markdown("##### 📈 Historique des protocoles validés")
             
-            # On cherche s'il y a des variables validées
             variables_valides = [v_key.replace(f"_{safe_idx}", "") for v_key, validated in st.session_state["msa_validated_vars"].items() if validated]
             
             if variables_valides:
-                # Création d'un résumé visuel sous forme d'onglets ou d'expander pour ne pas surcharger l'écran
-                with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=True):
+                with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=False):
                     for v_nom in variables_valides:
                         v_clean = "".join(e for e in v_nom if e.isalnum())
                         v_rep_key = f"rep_data_{v_clean}_{safe_idx}"
@@ -1818,11 +1816,11 @@ else:
                         c1, c2 = st.columns(2)
                         with c1:
                             if v_rep_key in st.session_state:
-                                st.caption("Données de Reproductibilité enregistrées :")
+                                st.caption("Données de Reproductibilité enregistrées (Inter-Opérateurs) :")
                                 st.dataframe(st.session_state[v_rep_key], use_container_width=True)
                         with c2:
                             if v_reprod_key in st.session_state:
-                                st.caption("Données de Répétabilité enregistrées :")
+                                st.caption("Données de Répétabilité enregistrées (Intra-Opérateur) :")
                                 st.dataframe(st.session_state[v_reprod_key], use_container_width=True)
                         st.markdown("---")
             else:
@@ -1835,7 +1833,7 @@ else:
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
             validation_key = f"{selected_var_to_test}_{safe_idx}"
             
-            # 📋 Liste des unités de mesure disponibles dans les listes déroulantes
+            # Liste des unités de mesure disponibles dans les listes déroulantes
             liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
             
             # Initialisation par défaut des tableaux avec les nouvelles colonnes d'unités
@@ -1863,7 +1861,6 @@ else:
             with col_t1:
                 st.markdown("**🔬 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires? même situation/produit, plusieurs opérateurs)**")
                 
-                # Configuration des listes déroulantes pour les colonnes d'unités du test A & B
                 edited_rep = st.data_editor(
                     st.session_state[dynamic_rep_key],
                     num_rows="dynamic",
@@ -1886,7 +1883,6 @@ else:
             with col_t2:
                 st.markdown("**👥 Test de Répétabilité (La même personne mesure-t-elle toujours pareil? 1 opérateur, même situation, plusieurs mesures)**")
                 
-                # Configuration de la liste déroulante pour la colonne d'unité globale
                 edited_reprod = st.data_editor(
                     st.session_state[dynamic_reprod_key],
                     num_rows="dynamic",
@@ -1901,7 +1897,16 @@ else:
                     }
                 )
             
-            # 🔘 LE BOUTON DE VALIDATION FORMELLE
+            # --- CONFIGURATION DE LA VALEUR DE RÉFÉRENCE POUR L'ANALYSE DU BIAIS ---
+            st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
+            valeur_reference = st.number_input(
+                f"Saisissez la valeur théorique / standard attendue pour {selected_var_to_test} :",
+                value=0.0,
+                step=0.1,
+                key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
+            )
+
+            # LE BOUTON DE VALIDATION FORMELLE
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button(
                 f"💾 Valider et verrouiller les données de test pour : {selected_var_to_test}", 
@@ -1912,20 +1917,21 @@ else:
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 st.session_state["msa_validated_vars"][validation_key] = True
-            #               
+                
                 # --- ANALYSE STATISTIQUE LEAN SIX SIGMA (Calcul du Biais et R&R) ---
                 try:
-                    df_rep = pd.DataFrame(edited_rep)
-                    # Calcul de la Répétabilité (Écart-type des écarts entre Situation A et Situation B)
-                    df_rep['Ecart'] = (df_rep['Situation A'] - df_rep['Situation B']).abs()
-                    avg_range = df_rep['Ecart'].mean()
+                    df_rep_calc = pd.DataFrame(edited_rep)
+                    val_sit_a = pd.to_numeric(df_rep_calc['Situation A'], errors='coerce')
+                    val_sit_b = pd.to_numeric(df_rep_calc['Situation B'], errors='coerce')
                     
-                    # Formule d'évaluation standardisée (D2 pour 2 essais = 1.128)
-                    ev = avg_range / 1.128  
+                    df_rep_calc['Ecart'] = (val_sit_a - val_sit_b).abs()
+                    avg_range = df_rep_calc['Ecart'].mean()
+                    
+                    # Formule standardisée EV (Fidélité de l'équipement)
+                    ev = avg_range / 1.128 if not pd.isna(avg_range) else 0.0
                     
                     st.markdown("##### 🔬 Analyse de la Capabilité du Système de Mesure (MSA)")
                     
-                    # Verdict LSS
                     if ev == 0:
                         st.success("🎯 **Analyse du Biais : Excellent.** Aucune capabilité de biais d'équipement détectée (Répétabilité parfaite).")
                     elif ev < 0.1:
@@ -1946,12 +1952,14 @@ else:
         # --- 4. DEUXIÈME LECTURE AUTOMATISÉE ET DÉTECTION DES BIAIS ---
         st.markdown("##### ⚠️ Analyse des Risques de Biais de Mesure")
         detected_biais = []
-        df_r1 = st.session_state.get(rep_key, pd.DataFrame())
         
-        if not df_r1.empty and len(df_r1.columns) >= 3:
+        # Point de contrôle dynamique basé sur la variable active sélectionnée
+        df_r1 = st.session_state.get(dynamic_rep_key, pd.DataFrame())
+        
+        if not df_r1.empty and 'Situation A' in df_r1.columns and 'Situation B' in df_r1.columns:
             try:
-                val_col1 = pd.to_numeric(df_r1.iloc[:, 1], errors='coerce')
-                val_col2 = pd.to_numeric(df_r1.iloc[:, 2], errors='coerce')
+                val_col1 = pd.to_numeric(df_r1['Situation A'], errors='coerce')
+                val_col2 = pd.to_numeric(df_r1['Situation B'], errors='coerce')
                 
                 diffs = np.abs(val_col1 - val_col2)
                 mean_val = val_col1.mean()
@@ -1959,8 +1967,8 @@ else:
                 if not diffs.dropna().empty and mean_val > 0:
                     if diffs.max() > mean_val * 0.15:
                         detected_biais.append({
-                            "Biais": "Incohérence Forte Intra-Opérateur",
-                            "Impact": "Répétabilité instable. L'outil ou la méthode de lecture manque de régularité.",
+                            "Biais": "Incohérence Forte Inter-Opérateurs (Reproductibilité)",
+                            "Impact": "Les opérateurs divergent de façon significative sur les mêmes situations.",
                             "Solution": "Créer un détrompeur (Poka-Yoke) ou standardiser le mode opératoire visuel."
                         })
                 
@@ -1974,16 +1982,20 @@ else:
             except:
                 pass
 
-        df_r2 = st.session_state.get(reprod_key, pd.DataFrame())
+        df_r2 = st.session_state.get(dynamic_reprod_key, pd.DataFrame())
         if not df_r2.empty and "Résultat" in df_r2.columns:
             try:
                 vals_reprod = pd.to_numeric(df_r2["Résultat"], errors='coerce').dropna()
-                if len(vals_reprod) >= 2 and vals_reprod.mean() > 0:
-                    if (vals_reprod.max() - vals_reprod.min()) > vals_reprod.mean() * 0.20:
+                if len(vals_reprod) >= 1:
+                    # Calcul de l'écart à la valeur standard cible (Justesse / Biais de centralisation)
+                    biais_centralisation = vals_reprod.mean() - valeur_reference
+                    seuil_tolerance = 0.05 if valeur_reference == 0 else abs(valeur_reference * 0.05)
+                    
+                    if abs(biais_centralisation) > seuil_tolerance:
                         detected_biais.append({
-                            "Biais": "Biais d'Interprétation Inter-Opérateurs",
-                            "Impact": "Les opérateurs n'interprètent pas la mesure de la même manière (subjectivité).",
-                            "Solution": "Organiser un atelier d'alignement et publier une définition opérationnelle imagée."
+                            "Biais": "Biais d'Étalonnage / Justesse (Décalage du Master)",
+                            "Impact": f"La moyenne des mesures ({vals_reprod.mean():.2f}) dévie de la référence théorique attendue ({valeur_reference:.2f}).",
+                            "Solution": "Réétalonner l'appareil de mesure ou réaligner les critères d'évaluation de l'opérateur unique."
                         })
             except:
                 pass
@@ -2033,7 +2045,7 @@ else:
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
         st.markdown("##### 📋 Validation Finale")
         if statut_systeme == "Non Fiable":
-            st.error("🛑 Signature bloquée : La variance du système de mesure is trop élevée (>30%). Ajustez vos données terrain après correction pour débloquer.")
+            st.error("🛑 Signature bloquée : La variance du système de mesure est trop élevée. Ajustez vos données terrain après correction pour débloquer.")
         else:
             saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
             is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
