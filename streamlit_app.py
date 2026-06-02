@@ -1775,27 +1775,26 @@ else:
         nom_colonne_variable = "Variable Critique (liée au Y)"
 
         if not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
-            # Sécurité : On s'assure que la colonne demandée existe bien
             if "statut validation" not in df_msa_classif.columns:
                 df_msa_classif["statut validation"] = "en attente de test"
             
-            # On parcourt le tableau pour basculer le statut si validé
             for idx_row, row in df_msa_classif.iterrows():
                 var_nom = row[nom_colonne_variable]
-                v_c = "".join(e for e in var_nom if e.isalnum())
-                validation_key = f"{var_nom}_{safe_idx}"
                 
-                is_validated = st.session_state.get("msa_validated_vars", {}).get(validation_key, False)
+                # 🔒 SÉCURITÉ : On crée une clé basée UNIQUEMENT sur les caractères alphanumériques de la variable
+                v_c = "".join(e for e in str(var_nom) if e.isalnum())
+                id_validation_blindee = f"status_lock_{v_c}_{safe_idx}"
+                
+                # On vérifie dans la session OU dans le dictionnaire persistant 'p'
+                is_validated = st.session_state.get(id_validation_blindee, False)
                 if 'p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p:
                     is_validated = True
                 
-                # Modification stricte selon vos consignes : "test effectué" ou "en attente de test"
                 if is_validated:
                     df_msa_classif.at[idx_row, "statut validation"] = "test effectué"
                 else:
                     df_msa_classif.at[idx_row, "statut validation"] = "en attente de test"
             
-            # Ré-enregistrement de l'état mis à jour dans la session
             st.session_state[msa_classif_key] = df_msa_classif
 
 
@@ -1808,7 +1807,6 @@ else:
             list_variables_critiques = []
         
         if list_variables_critiques:
-            # 🔒 INITIALISATION BLINDÉE DES DICTIONNAIRES DE SESSION
             if "msa_validated_vars" not in st.session_state:
                 st.session_state["msa_validated_vars"] = {}
             if "msa_bias_history" not in st.session_state:
@@ -1817,8 +1815,10 @@ else:
             # Génération des options du sélecteur avec un indicateur de statut
             options_sélecteur = []
             for var in list_variables_critiques:
-                v_c = "".join(e for e in var if e.isalnum())
-                if st.session_state["msa_validated_vars"].get(f"{var}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                v_c = "".join(e for e in str(var) if e.isalnum())
+                id_validation_blindee = f"status_lock_{v_c}_{safe_idx}"
+                
+                if st.session_state.get(id_validation_blindee, False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
                     options_sélecteur.append(f"✅ {var}")
                 else:
                     options_sélecteur.append(f"⏳ {var}")
@@ -1834,14 +1834,18 @@ else:
             # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
             st.markdown("##### 📈 Historique des protocoles validés")
             
-            variables_valides = [v_key.replace(f"_{safe_idx}", "") for v_key, validated in st.session_state["msa_validated_vars"].items() if validated]
+            variables_valides = []
+            for var in list_variables_critiques:
+                v_c = "".join(e for e in str(var) if e.isalnum())
+                id_validation_blindee = f"status_lock_{v_c}_{safe_idx}"
+                if st.session_state.get(id_validation_blindee, False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                    variables_valides.append(var)
             
             if variables_valides:
                 with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=False):
                     for v_nom in variables_valides:
-                        v_clean = "".join(e for e in v_nom if e.isalnum())
+                        v_clean = "".join(e for e in str(v_nom) if e.isalnum())
                         
-                        # Récupération sécurisée depuis le dictionnaire projet 'p' pour l'historique visuel
                         p_rep_key = f"save_rep_{v_clean}_{safe_idx}"
                         p_reprod_key = f"save_reprod_{v_clean}_{safe_idx}"
                         
@@ -1864,7 +1868,6 @@ else:
             
             dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
-            validation_key = f"{selected_var_to_test}_{safe_idx}"
             bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
             
             # Clés uniques de sauvegarde persistante dans le dictionnaire de projet 'p'
@@ -1872,7 +1875,7 @@ else:
             p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
             p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
             
-            # 📥 PASSERELLE D'IMPORTATION : Si les données existent dans le fichier sauvegardé 'p', on les restaure en session
+            # 📥 PASSERELLE D'IMPORTATION
             if 'p' in locals() and isinstance(p, dict):
                 if p_rep_save_key in p and dynamic_rep_key not in st.session_state:
                     st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
@@ -1881,14 +1884,11 @@ else:
                 if p_bias_hist_save_key in p and bias_hist_key not in st.session_state["msa_bias_history"]:
                     st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]
             
-            # Garantir que la sous-liste d'historique existe en session
             if bias_hist_key not in st.session_state["msa_bias_history"]:
                 st.session_state["msa_bias_history"][bias_hist_key] = []
             
-            # Liste des unités de mesure disponibles
             liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
             
-            # Initialisation par défaut si aucune donnée passée ou présente
             if dynamic_rep_key not in st.session_state:
                 st.session_state[dynamic_rep_key] = pd.DataFrame([
                     {"Opérateur": "Opérateur 1", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"},
@@ -1902,7 +1902,8 @@ else:
                 ])
                 
             # Affichage du statut de la variable actuelle
-            if st.session_state["msa_validated_vars"].get(validation_key, False):
+            id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
+            if st.session_state.get(id_validation_blindee_active, False):
                 st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
             else:
                 st.warning(f"📋 **Statut : Saisie en cours / En recalibrage** | Remplissez les mesures pour : **{selected_var_to_test}**")
@@ -1935,7 +1936,6 @@ else:
                     }
                 )
             
-            # --- CONFIGURATION DE LA VALEUR DE RÉFÉRENCE POUR L'ANALYSE DU BIAIS ---
             st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
             valeur_reference = st.number_input(
                 f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
@@ -1947,7 +1947,6 @@ else:
             # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
-                
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 if 'p' in locals() and isinstance(p, dict):
@@ -1957,27 +1956,23 @@ else:
                 anomalies_mineures = []
                 anomalies_majeures = []
                 
-                # Analyse Reproductibilité
                 if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
                     try:
                         val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
                         val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
                         diffs = np.abs(val_col1 - val_col2)
                         mean_val = val_col1.mean()
-                        
                         if not diffs.dropna().empty and mean_val > 0:
                             if diffs.max() > mean_val * 0.30:
                                 anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
                             elif diffs.max() > mean_val * 0.10:
                                 anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
-                        
                         all_vals = pd.concat([val_col1, val_col2]).dropna()
                         if not all_vals.empty and all(v % 5 == 0 or v % 1 == 0 for v in all_vals if v > 0):
                             anomalies_mineures.append("Biais d'Arrondis Systématiques")
                     except:
                         pass
 
-                # Analyse Répétabilité
                 if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
                     try:
                         vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
@@ -1985,7 +1980,6 @@ else:
                             std_dev = vals_reprod.std()
                             if std_dev > (vals_reprod.mean() * 0.20):
                                 anomalies_majeures.append("Forte Instabilité Intra-Opérateur")
-                            
                             if valeur_reference != 0.0:
                                 biais_justesse = abs(vals_reprod.mean() - valeur_reference)
                                 if biais_justesse > abs(valeur_reference * 0.08):
@@ -2005,7 +1999,6 @@ else:
                 toutes_anomalies = anomalies_majeures + anomalies_mineures
                 liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
                 
-                # 2️⃣ CALCUL DE L'HEURE STRICTEMENT EN FUSEAU GMT+3 (EAT / Madagascar)
                 gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
                 
                 run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
@@ -2022,13 +2015,12 @@ else:
                 
                 st.rerun()
 
-            # --- AFFICHAGE DE L'HISTORIQUE ENREGISTRÉ ---
             if st.session_state["msa_bias_history"][bias_hist_key]:
                 st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
                 df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
                 st.table(df_history)
 
-            # LE BOUTON DE VALIDATION FORMELLE
+            # 🛠️ LE FIX EST ICI : LE BOUTON APPLIQUE DÉSORMAIS LA CLÉ SÉCURISÉE ALPHANUMÉRIQUE
             if st.button(
                 f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
                 key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
@@ -2037,7 +2029,11 @@ else:
             ):
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
-                st.session_state["msa_validated_vars"][validation_key] = True
+                
+                # On valide via la clé blindée
+                id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
+                st.session_state[id_validation_blindee_active] = True
+                st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                 
                 if 'p' in locals() and isinstance(p, dict):
                     p[p_rep_save_key] = edited_rep.to_dict(orient='records')
