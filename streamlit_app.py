@@ -1813,14 +1813,14 @@ else:
             # Initialisation par défaut des tableaux avec les nouvelles colonnes d'unités
             if dynamic_rep_key not in st.session_state:
                 st.session_state[dynamic_rep_key] = pd.DataFrame([
-                    {"Essai / Pièce": "Pièce 1", "Répétition A": 0.0, "Unité A": "unité", "Répétition B": 0.0, "Unité B": "unité"},
-                    {"Essai / Pièce": "Pièce 2", "Répétition A": 0.0, "Unité A": "unité", "Répétition B": 0.0, "Unité B": "unité"}
+                    {"Opérateur": "Opérateur 1", "Répétition A": 0.0, "Unité A": "unité", "Répétition B": 0.0, "Unité B": "unité"},
+                    {"Opérateur": "Opérateur 2", "Répétition A": 0.0, "Unité A": "unité", "Répétition B": 0.0, "Unité B": "unité"}
                 ])
                 
             if dynamic_reprod_key not in st.session_state:
                 st.session_state[dynamic_reprod_key] = pd.DataFrame([
-                    {"Opérateur": "Opérateur 1", "Résultat": 0.0, "Unité": "unité"},
-                    {"Opérateur": "Opérateur 2", "Résultat": 0.0, "Unité": "unité"}
+                    {"Essai / Pièce": "Pièce 1", "Résultat": 0.0, "Unité": "unité"},
+                    {"Essai / Pièce": "Pièce 2", "Résultat": 0.0, "Unité": "unité"}
                 ])
                 
             # Affichage du statut de la variable actuelle
