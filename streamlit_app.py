@@ -1780,9 +1780,11 @@ else:
             list_variables_critiques = []
         
         if list_variables_critiques:
-            # Initialisation du dictionnaire de validation si non présent
+            # Initialisation des dictionnaires de session si non présents
             if "msa_validated_vars" not in st.session_state:
                 st.session_state["msa_validated_vars"] = {}
+            if "msa_bias_history" not in st.session_state:
+                st.session_state["msa_bias_history"] = {}
 
             # Génération des options du sélecteur avec un indicateur de statut
             options_sélecteur = []
@@ -1832,6 +1834,7 @@ else:
             dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
             validation_key = f"{selected_var_to_test}_{safe_idx}"
+            bias_hist_key = f"bias_hist_{var_clean_id}_{safe_idx}"
             
             # Liste des unités de mesure disponibles dans les listes déroulantes
             liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
@@ -1853,7 +1856,7 @@ else:
             if st.session_state["msa_validated_vars"].get(validation_key, False):
                 st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
             else:
-                st.warning(f"📋 **Statut : Saisie en cours** | Remplissez les mesures pour : **{selected_var_to_test}**")
+                st.warning(f"📋 **Statut : Saisie en cours / En recalibrage** | Remplissez les mesures pour : **{selected_var_to_test}**")
             
             # --- SÉQUENCE DES TESTS TERRAIN ---
             col_t1, col_t2 = st.columns(2)
@@ -1906,10 +1909,76 @@ else:
                 key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
             )
 
-            # LE BOUTON DE VALIDATION FORMELLE
+            # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
             st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
+                # Analyse à chaud sur les données actuelles des éditeurs
+                current_detected_biais = []
+                
+                # 1. Analyse Reproductibilité (Tableau de gauche)
+                if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
+                    try:
+                        val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
+                        val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
+                        diffs = np.abs(val_col1 - val_col2)
+                        mean_val = val_col1.mean()
+                        
+                        if not diffs.dropna().empty and mean_val > 0:
+                            if diffs.max() > mean_val * 0.15:
+                                current_detected_biais.append("Incohérence Forte Inter-Opérateurs (Reproductibilité)")
+                        
+                        all_vals = pd.concat([val_col1, val_col2]).dropna()
+                        if not all_vals.empty and all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
+                            current_detected_biais.append("Biais d'Arrondis Systématiques")
+                    except:
+                        pass
+
+                # 2. Analyse Répétabilité (Tableau de droite)
+                if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
+                    try:
+                        vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
+                        if len(vals_reprod) >= 1:
+                            biais_centralisation = vals_reprod.mean() - valeur_reference
+                            seuil_tolerance = 0.05 if valeur_reference == 0 else abs(valeur_reference * 0.05)
+                            if abs(biais_centralisation) > seuil_tolerance:
+                                current_detected_biais.append("Biais d'Étalonnage / Justesse (Décalage du Master)")
+                    except:
+                        pass
+                
+                # Calcul du score à chaud
+                if len(current_detected_biais) == 0:
+                    score = 100
+                    status = "Fiable"
+                elif len(current_detected_biais) == 1:
+                    score = 75
+                    status = "Partiellement Fiable"
+                else:
+                    score = 45
+                    status = "Non Fiable"
+                
+                # Enregistrement chronologique dans l'historique de la session
+                if bias_hist_key not in st.session_state["msa_bias_history"]:
+                    st.session_state["msa_bias_history"][bias_hist_key] = []
+                
+                run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
+                st.session_state["msa_bias_history"][bias_hist_key].append({
+                    "Essai": f"Analyse #{run_number}",
+                    "Date/Heure": pd.Timestamp.now().strftime("%H:%M:%S"),
+                    "Indice de Fidélité": f"{score}%",
+                    "Statut Global": status,
+                    "Anomalies Détectées": ", ".join(current_detected_biais) if current_detected_biais else "Aucune (Système sain)"
+                })
+                st.toast("Analyse de biais enregistrée dans l'historique !", icon="📈")
+
+            # --- AFFICHAGE COMPARATIF DE L'ÉVOLUTION DES ANALYSES ---
+            if bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
+                st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi des recalibrages)")
+                df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
+                st.table(df_history) # Affichage sous forme de tableau fixe pour une lecture claire des gains Lean Six Sigma
+
+            # LE BOUTON DE VALIDATION FORMELLE
             if st.button(
-                f"💾 Valider et verrouiller les données de test pour : {selected_var_to_test}", 
+                f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
                 key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
                 type="primary", 
                 use_container_width=True
@@ -1917,123 +1986,27 @@ else:
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 st.session_state["msa_validated_vars"][validation_key] = True
-                
-                # --- ANALYSE STATISTIQUE LEAN SIX SIGMA (Calcul du Biais et R&R) ---
-                try:
-                    df_rep_calc = pd.DataFrame(edited_rep)
-                    val_sit_a = pd.to_numeric(df_rep_calc['Situation A'], errors='coerce')
-                    val_sit_b = pd.to_numeric(df_rep_calc['Situation B'], errors='coerce')
-                    
-                    df_rep_calc['Ecart'] = (val_sit_a - val_sit_b).abs()
-                    avg_range = df_rep_calc['Ecart'].mean()
-                    
-                    # Formule standardisée EV (Fidélité de l'équipement)
-                    ev = avg_range / 1.128 if not pd.isna(avg_range) else 0.0
-                    
-                    st.markdown("##### 🔬 Analyse de la Capabilité du Système de Mesure (MSA)")
-                    
-                    if ev == 0:
-                        st.success("🎯 **Analyse du Biais : Excellent.** Aucune capabilité de biais d'équipement détectée (Répétabilité parfaite).")
-                    elif ev < 0.1:
-                        st.success(f"✅ **Système de mesure Acceptable (LSS)** : Variabilité Équipement (EV) de {ev:.4f}. Le biais est sous contrôle.")
-                    else:
-                        st.error(f"❌ **Système de mesure REJETÉ (Biais trop élevé)** : Variabilité Équipement (EV) de {ev:.4f}. Votre instrument ou méthode de test n'est pas fiable.")
-                except Exception as e:
-                    st.caption("L'analyse statistique automatique nécessite des valeurs numériques valides dans les colonnes de Situation.")
-                
                 st.balloons()
-                st.success(f"✅ Données terrain validées avec succès pour **{selected_var_to_test}** ! Vous pouvez maintenant choisir une autre variable dans la liste ci-dessus.")
+                st.success(f"✅ Données terrain validées et gelées avec succès pour **{selected_var_to_test}** !")
                 st.rerun()
             
         else:
             st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse. Ajoutez une ligne pour activer la suite du protocole terrain.")
             selected_var_to_test = "Aucune variable sélectionnée"
 
-        # --- 4. DEUXIÈME LECTURE AUTOMATISÉE ET DÉTECTION DES BIAIS ---
-        st.markdown("##### ⚠️ Analyse des Risques de Biais de Mesure")
-        detected_biais = []
+        # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE SIMPLIFIÉE ---
+        st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
         
-        # Point de contrôle dynamique basé sur la variable active sélectionnée
-        df_r1 = st.session_state.get(dynamic_rep_key, pd.DataFrame())
-        
-        if not df_r1.empty and 'Situation A' in df_r1.columns and 'Situation B' in df_r1.columns:
-            try:
-                val_col1 = pd.to_numeric(df_r1['Situation A'], errors='coerce')
-                val_col2 = pd.to_numeric(df_r1['Situation B'], errors='coerce')
-                
-                diffs = np.abs(val_col1 - val_col2)
-                mean_val = val_col1.mean()
-                
-                if not diffs.dropna().empty and mean_val > 0:
-                    if diffs.max() > mean_val * 0.15:
-                        detected_biais.append({
-                            "Biais": "Incohérence Forte Inter-Opérateurs (Reproductibilité)",
-                            "Impact": "Les opérateurs divergent de façon significative sur les mêmes situations.",
-                            "Solution": "Créer un détrompeur (Poka-Yoke) ou standardiser le mode opératoire visuel."
-                        })
-                
-                all_vals = pd.concat([val_col1, val_col2]).dropna()
-                if not all_vals.empty and all(v % 1 == 0 or v % 5 == 0 for v in all_vals):
-                    detected_biais.append({
-                        "Biais": "Biais d'Arrondis Systématiques",
-                        "Impact": "Perte de granularité de la donnée. Risque de masquer la vraie capabilité du procédé.",
-                        "Solution": "Imposer une règle stricte de saisie à 1 ou 2 décimales."
-                    })
-            except:
-                pass
+        # Récupération du dernier état connu dans l'historique pour l'affichage des alertes de blocage
+        last_score = 100
+        if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
+            last_status_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Statut Global"]
+            if last_status_str == "Partiellement Fiable": last_score = 75
+            elif last_status_str == "Non Fiable": last_score = 45
 
-        df_r2 = st.session_state.get(dynamic_reprod_key, pd.DataFrame())
-        if not df_r2.empty and "Résultat" in df_r2.columns:
-            try:
-                vals_reprod = pd.to_numeric(df_r2["Résultat"], errors='coerce').dropna()
-                if len(vals_reprod) >= 1:
-                    # Calcul de l'écart à la valeur standard cible (Justesse / Biais de centralisation)
-                    biais_centralisation = vals_reprod.mean() - valeur_reference
-                    seuil_tolerance = 0.05 if valeur_reference == 0 else abs(valeur_reference * 0.05)
-                    
-                    if abs(biais_centralisation) > seuil_tolerance:
-                        detected_biais.append({
-                            "Biais": "Biais d'Étalonnage / Justesse (Décalage du Master)",
-                            "Impact": f"La moyenne des mesures ({vals_reprod.mean():.2f}) dévie de la référence théorique attendue ({valeur_reference:.2f}).",
-                            "Solution": "Réétalonner l'appareil de mesure ou réaligner les critères d'évaluation de l'opérateur unique."
-                        })
-            except:
-                pass
-
-        if not detected_biais:
-            st.success("✅ Aucun biais critique ou anomalie statistique détectée dans vos données de test.")
-        else:
-            for b in detected_biais:
-                with st.status(f"⚠️ Alerte : {b['Biais']}", expanded=True):
-                    st.write(f"**Impact :** {b['Impact']}")
-                    st.info(f"**Action corrective :** {b['Solution']}")
-
-        # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE ---
-        st.markdown("##### 📊 Score de Capabilité & Recommandations")
-        score_coherence = 100
-        statut_systeme = "Fiable"
-        couleur_statut = "green"
-        
-        if len(detected_biais) == 1:
-            score_coherence = 75
-            statut_systeme = "Partiellement Fiable"
-            couleur_statut = "orange"
-        elif len(detected_biais) > 1:
-            score_coherence = 45
-            statut_systeme = "Non Fiable"
-            couleur_statut = "red"
-
-        col_d1, col_d2 = st.columns([1, 2])
-        with col_d1:
-            st.metric(label="Indice de Fidélité", value=f"{score_coherence}%", delta=statut_systeme, delta_color="normal" if score_coherence > 50 else "inverse")
-        with col_d2:
-            st.markdown(f"Statut global : <span style='color:{couleur_statut}; font-weight:bold;'>{statut_systeme}</span>", unsafe_allow_html=True)
-            if statut_systeme != "Fiable":
-                st.warning("⚠️ Le système de mesure injecte trop de bruit. Appliquez une action corrective ci-dessous avant de pouvoir valider.")
-
-        if statut_systeme != "Fiable" and 'p' in locals() and isinstance(p, dict):
+        if last_score < 100 and 'p' in locals() and isinstance(p, dict):
             p["msa_corrective_action"] = st.selectbox(
-                "Plan d'action prioritaire à déployer :",
+                "Plan d'action prioritaire déployé lors du recalibrage :",
                 options=[
                     "Automatisation de la capture (Remplacement du facteur humain par une règle SI)",
                     "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
@@ -2044,11 +2017,11 @@ else:
 
         # --- 7. VALIDATION FINALE (SIGN-OFF) ---
         st.markdown("##### 📋 Validation Finale")
-        if statut_systeme == "Non Fiable":
-            st.error("🛑 Signature bloquée : La variance du système de mesure est trop élevée. Ajustez vos données terrain après correction pour débloquer.")
+        if last_score == 45:
+            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable'. Veuillez recalibrer vos machines, modifier vos données de test et ré-appuyer sur 'Lancer l'analyse des risques de biais'.")
         else:
             saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
-            is_validated = st.checkbox("Je certifie que le système de mesure est stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
+            is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
             if 'p' in locals() and isinstance(p, dict):
                 p["msa_is_validated_status"] = is_validated
             
