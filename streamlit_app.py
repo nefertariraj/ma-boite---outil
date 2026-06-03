@@ -2084,9 +2084,6 @@ else:
                     st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # 5. Data collection
-        # =====================================================================
-        # CONFIGURATION ET INITIALISATION DES SESSIONS STREAMLIT
-        # =====================================================================
         # Définition des variables cibles du Data Collection Plan (DCP)
         DCP_VARIABLES = {
             "Lead Time (Y)": {
