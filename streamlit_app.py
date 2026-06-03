@@ -1935,6 +1935,16 @@ else:
                         }
                     )
                 
+                # 🛡️ SÉCURITÉ SANS TOUCHER AUX BOUTONS : Si l'utilisateur clique sur un bouton plus bas,
+                # les variables edited_rep et edited_reprod se vident. On les force ici à récupérer les données en mémoire.
+                if edited_rep is None or (isinstance(edited_rep, dict) and not edited_rep.get("edited_rows") and not edited_rep.get("added_rows") and not edited_rep.get("deleted_rows")):
+                    if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state:
+                        edited_rep = st.session_state[f"editor_rep_{var_clean_id}_{safe_idx}"]
+
+                if edited_reprod is None or (isinstance(edited_reprod, dict) and not edited_reprod.get("edited_rows") and not edited_reprod.get("added_rows") and not edited_reprod.get("deleted_rows")):
+                    if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
+                        edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
+                
                 st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
                 valeur_reference = st.number_input(
                     f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
