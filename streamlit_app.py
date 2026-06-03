@@ -1947,7 +1947,22 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                     
-                    # 1. INITIALISATION DE L'ANALYSE (LOGIQUE INTACTE)
+                    # 1. RÉCUPÉRATION SÉCURISÉE DES DONNÉES (Méthode validée hier)
+                    # On vérifie d'abord dans le session_state des éditeurs pour éviter l'effet d'effacement au clic
+                    if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state:
+                        edited_rep = st.session_state[f"editor_rep_{var_clean_id}_{safe_idx}"]
+                    if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
+                        edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
+
+                    # 2. SAUVEGARDE IMMÉDIATE ET COMPLÈTE DANS LE DICTIONNAIRE GLOBAL 'P'
+                    if edited_rep is not None:
+                        p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                        st.session_state[dynamic_rep_key] = edited_rep
+                    if edited_reprod is not None:
+                        p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+                        st.session_state[dynamic_reprod_key] = edited_reprod
+
+                    # 3. VOTRE LOGIQUE D'ANALYSE DES BIAIS (100% INTACTE)
                     anomalies_mineures = []
                     anomalies_majeures = []
                     
@@ -1956,7 +1971,6 @@ else:
                             val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
                             val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
                             
-                            # Sécurité MSA : Détecte si les données saisies ne sont pas numériques ou vides
                             if val_col1.dropna().empty or val_col2.dropna().empty:
                                 anomalies_majeures.append("Données de Répétabilité Invalides ou Vides")
                             else:
@@ -1978,7 +1992,6 @@ else:
                         try:
                             vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
                             
-                            # Sécurité MSA : Détecte si le tableau de reproductibilité est vide ou textuel
                             if vals_reprod.empty:
                                 anomalies_majeures.append("Données de Reproductibilité Manquantes ou Invalides")
                             else:
@@ -1994,11 +2007,9 @@ else:
                         except Exception as e:
                             anomalies_majeures.append(f"Erreur évaluation Reproductibilité: {str(e)}")
                     
-                    # Sécurité LSS : Si aucune donnée n'est exploitable
                     if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
                         anomalies_majeures.append("Variabilité Incalculable : Aucune donnée disponible")
                     
-                    # Logique de scoring rigoureuse LSS Master Black Belt
                     if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
                         score, status = "100%", "🟢 Système Fiable"
                     elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
@@ -2013,10 +2024,10 @@ else:
                     toutes_anomalies = anomalies_majeures + anomalies_mineures
                     liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
                     
-                    # Configuration temporelle stricte GMT+3
+                    # Horodatage stable GMT+3
                     gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
                     
-                    # 2. ENREGISTREMENT ET COMPILATION DE L'HISTORIQUE DES BIAIS
+                    # 4. ENREGISTREMENT DE L'HISTORIQUE DE CALCUL
                     run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
                     st.session_state["msa_bias_history"][bias_hist_key].append({
                         "Essai": f"Analyse #{run_number}",
@@ -2026,14 +2037,7 @@ else:
                         "Anomalies Détectées": liste_anomalies_str
                     })
                     
-                    # 3. VERROUILLAGE CENTRALISÉ ET SAUVEGARDE ABSOLUE DE TOUTES LES DONNÉES DE TERRAIN SIZES
-                    st.session_state[dynamic_rep_key] = edited_rep
-                    st.session_state[dynamic_reprod_key] = edited_reprod
-                    
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
-                    
                     st.rerun()
 
                 if st.session_state["msa_bias_history"][bias_hist_key]:
@@ -2042,7 +2046,7 @@ else:
                     st.table(df_history)
 
                 # =====================================================================
-                # 💾 BOUTON DE VALIDATION DÉFINITIVE AVEC SAUVEGARDE STRICTE DANS 'P'
+                # 💾 BOUTON DE VALIDATION DÉFINITIVE
                 # =====================================================================
                 if st.button(
                     f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
@@ -2056,14 +2060,12 @@ else:
                     st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
                     st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                     
-                    # Force la ré-écriture immédiate du statut dans l'éditeur
                     if not df_classification_current.empty:
                         for idx_row, row in df_classification_current.iterrows():
                             if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
                                 df_classification_current.at[idx_row, "statut validation"] = "test effectué"
                         st.session_state[msa_classif_key] = df_classification_current
 
-                    # Export et écriture rigide dans le dictionnaire 'p' de session
                     p[p_rep_save_key] = edited_rep.to_dict(orient='records')
                     p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
@@ -2077,7 +2079,7 @@ else:
                 st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse.")
                 selected_var_to_test = "Aucune variable sélectionnée"
 
-            # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE SIMPLIFIÉE ---
+            # --- 5 & 6. DIAGNOSTIC ET PLAN D'ACTION ---
             st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
             
             last_score_str = "100%"
