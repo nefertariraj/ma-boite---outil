@@ -1947,22 +1947,24 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                     
-                    # 1. RÉCUPÉRATION SÉCURISÉE DES DONNÉES (Méthode validée hier)
-                    # On vérifie d'abord dans le session_state des éditeurs pour éviter l'effet d'effacement au clic
-                    if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state:
-                        edited_rep = st.session_state[f"editor_rep_{var_clean_id}_{safe_idx}"]
-                    if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
-                        edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
+                    # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (NONE-CHECK)
+                    # Si la variable locale est perdue au clic, on tente de la récupérer via les clés d'état actives
+                    if 'edited_rep' not in locals() or edited_rep is None:
+                        edited_rep = st.session_state.get(dynamic_rep_key) or st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
+                        
+                    if 'edited_reprod' not in locals() or edited_reprod is None:
+                        edited_reprod = st.session_state.get(dynamic_reprod_key) or st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
 
-                    # 2. SAUVEGARDE IMMÉDIATE ET COMPLÈTE DANS LE DICTIONNAIRE GLOBAL 'P'
-                    if edited_rep is not None:
+                    # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P' (Uniquement si les données existent)
+                    if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
                         p[p_rep_save_key] = edited_rep.to_dict(orient='records')
                         st.session_state[dynamic_rep_key] = edited_rep
-                    if edited_reprod is not None:
+                    
+                    if edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
                         p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                         st.session_state[dynamic_reprod_key] = edited_reprod
 
-                    # 3. VOTRE LOGIQUE D'ANALYSE DES BIAIS (100% INTACTE)
+                    # 3. VOTRE LOGIQUE D'ANALYSE DES BIAIS (100% INTACTE ET PROTÉGÉE)
                     anomalies_mineures = []
                     anomalies_majeures = []
                     
@@ -2024,10 +2026,8 @@ else:
                     toutes_anomalies = anomalies_majeures + anomalies_mineures
                     liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
                     
-                    # Horodatage stable GMT+3
                     gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
                     
-                    # 4. ENREGISTREMENT DE L'HISTORIQUE DE CALCUL
                     run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
                     st.session_state["msa_bias_history"][bias_hist_key].append({
                         "Essai": f"Analyse #{run_number}",
@@ -2054,8 +2054,12 @@ else:
                     type="primary", 
                     use_container_width=True
                 ):
-                    st.session_state[dynamic_rep_key] = edited_rep
-                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    if 'edited_rep' in locals() and edited_rep is not None and hasattr(edited_rep, 'to_dict'):
+                        p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                        st.session_state[dynamic_rep_key] = edited_rep
+                    if 'edited_reprod' in locals() and edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
+                        p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+                        st.session_state[dynamic_reprod_key] = edited_reprod
                     
                     st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
                     st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
@@ -2066,8 +2070,6 @@ else:
                                 df_classification_current.at[idx_row, "statut validation"] = "test effectué"
                         st.session_state[msa_classif_key] = df_classification_current
 
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
                     p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
                     
