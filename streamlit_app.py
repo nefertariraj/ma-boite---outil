@@ -2084,319 +2084,321 @@ else:
                     st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # 5. Data collection
-            # Définition des variables cibles du Data Collection Plan (DCP)
-            DCP_VARIABLES = {
-                "Lead Time (Y)": {
-                    "type": "Continue",
-                    "definition": "Temps écoulé entre la réception du dossier et la décision finale",
-                    "unite": "Heures",
-                    "frequence": "À chaque dossier traité",
-                    "point_collecte": "Extracteur Workflow",
-                    "responsable": "Admin Système",
-                },
-                "Statut Dossier (X1)": {
-                    "type": "Attributaire",
-                    "definition": "État final du dossier après analyse",
-                    "unite": "Catégorie (Validé / Rejeté / Retouche)",
-                    "frequence": "À chaque décision",
-                    "point_collecte": "Formulaire Agent",
-                    "responsable": "Superviseur Équipe",
-                },
+            # =====================================================================
+        # ÉTAPE 0 : INITIALISATION DE LA PERSISTANCE (JSON & STATE)
+        # =====================================================================
+        # p correspond à votre dictionnaire de projet pour la reprise de travail JSON
+        if "dc_plan" not in p:
+            p["dc_plan"] = {
+                "taille_prevue": 100,
+                "date_debut": "2026-06-01",
+                "date_fin_est": "2026-06-15",
             }
 
-            # Initialisation de la base de données de collecte dans le State Streamlit
-            if "data_collection_db" not in st.session_state:
-                st.session_state.data_collection_db = pd.DataFrame(
-                    columns=[
-                        "id_obs",
-                        "timestamp_gmt3",
-                        "ref_dossier",
-                        "lead_time_hours",
-                        "statut_dossier",
-                        "observateur",
-                        "commentaires",
-                    ]
+        # Initialisation de la table maîtresse dans le state si absente
+        if "dc_master_data" not in st.session_state:
+            if "dc_saved_df_json" in p and p["dc_saved_df_json"]:
+                st.session_state.dc_master_data = pd.read_json(p["dc_saved_df_json"])
+            else:
+                st.session_state.dc_master_data = pd.DataFrame(
+                    columns=["ID observation", "Date", "Variable mesurée", "Valeur", "Unité de mesure", "Commentaire"]
                 )
 
-            # =====================================================================
-            # FONCTIONS REUTILISABLES (MOTEUR LEAN SIX SIGMA)
-            # =====================================================================
+        # Variables par défaut adaptables (Garage, Industrie, Admin)
+        DCP_VARS_DEF = {
+            "Temps d'entretien": "Heures",
+            "Temps attente pièces": "Heures",
+            "Temps réparation": "Heures",
+            "Statut Retouche": "Attributaire",
+        }
 
-            def ajouter_ligne_collecte(ref, lt, statut, obs, comm):
-                """Calcule l'horodatage en GMT+3 et injecte l'observation dans le state."""
-                db = st.session_state.data_collection_db
-                next_id = f"OBS-{len(db) + 1:03d}"
+        # =====================================================================
+        # ÉCRAN 1 : RÉSUMÉ DE LA COLLECTE & IMPORT GLOBAL
+        # =====================================================================
+        st.title("📊 Module : Data Collection & Process Baseline")
+        st.markdown("---")
+        st.header("Écran 1 : Résumé de la Collecte")
 
-                # Capture et conversion automatique en GMT+3 (Etc/GMT-3 dans la base IANA)
-                tz_gmt3 = pd.Timestamp.now(tz="UTC").tz_convert("Etc/GMT-3")
+        e1_c1, e1_c2, e1_c3 = st.columns(3)
+        with e1_c1:
+            p["dc_plan"]["taille_prevue"] = st.number_input(
+                "Taille d'échantillon prévue (N)", min_value=1, value=int(p["dc_plan"]["taille_prevue"]), key="dc_n_prevu"
+            )
+        with e1_c2:
+            p["dc_plan"]["date_debut"] = st.text_input(
+                "Date de début de collecte", value=p["dc_plan"]["date_debut"], key="dc_d_deb"
+            )
+        with e1_c3:
+            p["dc_plan"]["date_fin_est"] = st.text_input(
+                "Date estimée de fin", value=p["dc_plan"]["date_fin_est"], key="dc_d_fin"
+            )
 
-                new_row = {
-                    "id_obs": next_id,
-                    "timestamp_gmt3": tz_gmt3.strftime("%Y-%m-%d %H:%M:%S"),
-                    "ref_dossier": ref,
-                    "lead_time_hours": float(lt) if lt is not None else np.nan,
-                    "statut_dossier": statut,
-                    "observateur": obs,
-                    "commentaires": comm,
-                }
-                st.session_state.data_collection_db = pd.concat([db, pd.DataFrame([new_row])], ignore_index=True)
+        st.subheader("📋 Liste des variables définies dans le DCP")
+        dcp_display = pd.DataFrame(
+            [{"Variable": k, "Type/Unité": v} for k, v in DCP_VARS_DEF.items()]
+        )
+        st.table(dcp_display)
 
-            def controler_qualite_donnees(df):
-                """Analyse les erreurs, doublons, manquants et outliers (IQR)."""
-                anomalies = {
-                    "missing": [],
-                    "duplicates": [],
-                    "invalid_status": [],
-                    "outliers": [],
-                }
-                if df.empty:
-                    return anomalies
+        # Import global Excel
+        uploaded_file = st.file_uploader(
+            "📥 Importer un fichier Excel pour compléter automatiquement les tableaux",
+            type=["xlsx", "xls"],
+            key="dc_excel_uploader",
+        )
 
-                # 1. Manquants
-                anomalies["missing"] = df[df["lead_time_hours"].isna()]["id_obs"].tolist()
+        if uploaded_file:
+            try:
+                imported_df = pd.read_excel(uploaded_file)
+                # Alignement des colonnes cibles
+                required_cols = ["ID observation", "Date", "Variable mesurée", "Valeur", "Unité de mesure", "Commentaire"]
+                for col in required_cols:
+                    if col not in imported_df.columns:
+                        imported_df[col] = np.nan if col != "Commentaire" else ""
+                
+                imported_df = imported_df[required_cols]
+                st.session_state.dc_master_data = pd.concat(
+                    [st.session_state.dc_master_data, imported_df], ignore_index=True
+                ).drop_duplicates(subset=["ID observation", "Variable mesurée"], keep="last")
+                
+                # Sauvegarde immédiate dans la structure JSON de reprise de travail
+                p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+                st.success("✅ Fichier Excel importé et synchronisé avec succès dans la session LSS.")
+            except Exception as e:
+                st.error(f"Erreur lors de la lecture du fichier Excel : {e}")
 
-                # 2. Doublons
-                anomalies["duplicates"] = df[df.duplicated(subset=["ref_dossier"], keep="first")]["id_obs"].tolist()
+        # =====================================================================
+        # ÉCRAN 2 : SAISIE DES DONNÉES & TABLEAUX DYNAMIQUES
+        # =====================================================================
+        st.markdown("---")
+        st.header("Écran 2 : Saisie des Données (Tableaux Dynamiques)")
 
-                # 3. Valeurs Impossibles (Statuts invalides)
-                status_autorises = ["Validé", "Rejeté", "Retouche"]
-                anomalies["invalid_status"] = df[~df["statut_dossier"].isin(status_autorises)]["id_obs"].tolist()
+        st.markdown("#### Saisie manuelle rapide")
+        with st.form("dc_form_manual", clear_on_submit=True):
+            f_c1, f_c2, f_c3, f_c4 = st.columns(4)
+            with f_c1:
+                v_var = st.selectbox("Variable à mesurer", list(DCP_VARS_DEF.keys()))
+            with f_c2:
+                v_val = st.text_input("Valeur (Nombre si continue, Texte si attributaire)")
+            with f_c3:
+                v_obs = st.text_input("ID observation (ex: OBS-001)")
+            with f_c4:
+                v_comm = st.text_input("Commentaire")
 
-                # 4. Outliers par la méthode des Écarts Interquartiles (IQR)
-                lt_clean = df["lead_time_hours"].dropna()
-                if len(lt_clean) >= 3:
-                    q1 = lt_clean.quantile(0.25)
-                    q3 = lt_clean.quantile(0.75)
-                    iqr = q3 - q1
-                    upper_bound = q3 + 1.5 * iqr
-                    lower_bound = max(0, q1 - 1.5 * iqr)
-                    outliers_df = df[(df["lead_time_hours"] > upper_bound) | (df["lead_time_hours"] < lower_bound)]
-                    anomalies["outliers"] = outliers_df["id_obs"].tolist()
-
-                return anomalies
-
-            # =====================================================================
-            # RE RENDU DE L'INTERFACE GRAPHIQUE STREAMLIT
-            # =====================================================================
-            st.title("📊 Phase Measure : Pilotage de la Collecte Terrain")
-            st.markdown("---")
-
-            # --- ÉTAPE 1 : RÉSUMÉ DU DATA COLLECTION PLAN ---
-            st.header("1. Résumé du Data Collection Plan (DCP)")
-            dcp_df = pd.DataFrame.from_dict(DCP_VARIABLES, orient="index")
-            st.table(dcp_df)
-
-            # --- ÉTAPE 2 : FORMULAIRE ET TABLEAU DYNAMIQUE ---
-            st.header("2. Formulaire de Collecte Réelle & Tableaux Dynamiques")
-
-            col_form, col_actions = st.columns([1, 2])
-
-            with col_form:
-                st.subheader("Saisie Terrain")
-                with st.form("form_saisie", clear_on_submit=True):
-                    ref_input = st.text_input("Référence Dossier (ex: DOS-2026-X)")
-                    lt_input = st.number_input(
-                        "Lead Time (Heures)", min_value=0.0, step=0.1, value=None, placeholder="Saisir..."
+            if st.form_submit_button("＋ Ajouter la ligne"):
+                if v_obs and v_val:
+                    tz_gmt3 = pd.Timestamp.now(tz="UTC").tz_convert("Etc/GMT-3").strftime("%Y-%m-%d %H:%M:%S")
+                    new_row = {
+                        "ID observation": v_obs,
+                        "Date": tz_gmt3,
+                        "Variable mesurée": v_var,
+                        "Valeur": v_val,
+                        "Unité de mesure": DCP_VARS_DEF[v_var],
+                        "Commentaire": v_comm,
+                    }
+                    st.session_state.dc_master_data = pd.concat(
+                        [st.session_state.dc_master_data, pd.DataFrame([new_row])], ignore_index=True
                     )
-                    statut_input = st.selectbox("Statut Final du Dossier", ["Validé", "Rejeté", "Retouche", "En cours"])
-                    obs_input = st.text_input("Identifiant Observateur / Agent")
-                    comm_input = st.text_area("Commentaires terrain")
+                    p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+                    st.rerun()
 
-                    submit = st.form_submit_button("📥 Enregistrer l'observation")
-                    if submit and ref_input:
-                        ajouter_ligne_collecte(ref_input, lt_input, statut_input, obs_input, comm_input)
-                        st.success("Donnée enregistrée en GMT+3.")
-
-            with col_actions:
-                st.subheader("Base de Données Brute Actuelle")
-                if not st.session_state.data_collection_db.empty:
-                    # Permettre la modification et suppression en direct via le data_editor de Streamlit
-                    edited_df = st.data_editor(
-                        st.session_state.data_collection_db, num_rows="dynamic", key="db_editor"
-                    )
-                    st.session_state.data_collection_db = edited_df
-                else:
-                    st.info("Aucune donnée enregistrée pour le moment.")
-
-            # Injection optionnelle d'un jeu de données de test si la table est vide
-            if st.button("🧬 Charger le jeu de données de simulation LSS (Optionnel)"):
-                st.session_state.data_collection_db = pd.DataFrame(
-                    [
-                        {
-                            "id_obs": "OBS-001",
-                            "timestamp_gmt3": "2026-06-01 09:15:00",
-                            "ref_dossier": "DOS-2026-881",
-                            "lead_time_hours": 14.5,
-                            "statut_dossier": "Validé",
-                            "observateur": "Agent A",
-                            "commentaires": "",
-                        },
-                        {
-                            "id_obs": "OBS-002",
-                            "timestamp_gmt3": "2026-06-01 10:30:00",
-                            "ref_dossier": "DOS-2026-882",
-                            "lead_time_hours": 22.1,
-                            "statut_dossier": "Retouche",
-                            "observateur": "Agent B",
-                            "commentaires": "",
-                        },
-                        {
-                            "id_obs": "OBS-003",
-                            "timestamp_gmt3": "2026-06-01 14:00:00",
-                            "ref_dossier": "DOS-2026-883",
-                            "lead_time_hours": 11.0,
-                            "statut_dossier": "Validé",
-                            "observateur": "Agent A",
-                            "commentaires": "",
-                        },
-                        {
-                            "id_obs": "OBS-004",
-                            "timestamp_gmt3": "2026-06-02 11:15:00",
-                            "ref_dossier": "DOS-2026-884",
-                            "lead_time_hours": 198.0,
-                            "statut_dossier": "Rejeté",
-                            "observateur": "Agent C",
-                            "commentaires": "Cause spéciale externe",
-                        },
-                        {
-                            "id_obs": "OBS-005",
-                            "timestamp_gmt3": "2026-06-02 16:45:00",
-                            "ref_dossier": "DOS-2026-885",
-                            "lead_time_hours": None,
-                            "statut_dossier": "Validé",
-                            "observateur": "Agent B",
-                            "commentaires": "",
-                        },
-                        {
-                            "id_obs": "OBS-006",
-                            "timestamp_gmt3": "2026-06-03 09:00:00",
-                            "ref_dossier": "DOS-2026-886",
-                            "lead_time_hours": 16.2,
-                            "statut_dossier": "En cours",
-                            "observateur": "Agent A",
-                            "commentaires": "Erreur statut",
-                        },
-                        {
-                            "id_obs": "OBS-007",
-                            "timestamp_gmt3": "2026-06-03 10:30:00",
-                            "ref_dossier": "DOS-2026-882",
-                            "lead_time_hours": 22.1,
-                            "statut_dossier": "Retouche",
-                            "observateur": "Agent B",
-                            "commentaires": "Doublon",
-                        },
-                    ]
-                )
+        # Rendu du tableau dynamique interactif
+        st.markdown("#### Édition en temps réel de la base maîtresse")
+        if not st.session_state.dc_master_data.empty:
+            edited_master = st.data_editor(
+                st.session_state.dc_master_data, num_rows="dynamic", key="dc_master_editor"
+            )
+            if not edited_master.equals(st.session_state.dc_master_data):
+                st.session_state.dc_master_data = edited_master
+                p["dc_saved_df_json"] = edited_master.to_json()
                 st.rerun()
+            
+            # Export Excel
+            @st.cache_data
+            def convert_df_to_excel(df):
+                import io
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Data_Collection")
+                return output.getvalue()
+            
+            excel_data = convert_df_to_excel(st.session_state.dc_master_data)
+            st.download_button(
+                label="📥 Export complet de la base vers Excel",
+                data=excel_data,
+                file_name="LSS_Data_Collection_Master.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        else:
+            st.info("La base de données est actuellement vide. Utilisez le formulaire ou l'import Excel.")
 
-            # --- BLOCS D'ANALYSE SI DES DONNÉES SONT PRÉSENTES ---
-            if not st.session_state.data_collection_db.empty:
-                df_actuel = st.session_state.data_collection_db
-                errors = controler_qualite_donnees(df_actuel)
+        # =====================================================================
+        # ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES
+        # =====================================================================
+        st.markdown("---")
+        st.header("Écran 3 : Contrôle Qualité des Données")
 
-                # --- ÉTAPE 3 : CONTRÔLE QUALITÉ DES DONNÉES ---
-                st.header("3. Contrôle Qualité Automatisé")
-                c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Manquants (N/A)", len(errors["missing"]))
-                c2.metric("Doublons Détectés", len(errors["duplicates"]))
-                c3.metric("Statuts Invalides", len(errors["invalid_status"]))
-                c4.metric("Outliers (Hors IQR)", len(errors["outliers"]))
+        df_cq = st.session_state.dc_master_data.copy()
+        num_erreurs = 0
+        num_manquants = 0
+        total_prevu = max(1, int(p["dc_plan"]["taille_prevue"]))
+        
+        if not df_cq.empty:
+            # Détection des manquants
+            num_manquants = df_cq["Valeur"].isna().sum() + (df_cq["Valeur"] == "").sum()
+            
+            # Analyse des lignes pour erreurs de format, négatifs et incohérences
+            for idx, row in df_cq.iterrows():
+                val = str(row["Valeur"]).strip()
+                var_type = DCP_VARS_DEF.get(row["Variable mesurée"], "Heures")
+                
+                if var_type == "Heures":
+                    try:
+                        numeric_val = float(val)
+                        if numeric_val < 0:
+                            num_erreurs += 1  # Valeur négative impossible
+                    except ValueError:
+                        if val and val.lower() != "nan":
+                            num_erreurs += 1  # Format incorrect pour variable continue
+            
+            # Détection des doublons logiques (Même ID d'observation pour la même variable)
+            num_doublons = df_cq.duplicated(subset=["ID observation", "Variable mesurée"]).sum()
+            num_erreurs += num_doublons
+            
+            taux_completude = (len(df_cq) / total_prevu) * 100
+        else:
+            taux_completude = 0.0
 
-                if any(errors.values()):
-                    st.warning(f"⚠️ Anomalies détectées sur les observations suivantes : {errors}")
-                else:
-                    st.success("✅ Aucun problème qualité détecté sur la base actuelle.")
+        # Rendu visuel du Contrôle Qualité
+        st.metric("Nombre d'erreurs détectées", num_erreurs)
+        st.metric("Nombre de données manquantes", num_manquants)
+        st.metric("Taux de complétude théorique", f"{taux_completude:.1f} %")
 
-                # --- ÉTAPE 4 : VALIDATION DE LA COLLECTE ---
-                st.header("4. Rapport de Progression & Taux de Complétude")
-                OBJECTIF_COLLECTE = 100  # Seuil cible ajustable
-                realisees = len(df_actuel)
-                completude = min(100.0, (realisees / OBJECTIF_COLLECTE) * 100)
-                taux_erreur = (
-                    (len(set(errors["duplicates"] + errors["invalid_status"])) / realisees) * 100
-                    if realisees > 0
-                    else 0
-                )
+        # Code couleur Black Belt
+        if num_erreurs > 0:
+            st.error("🔴 Statut : Correction requise. Des valeurs négatives, des doublons ou des formats incorrects polluent la base.")
+        elif num_manquants > 0 or taux_completude < 80:
+            st.warning("🟠 Statut : Attention. Aucune anomalie critique mais l'échantillon est incomplet ou contient des cellules vides.")
+        elif len(df_cq) == 0:
+            st.info("🔵 En attente d'injection de données.")
+        else:
+            st.success("🟢 Statut : Données conformes. Prêt pour l'établissement de la Baseline.")
 
-                if completude >= 95 and taux_erreur <= 2:
-                    st.select_slider(
-                        "Indicateur d'Exécution du Plan de Collecte",
-                        options=["Rouge", "Orange", "Vert"],
-                        value="Vert",
-                        disabled=True,
-                        key="slider_perf_green"
-                    )
-                    st.success("Collecte conforme. Prête pour l'export.")
-                elif completude >= 75 and taux_erreur <= 5:
-                    st.select_slider(
-                        "Indicateur d'Exécution du Plan de Collecte",
-                        options=["Rouge", "Orange", "Vert"],
-                        value="Orange",
-                        disabled=True,
-                        key="slider_perf_orange"
-                    )
-                    st.warning("Vigilance : Volume encore faible ou légères erreurs de saisie.")
-                else:
-                    st.select_slider(
-                        "Indicateur d'Exécution du Plan de Collecte",
-                        options=["Rouge", "Orange", "Vert"],
-                        value="Rouge",
-                        disabled=True,
-                        key="slider_perf_red"
-                    )
-                    st.error("Collecte insuffisante ou taux d'erreur critique.")
+        # =====================================================================
+        # ÉCRAN 4 : SUIVI DE LA COLLECTE (TEMPS RÉEL)
+        # =====================================================================
+        st.markdown("---")
+        st.header("Écran 4 : Suivi de la Collecte")
 
-                # Nettoyage à la volée des doublons et manquants pour l'analyse
-                exclure_ids = set(errors["duplicates"] + errors["missing"])
-                df_analyse_lss = df_actuel[~df_actuel["id_obs"].isin(exclure_ids)].copy()
-                df_stats_sans_outliers = df_analyse_lss[~df_analyse_lss["id_obs"].isin(errors["outliers"])]
+        obs_collectees = len(df_cq["ID observation"].unique()) if not df_cq.empty else 0
+        restant = max(0, total_prevu - obs_collectees)
+        avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
-                # --- ÉTAPE 5 & 6 : STATISTIQUES DESCRIPTIVES ET BASELINE ---
-                st.header("5 & 6. Statistiques Descriptives et Baseline du Processus")
+        e4_c1, e4_c2, e4_c3 = st.columns(3)
+        e4_c1.metric("Observations collectées", obs_collectees)
+        e4_c2.metric("Restant à collecter", restant)
+        e4_c3.metric("Taux d'avancement", f"{avancement:.1f} %")
 
-                col_stats_y, col_baseline = st.columns(2)
+        # Graphique d'avancement de type jauge / barre LSS
+        progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
+        st.bar_chart(progress_df.set_index("Statut"))
 
-                with col_stats_y:
-                    st.subheader("Statistiques sur le Lead Time (Y) - Hors Outliers")
-                    if not df_stats_sans_outliers.empty:
-                        stats_y = {
-                            "Moyenne (Heures)": df_stats_sans_outliers["lead_time_hours"].mean(),
-                            "Médiane (Heures)": df_stats_sans_outliers["lead_time_hours"].median(),
-                            "Minimum (Heures)": df_stats_sans_outliers["lead_time_hours"].min(),
-                            "Maximum (Heures)": df_stats_sans_outliers["lead_time_hours"].max(),
-                            "Écart-type (σ)": df_stats_sans_outliers["lead_time_hours"].std(),
+        # =====================================================================
+        # ÉCRAN 5 : STATISTIQUES DESCRIPTIVES
+        # =====================================================================
+        st.markdown("---")
+        st.header("Écran 5 : Statistiques Descriptives")
+
+        if not df_cq.empty:
+            for variable, v_type in DCP_VARS_DEF.items():
+                st.subheader(f"📊 Analyse descriptive : {variable}")
+                df_var = df_cq[df_cq["Variable mesurée"] == variable]
+                
+                if df_var.empty:
+                    st.info(f"Aucune donnée collectée pour {variable}")
+                    continue
+
+                if v_type == "Heures":
+                    # Forcer la conversion numérique pour les statistiques continues
+                    numeric_series = pd.to_numeric(df_var["Valeur"], errors="coerce").dropna()
+                    
+                    if not numeric_series.empty:
+                        stats_data = {
+                            "Métrique LSS": ["Moyenne", "Médiane", "Minimum", "Maximum", "Écart-type (σ)"],
+                            "Valeur": [
+                                f"{numeric_series.mean():.2f}",
+                                f"{numeric_series.median():.2f}",
+                                f"{numeric_series.min():.2f}",
+                                f"{numeric_series.max():.2f}",
+                                f"{numeric_series.std():.2f}" if len(numeric_series) > 1 else "0.00"
+                            ]
                         }
-                        st.json(stats_y)
+                        st.table(pd.DataFrame(stats_data))
+                        
+                        # Graphique d'analyse de distribution (Histogramme)
+                        st.bar_chart(np.histogram(numeric_series, bins=10)[0])
+                    else:
+                        st.error("Erreur d'analyse : Les données de cette variable continue ne sont pas numériques.")
+                
+                else:
+                    # Traitement des variables attributaires (ex: Statut Retouche)
+                    attr_counts = df_var["Valeur"].value_counts()
+                    attr_pct = df_var["Valeur"].value_counts(normalize=True) * 100
+                    
+                    attr_df = pd.DataFrame({
+                        "Fréquence (N)": attr_counts,
+                        "Pourcentage (%)": attr_pct.map("{:.2f} %".format),
+                        "Taux d'occurrence": attr_counts / len(df_var)
+                    })
+                    st.table(attr_df)
+        else:
+            st.info("Aucune statistique disponible : la base maîtresse est vide.")
 
-                with col_baseline:
-                    st.subheader("Baseline Finale de Performance")
-                    total_clean = len(df_analyse_lss)
-                    if total_clean > 0:
-                        counts = df_analyse_lss["statut_dossier"].value_counts()
-                        valides = counts.get("Validé", 0)
-                        retouches = counts.get("Retouche", 0)
-                        rejets = counts.get("Rejeté", 0)
+        # =====================================================================
+        # ÉCRAN 6 : BASELINE DU PROCESSUS
+        # =====================================================================
+        st.markdown("---")
+        st.header("Écran 6 : Baseline du Processus")
 
-                        yield_pct = (valides / total_clean) * 100
-                        retouche_pct = (retouches / total_clean) * 100
-                        defauts_pct = ((retouches + rejets) / total_clean) * 100
+        if not df_cq.empty:
+            st.markdown("### 🎯 Situation de référence avant amélioration (KPI Actuels)")
+            
+            # Fonction interne pour convertir une valeur décimale d'heures en chaîne de caractères classique H:MM
+            def format_to_hours_mins(decimal_hours):
+                if pd.isna(decimal_hours):
+                    return "0h00"
+                hours = int(decimal_hours)
+                minutes = int(round((decimal_hours - hours) * 60))
+                if minutes == 60:
+                    hours += 1
+                    minutes = 0
+                return f"{hours}h{minutes:02d}"
 
-                        st.metric("Process Yield (First Time Right)", f"{yield_pct:.2f} %")
-                        st.metric("Taux de Retouches (Rework)", f"{retouche_pct:.2f} %")
-                        st.metric("Taux de Non-Conformité global", f"{defauts_pct:.2f} %")
+            baseline_metrics = []
+            
+            # Calcul automatique des temps moyens pour les variables continues (Y et X)
+            for variable, v_type in DCP_VARS_DEF.items():
+                df_var = df_cq[df_cq["Variable mesurée"] == variable]
+                if v_type == "Heures" and not df_var.empty:
+                    num_series = pd.to_numeric(df_var["Valeur"], errors="coerce").dropna()
+                    if not num_series.empty:
+                        avg_formatted = format_to_hours_mins(num_series.mean())
+                        baseline_metrics.append({"KPI Courant": f"Temps moyen [{variable}]", "Niveau de performance actuel": avg_formatted})
 
-                # --- ÉTAPE 7 : PRÉPARATION DE LA PHASE ANALYZE ---
-                st.header("7. Variables Prioritaires & Recommandations pour Analyze")
-                st.info(
-                    "📌 **Variables cibles identifiées pour la phase Analyze :**\n"
-                    "1. **Variabilité de Y (Lead Time)** : L'écart-type mesuré indique une instabilité à cartographier par rapport aux types de demandes.\n"
-                    "2. **Le goulot des 'Retouches'** : Constitue la principale source de dégradation du Yield."
-                )
-                st.markdown(
-                    "> **Règle d'or Master Black Belt :** Aucune recherche de cause racine ni proposition de solution "
-                    "n'est tolérée à cette étape. La base de données ci-dessus est déclarée statistiquement saine. "
-                    "Le transfert vers la phase **Analyze** est validé."
-                )
+            # Calcul automatique du taux de retouche (Variable attributaire)
+            df_attr = df_cq[df_cq["Variable mesurée"] == "Statut Retouche"]
+            if not df_attr.empty:
+                # On considère comme retouche toute ligne explicitée positivement (ex: "Oui", "Retouche", "True")
+                retouche_count = df_attr["Valeur"].astype(str).str.lower().isin(["oui", "retouche", "true", "1"]).sum()
+                taux_retouche_calc = (retouche_count / len(df_attr)) * 100
+                baseline_metrics.append({"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": f"{taux_retouche_calc:.1f} %"})
+            else:
+                # Exemple de fallback automatique si la variable n'a pas encore été nourrie
+                baseline_metrics.append({"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": "11.0 % (Valeur cible par défaut)"})
+
+            st.table(pd.DataFrame(baseline_metrics))
+            st.caption("⚙️ Les calculs de cette table de référence se mettent à jour dynamiquement à chaque modification des données de l'Écran 2.")
+        else:
+            st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
 
         # 6. Baseline performance
         st.divider()
