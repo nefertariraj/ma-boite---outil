@@ -2084,319 +2084,319 @@ else:
                     st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # 5. Data collection
-        # Définition des variables cibles du Data Collection Plan (DCP)
-        DCP_VARIABLES = {
-            "Lead Time (Y)": {
-                "type": "Continue",
-                "definition": "Temps écoulé entre la réception du dossier et la décision finale",
-                "unite": "Heures",
-                "frequence": "À chaque dossier traité",
-                "point_collecte": "Extracteur Workflow",
-                "responsable": "Admin Système",
-            },
-            "Statut Dossier (X1)": {
-                "type": "Attributaire",
-                "definition": "État final du dossier après analyse",
-                "unite": "Catégorie (Validé / Rejeté / Retouche)",
-                "frequence": "À chaque décision",
-                "point_collecte": "Formulaire Agent",
-                "responsable": "Superviseur Équipe",
-            },
-        }
-
-        # Initialisation de la base de données de collecte dans le State Streamlit
-        if "data_collection_db" not in st.session_state:
-            st.session_state.data_collection_db = pd.DataFrame(
-                columns=[
-                    "id_obs",
-                    "timestamp_gmt3",
-                    "ref_dossier",
-                    "lead_time_hours",
-                    "statut_dossier",
-                    "observateur",
-                    "commentaires",
-                ]
-            )
-
-        # =====================================================================
-        # FONCTIONS REUTILISABLES (MOTEUR LEAN SIX SIGMA)
-        # =====================================================================
-
-        def ajouter_ligne_collecte(ref, lt, statut, obs, comm):
-            """Calcule l'horodatage en GMT+3 et injecte l'observation dans le state."""
-            db = st.session_state.data_collection_db
-            next_id = f"OBS-{len(db) + 1:03d}"
-
-            # Capture et conversion automatique en GMT+3 (Etc/GMT-3 dans la base IANA)
-            tz_gmt3 = pd.Timestamp.now(tz="UTC").tz_convert("Etc/GMT-3")
-
-            new_row = {
-                "id_obs": next_id,
-                "timestamp_gmt3": tz_gmt3.strftime("%Y-%m-%d %H:%M:%S"),
-                "ref_dossier": ref,
-                "lead_time_hours": float(lt) if lt is not None else np.nan,
-                "statut_dossier": statut,
-                "observateur": obs,
-                "commentaires": comm,
+            # Définition des variables cibles du Data Collection Plan (DCP)
+            DCP_VARIABLES = {
+                "Lead Time (Y)": {
+                    "type": "Continue",
+                    "definition": "Temps écoulé entre la réception du dossier et la décision finale",
+                    "unite": "Heures",
+                    "frequence": "À chaque dossier traité",
+                    "point_collecte": "Extracteur Workflow",
+                    "responsable": "Admin Système",
+                },
+                "Statut Dossier (X1)": {
+                    "type": "Attributaire",
+                    "definition": "État final du dossier après analyse",
+                    "unite": "Catégorie (Validé / Rejeté / Retouche)",
+                    "frequence": "À chaque décision",
+                    "point_collecte": "Formulaire Agent",
+                    "responsable": "Superviseur Équipe",
+                },
             }
-            st.session_state.data_collection_db = pd.concat([db, pd.DataFrame([new_row])], ignore_index=True)
 
-        def controler_qualite_donnees(df):
-            """Analyse les erreurs, doublons, manquants et outliers (IQR)."""
-            anomalies = {
-                "missing": [],
-                "duplicates": [],
-                "invalid_status": [],
-                "outliers": [],
-            }
-            if df.empty:
+            # Initialisation de la base de données de collecte dans le State Streamlit
+            if "data_collection_db" not in st.session_state:
+                st.session_state.data_collection_db = pd.DataFrame(
+                    columns=[
+                        "id_obs",
+                        "timestamp_gmt3",
+                        "ref_dossier",
+                        "lead_time_hours",
+                        "statut_dossier",
+                        "observateur",
+                        "commentaires",
+                    ]
+                )
+
+            # =====================================================================
+            # FONCTIONS REUTILISABLES (MOTEUR LEAN SIX SIGMA)
+            # =====================================================================
+
+            def ajouter_ligne_collecte(ref, lt, statut, obs, comm):
+                """Calcule l'horodatage en GMT+3 et injecte l'observation dans le state."""
+                db = st.session_state.data_collection_db
+                next_id = f"OBS-{len(db) + 1:03d}"
+
+                # Capture et conversion automatique en GMT+3 (Etc/GMT-3 dans la base IANA)
+                tz_gmt3 = pd.Timestamp.now(tz="UTC").tz_convert("Etc/GMT-3")
+
+                new_row = {
+                    "id_obs": next_id,
+                    "timestamp_gmt3": tz_gmt3.strftime("%Y-%m-%d %H:%M:%S"),
+                    "ref_dossier": ref,
+                    "lead_time_hours": float(lt) if lt is not None else np.nan,
+                    "statut_dossier": statut,
+                    "observateur": obs,
+                    "commentaires": comm,
+                }
+                st.session_state.data_collection_db = pd.concat([db, pd.DataFrame([new_row])], ignore_index=True)
+
+            def controler_qualite_donnees(df):
+                """Analyse les erreurs, doublons, manquants et outliers (IQR)."""
+                anomalies = {
+                    "missing": [],
+                    "duplicates": [],
+                    "invalid_status": [],
+                    "outliers": [],
+                }
+                if df.empty:
+                    return anomalies
+
+                # 1. Manquants
+                anomalies["missing"] = df[df["lead_time_hours"].isna()]["id_obs"].tolist()
+
+                # 2. Doublons
+                anomalies["duplicates"] = df[df.duplicated(subset=["ref_dossier"], keep="first")]["id_obs"].tolist()
+
+                # 3. Valeurs Impossibles (Statuts invalides)
+                status_autorises = ["Validé", "Rejeté", "Retouche"]
+                anomalies["invalid_status"] = df[~df["statut_dossier"].isin(status_autorises)]["id_obs"].tolist()
+
+                # 4. Outliers par la méthode des Écarts Interquartiles (IQR)
+                lt_clean = df["lead_time_hours"].dropna()
+                if len(lt_clean) >= 3:
+                    q1 = lt_clean.quantile(0.25)
+                    q3 = lt_clean.quantile(0.75)
+                    iqr = q3 - q1
+                    upper_bound = q3 + 1.5 * iqr
+                    lower_bound = max(0, q1 - 1.5 * iqr)
+                    outliers_df = df[(df["lead_time_hours"] > upper_bound) | (df["lead_time_hours"] < lower_bound)]
+                    anomalies["outliers"] = outliers_df["id_obs"].tolist()
+
                 return anomalies
 
-            # 1. Manquants
-            anomalies["missing"] = df[df["lead_time_hours"].isna()]["id_obs"].tolist()
+            # =====================================================================
+            # RE RENDU DE L'INTERFACE GRAPHIQUE STREAMLIT
+            # =====================================================================
+            st.title("📊 Phase Measure : Pilotage de la Collecte Terrain")
+            st.markdown("---")
 
-            # 2. Doublons
-            anomalies["duplicates"] = df[df.duplicated(subset=["ref_dossier"], keep="first")]["id_obs"].tolist()
+            # --- ÉTAPE 1 : RÉSUMÉ DU DATA COLLECTION PLAN ---
+            st.header("1. Résumé du Data Collection Plan (DCP)")
+            dcp_df = pd.DataFrame.from_dict(DCP_VARIABLES, orient="index")
+            st.table(dcp_df)
 
-            # 3. Valeurs Impossibles (Statuts invalides)
-            status_autorises = ["Validé", "Rejeté", "Retouche"]
-            anomalies["invalid_status"] = df[~df["statut_dossier"].isin(status_autorises)]["id_obs"].tolist()
+            # --- ÉTAPE 2 : FORMULAIRE ET TABLEAU DYNAMIQUE ---
+            st.header("2. Formulaire de Collecte Réelle & Tableaux Dynamiques")
 
-            # 4. Outliers par la méthode des Écarts Interquartiles (IQR)
-            lt_clean = df["lead_time_hours"].dropna()
-            if len(lt_clean) >= 3:
-                q1 = lt_clean.quantile(0.25)
-                q3 = lt_clean.quantile(0.75)
-                iqr = q3 - q1
-                upper_bound = q3 + 1.5 * iqr
-                lower_bound = max(0, q1 - 1.5 * iqr)
-                outliers_df = df[(df["lead_time_hours"] > upper_bound) | (df["lead_time_hours"] < lower_bound)]
-                anomalies["outliers"] = outliers_df["id_obs"].tolist()
+            col_form, col_actions = st.columns([1, 2])
 
-            return anomalies
+            with col_form:
+                st.subheader("Saisie Terrain")
+                with st.form("form_saisie", clear_on_submit=True):
+                    ref_input = st.text_input("Référence Dossier (ex: DOS-2026-X)")
+                    lt_input = st.number_input(
+                        "Lead Time (Heures)", min_value=0.0, step=0.1, value=None, placeholder="Saisir..."
+                    )
+                    statut_input = st.selectbox("Statut Final du Dossier", ["Validé", "Rejeté", "Retouche", "En cours"])
+                    obs_input = st.text_input("Identifiant Observateur / Agent")
+                    comm_input = st.text_area("Commentaires terrain")
 
-        # =====================================================================
-        # RE RENDU DE L'INTERFACE GRAPHIQUE STREAMLIT
-        # =====================================================================
-        st.title("📊 Phase Measure : Pilotage de la Collecte Terrain")
-        st.markdown("---")
+                    submit = st.form_submit_button("📥 Enregistrer l'observation")
+                    if submit and ref_input:
+                        ajouter_ligne_collecte(ref_input, lt_input, statut_input, obs_input, comm_input)
+                        st.success("Donnée enregistrée en GMT+3.")
 
-        # --- ÉTAPE 1 : RÉSUMÉ DU DATA COLLECTION PLAN ---
-        st.header("1. Résumé du Data Collection Plan (DCP)")
-        dcp_df = pd.DataFrame.from_dict(DCP_VARIABLES, orient="index")
-        st.table(dcp_df)
+            with col_actions:
+                st.subheader("Base de Données Brute Actuelle")
+                if not st.session_state.data_collection_db.empty:
+                    # Permettre la modification et suppression en direct via le data_editor de Streamlit
+                    edited_df = st.data_editor(
+                        st.session_state.data_collection_db, num_rows="dynamic", key="db_editor"
+                    )
+                    st.session_state.data_collection_db = edited_df
+                else:
+                    st.info("Aucune donnée enregistrée pour le moment.")
 
-        # --- ÉTAPE 2 : FORMULAIRE ET TABLEAU DYNAMIQUE ---
-        st.header("2. Formulaire de Collecte Réelle & Tableaux Dynamiques")
-
-        col_form, col_actions = st.columns([1, 2])
-
-        with col_form:
-            st.subheader("Saisie Terrain")
-            with st.form("form_saisie", clear_on_submit=True):
-                ref_input = st.text_input("Référence Dossier (ex: DOS-2026-X)")
-                lt_input = st.number_input(
-                    "Lead Time (Heures)", min_value=0.0, step=0.1, value=None, placeholder="Saisir..."
+            # Injection optionnelle d'un jeu de données de test si la table est vide
+            if st.button("🧬 Charger le jeu de données de simulation LSS (Optionnel)"):
+                st.session_state.data_collection_db = pd.DataFrame(
+                    [
+                        {
+                            "id_obs": "OBS-001",
+                            "timestamp_gmt3": "2026-06-01 09:15:00",
+                            "ref_dossier": "DOS-2026-881",
+                            "lead_time_hours": 14.5,
+                            "statut_dossier": "Validé",
+                            "observateur": "Agent A",
+                            "commentaires": "",
+                        },
+                        {
+                            "id_obs": "OBS-002",
+                            "timestamp_gmt3": "2026-06-01 10:30:00",
+                            "ref_dossier": "DOS-2026-882",
+                            "lead_time_hours": 22.1,
+                            "statut_dossier": "Retouche",
+                            "observateur": "Agent B",
+                            "commentaires": "",
+                        },
+                        {
+                            "id_obs": "OBS-003",
+                            "timestamp_gmt3": "2026-06-01 14:00:00",
+                            "ref_dossier": "DOS-2026-883",
+                            "lead_time_hours": 11.0,
+                            "statut_dossier": "Validé",
+                            "observateur": "Agent A",
+                            "commentaires": "",
+                        },
+                        {
+                            "id_obs": "OBS-004",
+                            "timestamp_gmt3": "2026-06-02 11:15:00",
+                            "ref_dossier": "DOS-2026-884",
+                            "lead_time_hours": 198.0,
+                            "statut_dossier": "Rejeté",
+                            "observateur": "Agent C",
+                            "commentaires": "Cause spéciale externe",
+                        },
+                        {
+                            "id_obs": "OBS-005",
+                            "timestamp_gmt3": "2026-06-02 16:45:00",
+                            "ref_dossier": "DOS-2026-885",
+                            "lead_time_hours": None,
+                            "statut_dossier": "Validé",
+                            "observateur": "Agent B",
+                            "commentaires": "",
+                        },
+                        {
+                            "id_obs": "OBS-006",
+                            "timestamp_gmt3": "2026-06-03 09:00:00",
+                            "ref_dossier": "DOS-2026-886",
+                            "lead_time_hours": 16.2,
+                            "statut_dossier": "En cours",
+                            "observateur": "Agent A",
+                            "commentaires": "Erreur statut",
+                        },
+                        {
+                            "id_obs": "OBS-007",
+                            "timestamp_gmt3": "2026-06-03 10:30:00",
+                            "ref_dossier": "DOS-2026-882",
+                            "lead_time_hours": 22.1,
+                            "statut_dossier": "Retouche",
+                            "observateur": "Agent B",
+                            "commentaires": "Doublon",
+                        },
+                    ]
                 )
-                statut_input = st.selectbox("Statut Final du Dossier", ["Validé", "Rejeté", "Retouche", "En cours"])
-                obs_input = st.text_input("Identifiant Observateur / Agent")
-                comm_input = st.text_area("Commentaires terrain")
+                st.rerun()
 
-                submit = st.form_submit_button("📥 Enregistrer l'observation")
-                if submit and ref_input:
-                    ajouter_ligne_collecte(ref_input, lt_input, statut_input, obs_input, comm_input)
-                    st.success("Donnée enregistrée en GMT+3.")
-
-        with col_actions:
-            st.subheader("Base de Données Brute Actuelle")
+            # --- BLOCS D'ANALYSE SI DES DONNÉES SONT PRÉSENTES ---
             if not st.session_state.data_collection_db.empty:
-                # Permettre la modification et suppression en direct via le data_editor de Streamlit
-                edited_df = st.data_editor(
-                    st.session_state.data_collection_db, num_rows="dynamic", key="db_editor"
+                df_actuel = st.session_state.data_collection_db
+                errors = controler_qualite_donnees(df_actuel)
+
+                # --- ÉTAPE 3 : CONTRÔLE QUALITÉ DES DONNÉES ---
+                st.header("3. Contrôle Qualité Automatisé")
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Manquants (N/A)", len(errors["missing"]))
+                c2.metric("Doublons Détectés", len(errors["duplicates"]))
+                c3.metric("Statuts Invalides", len(errors["invalid_status"]))
+                c4.metric("Outliers (Hors IQR)", len(errors["outliers"]))
+
+                if any(errors.values()):
+                    st.warning(f"⚠️ Anomalies détectées sur les observations suivantes : {errors}")
+                else:
+                    st.success("✅ Aucun problème qualité détecté sur la base actuelle.")
+
+                # --- ÉTAPE 4 : VALIDATION DE LA COLLECTE ---
+                st.header("4. Rapport de Progression & Taux de Complétude")
+                OBJECTIF_COLLECTE = 100  # Seuil cible ajustable
+                realisees = len(df_actuel)
+                completude = min(100.0, (realisees / OBJECTIF_COLLECTE) * 100)
+                taux_erreur = (
+                    (len(set(errors["duplicates"] + errors["invalid_status"])) / realisees) * 100
+                    if realisees > 0
+                    else 0
                 )
-                st.session_state.data_collection_db = edited_df
-            else:
-                st.info("Aucune donnée enregistrée pour le moment.")
 
-        # Injection optionnelle d'un jeu de données de test si la table est vide
-        if st.button("🧬 Charger le jeu de données de simulation LSS (Optionnel)"):
-            st.session_state.data_collection_db = pd.DataFrame(
-                [
-                    {
-                        "id_obs": "OBS-001",
-                        "timestamp_gmt3": "2026-06-01 09:15:00",
-                        "ref_dossier": "DOS-2026-881",
-                        "lead_time_hours": 14.5,
-                        "statut_dossier": "Validé",
-                        "observateur": "Agent A",
-                        "commentaires": "",
-                    },
-                    {
-                        "id_obs": "OBS-002",
-                        "timestamp_gmt3": "2026-06-01 10:30:00",
-                        "ref_dossier": "DOS-2026-882",
-                        "lead_time_hours": 22.1,
-                        "statut_dossier": "Retouche",
-                        "observateur": "Agent B",
-                        "commentaires": "",
-                    },
-                    {
-                        "id_obs": "OBS-003",
-                        "timestamp_gmt3": "2026-06-01 14:00:00",
-                        "ref_dossier": "DOS-2026-883",
-                        "lead_time_hours": 11.0,
-                        "statut_dossier": "Validé",
-                        "observateur": "Agent A",
-                        "commentaires": "",
-                    },
-                    {
-                        "id_obs": "OBS-004",
-                        "timestamp_gmt3": "2026-06-02 11:15:00",
-                        "ref_dossier": "DOS-2026-884",
-                        "lead_time_hours": 198.0,
-                        "statut_dossier": "Rejeté",
-                        "observateur": "Agent C",
-                        "commentaires": "Cause spéciale externe",
-                    },
-                    {
-                        "id_obs": "OBS-005",
-                        "timestamp_gmt3": "2026-06-02 16:45:00",
-                        "ref_dossier": "DOS-2026-885",
-                        "lead_time_hours": None,
-                        "statut_dossier": "Validé",
-                        "observateur": "Agent B",
-                        "commentaires": "",
-                    },
-                    {
-                        "id_obs": "OBS-006",
-                        "timestamp_gmt3": "2026-06-03 09:00:00",
-                        "ref_dossier": "DOS-2026-886",
-                        "lead_time_hours": 16.2,
-                        "statut_dossier": "En cours",
-                        "observateur": "Agent A",
-                        "commentaires": "Erreur statut",
-                    },
-                    {
-                        "id_obs": "OBS-007",
-                        "timestamp_gmt3": "2026-06-03 10:30:00",
-                        "ref_dossier": "DOS-2026-882",
-                        "lead_time_hours": 22.1,
-                        "statut_dossier": "Retouche",
-                        "observateur": "Agent B",
-                        "commentaires": "Doublon",
-                    },
-                ]
-            )
-            st.rerun()
+                if completude >= 95 and taux_erreur <= 2:
+                    st.select_slider(
+                        "Indicateur d'Exécution du Plan de Collecte",
+                        options=["Rouge", "Orange", "Vert"],
+                        value="Vert",
+                        disabled=True,
+                        key="slider_perf_green"
+                    )
+                    st.success("Collecte conforme. Prête pour l'export.")
+                elif completude >= 75 and taux_erreur <= 5:
+                    st.select_slider(
+                        "Indicateur d'Exécution du Plan de Collecte",
+                        options=["Rouge", "Orange", "Vert"],
+                        value="Orange",
+                        disabled=True,
+                        key="slider_perf_orange"
+                    )
+                    st.warning("Vigilance : Volume encore faible ou légères erreurs de saisie.")
+                else:
+                    st.select_slider(
+                        "Indicateur d'Exécution du Plan de Collecte",
+                        options=["Rouge", "Orange", "Vert"],
+                        value="Rouge",
+                        disabled=True,
+                        key="slider_perf_red"
+                    )
+                    st.error("Collecte insuffisante ou taux d'erreur critique.")
 
-        # --- BLOCS D'ANALYSE SI DES DONNÉES SONT PRÉSENTES ---
-        if not st.session_state.data_collection_db.empty:
-            df_actuel = st.session_state.data_collection_db
-            errors = controler_qualite_donnees(df_actuel)
+                # Nettoyage à la volée des doublons et manquants pour l'analyse
+                exclure_ids = set(errors["duplicates"] + errors["missing"])
+                df_analyse_lss = df_actuel[~df_actuel["id_obs"].isin(exclure_ids)].copy()
+                df_stats_sans_outliers = df_analyse_lss[~df_analyse_lss["id_obs"].isin(errors["outliers"])]
 
-            # --- ÉTAPE 3 : CONTRÔLE QUALITÉ DES DONNÉES ---
-            st.header("3. Contrôle Qualité Automatisé")
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Manquants (N/A)", len(errors["missing"]))
-            c2.metric("Doublons Détectés", len(errors["duplicates"]))
-            c3.metric("Statuts Invalides", len(errors["invalid_status"]))
-            c4.metric("Outliers (Hors IQR)", len(errors["outliers"]))
+                # --- ÉTAPE 5 & 6 : STATISTIQUES DESCRIPTIVES ET BASELINE ---
+                st.header("5 & 6. Statistiques Descriptives et Baseline du Processus")
 
-            if any(errors.values()):
-                st.warning(f"⚠️ Anomalies détectées sur les observations suivantes : {errors}")
-            else:
-                st.success("✅ Aucun problème qualité détecté sur la base actuelle.")
+                col_stats_y, col_baseline = st.columns(2)
 
-            # --- ÉTAPE 4 : VALIDATION DE LA COLLECTE ---
-            st.header("4. Rapport de Progression & Taux de Complétude")
-            OBJECTIF_COLLECTE = 100  # Seuil cible ajustable
-            realisees = len(df_actuel)
-            completude = min(100.0, (realisees / OBJECTIF_COLLECTE) * 100)
-            taux_erreur = (
-                (len(set(errors["duplicates"] + errors["invalid_status"])) / realisees) * 100
-                if realisees > 0
-                else 0
-            )
+                with col_stats_y:
+                    st.subheader("Statistiques sur le Lead Time (Y) - Hors Outliers")
+                    if not df_stats_sans_outliers.empty:
+                        stats_y = {
+                            "Moyenne (Heures)": df_stats_sans_outliers["lead_time_hours"].mean(),
+                            "Médiane (Heures)": df_stats_sans_outliers["lead_time_hours"].median(),
+                            "Minimum (Heures)": df_stats_sans_outliers["lead_time_hours"].min(),
+                            "Maximum (Heures)": df_stats_sans_outliers["lead_time_hours"].max(),
+                            "Écart-type (σ)": df_stats_sans_outliers["lead_time_hours"].std(),
+                        }
+                        st.json(stats_y)
 
-            if completude >= 95 and taux_erreur <= 2:
-                st.select_slider(
-                    "Indicateur d'Exécution du Plan de Collecte",
-                    options=["Rouge", "Orange", "Vert"],
-                    value="Vert",
-                    disabled=True,
-                    key="slider_perf_green"
+                with col_baseline:
+                    st.subheader("Baseline Finale de Performance")
+                    total_clean = len(df_analyse_lss)
+                    if total_clean > 0:
+                        counts = df_analyse_lss["statut_dossier"].value_counts()
+                        valides = counts.get("Validé", 0)
+                        retouches = counts.get("Retouche", 0)
+                        rejets = counts.get("Rejeté", 0)
+
+                        yield_pct = (valides / total_clean) * 100
+                        retouche_pct = (retouches / total_clean) * 100
+                        defauts_pct = ((retouches + rejets) / total_clean) * 100
+
+                        st.metric("Process Yield (First Time Right)", f"{yield_pct:.2f} %")
+                        st.metric("Taux de Retouches (Rework)", f"{retouche_pct:.2f} %")
+                        st.metric("Taux de Non-Conformité global", f"{defauts_pct:.2f} %")
+
+                # --- ÉTAPE 7 : PRÉPARATION DE LA PHASE ANALYZE ---
+                st.header("7. Variables Prioritaires & Recommandations pour Analyze")
+                st.info(
+                    "📌 **Variables cibles identifiées pour la phase Analyze :**\n"
+                    "1. **Variabilité de Y (Lead Time)** : L'écart-type mesuré indique une instabilité à cartographier par rapport aux types de demandes.\n"
+                    "2. **Le goulot des 'Retouches'** : Constitue la principale source de dégradation du Yield."
                 )
-                st.success("Collecte conforme. Prête pour l'export.")
-            elif completude >= 75 and taux_erreur <= 5:
-                st.select_slider(
-                    "Indicateur d'Exécution du Plan de Collecte",
-                    options=["Rouge", "Orange", "Vert"],
-                    value="Orange",
-                    disabled=True,
-                    key="slider_perf_orange"
+                st.markdown(
+                    "> **Règle d'or Master Black Belt :** Aucune recherche de cause racine ni proposition de solution "
+                    "n'est tolérée à cette étape. La base de données ci-dessus est déclarée statistiquement saine. "
+                    "Le transfert vers la phase **Analyze** est validé."
                 )
-                st.warning("Vigilance : Volume encore faible ou légères erreurs de saisie.")
-            else:
-                st.select_slider(
-                    "Indicateur d'Exécution du Plan de Collecte",
-                    options=["Rouge", "Orange", "Vert"],
-                    value="Rouge",
-                    disabled=True,
-                    key="slider_perf_red"
-                )
-                st.error("Collecte insuffisante ou taux d'erreur critique.")
-
-            # Nettoyage à la volée des doublons et manquants pour l'analyse
-            exclure_ids = set(errors["duplicates"] + errors["missing"])
-            df_analyse_lss = df_actuel[~df_actuel["id_obs"].isin(exclure_ids)].copy()
-            df_stats_sans_outliers = df_analyse_lss[~df_analyse_lss["id_obs"].isin(errors["outliers"])]
-
-            # --- ÉTAPE 5 & 6 : STATISTIQUES DESCRIPTIVES ET BASELINE ---
-            st.header("5 & 6. Statistiques Descriptives et Baseline du Processus")
-
-            col_stats_y, col_baseline = st.columns(2)
-
-            with col_stats_y:
-                st.subheader("Statistiques sur le Lead Time (Y) - Hors Outliers")
-                if not df_stats_sans_outliers.empty:
-                    stats_y = {
-                        "Moyenne (Heures)": df_stats_sans_outliers["lead_time_hours"].mean(),
-                        "Médiane (Heures)": df_stats_sans_outliers["lead_time_hours"].median(),
-                        "Minimum (Heures)": df_stats_sans_outliers["lead_time_hours"].min(),
-                        "Maximum (Heures)": df_stats_sans_outliers["lead_time_hours"].max(),
-                        "Écart-type (σ)": df_stats_sans_outliers["lead_time_hours"].std(),
-                    }
-                    st.json(stats_y)
-
-            with col_baseline:
-                st.subheader("Baseline Finale de Performance")
-                total_clean = len(df_analyse_lss)
-                if total_clean > 0:
-                    counts = df_analyse_lss["statut_dossier"].value_counts()
-                    valides = counts.get("Validé", 0)
-                    retouches = counts.get("Retouche", 0)
-                    rejets = counts.get("Rejeté", 0)
-
-                    yield_pct = (valides / total_clean) * 100
-                    retouche_pct = (retouches / total_clean) * 100
-                    defauts_pct = ((retouches + rejets) / total_clean) * 100
-
-                    st.metric("Process Yield (First Time Right)", f"{yield_pct:.2f} %")
-                    st.metric("Taux de Retouches (Rework)", f"{retouche_pct:.2f} %")
-                    st.metric("Taux de Non-Conformité global", f"{defauts_pct:.2f} %")
-
-            # --- ÉTAPE 7 : PRÉPARATION DE LA PHASE ANALYZE ---
-            st.header("7. Variables Prioritaires & Recommandations pour Analyze")
-            st.info(
-                "📌 **Variables cibles identifiées pour la phase Analyze :**\n"
-                "1. **Variabilité de Y (Lead Time)** : L'écart-type mesuré indique une instabilité à cartographier par rapport aux types de demandes.\n"
-                "2. **Le goulot des 'Retouches'** : Constitue la principale source de dégradation du Yield."
-            )
-            st.markdown(
-                "> **Règle d'or Master Black Belt :** Aucune recherche de cause racine ni proposition de solution "
-                "n'est tolérée à cette étape. La base de données ci-dessus est déclarée statistiquement saine. "
-                "Le transfert vers la phase **Analyze** est validé."
-            )
 
         # 6. Baseline performance
         st.divider()
