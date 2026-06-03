@@ -2083,8 +2083,8 @@ else:
                 if is_validated:
                     st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
-        # 5. Data collection
-            # =====================================================================
+        # # 5. Data Collection Module
+        # =====================================================================
         # ÉTAPE 0 : INITIALISATION DE LA PERSISTANCE (JSON & STATE)
         # =====================================================================
         # p correspond à votre dictionnaire de projet pour la reprise de travail JSON
@@ -2115,7 +2115,7 @@ else:
         # =====================================================================
         # ÉCRAN 1 : RÉSUMÉ DE LA COLLECTE & IMPORT GLOBAL
         # =====================================================================
-        st.title("📊 Module : Data Collection & Process Baseline")
+        st.title("Data Collection & Process Baseline")
         st.markdown("---")
         st.header("Écran 1 : Résumé de la Collecte")
 
