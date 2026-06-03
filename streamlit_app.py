@@ -1857,11 +1857,11 @@ else:
                             c1, c2 = st.columns(2)
                             with c1:
                                 if p_rep_key in p:
-                                    st.caption("Données de Reproductibilité enregistrées (Inter-Opérateurs) :")
+                                    st.caption("Données de Reproductibilité enregistrées (différentes personnes obtiennent-elles des résultats similaires?: même produit, plusieurs opérateurs) :")
                                     st.dataframe(pd.DataFrame(p[p_rep_key]), use_container_width=True)
                             with c2:
                                 if p_reprod_key in p:
-                                    st.caption("Données de Répétabilité enregistrées (Intra-Opérateur) :")
+                                    st.caption("Données de Répétabilité enregistrées (La même personne mesure-t-elle toujours pareil?: 1 opérateur, même situation, plusieurs mesures) :")
                                     st.dataframe(pd.DataFrame(p[p_reprod_key]), use_container_width=True)
                             st.markdown("---")
                 else:
