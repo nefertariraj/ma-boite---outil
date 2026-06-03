@@ -2084,10 +2084,6 @@ else:
                     st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # 5. Data collection
-        import numpy as np
-        import pandas as pd
-        import streamlit as st
-
         # =====================================================================
         # CONFIGURATION ET INITIALISATION DES SESSIONS STREAMLIT
         # =====================================================================
