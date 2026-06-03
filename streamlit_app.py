@@ -2084,197 +2084,60 @@ else:
                     st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # 5. Data collection
-        import numpy as np
-    import pandas as pd
+       class LeanSixSigmaDataCollector:
 
+            def __init__(self, target_timezone="Etc/GMT-3"):
+                """Initialise le module avec la configuration GMT+3."""
+                self.timezone = target_timezone
+                self.expected_statuses = ["Validé", "Rejeté", "Retouche"]
 
-    class LeanSixSigmaDataCollector:
+            def generate_empty_collection_table(self):
+                """Construit la structure du tableau de collecte."""
+                columns = [
+                    "id_obs",
+                    "timestamp_gmt3",
+                    "ref_dossier",
+                    "lead_time_hours",
+                    "statut_dossier",
+                    "observateur",
+                    "commentaires",
+                ]
+                return pd.DataFrame(columns=columns)
 
-    def __init__(self, target_timezone="Etc/GMT-3"):
-        """Initialise le module de collecte avec la configuration de la zone temporelle.
+            def add_observation(self, df, ref_dossier, lead_time, statut, observateur, commentaires=""):
+                """Ajoute une ligne avec horodatage GMT+3 automatique."""
+                next_id = f"OBS-{len(df) + 1:03d}"
+                current_time = pd.Timestamp.now(tz="UTC").tz_convert(self.timezone)
 
-        Note: Dans la base de données de la zone IANA, 'Etc/GMT-3' correspond
-        à un décalage positif de GMT+3.
-        """
-        self.timezone = target_timezone
-        # Modèle de données attendu (Data Collection Plan)
-        self.expected_statuses = ["Validé", "Rejeté", "Retouche"]
+                new_row = {
+                    "id_obs": next_id,
+                    "timestamp_gmt3": current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "ref_dossier": ref_dossier,
+                    "lead_time_hours": float(lead_time) if lead_time is not None else np.nan,
+                    "statut_dossier": statut,
+                    "observateur": observateur,
+                    "commentaires": commentaires,
+                }
+                return pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
-    def generate_empty_collection_table(self):
-        """Étape 2: Construit la structure du tableau de collecte dynamique."""
-        columns = [
-            "id_obs",
-            "timestamp_gmt3",
-            "ref_dossier",
-            "lead_time_hours",
-            "statut_dossier",
-            "observateur",
-            "commentaires",
-        ]
-        return pd.DataFrame(columns=columns)
+            def control_data_quality(self, df):
+                """Contrôle qualité automatique (Manquants, Doublons, Outliers)."""
+                anomalies = {
+                    "missing_values": [],
+                    "duplicates": [],
+                    "invalid_statuses": [],
+                    "outliers_iqr": [],
+                }
+                if df.empty:
+                    return anomalies
 
-    def add_observation(self, df, ref_dossier, lead_time, statut, observateur, commentaires=""):
-        """Permet l'ajout dynamique d'une ligne avec horodatage GMT+3 automatique."""
-        next_id = f"OBS-{len(df) + 1:03d}"
-        # Capture du moment présent configuré sur le fuseau horaire GMT+3
-        current_time = pd.Timestamp.now(tz="UTC").tz_convert(self.timezone)
+                missing_lt = df[df["lead_time_hours"].isna()]["id_obs"].tolist()
+                anomalies["missing_values"].extend(missing_lt)
 
-        new_row = {
-            "id_obs": next_id,
-            "timestamp_gmt3": current_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "ref_dossier": ref_dossier,
-            "lead_time_hours": float(lead_time) if lead_time is not None else np.nan,
-            "statut_dossier": statut,
-            "observateur": observateur,
-            "commentaires": commentaires,
-        }
+                duplicates = df[df.duplicated(subset=["ref_dossier"], keep="first")]["id_obs"].tolist()
+                anomalies["duplicates"].extend(duplicates)
 
-        return pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-
-    def control_data_quality(self, df):
-        """Étape 3: Contrôle qualité automatique des données collectées."""
-        anomalies = {
-            "missing_values": [],
-            "duplicates": [],
-            "invalid_statuses": [],
-            "outliers_iqr": [],
-        }
-
-        if df.empty:
-            return anomalies
-
-        # 1. Détection des valeurs manquantes (sur les métriques clés)
-        missing_lt = df[df["lead_time_hours"].isna()]["id_obs"].tolist()
-        anomalies["missing_values"].extend(missing_lt)
-
-        # 2. Détection des doublons basés sur la référence du dossier
-        duplicates = df[df.duplicated(subset=["ref_dossier"], keep="first")]["id_obs"].tolist()
-        anomalies["duplicates"].extend(duplicates)
-
-        # 3. Vérification des valeurs impossibles (Statuts non conformes au DCP)
-        invalid_st = df[~df["statut_dossier"].isin(self.expected_statuses)]["id_obs"].tolist()
-        anomalies["invalid_statuses"].extend(invalid_st)
-
-        # 4. Détection des valeurs extrêmes (Méthode de l'Interquantile Range - IQR)
-        lt_clean = df["lead_time_hours"].dropna()
-        if len(lt_clean) > 3:
-            q1 = lt_clean.quantile(0.25)
-            q3 = lt_clean.quantile(0.75)
-            iqr = q3 - q1
-            upper_bound = q3 + 1.5 * iqr
-            lower_bound = max(0, q1 - 1.5 * iqr)  # Un temps ne peut pas être négatif
-
-            outliers = df[(df["lead_time_hours"] > upper_bound) | (df["lead_time_hours"] < lower_bound)][
-                "id_obs"
-            ].tolist()
-            anomalies["outliers_iqr"].extend(outliers)
-
-        return anomalies
-
-    def calculate_collection_metrics(self, df, expected_count):
-        """Étape 4: Évalue le taux de complétude et la conformité de la collecte."""
-        total_realised = len(df)
-        anomalies = self.control_data_quality(df)
-
-        # Extraction des anomalies uniques
-        all_errors = set(anomalies["duplicates"] + anomalies["invalid_statuses"])
-        missing_count = len(anomalies["missing_values"])
-
-        completeness_rate = (total_realised / expected_count) * 100 if expected_count > 0 else 0
-        error_rate = (len(all_errors) / total_realised) * 100 if total_realised > 0 else 0
-        missing_rate = (missing_count / expected_count) * 100 if expected_count > 0 else 0
-
-        # Assignation de l'indicateur visuel (Vert / Orange / Rouge)
-        if completeness_rate >= 95 and error_rate <= 2:
-            status = "VERT (Collecte Conforme)"
-        elif completeness_rate >= 80 and error_rate <= 5:
-            status = "ORANGE (Vigilance - Anomalies mineures)"
-        else:
-            status = "ROUGE (Collecte Insuffisante)"
-
-        return {
-            "expected": expected_count,
-            "realised": total_realised,
-            "completeness_rate_%": round(completeness_rate, 2),
-            "error_rate_%": round(error_rate, 2),
-            "missing_rate_%": round(missing_rate, 2),
-            "health_status": status,
-        }
-
-    def generate_baseline_and_stats(self, df):
-        """Étape 5 & 6: Calcule les statistiques descriptives et la Baseline du processus."""
-        anomalies = self.control_data_quality(df)
-
-        # Nettoyage strict de la base pour les statistiques d'analyse (exclusion des doublons et manquants)
-        invalid_ids = set(anomalies["duplicates"] + anomalies["missing_values"])
-        df_clean = df[~df["id_obs"].isin(invalid_ids)].copy()
-
-        # Séparation des bases pour le calcul de la tendance centrale hors causes spéciales
-        df_no_outliers = df_clean[~df_clean["id_obs"].isin(anomalies["outliers_iqr"])]
-
-        # Statistiques descriptives du Lead Time (Y)
-        lt_stats = {
-            "mean_hours": round(df_no_outliers["lead_time_hours"].mean(), 2),
-            "median_hours": round(df_no_outliers["lead_time_hours"].median(), 2),
-            "min_hours": round(df_no_outliers["lead_time_hours"].min(), 2),
-            "max_hours": round(df_no_outliers["lead_time_hours"].max(), 2),
-            "std_dev": round(df_no_outliers["lead_time_hours"].std(), 2),
-        }
-
-        # Statistiques attributaires du Statut (X1)
-        status_counts = df_clean["statut_dossier"].value_counts()
-        status_pct = df_clean["statut_dossier"].value_counts(normalize=True) * 100
-
-        # Calcul de la Baseline
-        total_clean = len(df_clean)
-        valide_count = status_counts.get("Validé", 0)
-        retouche_count = status_counts.get("Retouche", 0)
-        rejet_count = status_counts.get("Rejeté", 0)
-
-        baseline = {
-            "yield_first_time_right_%": round((valide_count / total_clean) * 100, 2)
-            if total_clean > 0
-            else 0,
-            "rework_rate_%": round((retouche_count / total_clean) * 100, 2) if total_clean > 0 else 0,
-            "defect_rate_%": round(((retouche_count + rejet_count) / total_clean) * 100, 2)
-            if total_clean > 0
-            else 0,
-        }
-
-        return {"continuous_y_stats": lt_stats, "process_baseline": baseline}
-
-
-    # ==========================================
-    # EXEMPLE D'EXÉCUTION ET DE SIMULATION
-    # ==========================================
-    if __name__ == "__main__":
-        # Initialisation du contrôleur
-        collector = LeanSixSigmaDataCollector()
-        db = collector.generate_empty_collection_table()
-
-        # Simulation d'entrées de données terrains (incluant les anomalies du cas d'étude)
-        db = collector.add_observation(db, "DOS-2026-881", 14.5, "Validé", "Agent A")
-        db = collector.add_observation(db, "DOS-2026-882", 22.1, "Retouche", "Agent B")
-        db = collector.add_observation(db, "DOS-2026-883", 11.0, "Validé", "Agent A")
-        db = collector.add_observation(db, "DOS-2026-884", 198.0, "Rejeté", "Agent C")  # Outlier
-        db = collector.add_observation(db, "DOS-2026-885", None, "Validé", "Agent B")  # Manquant
-        db = collector.add_observation(db, "DOS-2026-886", 16.2, "En cours", "Agent A")  # Statut invalide
-        db = collector.add_observation(db, "DOS-2026-882", 22.1, "Retouche", "Agent B")  # Doublon de saisie
-
-        print("--- 1. TABLEAU DES DONNÉES BRUTES COLLECTÉES (GMT+3) ---")
-        print(db[["id_obs", "timestamp_gmt3", "ref_dossier", "lead_time_hours", "statut_dossier"]])
-
-        print("\n--- 2. RAPPORT DE CONTRÔLE QUALITÉ ---")
-        print(collector.control_data_quality(db))
-
-        print("\n--- 3. INDICATEURS DE VALIDATION DE LA COLLECTE ---")
-        # Simulation sur un objectif de 100 observations attendues
-        print(collector.calculate_collection_metrics(db, expected_count=100))
-
-        print("\n--- 4. BASELINE ET STATISTIQUES DESCRIPTIVES (NETTOYÉES) ---")
-        results = collector.generate_baseline_and_stats(db)
-        print("Statistiques Y (Lead Time):", results["continuous_y_stats"])
-        print("Baseline du Processus:", results["process_baseline"])
+                invalid_st = df[~df["statut_dossier"].isin(
 
         # 6. Baseline performance
         st.divider()
