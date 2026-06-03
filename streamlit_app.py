@@ -1959,29 +1959,29 @@ else:
                             val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
                             val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
                             
-                            # Sécurité : Détecte si les données saisies ne sont pas numériques ou vides
+                            # Sécurité MSA : Détecte si les données saisies ne sont pas numériques ou vides
                             if val_col1.dropna().empty or val_col2.dropna().empty:
                                 anomalies_majeures.append("Données de Répétabilité Invalides ou Vides")
                             else:
-                                diffs = np.abs(val_col1 - val_col2)
+                                diffs = (val_col1 - val_col2).abs()
                                 mean_val = val_col1.mean()
                                 if not diffs.dropna().empty and mean_val > 0:
                                     if diffs.max() > mean_val * 0.30:
-                                        anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
+                                        anomalies_majeures.append("Incohérence Critique de Répétabilité (EV)")
                                     elif diffs.max() > mean_val * 0.10:
-                                        anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
+                                        anomalies_mineures.append("Dispersion de Répétabilité légère")
                                 
                                 all_vals = pd.concat([val_col1, val_col2]).dropna()
                                 if not all_vals.empty and all(v % 5 == 0 for v in all_vals if v > 0):
-                                    anomalies_mineures.append("Biais d'Arrondis Systématiques (Multiples de 5)")
+                                    anomalies_mineures.append("Biais d'Arrondis Systématiques (Résolution insuffisante)")
                         except Exception as e:
-                            anomalies_majeures.append(f"Erreur calcul Répétabilité: {str(e)}")
+                            anomalies_majeures.append(f"Erreur évaluation Répétabilité: {str(e)}")
 
                     if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
                         try:
                             vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
                             
-                            # Sécurité : Détecte si le tableau de reproductibilité est vide ou texte
+                            # Sécurité MSA : Détecte si le tableau de reproductibilité est vide ou textuel
                             if vals_reprod.empty:
                                 anomalies_majeures.append("Données de Reproductibilité Manquantes ou Invalides")
                             else:
@@ -1989,26 +1989,29 @@ else:
                                     std_dev = vals_reprod.std()
                                     if pd.notna(std_dev) and vals_reprod.mean() > 0:
                                         if std_dev > (vals_reprod.mean() * 0.20):
-                                            anomalies_majeures.append("Forte Instabilité Intra-Opérateur")
+                                            anomalies_majeures.append("Instabilité Critique de Reproductibilité (AV)")
                                 if 'valeur_reference' in locals() and valeur_reference != 0.0:
                                     biais_justesse = abs(vals_reprod.mean() - valeur_reference)
                                     if biais_justesse > abs(valeur_reference * 0.08):
-                                        anomalies_majeures.append("Biais d'Étalonnage (Décalage / Master)")
+                                        anomalies_majeures.append("Biais de Justesse Linéaire (Décalage / Master)")
                         except Exception as e:
-                            anomalies_majeures.append(f"Erreur calcul Reproductibilité: {str(e)}")
+                            anomalies_majeures.append(f"Erreur évaluation Reproductibilité: {str(e)}")
                     
-                    # Sécurité : Si l'utilisateur n'a absolument rien saisi de valide
+                    # Sécurité LSS : Si aucune donnée n'est exploitable
                     if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
-                        anomalies_majeures.append("Aucune donnée disponible pour l'analyse")
+                        anomalies_majeures.append("Variabilité Incalculable : Aucune donnée disponible")
                     
+                    # Logique de scoring rigoureuse LSS Master Black Belt
                     if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
                         score, status = "100%", "🟢 Système Fiable"
                     elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
-                        score, status = "75%", "🟡 Alerte : Biais Mineur"
-                    elif len(anomalies_majeures) == 1:
-                        score, status = "50%", "🟠 Alerte : Biais Majeur"
+                        score, status = "75%", "🟡 Alerte : Biais Mineur (Sous contrôle)"
+                    elif len(anomalies_majeures) == 1 and len(anomalies_mineures) == 0:
+                        score, status = "50%", "🟠 Alerte : Dérive Majeure"
+                    elif len(anomalies_majeures) == 1 and len(anomalies_mineures) > 0:
+                        score, status = "35%", "🟠 Alerte : Instabilité Système Cumulée"
                     else:
-                        score, status = "25%", "🔴 Système Non Fiable"
+                        score, status = "10%", "🔴 Système Non Fiable (Processus Hors Contrôle)"
                     
                     toutes_anomalies = anomalies_majeures + anomalies_mineures
                     liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
