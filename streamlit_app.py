@@ -2115,23 +2115,23 @@ else:
         # =====================================================================
         # ÉCRAN 1 : RÉSUMÉ DE LA COLLECTE & IMPORT GLOBAL
         # =====================================================================
-        st.title("Data Collection & Process Baseline")
-        st.markdown("---")
-        st.header("Écran 1 : Résumé de la Collecte")
+        st.title("5. Data Collection & Process Baseline")
+            st.markdown("---")
+            st.header("Écran 1 : Résumé de la Collecte")
 
-        e1_c1, e1_c2, e1_c3 = st.columns(3)
-        with e1_c1:
-            p["dc_plan"]["taille_prevue"] = st.number_input(
-                "Taille d'échantillon prévue (N)", min_value=1, value=int(p["dc_plan"]["taille_prevue"]), key="dc_n_prevu"
-            )
-        with e1_c2:
-            p["dc_plan"]["date_debut"] = st.text_input(
-                "Date de début de collecte", value=p["dc_plan"]["date_debut"], key="dc_d_deb"
-            )
-        with e1_c3:
-            p["dc_plan"]["date_fin_est"] = st.text_input(
-                "Date estimée de fin", value=p["dc_plan"]["date_fin_est"], key="dc_d_fin"
-            )
+            e1_c1, e1_c2, e1_c3 = st.columns(3)
+            with e1_c1:
+                p["dc_plan"]["taille_prevue"] = st.number_input(
+                    "Taille d'échantillon prévue (N)", min_value=1, value=int(p["dc_plan"]["taille_prevue"]), key="dc_n_prevu"
+                )
+            with e1_c2:
+                p["dc_plan"]["date_debut"] = st.text_input(
+                    "Date de début de collecte", value=p["dc_plan"]["date_debut"], key="dc_d_deb"
+                )
+            with e1_c3:
+                p["dc_plan"]["date_fin_est"] = st.text_input(
+                    "Date estimée de fin", value=p["dc_plan"]["date_fin_est"], key="dc_d_fin"
+                )
 
         st.subheader("📋 Liste des variables définies dans le DCP")
         dcp_display = pd.DataFrame(
