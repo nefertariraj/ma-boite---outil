@@ -1649,14 +1649,13 @@ else:
                     ])
 
             # =====================================================================
-            # 🛡️ ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P'
+            # 🛡️ ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P' (CORRIGÉ)
             # =====================================================================
-            # On force la création de 'p' dans le session_state s'il n'existe pas
             if 'p' not in st.session_state:
                 st.session_state['p'] = {}
             
-            # On définit 'p' comme une référence directe vers la mémoire de session
             p = st.session_state['p']
+            # ---------------------------------------------------------------------
 
             # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
