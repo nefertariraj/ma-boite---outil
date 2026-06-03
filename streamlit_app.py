@@ -1946,11 +1946,8 @@ else:
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
-                    st.session_state[dynamic_rep_key] = edited_rep
-                    st.session_state[dynamic_reprod_key] = edited_reprod
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
-
+                    
+                    # 1. INITIALISATION DE L'ANALYSE (LOGIQUE INTACTE)
                     anomalies_mineures = []
                     anomalies_majeures = []
                     
@@ -2016,8 +2013,10 @@ else:
                     toutes_anomalies = anomalies_majeures + anomalies_mineures
                     liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
                     
+                    # Configuration temporelle stricte GMT+3
                     gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
                     
+                    # 2. ENREGISTREMENT ET COMPILATION DE L'HISTORIQUE DES BIAIS
                     run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
                     st.session_state["msa_bias_history"][bias_hist_key].append({
                         "Essai": f"Analyse #{run_number}",
@@ -2027,7 +2026,14 @@ else:
                         "Anomalies Détectées": liste_anomalies_str
                     })
                     
+                    # 3. VERROUILLAGE CENTRALISÉ ET SAUVEGARDE ABSOLUE DE TOUTES LES DONNÉES DE TERRAIN SIZES
+                    st.session_state[dynamic_rep_key] = edited_rep
+                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    
+                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                    
                     st.rerun()
 
                 if st.session_state["msa_bias_history"][bias_hist_key]:
@@ -2078,7 +2084,7 @@ else:
             if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
                 last_score_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Indice de Fidélité"]
 
-            if last_score_str in ["50%", "25%"]:
+            if last_score_str in ["50%", "35%", "10%"]:
                 p["msa_corrective_action"] = st.selectbox(
                     "Plan d'action prioritaire déployé lors du recalibrage :",
                     options=[
@@ -2091,8 +2097,8 @@ else:
 
             # --- 7. VALIDATION FINALE (SIGN-OFF) ---
             st.markdown("##### 📋 Validation Finale")
-            if last_score_str == "25%":
-                st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable' (25%). Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
+            if last_score_str == "10%":
+                st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable' (10%). Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
             else:
                 saved_status = p.get("msa_is_validated_status", False)
                 is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
