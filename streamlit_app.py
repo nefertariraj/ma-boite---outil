@@ -2125,7 +2125,6 @@ else:
         # FONCTIONS REUTILISABLES (MOTEUR LEAN SIX SIGMA)
         # =====================================================================
 
-
         def ajouter_ligne_collecte(ref, lt, statut, obs, comm):
             """Calcule l'horodatage en GMT+3 et injecte l'observation dans le state."""
             db = st.session_state.data_collection_db
@@ -2145,7 +2144,6 @@ else:
             }
             st.session_state.data_collection_db = pd.concat([db, pd.DataFrame([new_row])], ignore_index=True)
 
-
         def controler_qualite_donnees(df):
             """Analyse les erreurs, doublons, manquants et outliers (IQR)."""
             anomalies = {
@@ -2161,9 +2159,7 @@ else:
             anomalies["missing"] = df[df["lead_time_hours"].isna()]["id_obs"].tolist()
 
             # 2. Doublons
-            anomalies["duplicates"] = df[df.duplicated(subset=["ref_dossier"], keep="first")][
-                "id_obs"
-            ].tolist()
+            anomalies["duplicates"] = df[df.duplicated(subset=["ref_dossier"], keep="first")]["id_obs"].tolist()
 
             # 3. Valeurs Impossibles (Statuts invalides)
             status_autorises = ["Validé", "Rejeté", "Retouche"]
@@ -2180,8 +2176,7 @@ else:
                 outliers_df = df[(df["lead_time_hours"] > upper_bound) | (df["lead_time_hours"] < lower_bound)]
                 anomalies["outliers"] = outliers_df["id_obs"].tolist()
 
-             return anomalies
-
+            return anomalies
 
         # =====================================================================
         # RE RENDU DE L'INTERFACE GRAPHIQUE STREAMLIT
@@ -2293,7 +2288,7 @@ else:
                         "observateur": "Agent B",
                         "commentaires": "Doublon",
                     },
-                 ]
+                ]
             )
             st.rerun()
 
@@ -2332,6 +2327,7 @@ else:
                     options=["Rouge", "Orange", "Vert"],
                     value="Vert",
                     disabled=True,
+                    key="slider_perf_green"
                 )
                 st.success("Collecte conforme. Prête pour l'export.")
             elif completude >= 75 and taux_erreur <= 5:
@@ -2340,6 +2336,7 @@ else:
                     options=["Rouge", "Orange", "Vert"],
                     value="Orange",
                     disabled=True,
+                    key="slider_perf_orange"
                 )
                 st.warning("Vigilance : Volume encore faible ou légères erreurs de saisie.")
             else:
@@ -2348,6 +2345,7 @@ else:
                     options=["Rouge", "Orange", "Vert"],
                     value="Rouge",
                     disabled=True,
+                    key="slider_perf_red"
                 )
                 st.error("Collecte insuffisante ou taux d'erreur critique.")
 
