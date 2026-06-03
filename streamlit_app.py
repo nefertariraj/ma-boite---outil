@@ -1650,432 +1650,448 @@ else:
 
             # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
-        
-        # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ AVEC LA CLÉ CTQ INTÉGRÉE
-        project_y = "Indéterminé"
-        primary_keys = ["selected_ctq", "project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
-        
-        # Passe 1 : Analyse directe du dictionnaire de projet (Trouvera "selected_ctq" en priorité)
-        if 'p' in locals() and isinstance(p, dict):
-            for k in primary_keys:
-                if p.get(k):
-                    project_y = p.get(k)
-                    break
-        
-        # Passe 2 : Scan récursif profond (Détection automatique de secours)
-        if project_y == "Indéterminé" and 'p' in locals() and isinstance(p, dict):
-            def find_y_recursive(data):
-                if isinstance(data, dict):
-                    for k, v in data.items():
-                        if any(x in k.lower() for x in ["selected_ctq", "y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
-                            return v
-                    if "master_dcp_table" in data and isinstance(data["master_dcp_table"], list):
-                        for row in data["master_dcp_table"]:
-                            if isinstance(row, dict) and str(row.get("Rôle", "")).strip().upper() == "Y":
-                                return row.get("Variable à mesurer", "")
-                    for v in data.values():
-                        res = find_y_recursive(v)
-                        if res: return res
-                elif isinstance(data, list):
-                    for item in data:
-                        res = find_y_recursive(item)
-                        if res: return res
-                return None
             
-            deep_search_result = find_y_recursive(p)
-            if deep_search_result:
-                project_y = deep_search_result
-
-        # Passe 3 : Vérification au sein de la table DCP source
-        dcp_source = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
-        if project_y == "Indéterminé" and dcp_source:
-            for v in dcp_source:
-                if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
-                    project_y = v.get("Variable à mesurer")
-                    break
-
-        st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
-
-        # Initialisation sécurisée du tableau d'analyse MSA
-        if msa_classif_key not in st.session_state:
-            ai_analyzed_rows = []
-            if dcp_source:
-                for v in dcp_source:
-                    if isinstance(v, dict):
-                        var_name = v.get("Variable à mesurer", "")
-                        type_brut = v.get("Type de donnée", "Continue")
-                        role = v.get("Rôle", "X (Influent)")
-                        
-                        if var_name:
-                            if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
-                                det_type = "Continue (Quantitative)"
-                                rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
-                            else:
-                                det_type = "Attributaire / Catégorielle"
-                                rec_msa = "Attribute Agreement Analysis (Kappa)"
-                            
-                            ai_analyzed_rows.append({
-                                "Variable Critique": var_name,
-                                "Type de Donnée": det_type,
-                                "MSA Recommandé": rec_msa,
-                                "Criticité par rapport au Y": "Haute (Lien Direct)" if str(role).strip().upper() == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
-                            })
+            # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ AVEC LA CLÉ CTQ INTÉGRÉE
+            project_y = "Indéterminé"
+            primary_keys = ["selected_ctq", "project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
+            
+            # Passe 1 : Analyse directe du dictionnaire de projet (Trouvera "selected_ctq" en priorité)
+            if 'p' in locals() and isinstance(p, dict):
+                for k in primary_keys:
+                    if p.get(k):
+                        project_y = p.get(k)
+                        break
+            
+            # Passe 2 : Scan récursif profond (Détection automatique de secours)
+            if project_y == "Indéterminé" and 'p' in locals() and isinstance(p, dict):
+                def find_y_recursive(data):
+                    if isinstance(data, dict):
+                        for k, v in data.items():
+                            if any(x in k.lower() for x in ["selected_ctq", "y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
+                                return v
+                        if "master_dcp_table" in data and isinstance(data["master_dcp_table"], list):
+                            for row in data["master_dcp_table"]:
+                                if isinstance(row, dict) and str(row.get("Rôle", "")).strip().upper() == "Y":
+                                    return row.get("Variable à mesurer", "")
+                        for v in data.values():
+                            res = find_y_recursive(v)
+                            if res: return res
+                    elif isinstance(data, list):
+                        for item in data:
+                            res = find_y_recursive(item)
+                            if res: return res
+                    return None
                 
+                deep_search_result = find_y_recursive(p)
+                if deep_search_result:
+                    project_y = deep_search_result
+
+            # Passe 3 : Vérification au sein de la table DCP source
+            dcp_source = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
+            if project_y == "Indéterminé" and dcp_source:
+                for v in dcp_source:
+                    if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
+                        project_y = v.get("Variable à mesurer")
+                        break
+
+            st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
+
+            # Initialisation sécurisée du tableau d'analyse MSA
+            if msa_classif_key not in st.session_state:
+                ai_analyzed_rows = []
+                if dcp_source:
+                    for v in dcp_source:
+                        if isinstance(v, dict):
+                            var_name = v.get("Variable à mesurer", "")
+                            type_brut = v.get("Type de donnée", "Continue")
+                            role = v.get("Rôle", "X (Influent)")
+                            
+                            if var_name:
+                                if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
+                                    det_type = "Continue (Quantitative)"
+                                    rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
+                                else:
+                                    det_type = "Attributaire / Catégorielle"
+                                    rec_msa = "Attribute Agreement Analysis (Kappa)"
+                                
+                                ai_analyzed_rows.append({
+                                    "Variable Critique": var_name,
+                                    "Type de Donnée": det_type,
+                                    "MSA Recommandé": rec_msa,
+                                    "Criticité par rapport au Y": "Haute (Lien Direct)" if str(role).strip().upper() == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
+                                })
+                    
                 ai_analyzed_rows = sorted(ai_analyzed_rows, key=lambda k: k["Criticité par rapport au Y"], reverse=True)[:4]
 
-            if not ai_analyzed_rows:
-                if "temps" in str(project_y).lower() or "délai" in str(project_y).lower() or "lead time" in str(project_y).lower():
-                    ai_analyzed_rows = [
-                        {"Variable Critique": "Temps de traitement unitaire (Cycle Time)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
-                        {"Variable Critique": "Horodatage de début/fin de tâche", "Type de Donnée": "Système / Log IT", "MSA Recommandé": "Audit de Stabilité & Exactitude", "Criticité par rapport au Y": "Haute (Source de la donnée)"},
-                        {"Variable Critique": "Statut de mise en attente du dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Moyenne (Bruit potentiel)"}
-                    ]
-                elif "qualité" in str(project_y).lower() or "erreur" in str(project_y).lower() or "rebut" in str(project_y).lower() or "conform" in str(project_y).lower():
-                    ai_analyzed_rows = [
-                        {"Variable Critique": "Verdict de conformité de la pièce (Go / No-Go)", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
-                        {"Variable Critique": "Code défaut saisi par l'opérateur", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute (Fiabilité du Pareto)"},
-                        {"Variable Critique": "Dimension ou écart mesuré au pied à coulisse", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Moyenne (Physique)"}
-                    ]
-                else:
-                    ai_analyzed_rows = [
-                        {"Variable Critique": f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique"},
-                        {"Variable Critique": "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute"}
-                    ]
-            
-            st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
-
-        if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
-            if msa_classif_key in st.session_state:
-                del st.session_state[msa_classif_key]
-            st.rerun()
-
-        st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
-        
-        df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
-        edited_classification = st.data_editor(
-            df_classification_current,
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config={
-                "Variable Critique": st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
-                "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
-                "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
-                "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", disabled=True)
-            },
-            key=f"classification_editor_widget_{safe_idx}"
-        )
-        
-        if edited_classification is not None:
-            st.session_state[msa_classif_key] = edited_classification
-
-        # =====================================================================
-        # 1/ MISE À JOUR DYNAMIQUE DU TABLEAU DE CLASSIFICATION IA
-        # =====================================================================
-        df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
-        nom_colonne_variable = "Variable Critique (liée au Y)"
-
-        if not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
-            # On s'assure que la colonne existe sans écraser les données existantes
-            if "statut validation" not in df_msa_classif.columns:
-                df_msa_classif["statut validation"] = "en attente de test"
-            
-            # Application des statuts enregistrés de manière persistante
-            for idx_row, row in df_msa_classif.iterrows():
-                var_nom = row[nom_colonne_variable]
-                v_c = "".join(e for e in str(var_nom) if e.isalnum())
+                if not ai_analyzed_rows:
+                    if "temps" in str(project_y).lower() or "délai" in str(project_y).lower() or "lead time" in str(project_y).lower():
+                        ai_analyzed_rows = [
+                            {"Variable Critique": "Temps de traitement unitaire (Cycle Time)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
+                            {"Variable Critique": "Horodatage de début/fin de tâche", "Type de Donnée": "Système / Log IT", "MSA Recommandé": "Audit de Stabilité & Exactitude", "Criticité par rapport au Y": "Haute (Source de la donnée)"},
+                            {"Variable Critique": "Statut de mise en attente du dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Moyenne (Bruit potentiel)"}
+                        ]
+                    elif "qualité" in str(project_y).lower() or "erreur" in str(project_y).lower() or "rebut" in str(project_y).lower() or "conform" in str(project_y).lower():
+                        ai_analyzed_rows = [
+                            {"Variable Critique": "Verdict de conformité de la pièce (Go / No-Go)", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Critique (Directement lié au Y)"},
+                            {"Variable Critique": "Code défaut saisi par l'opérateur", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute (Fiabilité du Pareto)"},
+                            {"Variable Critique": "Dimension ou écart mesuré au pied à coulisse", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Moyenne (Physique)"}
+                        ]
+                    else:
+                        ai_analyzed_rows = [
+                            {"Variable Critique": f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique"},
+                            {"Variable Critique": "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute"}
+                        ]
                 
-                # Double vérification de sécurité (Session + Dictionnaire P)
-                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
-                    df_msa_classif.at[idx_row, "statut validation"] = "test effectué"
-            
-            st.session_state[msa_classif_key] = df_msa_classif
+                st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
-
-        # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
-        st.markdown("##### 👟 Exécution du Protocole Terrain")
-        
-        if df_msa_classif is not None and not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
-            list_variables_critiques = df_msa_classif[nom_colonne_variable].dropna().tolist()
-        else:
-            list_variables_critiques = []
-        
-        if list_variables_critiques:
-            if "msa_validated_vars" not in st.session_state:
-                st.session_state["msa_validated_vars"] = {}
-            if "msa_bias_history" not in st.session_state:
-                st.session_state["msa_bias_history"] = {}
-
-            # Génération des options du sélecteur avec un indicateur de statut
-            options_sélecteur = []
-            for var in list_variables_critiques:
-                v_c = "".join(e for e in str(var) if e.isalnum())
-                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
-                    options_sélecteur.append(f"✅ {var}")
-                else:
-                    options_sélecteur.append(f"⏳ {var}")
-
-            selected_option = st.selectbox(
-                "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
-                options=options_sélecteur,
-                key=f"msa_selected_var_{safe_idx}"
-            )
-            
-            selected_var_to_test = selected_option[4:]  
-
-            # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
-            st.markdown("##### 📈 Historique des protocoles validés")
-            
-            variables_valides = []
-            for var in list_variables_critiques:
-                v_c = "".join(e for e in str(var) if e.isalnum())
-                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
-                    variables_valides.append(var)
-            
-            if variables_valides:
-                with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=False):
-                    for v_nom in variables_valides:
-                        v_clean = "".join(e for e in str(v_nom) if e.isalnum())
-                        p_rep_key = f"save_rep_{v_clean}_{safe_idx}"
-                        p_reprod_key = f"save_reprod_{v_clean}_{safe_idx}"
-                        
-                        st.markdown(f"**🟢 Variable : {v_nom}**")
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if 'p' in locals() and isinstance(p, dict) and p_rep_key in p:
-                                st.caption("Données de Reproductibilité enregistrées (Inter-Opérateurs) :")
-                                st.dataframe(pd.DataFrame(p[p_rep_key]), use_container_width=True)
-                        with c2:
-                            if 'p' in locals() and isinstance(p, dict) and p_reprod_key in p:
-                                st.caption("Données de Répétabilité enregistrées (Intra-Opérateur) :")
-                                st.dataframe(pd.DataFrame(p[p_reprod_key]), use_container_width=True)
-                        st.markdown("---")
-            else:
-                st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici au fur et à mesure.")
-            
-            # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
-            var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
-            
-            dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
-            dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
-            bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
-            
-            p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
-            p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
-            p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
-            
-            if 'p' in locals() and isinstance(p, dict):
-                if p_rep_save_key in p and dynamic_rep_key not in st.session_state:
-                    st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
-                if p_reprod_save_key in p and dynamic_reprod_key not in st.session_state:
-                    st.session_state[dynamic_reprod_key] = pd.DataFrame(p[p_reprod_save_key])
-                if p_bias_hist_save_key in p and bias_hist_key not in st.session_state["msa_bias_history"]:
-                    st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]
-            
-            if bias_hist_key not in st.session_state["msa_bias_history"]:
-                st.session_state["msa_bias_history"][bias_hist_key] = []
-            
-            liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
-            
-            if dynamic_rep_key not in st.session_state:
-                st.session_state[dynamic_rep_key] = pd.DataFrame([
-                    {"Opérateur": "Opérateur 1", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"},
-                    {"Opérateur": "Opérateur 2", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"}
-                ])
-                
-            if dynamic_reprod_key not in st.session_state:
-                st.session_state[dynamic_reprod_key] = pd.DataFrame([
-                    {"Essai / Pièce": "Pièce 1", "Résultat": 0.0, "Unité": "unité"},
-                    {"Essai / Pièce": "Pièce 2", "Résultat": 0.0, "Unité": "unité"}
-                ])
-                
-            id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
-            if st.session_state.get(id_validation_blindee_active, False):
-                st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
-            else:
-                st.warning(f"📋 **Statut : Saisie en cours / En recalibrage** | Remplissez les mesures pour : **{selected_var_to_test}**")
-            
-            col_t1, col_t2 = st.columns(2)
-            
-            with col_t1:
-                st.markdown("**🔬 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires?)**")
-                edited_rep = st.data_editor(
-                    st.session_state[dynamic_rep_key],
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    key=f"editor_rep_{var_clean_id}_{safe_idx}",
-                    column_config={
-                        "Unité A": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True),
-                        "Unité B": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
-                    }
-                )
-
-            with col_t2:
-                st.markdown("**👥 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?)**")
-                edited_reprod = st.data_editor(
-                    st.session_state[dynamic_reprod_key],
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    key=f"editor_reprod_{var_clean_id}_{safe_idx}",
-                    column_config={
-                        "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
-                    }
-                )
-            
-            st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
-            valeur_reference = st.number_input(
-                f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
-                value=0.0,
-                step=0.1,
-                key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
-            )
-
-            # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
-                st.session_state[dynamic_rep_key] = edited_rep
-                st.session_state[dynamic_reprod_key] = edited_reprod
-                if 'p' in locals() and isinstance(p, dict):
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
-
-                anomalies_mineures = []
-                anomalies_majeures = []
-                
-                if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
-                    try:
-                        val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
-                        val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
-                        diffs = np.abs(val_col1 - val_col2)
-                        mean_val = val_col1.mean()
-                        if not diffs.dropna().empty and mean_val > 0:
-                            if diffs.max() > mean_val * 0.30:
-                                anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
-                            elif diffs.max() > mean_val * 0.10:
-                                anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
-                        all_vals = pd.concat([val_col1, val_col2]).dropna()
-                        if not all_vals.empty and all(v % 5 == 0 or v % 1 == 0 for v in all_vals if v > 0):
-                            anomalies_mineures.append("Biais d'Arrondis Systématiques")
-                    except:
-                        pass
-
-                if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
-                    try:
-                        vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
-                        if len(vals_reprod) >= 2:
-                            std_dev = vals_reprod.std()
-                            if std_dev > (vals_reprod.mean() * 0.20):
-                                anomalies_majeures.append("Forte Instabilité Intra-Opérateur")
-                            if valeur_reference != 0.0:
-                                biais_justesse = abs(vals_reprod.mean() - valeur_reference)
-                                if biais_justesse > abs(valeur_reference * 0.08):
-                                    anomalies_majeures.append("Biais d'Étalonnage (Décalage / Master)")
-                    except:
-                        pass
-                
-                if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
-                    score, status = "100%", "🟢 Système Fiable"
-                elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
-                    score, status = "75%", "🟡 Alerte : Biais Mineur"
-                elif len(anomalies_majeures) == 1:
-                    score, status = "50%", "🟠 Alerte : Biais Majeur"
-                else:
-                    score, status = "25%", "🔴 Système Non Fiable"
-                
-                toutes_anomalies = anomalies_majeures + anomalies_mineures
-                liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
-                
-                gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
-                
-                run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
-                st.session_state["msa_bias_history"][bias_hist_key].append({
-                    "Essai": f"Analyse #{run_number}",
-                    "Date/Heure": gmt3_time,
-                    "Indice de Fidélité": score,
-                    "Statut Global": status,
-                    "Anomalies Détectées": liste_anomalies_str
-                })
-                
-                if 'p' in locals() and isinstance(p, dict):
-                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
-                
+            if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
+                if msa_classif_key in st.session_state:
+                    del st.session_state[msa_classif_key]
                 st.rerun()
 
-            if st.session_state["msa_bias_history"][bias_hist_key]:
-                st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
-                df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
-                st.table(df_history)
+            st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
+            
+            df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
 
             # =====================================================================
-            # ACTION DU BOUTON ACCÉLÉRÉE ET SÉCURISÉE DIRECTEMENT SUR LE DATAFRAME
+            # 🛠️ SYNCHRONISATION DU LIEN VISUEL AVANT L'AFFICHAGE DANS L'ÉDITEUR
             # =====================================================================
-            if st.button(
-                f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
-                key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
-                type="primary", 
-                use_container_width=True
-            ):
-                # 1. Sauvegarde des inputs édités
-                st.session_state[dynamic_rep_key] = edited_rep
-                st.session_state[dynamic_reprod_key] = edited_reprod
+            if not df_classification_current.empty:
+                if "statut validation" not in df_classification_current.columns:
+                    df_classification_current["statut validation"] = "en attente de test"
                 
-                # 2. Activation des verrous de session
+                for idx_row, row in df_classification_current.iterrows():
+                    var_nom = row.get("Variable Critique", "")
+                    if pd.notna(var_nom):
+                        v_c = "".join(e for e in str(var_nom) if e.isalnum())
+                        if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                            df_classification_current.at[idx_row, "statut validation"] = "test effectué"
+                        else:
+                            df_classification_current.at[idx_row, "statut validation"] = "en attente de test"
+            # =====================================================================
+
+            edited_classification = st.data_editor(
+                df_classification_current,
+                num_rows="dynamic",
+                use_container_width=True,
+                column_config={
+                    "Variable Critique": st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
+                    "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
+                    "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
+                    "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", disabled=True),
+                    "statut validation": st.column_config.TextColumn("Statut Validation", disabled=True)
+                },
+                key=f"classification_editor_widget_{safe_idx}"
+            )
+            
+            if edited_classification is not None:
+                st.session_state[msa_classif_key] = edited_classification
+
+            # =====================================================================
+            # 1/ MISE À JOUR DYNAMIQUE DU TABLEAU DE CLASSIFICATION IA
+            # =====================================================================
+            df_msa_classif = st.session_state.get(msa_classif_key, pd.DataFrame())
+            nom_colonne_variable = "Variable Critique (liée au Y)"
+
+            if not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
+                if "statut validation" not in df_msa_classif.columns:
+                    df_msa_classif["statut validation"] = "en attente de test"
+                
+                for idx_row, row in df_msa_classif.iterrows():
+                    var_nom = row[nom_colonne_variable]
+                    v_c = "".join(e for e in str(var_nom) if e.isalnum())
+                    
+                    if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                        df_msa_classif.at[idx_row, "statut validation"] = "test effectué"
+                
+                st.session_state[msa_classif_key] = df_msa_classif
+
+
+            # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
+            st.markdown("##### 👟 Exécution du Protocole Terrain")
+            
+            if df_msa_classif is not None and not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
+                list_variables_critiques = df_msa_classif[nom_colonne_variable].dropna().tolist()
+            else:
+                list_variables_critiques = []
+            
+            if list_variables_critiques:
+                if "msa_validated_vars" not in st.session_state:
+                    st.session_state["msa_validated_vars"] = {}
+                if "msa_bias_history" not in st.session_state:
+                    st.session_state["msa_bias_history"] = {}
+
+                # Génération des options du sélecteur avec un indicateur de statut
+                options_sélecteur = []
+                for var in list_variables_critiques:
+                    v_c = "".join(e for e in str(var) if e.isalnum())
+                    if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                        options_sélecteur.append(f"✅ {var}")
+                    else:
+                        options_sélecteur.append(f"⏳ {var}")
+
+                selected_option = st.selectbox(
+                    "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
+                    options=options_sélecteur,
+                    key=f"msa_selected_var_{safe_idx}"
+                )
+                
+                selected_var_to_test = selected_option[4:]  
+
+                # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
+                st.markdown("##### 📈 Historique des protocoles validés")
+                
+                variables_valides = []
+                for var in list_variables_critiques:
+                    v_c = "".join(e for e in str(var) if e.isalnum())
+                    if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                        variables_valides.append(var)
+                
+                if variables_valides:
+                    with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=False):
+                        for v_nom in variables_valides:
+                            v_clean = "".join(e for e in str(v_nom) if e.isalnum())
+                            p_rep_key = f"save_rep_{v_clean}_{safe_idx}"
+                            p_reprod_key = f"save_reprod_{v_clean}_{safe_idx}"
+                            
+                            st.markdown(f"**🟢 Variable : {v_nom}**")
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if 'p' in locals() and isinstance(p, dict) and p_rep_key in p:
+                                    st.caption("Données de Reproductibilité enregistrées (Inter-Opérateurs) :")
+                                    st.dataframe(pd.DataFrame(p[p_rep_key]), use_container_width=True)
+                            with c2:
+                                if 'p' in locals() and isinstance(p, dict) and p_reprod_key in p:
+                                    st.caption("Données de Répétabilité enregistrées (Intra-Opérateur) :")
+                                    st.dataframe(pd.DataFrame(p[p_reprod_key]), use_container_width=True)
+                            st.markdown("---")
+                else:
+                    st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici au fur et à mesure.")
+                
+                # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
+                var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
+                
+                dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
+                dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
+                bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
+                
+                p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
+                p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
+                p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
+                
+                if 'p' in locals() and isinstance(p, dict):
+                    if p_rep_save_key in p and dynamic_rep_key not in st.session_state:
+                        st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
+                    if p_reprod_save_key in p and dynamic_reprod_key not in st.session_state:
+                        st.session_state[dynamic_reprod_key] = pd.DataFrame(p[p_reprod_save_key])
+                    if p_bias_hist_save_key in p and bias_hist_key not in st.session_state["msa_bias_history"]:
+                        st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]
+                
+                if bias_hist_key not in st.session_state["msa_bias_history"]:
+                    st.session_state["msa_bias_history"][bias_hist_key] = []
+                
+                liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
+                
+                if dynamic_rep_key not in st.session_state:
+                    st.session_state[dynamic_rep_key] = pd.DataFrame([
+                        {"Opérateur": "Opérateur 1", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"},
+                        {"Opérateur": "Opérateur 2", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"}
+                    ])
+                    
+                if dynamic_reprod_key not in st.session_state:
+                    st.session_state[dynamic_reprod_key] = pd.DataFrame([
+                        {"Essai / Pièce": "Pièce 1", "Résultat": 0.0, "Unité": "unité"},
+                        {"Essai / Pièce": "Pièce 2", "Résultat": 0.0, "Unité": "unité"}
+                    ])
+                    
                 id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
-                st.session_state[id_validation_blindee_active] = True
-                st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
+                if st.session_state.get(id_validation_blindee_active, False):
+                    st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
+                else:
+                    st.warning(f"📋 **Statut : Saisie en cours / En recalibrage** | Remplissez les mesures pour : **{selected_var_to_test}**")
                 
-                # 3. 🎯 FORCE BRUTE : On va chercher le tableau de l'IA immédiatement et on écrit "test effectué" en mémoire de session avant le rerun
-                df_ia_direct = st.session_state.get(msa_classif_key, pd.DataFrame())
-                if not df_ia_direct.empty and nom_colonne_variable in df_ia_direct.columns:
-                    for idx_row, row in df_ia_direct.iterrows():
-                        if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
-                            df_ia_direct.at[idx_row, "statut validation"] = "test effectué"
-                    st.session_state[msa_classif_key] = df_ia_direct # Ré-écriture immédiate
+                col_t1, col_t2 = st.columns(2)
+                
+                with col_t1:
+                    st.markdown("**🔬 Test de Reproductibilité (Différentes personnes obtiennent-elles des résultats similaires?)**")
+                    edited_rep = st.data_editor(
+                        st.session_state[dynamic_rep_key],
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"editor_rep_{var_clean_id}_{safe_idx}",
+                        column_config={
+                            "Unité A": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True),
+                            "Unité B": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
+                        }
+                    )
 
-                # 4. Sauvegarde persistante dans le dictionnaire p
+                with col_t2:
+                    st.markdown("**👥 Test de Répétabilité (La même personne mesure-t-elle toujours pareil?)**")
+                    edited_reprod = st.data_editor(
+                        st.session_state[dynamic_reprod_key],
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"editor_reprod_{var_clean_id}_{safe_idx}",
+                        column_config={
+                            "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
+                        }
+                    )
+                
+                st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
+                valeur_reference = st.number_input(
+                    f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
+                    value=0.0,
+                    step=0.1,
+                    key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
+                )
+
+                # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
+                    st.session_state[dynamic_rep_key] = edited_rep
+                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    if 'p' in locals() and isinstance(p, dict):
+                        p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                        p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+
+                    anomalies_mineures = []
+                    anomalies_majeures = []
+                    
+                    if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
+                        try:
+                            val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
+                            val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
+                            diffs = np.abs(val_col1 - val_col2)
+                            mean_val = val_col1.mean()
+                            if not diffs.dropna().empty and mean_val > 0:
+                                if diffs.max() > mean_val * 0.30:
+                                    anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
+                                elif diffs.max() > mean_val * 0.10:
+                                    anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
+                            all_vals = pd.concat([val_col1, val_col2]).dropna()
+                            if not all_vals.empty and all(v % 5 == 0 or v % 1 == 0 for v in all_vals if v > 0):
+                                anomalies_mineures.append("Biais d'Arrondis Systématiques")
+                        except:
+                            pass
+
+                    if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
+                        try:
+                            vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
+                            if len(vals_reprod) >= 2:
+                                std_dev = vals_reprod.std()
+                                if std_dev > (vals_reprod.mean() * 0.20):
+                                    anomalies_majeures.append("Forte Instabilité Intra-Opérateur")
+                                if valeur_reference != 0.0:
+                                    biais_justesse = abs(vals_reprod.mean() - valeur_reference)
+                                    if biais_justesse > abs(valeur_reference * 0.08):
+                                        anomalies_majeures.append("Biais d'Étalonnage (Décalage / Master)")
+                        except:
+                            pass
+                    
+                    if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
+                        score, status = "100%", "🟢 Système Fiable"
+                    elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
+                        score, status = "75%", "🟡 Alerte : Biais Mineur"
+                    elif len(anomalies_majeures) == 1:
+                        score, status = "50%", "🟠 Alerte : Biais Majeur"
+                    else:
+                        score, status = "25%", "🔴 Système Non Fiable"
+                    
+                    toutes_anomalies = anomalies_majeures + anomalies_mineures
+                    liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
+                    
+                    gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
+                    
+                    run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
+                    st.session_state["msa_bias_history"][bias_hist_key].append({
+                        "Essai": f"Analyse #{run_number}",
+                        "Date/Heure": gmt3_time,
+                        "Indice de Fidélité": score,
+                        "Statut Global": status,
+                        "Anomalies Détectées": liste_anomalies_str
+                    })
+                    
+                    if 'p' in locals() and isinstance(p, dict):
+                        p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                    
+                    st.rerun()
+
+                if st.session_state["msa_bias_history"][bias_hist_key]:
+                    st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
+                    df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
+                    st.table(df_history)
+
+                # =====================================================================
+                # ACTION DU BOUTON ACCÉLÉRÉE ET SÉCURISÉE DIRECTEMENT SUR LE DATAFRAME
+                # =====================================================================
+                if st.button(
+                    f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
+                    key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
+                    type="primary", 
+                    use_container_width=True
+                ):
+                    # 1. Sauvegarde des inputs édités
+                    st.session_state[dynamic_rep_key] = edited_rep
+                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    
+                    # 2. Activation des verrous de session
+                    id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
+                    st.session_state[id_validation_blindee_active] = True
+                    st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
+                    
+                    # 3. 🎯 FORCE BRUTE : On va chercher le tableau de l'IA immédiatement et on écrit "test effectué" en mémoire de session avant le rerun
+                    df_ia_direct = st.session_state.get(msa_classif_key, pd.DataFrame())
+                    if not df_ia_direct.empty and nom_colonne_variable in df_ia_direct.columns:
+                        for idx_row, row in df_ia_direct.iterrows():
+                            if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
+                                df_ia_direct.at[idx_row, "statut validation"] = "test effectué"
+                        st.session_state[msa_classif_key] = df_ia_direct # Ré-écriture immédiate
+
+                    # 4. Sauvegarde persistante dans le dictionnaire p
+                    if 'p' in locals() and isinstance(p, dict):
+                        p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                        p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+                        p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                        p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
+                    
+                    st.balloons()
+                    st.success(f"✅ Données terrain validées et gelées avec succès pour **{selected_var_to_test}** !")
+                    st.rerun()
+                
+            else:
+                st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse.")
+                selected_var_to_test = "Aucune variable sélectionnée"
+
+            # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE SIMPLIFIÉE ---
+            st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
+            
+            last_score_str = "100%"
+            if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
+                last_score_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Indice de Fidélité"]
+
+            if last_score_str in ["50%", "25%"] and 'p' in locals() and isinstance(p, dict):
+                p["msa_corrective_action"] = st.selectbox(
+                    "Plan d'action prioritaire déployé lors du recalibrage :",
+                    options=[
+                        "Automatisation de la capture (Remplacement du facteur humain par une règle SI)",
+                        "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
+                        "Mise en place d'une checksheet avec contrôles de saisie rigides"
+                    ],
+                    key=f"msa_action_choice_{safe_idx}"
+                )
+
+            # --- 7. VALIDATION FINALE (SIGN-OFF) ---
+            st.markdown("##### 📋 Validation Finale")
+            if last_score_str == "25%":
+                st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable' (25%). Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
+            else:
+                saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
+                is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
                 if 'p' in locals() and isinstance(p, dict):
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
-                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
-                    p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
+                    p["msa_is_validated_status"] = is_validated
                 
-                st.balloons()
-                st.success(f"✅ Données terrain validées et gelées avec succès pour **{selected_var_to_test}** !")
-                st.rerun()
-            
-        else:
-            st.info("💡 Le tableau de classification ci-dessus est vide ou en cours d'analyse.")
-            selected_var_to_test = "Aucune variable sélectionnée"
-
-        # --- 5 & 6. DIAGNOSTIC ET BOUCLE CORRECTIVE SIMPLIFIÉE ---
-        st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
-        
-        last_score_str = "100%"
-        if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
-            last_score_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Indice de Fidélité"]
-
-        if last_score_str in ["50%", "25%"] and 'p' in locals() and isinstance(p, dict):
-            p["msa_corrective_action"] = st.selectbox(
-                "Plan d'action prioritaire déployé lors du recalibrage :",
-                options=[
-                    "Automatisation de la capture (Remplacement du facteur humain par une règle SI)",
-                    "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
-                    "Mise en place d'une checksheet avec contrôles de saisie rigides"
-                ],
-                key=f"msa_action_choice_{safe_idx}"
-            )
-
-        # --- 7. VALIDATION FINALE (SIGN-OFF) ---
-        st.markdown("##### 📋 Validation Finale")
-        if last_score_str == "25%":
-            st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable' (25%). Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
-        else:
-            saved_status = p.get("msa_is_validated_status", False) if ('p' in locals() and isinstance(p, dict)) else False
-            is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
-            if 'p' in locals() and isinstance(p, dict):
-                p["msa_is_validated_status"] = is_validated
-            
-            if is_validated:
-                st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
+                if is_validated:
+                    st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # 5. Data collection
         st.divider()
