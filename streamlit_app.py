@@ -1958,32 +1958,48 @@ else:
                         try:
                             val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
                             val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
-                            diffs = np.abs(val_col1 - val_col2)
-                            mean_val = val_col1.mean()
-                            if not diffs.dropna().empty and mean_val > 0:
-                                if diffs.max() > mean_val * 0.30:
-                                    anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
-                                elif diffs.max() > mean_val * 0.10:
-                                    anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
-                            all_vals = pd.concat([val_col1, val_col2]).dropna()
-                            if not all_vals.empty and all(v % 5 == 0 or v % 1 == 0 for v in all_vals if v > 0):
-                                anomalies_mineures.append("Biais d'Arrondis Systématiques")
-                        except:
-                            pass
+                            
+                            # Sécurité : Détecte si les données saisies ne sont pas numériques ou vides
+                            if val_col1.dropna().empty or val_col2.dropna().empty:
+                                anomalies_majeures.append("Données de Répétabilité Invalides ou Vides")
+                            else:
+                                diffs = np.abs(val_col1 - val_col2)
+                                mean_val = val_col1.mean()
+                                if not diffs.dropna().empty and mean_val > 0:
+                                    if diffs.max() > mean_val * 0.30:
+                                        anomalies_majeures.append("Incohérence Critique Inter-Opérateurs")
+                                    elif diffs.max() > mean_val * 0.10:
+                                        anomalies_mineures.append("Dispersion Inter-Opérateurs légère")
+                                
+                                all_vals = pd.concat([val_col1, val_col2]).dropna()
+                                if not all_vals.empty and all(v % 5 == 0 for v in all_vals if v > 0):
+                                    anomalies_mineures.append("Biais d'Arrondis Systématiques (Multiples de 5)")
+                        except Exception as e:
+                            anomalies_majeures.append(f"Erreur calcul Répétabilité: {str(e)}")
 
                     if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
                         try:
                             vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
-                            if len(vals_reprod) >= 2:
-                                std_dev = vals_reprod.std()
-                                if std_dev > (vals_reprod.mean() * 0.20):
-                                    anomalies_majeures.append("Forte Instabilité Intra-Opérateur")
-                                if valeur_reference != 0.0:
+                            
+                            # Sécurité : Détecte si le tableau de reproductibilité est vide ou texte
+                            if vals_reprod.empty:
+                                anomalies_majeures.append("Données de Reproductibilité Manquantes ou Invalides")
+                            else:
+                                if len(vals_reprod) >= 2:
+                                    std_dev = vals_reprod.std()
+                                    if pd.notna(std_dev) and vals_reprod.mean() > 0:
+                                        if std_dev > (vals_reprod.mean() * 0.20):
+                                            anomalies_majeures.append("Forte Instabilité Intra-Opérateur")
+                                if 'valeur_reference' in locals() and valeur_reference != 0.0:
                                     biais_justesse = abs(vals_reprod.mean() - valeur_reference)
                                     if biais_justesse > abs(valeur_reference * 0.08):
                                         anomalies_majeures.append("Biais d'Étalonnage (Décalage / Master)")
-                        except:
-                            pass
+                        except Exception as e:
+                            anomalies_majeures.append(f"Erreur calcul Reproductibilité: {str(e)}")
+                    
+                    # Sécurité : Si l'utilisateur n'a absolument rien saisi de valide
+                    if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
+                        anomalies_majeures.append("Aucune donnée disponible pour l'analyse")
                     
                     if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
                         score, status = "100%", "🟢 Système Fiable"
