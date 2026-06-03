@@ -1775,25 +1775,18 @@ else:
         nom_colonne_variable = "Variable Critique (liée au Y)"
 
         if not df_msa_classif.empty and nom_colonne_variable in df_msa_classif.columns:
+            # On s'assure que la colonne existe sans écraser les données existantes
             if "statut validation" not in df_msa_classif.columns:
                 df_msa_classif["statut validation"] = "en attente de test"
             
+            # Application des statuts enregistrés de manière persistante
             for idx_row, row in df_msa_classif.iterrows():
                 var_nom = row[nom_colonne_variable]
-                
-                # 🔒 SÉCURITÉ : On crée une clé basée UNIQUEMENT sur les caractères alphanumériques de la variable
                 v_c = "".join(e for e in str(var_nom) if e.isalnum())
-                id_validation_blindee = f"status_lock_{v_c}_{safe_idx}"
                 
-                # On vérifie dans la session OU dans le dictionnaire persistant 'p'
-                is_validated = st.session_state.get(id_validation_blindee, False)
-                if 'p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p:
-                    is_validated = True
-                
-                if is_validated:
+                # Double vérification de sécurité (Session + Dictionnaire P)
+                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
                     df_msa_classif.at[idx_row, "statut validation"] = "test effectué"
-                else:
-                    df_msa_classif.at[idx_row, "statut validation"] = "en attente de test"
             
             st.session_state[msa_classif_key] = df_msa_classif
 
@@ -1816,9 +1809,7 @@ else:
             options_sélecteur = []
             for var in list_variables_critiques:
                 v_c = "".join(e for e in str(var) if e.isalnum())
-                id_validation_blindee = f"status_lock_{v_c}_{safe_idx}"
-                
-                if st.session_state.get(id_validation_blindee, False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
                     options_sélecteur.append(f"✅ {var}")
                 else:
                     options_sélecteur.append(f"⏳ {var}")
@@ -1837,15 +1828,13 @@ else:
             variables_valides = []
             for var in list_variables_critiques:
                 v_c = "".join(e for e in str(var) if e.isalnum())
-                id_validation_blindee = f"status_lock_{v_c}_{safe_idx}"
-                if st.session_state.get(id_validation_blindee, False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
+                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or ('p' in locals() and isinstance(p, dict) and f"validated_status_{v_c}_{safe_idx}" in p):
                     variables_valides.append(var)
             
             if variables_valides:
                 with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=False):
                     for v_nom in variables_valides:
                         v_clean = "".join(e for e in str(v_nom) if e.isalnum())
-                        
                         p_rep_key = f"save_rep_{v_clean}_{safe_idx}"
                         p_reprod_key = f"save_reprod_{v_clean}_{safe_idx}"
                         
@@ -1870,12 +1859,10 @@ else:
             dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
             bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
             
-            # Clés uniques de sauvegarde persistante dans le dictionnaire de projet 'p'
             p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
             p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
             p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
             
-            # 📥 PASSERELLE D'IMPORTATION
             if 'p' in locals() and isinstance(p, dict):
                 if p_rep_save_key in p and dynamic_rep_key not in st.session_state:
                     st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
@@ -1901,14 +1888,12 @@ else:
                     {"Essai / Pièce": "Pièce 2", "Résultat": 0.0, "Unité": "unité"}
                 ])
                 
-            # Affichage du statut de la variable actuelle
             id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
             if st.session_state.get(id_validation_blindee_active, False):
                 st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
             else:
                 st.warning(f"📋 **Statut : Saisie en cours / En recalibrage** | Remplissez les mesures pour : **{selected_var_to_test}**")
             
-            # --- SÉQUENCE DES TESTS TERRAIN ---
             col_t1, col_t2 = st.columns(2)
             
             with col_t1:
@@ -2020,21 +2005,33 @@ else:
                 df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
                 st.table(df_history)
 
-            # 🛠️ LE FIX EST ICI : LE BOUTON APPLIQUE DÉSORMAIS LA CLÉ SÉCURISÉE ALPHANUMÉRIQUE
+            # =====================================================================
+            # ACTION DU BOUTON ACCÉLÉRÉE ET SÉCURISÉE DIRECTEMENT SUR LE DATAFRAME
+            # =====================================================================
             if st.button(
                 f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
                 key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
                 type="primary", 
                 use_container_width=True
             ):
+                # 1. Sauvegarde des inputs édités
                 st.session_state[dynamic_rep_key] = edited_rep
                 st.session_state[dynamic_reprod_key] = edited_reprod
                 
-                # On valide via la clé blindée
+                # 2. Activation des verrous de session
                 id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
                 st.session_state[id_validation_blindee_active] = True
                 st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                 
+                # 3. 🎯 FORCE BRUTE : On va chercher le tableau de l'IA immédiatement et on écrit "test effectué" en mémoire de session avant le rerun
+                df_ia_direct = st.session_state.get(msa_classif_key, pd.DataFrame())
+                if not df_ia_direct.empty and nom_colonne_variable in df_ia_direct.columns:
+                    for idx_row, row in df_ia_direct.iterrows():
+                        if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
+                            df_ia_direct.at[idx_row, "statut validation"] = "test effectué"
+                    st.session_state[msa_classif_key] = df_ia_direct # Ré-écriture immédiate
+
+                # 4. Sauvegarde persistante dans le dictionnaire p
                 if 'p' in locals() and isinstance(p, dict):
                     p[p_rep_save_key] = edited_rep.to_dict(orient='records')
                     p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
