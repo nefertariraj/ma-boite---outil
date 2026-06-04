@@ -2041,40 +2041,45 @@ else:
                     type="primary", 
                     use_container_width=True
                 ):
-                    # 1️⃣ Récupération des deux tableaux modifiés ou actuels
-                    final_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}") if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_rep_key)
-                    final_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}") if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_reprod_key)
-
-                    # 2️⃣ On met à jour le dictionnaire local 'p'
-                    if final_rep is not None and hasattr(final_rep, 'to_dict'):
-                        p[p_rep_save_key] = final_rep.to_dict(orient='records')
-                    if final_reprod is not None and hasattr(final_reprod, 'to_dict'):
-                        p[p_reprod_save_key] = final_reprod.to_dict(orient='records')
-                    
-                    p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
-                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
-
-                    # 3️⃣ On force la mise à jour du statut "test effectué"
-                    classif_df = st.session_state.get(msa_classif_key, pd.DataFrame())
-                    if not classif_df.empty:
-                        for idx_row, row in classif_df.iterrows():
-                            if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
-                                classif_df.at[idx_row, "statut validation"] = "test effectué"
-                        st.session_state[msa_classif_key] = classif_df
-                        p["msa_classification_table"] = classif_df.to_dict(orient='records')
-
-                    # 4️⃣ LE MOYEN LE PLUS SIMPLE : On écrase directement la mémoire globale du JSON
-                    # De cette façon, peu importe ce que fait le reste du script, le JSON est déjà à jour.
+                    # 1️⃣ Sécurité : On s'assure que le projet existe dans la session globale
                     if 'projects' in st.session_state and 'p_idx' in locals():
-                        # On fusionne 'p' directement dans le projet actif de la session globale
-                        st.session_state.projects[p_idx].update(p)
+                        idx = p_idx
+                        
+                        # 2️⃣ Récupération directe des composants de la page
+                        final_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}") if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_rep_key)
+                        final_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}") if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_reprod_key)
 
-                    # 5️⃣ Verrouillage des états d'affichage et rafraîchissement
+                        # 3️⃣ ON ÉCRIT DIRECTEMENT DANS LE PROJET GLOBAL (Pas dans 'p')
+                        if final_rep is not None and hasattr(final_rep, 'to_dict'):
+                            st.session_state.projects[idx][p_rep_save_key] = final_rep.to_dict(orient='records')
+                            st.session_state[dynamic_rep_key] = final_rep
+                            
+                        if final_reprod is not None and hasattr(final_reprod, 'to_dict'):
+                            st.session_state.projects[idx][p_reprod_save_key] = final_reprod.to_dict(orient='records')
+                            st.session_state[dynamic_reprod_key] = final_reprod
+                        
+                        # Sauvegarde des statuts MSA directement dans le projet global
+                        st.session_state.projects[idx][f"validated_status_{var_clean_id}_{safe_idx}"] = True
+                        st.session_state.projects[idx][p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+
+                        # 4️⃣ Mise à jour et sauvegarde forcée du statut "test effectué"
+                        classif_df = st.session_state.get(msa_classif_key, pd.DataFrame())
+                        if not classif_df.empty:
+                            for idx_row, row in classif_df.iterrows():
+                                if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
+                                    classif_df.at[idx_row, "statut validation"] = "test effectué"
+                            st.session_state[msa_classif_key] = classif_df
+                            st.session_state.projects[idx]["msa_classification_table"] = classif_df.to_dict(orient='records')
+
+                        # 5️⃣ On synchronise la variable locale 'p' juste pour éviter les bugs d'affichage immédiat
+                        p.update(st.session_state.projects[idx])
+
+                    # Verrouillage de l'affichage de l'interface
                     st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
                     st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                     
                     st.balloons()
-                    st.success(f"✅ Données enregistrées directement dans la sauvegarde pour **{selected_var_to_test}** !")
+                    st.success(f"✅ Sauvegarde globale forcée avec succès pour **{selected_var_to_test}** !")
                     st.rerun()
 
             # --- 5 & 6. DIAGNOSTIC ET PLAN D'ACTION ---
