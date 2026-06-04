@@ -1658,8 +1658,8 @@ else:
             # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
             
-            # Reprise directe et simple de la variable de l'objectif du projet
-            project_y = st.session_state.get("selected_ctq", "Indéterminé")
+            # Récupération directe de la variable cible du projet depuis le dictionnaire p
+            project_y = p.get("selected_ctq", "Indéterminé")
             
             # Nom de colonne unique et harmonisé pour tout le script
             nom_colonne_variable = "Variable Critique (liée au Y)"
