@@ -1957,22 +1957,25 @@ else:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                     
-                    # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (NONE-CHECK)
-                    # Forçage systématique via le Session State pour parer les rafraîchissements de boutons
-                    edited_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
-                    if edited_rep is None or (isinstance(edited_rep, pd.DataFrame) and edited_rep.empty):
-                        edited_rep = st.session_state.get(dynamic_rep_key)
-                        
-                    edited_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
-                    if edited_reprod is None or (isinstance(edited_reprod, pd.DataFrame) and edited_reprod.empty):
-                        edited_reprod = st.session_state.get(dynamic_reprod_key)
+                    # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (Modifié pour accepter les dictionnaires st.data_editor)
+                    raw_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
+                    if isinstance(raw_rep, dict) or raw_rep is None:
+                        edited_rep = st.session_state.get(dynamic_rep_key, pd.DataFrame())
+                    else:
+                        edited_rep = raw_rep
 
-                    # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P' (Uniquement si les données existent)
-                    if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
+                    raw_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
+                    if isinstance(raw_reprod, dict) or raw_reprod is None:
+                        edited_reprod = st.session_state.get(dynamic_reprod_key, pd.DataFrame())
+                    else:
+                        edited_reprod = raw_reprod
+
+                    # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P'
+                    if isinstance(edited_rep, pd.DataFrame):
                         p[p_rep_save_key] = edited_rep.to_dict(orient='records')
                         st.session_state[dynamic_rep_key] = edited_rep
-                    
-                    if edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
+                        
+                    if isinstance(edited_reprod, pd.DataFrame):
                         p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                         st.session_state[dynamic_reprod_key] = edited_reprod
 
@@ -1980,7 +1983,7 @@ else:
                     anomalies_mineures = []
                     anomalies_majeures = []
                     
-                    if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
+                    if isinstance(edited_rep, pd.DataFrame) and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
                         try:
                             val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
                             val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
@@ -2002,7 +2005,7 @@ else:
                         except Exception as e:
                             anomalies_majeures.append(f"Erreur évaluation Répétabilité: {str(e)}")
 
-                    if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
+                    if isinstance(edited_reprod, pd.DataFrame) and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
                         try:
                             vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
                             
@@ -2021,7 +2024,7 @@ else:
                         except Exception as e:
                             anomalies_majeures.append(f"Erreur évaluation Reproductibilité: {str(e)}")
                     
-                    if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
+                    if (edited_rep is None or (isinstance(edited_rep, pd.DataFrame) and edited_rep.empty)) and (edited_reprod is None or (isinstance(edited_reprod, pd.DataFrame) and edited_reprod.empty)):
                         anomalies_majeures.append("Variabilité Incalculable : Aucune donnée disponible")
                     
                     if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
