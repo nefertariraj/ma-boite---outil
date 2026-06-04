@@ -1914,15 +1914,6 @@ else:
                             "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
                         }
                     )
-                # =====================================================================
-                # 💾 SAUVEGARDE EN TEMPS RÉEL DES TABLEAUX MSA (AJOUTÉ ICI 👇)
-                # =====================================================================
-                if edited_rep is not None:
-                    st.session_state[dynamic_rep_key] = edited_rep
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                if edited_reprod is not None:
-                    st.session_state[dynamic_reprod_key] = edited_reprod
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                     
                 # 🛡️ SÉCURITÉ SANS TOUCHER AUX BOUTONS : Si l'utilisateur clique sur un bouton plus bas,
                 # les variables edited_rep et edited_reprod se vident. On les force ici à récupérer les données en mémoire.
@@ -2058,8 +2049,8 @@ else:
                         idx = p_idx
                         
                         # 2️⃣ Récupération directe des composants de la page
-                        final_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}") if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_rep_key)
-                        final_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}") if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_reprod_key)
+                        final_rep = edited_rep
+                        final_reprod = edited_reprod
 
                         # 3️⃣ ON ÉCRIT DIRECTEMENT DANS LE PROJET GLOBAL (Pas dans 'p')
                         if final_rep is not None and hasattr(final_rep, 'to_dict'):
