@@ -2041,38 +2041,60 @@ else:
                     type="primary", 
                     use_container_width=True
                 ):
-                    # 🟢 Récupération blindée depuis le session_state pour contrer les st.rerun de l'analyse des biais
-                    final_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}") if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_rep_key)
-                    final_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}") if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_reprod_key)
-
-                    # Sauvegarde robuste de la Reproductibilité
-                    if final_rep is not None and hasattr(final_rep, 'to_dict'):
-                        p[p_rep_save_key] = final_rep.to_dict(orient='records')
-                        st.session_state[dynamic_rep_key] = final_rep
-                        
-                    # Sauvegarde robuste de la Répétabilité
-                    if final_reprod is not None and hasattr(final_reprod, 'to_dict'):
-                        p[p_reprod_save_key] = final_reprod.to_dict(orient='records')
-                        st.session_state[dynamic_reprod_key] = final_reprod
+                    # --- 1. RECONSTRUCTION SÉCURISÉE DES DONNÉES DE REPRODUCTIBILITÉ ---
+                    df_rep = st.session_state.get(dynamic_rep_key).copy()
+                    widget_rep_changes = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
                     
-                    # Verrouillage des statuts
+                    if widget_rep_changes and isinstance(widget_rep_changes, dict):
+                        # Appliquer les lignes modifiées
+                        for row_idx, changes in widget_rep_changes.get("edited_rows", {}).items():
+                            for col_name, col_val in changes.items():
+                                df_rep.at[int(row_idx), col_name] = col_val
+                        # Appliquer les nouvelles lignes si ajoutées
+                        if widget_rep_changes.get("added_rows"):
+                            df_rep = pd.concat([df_rep, pd.DataFrame(widget_rep_changes["added_rows"])], ignore_index=True)
+                    
+                    p[p_rep_save_key] = df_rep.to_dict(orient='records')
+                    st.session_state[dynamic_rep_key] = df_rep
+
+                    # --- 2. RECONSTRUCTION SÉCURISÉE DES DONNÉES DE RÉPÉTABILITÉ ---
+                    df_reprod = st.session_state.get(dynamic_reprod_key).copy()
+                    widget_reprod_changes = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
+                    
+                    if widget_reprod_changes and isinstance(widget_reprod_changes, dict):
+                        # Appliquer les lignes modifiées
+                        for row_idx, changes in widget_reprod_changes.get("edited_rows", {}).items():
+                            for col_name, col_val in changes.items():
+                                df_reprod.at[int(row_idx), col_name] = col_val
+                        # Appliquer les nouvelles lignes si ajoutées
+                        if widget_reprod_changes.get("added_rows"):
+                            df_reprod = pd.concat([df_reprod, pd.DataFrame(widget_reprod_changes["added_rows"])], ignore_index=True)
+                    
+                    p[p_reprod_save_key] = df_reprod.to_dict(orient='records')
+                    st.session_state[dynamic_reprod_key] = df_reprod
+                    
+                    # --- 3. VERROUILLAGE ET STATUTS ---
                     st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
                     st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                     
-                    # Mise à jour du statut dans le tableau de classification global
-                    if not df_classification_current.empty:
-                        for idx_row, row in df_classification_current.iterrows():
-                            if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
-                                df_classification_current.at[idx_row, "statut validation"] = "test effectué"
-                        st.session_state[msa_classif_key] = df_classification_current
+                    # Forcer la mise à jour immédiate du statut dans la classification
+                    if f"classification_editor_widget_{safe_idx}" in st.session_state:
+                        # On applique le statut directement dans la session de l'éditeur parent
+                        classif_changes = st.session_state.get(msa_classif_key, pd.DataFrame())
+                        if not classif_changes.empty:
+                            for idx_row, row in classif_changes.iterrows():
+                                if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
+                                    classif_changes.at[idx_row, "statut validation"] = "test effectué"
+                            st.session_state[msa_classif_key] = classif_changes
+                            # On duplique dans p pour la persistance
+                            p["msa_classification_table"] = classif_changes.to_dict(orient='records')
 
-                    # Synchronisation avec le dictionnaire persistant p
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
                     p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
                     
-                    # Célébration et rechargement propre
+                    # --- 4. EFFET ET RERUN ---
                     st.balloons()
-                    st.success(f"✅ Données terrain validées et gelées avec succès pour **{selected_var_to_test}** !")
+                    st.success(f"✅ Données terrain validées, enregistrées et gelées pour **{selected_var_to_test}** !")
                     st.rerun()
 
             # --- 5 & 6. DIAGNOSTIC ET PLAN D'ACTION ---
