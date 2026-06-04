@@ -2083,10 +2083,17 @@ else:
                         st.session_state[msa_classif_key] = classif_df
                         p["msa_classification_table"] = classif_df.to_dict(orient='records')
 
-                    # 5️⃣ PROTECTION SÉCURITÉ JSON : On pousse directement la structure 'p' mise à jour 
-                    # dans la liste des projets pour empêcher la fonction de synchronisation globale de l'écraser plus bas
+                    # 5️⃣ PROTECTION SÉCURITÉ JSON CORRIGÉE : On met à jour uniquement les clés modifiées
+                    # dans le projet global existant sans écraser le reste (comme le 'name')
                     if 'projects' in st.session_state and 'p_idx' in locals():
-                        st.session_state.projects[p_idx] = p
+                        if p_idx < len(st.session_state.projects):
+                            # On met à jour point par point pour ne rien perdre
+                            st.session_state.projects[p_idx][p_rep_save_key] = p[p_rep_save_key]
+                            st.session_state.projects[p_idx][p_reprod_save_key] = p[p_reprod_save_key]
+                            st.session_state.projects[p_idx][f"validated_status_{var_clean_id}_{safe_idx}"] = True
+                            st.session_state.projects[p_idx]["msa_classification_table"] = classif_df.to_dict(orient='records')
+                            if p_bias_hist_save_key in p:
+                                st.session_state.projects[p_idx][p_bias_hist_save_key] = p[p_bias_hist_save_key]
 
                     # 6️⃣ Succès et rechargement de la page
                     st.balloons()
