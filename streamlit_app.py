@@ -2041,60 +2041,56 @@ else:
                     type="primary", 
                     use_container_width=True
                 ):
-                    # --- 1. RECONSTRUCTION SÉCURISÉE DES DONNÉES DE REPRODUCTIBILITÉ ---
+                    # 1️⃣ Récupération directe et forcée des deltas du st.data_editor (Reproductibilité)
                     df_rep = st.session_state.get(dynamic_rep_key).copy()
                     widget_rep_changes = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
-                    
                     if widget_rep_changes and isinstance(widget_rep_changes, dict):
-                        # Appliquer les lignes modifiées
                         for row_idx, changes in widget_rep_changes.get("edited_rows", {}).items():
                             for col_name, col_val in changes.items():
                                 df_rep.at[int(row_idx), col_name] = col_val
-                        # Appliquer les nouvelles lignes si ajoutées
                         if widget_rep_changes.get("added_rows"):
                             df_rep = pd.concat([df_rep, pd.DataFrame(widget_rep_changes["added_rows"])], ignore_index=True)
                     
+                    # Injection immédiate dans p et session_state
                     p[p_rep_save_key] = df_rep.to_dict(orient='records')
                     st.session_state[dynamic_rep_key] = df_rep
 
-                    # --- 2. RECONSTRUCTION SÉCURISÉE DES DONNÉES DE RÉPÉTABILITÉ ---
+                    # 2️⃣ Même opération forcée pour la Répétabilité
                     df_reprod = st.session_state.get(dynamic_reprod_key).copy()
                     widget_reprod_changes = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
-                    
                     if widget_reprod_changes and isinstance(widget_reprod_changes, dict):
-                        # Appliquer les lignes modifiées
                         for row_idx, changes in widget_reprod_changes.get("edited_rows", {}).items():
                             for col_name, col_val in changes.items():
                                 df_reprod.at[int(row_idx), col_name] = col_val
-                        # Appliquer les nouvelles lignes si ajoutées
                         if widget_reprod_changes.get("added_rows"):
                             df_reprod = pd.concat([df_reprod, pd.DataFrame(widget_reprod_changes["added_rows"])], ignore_index=True)
                     
                     p[p_reprod_save_key] = df_reprod.to_dict(orient='records')
                     st.session_state[dynamic_reprod_key] = df_reprod
                     
-                    # --- 3. VERROUILLAGE ET STATUTS ---
+                    # 3️⃣ Fixation stricte des statuts MSA
                     st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
                     st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
-                    
-                    # Forcer la mise à jour immédiate du statut dans la classification
-                    if f"classification_editor_widget_{safe_idx}" in st.session_state:
-                        # On applique le statut directement dans la session de l'éditeur parent
-                        classif_changes = st.session_state.get(msa_classif_key, pd.DataFrame())
-                        if not classif_changes.empty:
-                            for idx_row, row in classif_changes.iterrows():
-                                if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
-                                    classif_changes.at[idx_row, "statut validation"] = "test effectué"
-                            st.session_state[msa_classif_key] = classif_changes
-                            # On duplique dans p pour la persistance
-                            p["msa_classification_table"] = classif_changes.to_dict(orient='records')
-
-                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
                     p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
-                    
-                    # --- 4. EFFET ET RERUN ---
+                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+
+                    # 4️⃣ Mise à jour directe et forcée du statut "test effectué" dans la classification
+                    classif_df = st.session_state.get(msa_classif_key, pd.DataFrame())
+                    if not classif_df.empty:
+                        for idx_row, row in classif_df.iterrows():
+                            if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
+                                classif_df.at[idx_row, "statut validation"] = "test effectué"
+                        st.session_state[msa_classif_key] = classif_df
+                        p["msa_classification_table"] = classif_df.to_dict(orient='records')
+
+                    # 5️⃣ PROTECTION SÉCURITÉ JSON : On pousse directement la structure 'p' mise à jour 
+                    # dans la liste des projets pour empêcher la fonction de synchronisation globale de l'écraser plus bas
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        st.session_state.projects[p_idx] = p
+
+                    # 6️⃣ Succès et rechargement de la page
                     st.balloons()
-                    st.success(f"✅ Données terrain validées, enregistrées et gelées pour **{selected_var_to_test}** !")
+                    st.success(f"✅ Données terrain validées et synchronisées pour le JSON pour **{selected_var_to_test}** !")
                     st.rerun()
 
             # --- 5 & 6. DIAGNOSTIC ET PLAN D'ACTION ---
