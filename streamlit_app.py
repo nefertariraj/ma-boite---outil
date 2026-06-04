@@ -1911,13 +1911,6 @@ else:
                             "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
                         }
                     )
-
-                if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    st.session_state[dynamic_rep_key] = edited_rep
-                if edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
-                    st.session_state[dynamic_reprod_key] = edited_reprod
                     
                 # 🛡️ SÉCURITÉ SANS TOUCHER AUX BOUTONS : Si l'utilisateur clique sur un bouton plus bas,
                 # les variables edited_rep et edited_reprod se vident. On les force ici à récupérer les données en mémoire.
