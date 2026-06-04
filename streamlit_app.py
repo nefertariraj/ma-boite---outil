@@ -1651,9 +1651,12 @@ else:
             # =====================================================================
             # 🛡️ ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P' (ALIGNÉ)
             # =====================================================================
-            if 'p' not in st.session_state:
-                st.session_state['p'] = {}
-            p = st.session_state['p']
+            if 'projects' in st.session_state and 'p_idx' in locals():
+                p = st.session_state.projects[p_idx]
+            else:
+                if 'p' not in st.session_state:
+                    st.session_state['p'] = {}
+                p = st.session_state['p']
 
             # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
@@ -1911,6 +1914,15 @@ else:
                             "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
                         }
                     )
+                # =====================================================================
+                # 💾 SAUVEGARDE EN TEMPS RÉEL DES TABLEAUX MSA (AJOUTÉ ICI 👇)
+                # =====================================================================
+                if edited_rep is not None:
+                    st.session_state[dynamic_rep_key] = edited_rep
+                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                if edited_reprod is not None:
+                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                     
                 # 🛡️ SÉCURITÉ SANS TOUCHER AUX BOUTONS : Si l'utilisateur clique sur un bouton plus bas,
                 # les variables edited_rep et edited_reprod se vident. On les force ici à récupérer les données en mémoire.
