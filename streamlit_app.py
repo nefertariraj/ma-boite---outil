@@ -2069,25 +2069,54 @@ else:
                     type="primary", 
                     use_container_width=True
                 ):
-                    if 'edited_rep' in locals() and edited_rep is not None and hasattr(edited_rep, 'to_dict'):
+                    # 1. RÉCUPÉRATION STRATÉGIQUE ANTI-PERTE (Gère le format dictionnaire ou DataFrame)
+                    raw_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
+                    if isinstance(raw_rep, dict) or raw_rep is None:
+                        edited_rep = st.session_state.get(dynamic_rep_key, pd.DataFrame())
+                    else:
+                        edited_rep = raw_rep
+
+                    raw_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
+                    if isinstance(raw_reprod, dict) or raw_reprod is None:
+                        edited_reprod = st.session_state.get(dynamic_reprod_key, pd.DataFrame())
+                    else:
+                        edited_reprod = raw_reprod
+
+                    # 2. ENREGISTREMENT SÉCURISÉ DANS LE PROJET 'P' ET EN SESSION
+                    if isinstance(edited_rep, pd.DataFrame):
                         p[p_rep_save_key] = edited_rep.to_dict(orient='records')
                         st.session_state[dynamic_rep_key] = edited_rep
-                    if 'edited_reprod' in locals() and edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
+                    elif isinstance(edited_rep, list):
+                        p[p_rep_save_key] = edited_rep
+                        
+                    if isinstance(edited_reprod, pd.DataFrame):
                         p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
                         st.session_state[dynamic_reprod_key] = edited_reprod
-                    
+                    elif isinstance(edited_reprod, list):
+                        p[p_reprod_save_key] = edited_reprod
+
+                    # 3. VERROUILLAGE DES STATUTS DE SESSION
                     st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
                     st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                     
+                    # 4. MISE À JOUR DU STATUT À "variable testée" DANS LE TABLEAU ET LE PROJET 'P'
                     if not df_classification_current.empty:
                         for idx_row, row in df_classification_current.iterrows():
                             if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
-                                df_classification_current.at[idx_row, "statut validation"] = "test effectué"
+                                df_classification_current.at[idx_row, "statut validation"] = "variable testée"
+                        
                         st.session_state[msa_classif_key] = df_classification_current
+                        # Sauvegarde immédiate du tableau mis à jour dans le projet global
+                        p[msa_classif_key] = df_classification_current.to_dict(orient='records')
 
+                    # 5. HISTORIQUE ET FLAGS DE SAUVEGARDE GLOBALE
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
                     p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
                     
+                    # Horodatage précis au format GMT+3
+                    p["date_verrouillage"] = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
+                    
+                    # Animation et rechargement de la page
                     st.balloons()
                     st.success(f"✅ Données terrain validées et gelées avec succès pour **{selected_var_to_test}** !")
                     st.rerun()
