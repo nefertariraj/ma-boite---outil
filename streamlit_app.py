@@ -1658,52 +1658,16 @@ else:
             # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
             
-            # 🔍 ALGORITHME DE SCAN TOTAL AVANCÉ AVEC LA CLÉ CTQ INTÉGRÉE
-            project_y = "Indéterminé"
-            primary_keys = ["selected_ctq", "project_y_objective", "project_y", "y_objective", "objective", "objectifs", "charter_objective", "y_variable"]
+            # 🔍 ALGORITHME DE SCAN ALIGNÉ SUR LA PHASE DEFINE
+            project_y = p.get("selected_ctq", "Indéterminé")
             
+            # Sécurité : Si le dictionnaire p s'est vidé temporairement, lecture de secours dans le session_state
+            if project_y == "Indéterminé" and "selected_ctq" in st.session_state:
+                project_y = st.session_state["selected_ctq"]
+                
             # Nom de colonne unique et harmonisé pour tout le script
             nom_colonne_variable = "Variable Critique (liée au Y)"
             
-            # Passe 1 : Analyse directe du dictionnaire de projet 'p'
-            for k in primary_keys:
-                if isinstance(p, dict) and p.get(k):
-                    project_y = p.get(k)
-                    break
-            
-            # Passe 2 : Scan récursif profond (Détection automatique de secours dans 'p')
-            if project_y == "Indéterminé":
-                def find_y_recursive(data):
-                    if isinstance(data, dict):
-                        for k, v in data.items():
-                            if any(x in k.lower() for x in ["selected_ctq", "y_obj", "objective", "charter", "definition", "projet_y"]) and isinstance(v, str) and len(v) > 2:
-                                return v
-                        if "master_dcp_table" in data and isinstance(data["master_dcp_table"], list):
-                            for row in data["master_dcp_table"]:
-                                if isinstance(row, dict) and str(row.get("Rôle", "")).strip().upper() == "Y":
-                                    return row.get("Variable à mesurer", "")
-                        for v in data.values():
-                            res = find_y_recursive(v)
-                            if res: return res
-                    elif isinstance(data, list):
-                        for item in data:
-                            res = find_y_recursive(item)
-                            if res: return res
-                    return None
-                
-                deep_search_result = find_y_recursive(p)
-                if deep_search_result:
-                    project_y = deep_search_result
-
-            # Passe 3 : Vérification directe au sein du session_state du Data Collection Plan (DCP Master)
-            if project_y == "Indéterminé" and "master_dcp_table" in st.session_state:
-                dcp_source_direct = st.session_state["master_dcp_table"]
-                if isinstance(dcp_source_direct, list):
-                    for v in dcp_source_direct:
-                        if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
-                            project_y = v.get("Variable à mesurer")
-                            break
-
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
             # Initialisation sécurisée du tableau d'analyse MSA
