@@ -1661,18 +1661,16 @@ else:
             # Nom de colonne unique et harmonisé pour tout le script
             nom_colonne_variable = "Variable Critique (liée au Y)"
             
-            # Recherche automatique du Y dans le dictionnaire p sans toucher au reste du code
+            # On reproduit exactement la logique de la Section 1 lue à l'instant
             project_y = "Indéterminé"
-            if isinstance(p, dict):
-                # 1. Test de la clé directe
-                if p.get("selected_ctq"):
-                    project_y = p.get("selected_ctq")
-                # 2. Scan automatique de secours de toutes les clés existantes dans p
-                else:
-                    for clé, valeur in p.items():
-                        if any(mot in clé.lower() for mot in ["ctq", "y_obj", "objective", "projet_y"]) and isinstance(valeur, str) and valeur != "Non défini":
-                            project_y = valeur
-                            break
+            if isinstance(p, dict) and p.get("selected_ctq"):
+                project_y = p.get("selected_ctq")
+            
+            # Sécurité absolue : Si 'p' a été nettoyé par Streamlit, on va chercher dans le dictionnaire maître
+            if (project_y == "Indéterminé" or project_y == "Non défini") and "p" in st.session_state:
+                p_master = st.session_state["p"]
+                if isinstance(p_master, dict) and p_master.get("selected_ctq"):
+                    project_y = p_master.get("selected_ctq")
             
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
