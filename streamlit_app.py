@@ -1718,7 +1718,7 @@ else:
                         else:
                             ai_analyzed_rows = [
                                 {nom_colonne_variable: f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique", "statut validation": "en attente de test"},
-                                {nom_colonne_variable: "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par haute", "statut validation": "en attente de test"}
+                                {nom_colonne_variable: "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute", "statut validation": "en attente de test"}
                             ]
                     st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
