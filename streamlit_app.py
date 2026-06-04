@@ -2041,40 +2041,20 @@ else:
                     type="primary", 
                     use_container_width=True
                 ):
-                    # 1️⃣ Récupération directe et forcée des deltas du st.data_editor (Reproductibilité)
-                    df_rep = st.session_state.get(dynamic_rep_key).copy()
-                    widget_rep_changes = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
-                    if widget_rep_changes and isinstance(widget_rep_changes, dict):
-                        for row_idx, changes in widget_rep_changes.get("edited_rows", {}).items():
-                            for col_name, col_val in changes.items():
-                                df_rep.at[int(row_idx), col_name] = col_val
-                        if widget_rep_changes.get("added_rows"):
-                            df_rep = pd.concat([df_rep, pd.DataFrame(widget_rep_changes["added_rows"])], ignore_index=True)
-                    
-                    # Injection immédiate dans p et session_state
-                    p[p_rep_save_key] = df_rep.to_dict(orient='records')
-                    st.session_state[dynamic_rep_key] = df_rep
+                    # 1️⃣ Récupération des deux tableaux modifiés ou actuels
+                    final_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}") if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_rep_key)
+                    final_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}") if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state else st.session_state.get(dynamic_reprod_key)
 
-                    # 2️⃣ Même opération forcée pour la Répétabilité
-                    df_reprod = st.session_state.get(dynamic_reprod_key).copy()
-                    widget_reprod_changes = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
-                    if widget_reprod_changes and isinstance(widget_reprod_changes, dict):
-                        for row_idx, changes in widget_reprod_changes.get("edited_rows", {}).items():
-                            for col_name, col_val in changes.items():
-                                df_reprod.at[int(row_idx), col_name] = col_val
-                        if widget_reprod_changes.get("added_rows"):
-                            df_reprod = pd.concat([df_reprod, pd.DataFrame(widget_reprod_changes["added_rows"])], ignore_index=True)
+                    # 2️⃣ On met à jour le dictionnaire local 'p'
+                    if final_rep is not None and hasattr(final_rep, 'to_dict'):
+                        p[p_rep_save_key] = final_rep.to_dict(orient='records')
+                    if final_reprod is not None and hasattr(final_reprod, 'to_dict'):
+                        p[p_reprod_save_key] = final_reprod.to_dict(orient='records')
                     
-                    p[p_reprod_save_key] = df_reprod.to_dict(orient='records')
-                    st.session_state[dynamic_reprod_key] = df_reprod
-                    
-                    # 3️⃣ Fixation stricte des statuts MSA
-                    st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
-                    st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                     p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
                     p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
 
-                    # 4️⃣ Mise à jour directe et forcée du statut "test effectué" dans la classification
+                    # 3️⃣ On force la mise à jour du statut "test effectué"
                     classif_df = st.session_state.get(msa_classif_key, pd.DataFrame())
                     if not classif_df.empty:
                         for idx_row, row in classif_df.iterrows():
@@ -2083,21 +2063,18 @@ else:
                         st.session_state[msa_classif_key] = classif_df
                         p["msa_classification_table"] = classif_df.to_dict(orient='records')
 
-                    # 5️⃣ PROTECTION SÉCURITÉ JSON CORRIGÉE : On met à jour uniquement les clés modifiées
-                    # dans le projet global existant sans écraser le reste (comme le 'name')
+                    # 4️⃣ LE MOYEN LE PLUS SIMPLE : On écrase directement la mémoire globale du JSON
+                    # De cette façon, peu importe ce que fait le reste du script, le JSON est déjà à jour.
                     if 'projects' in st.session_state and 'p_idx' in locals():
-                        if p_idx < len(st.session_state.projects):
-                            # On met à jour point par point pour ne rien perdre
-                            st.session_state.projects[p_idx][p_rep_save_key] = p[p_rep_save_key]
-                            st.session_state.projects[p_idx][p_reprod_save_key] = p[p_reprod_save_key]
-                            st.session_state.projects[p_idx][f"validated_status_{var_clean_id}_{safe_idx}"] = True
-                            st.session_state.projects[p_idx]["msa_classification_table"] = classif_df.to_dict(orient='records')
-                            if p_bias_hist_save_key in p:
-                                st.session_state.projects[p_idx][p_bias_hist_save_key] = p[p_bias_hist_save_key]
+                        # On fusionne 'p' directement dans le projet actif de la session globale
+                        st.session_state.projects[p_idx].update(p)
 
-                    # 6️⃣ Succès et rechargement de la page
+                    # 5️⃣ Verrouillage des états d'affichage et rafraîchissement
+                    st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
+                    st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
+                    
                     st.balloons()
-                    st.success(f"✅ Données terrain validées et synchronisées pour le JSON pour **{selected_var_to_test}** !")
+                    st.success(f"✅ Données enregistrées directement dans la sauvegarde pour **{selected_var_to_test}** !")
                     st.rerun()
 
             # --- 5 & 6. DIAGNOSTIC ET PLAN D'ACTION ---
