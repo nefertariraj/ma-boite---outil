@@ -1661,10 +1661,31 @@ else:
             # 🔍 ALGORITHME DE SCAN ALIGNÉ SUR LA PHASE DEFINE
             project_y = p.get("selected_ctq", "Indéterminé")
             
-            # Sécurité : Si le dictionnaire p s'est vidé temporairement, lecture de secours dans le session_state
+            # Sécurité 1 : Lecture de secours dans le session_state global
             if project_y == "Indéterminé" and "selected_ctq" in st.session_state:
                 project_y = st.session_state["selected_ctq"]
                 
+            # Sécurité 2 (BLINDAGE ABSOLU) : Extraction directe depuis le Master DCP (DataFrame ou Liste)
+            if project_y == "Indéterminé" and "master_dcp_table" in st.session_state:
+                dcp_data = st.session_state["master_dcp_table"]
+                import pandas as pd
+                
+                # Cas 1 : Si c'est un DataFrame Pandas
+                if isinstance(dcp_data, pd.DataFrame) and not dcp_data.empty:
+                    col_role = [c for c in dcp_data.columns if "rôle" in c.lower()]
+                    col_var = [c for c in dcp_data.columns if "variable" in c.lower() or "mesurer" in c.lower()]
+                    if col_role and col_var:
+                        ligne_y = dcp_data[dcp_data[col_role[0]].astype(str).str.strip().str.upper() == "Y"]
+                        if not ligne_y.empty:
+                            project_y = ligne_y[col_var[0]].iloc[0]
+                            
+                # Cas 2 : Si c'est une liste de dictionnaires
+                elif isinstance(dcp_data, list):
+                    for row in dcp_data:
+                        if isinstance(row, dict) and str(row.get("Rôle", "")).strip().upper() == "Y":
+                            project_y = row.get("Variable à mesurer", "")
+                            break
+            
             # Nom de colonne unique et harmonisé pour tout le script
             nom_colonne_variable = "Variable Critique (liée au Y)"
             
