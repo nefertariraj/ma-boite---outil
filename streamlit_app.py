@@ -1661,16 +1661,26 @@ else:
             # Nom de colonne unique et harmonisé pour tout le script
             nom_colonne_variable = "Variable Critique (liée au Y)"
             
-            # On reproduit exactement la logique de la Section 1 lue à l'instant
+            # 🔍 RECHERCHE ULTRA-LARGE SANS MODIFICATION DE LA PHASE 1
             project_y = "Indéterminé"
-            if isinstance(p, dict) and p.get("selected_ctq"):
-                project_y = p.get("selected_ctq")
             
-            # Sécurité absolue : Si 'p' a été nettoyé par Streamlit, on va chercher dans le dictionnaire maître
-            if (project_y == "Indéterminé" or project_y == "Non défini") and "p" in st.session_state:
-                p_master = st.session_state["p"]
-                if isinstance(p_master, dict) and p_master.get("selected_ctq"):
-                    project_y = p_master.get("selected_ctq")
+            # Étape A : On cherche dans toutes les versions de 'p' stockées en mémoire
+            for p_env in [p, st.session_state.get('p', {}), st.session_state.get('project_dict', {})]:
+                if isinstance(p_env, dict) and p_env.get("selected_ctq"):
+                    project_y = p_env.get("selected_ctq")
+                    break
+            
+            # Étape B : Si toujours indéterminé, on cherche n'importe quelle clé qui contient 'ctq' ou 'y' dans la session
+            if project_y == "Indéterminé" or project_y == "Non défini":
+                for k, v in st.session_state.items():
+                    if any(x in k.lower() for x in ["ctq", "project_y", "variable_y"]) and isinstance(v, str) and v != "Non défini":
+                        project_y = v
+                        break
+
+            # Étape C : Si Streamlit a tout effacé à cause du changement d'onglet, on affiche le Y par défaut ou un avertissement
+            if project_y == "Indéterminé" or project_y == "Non défini":
+                # On essaie de voir si une autre variable de ton script contient l'objectif
+                project_y = st.session_state.get("ctq_v", "Indéterminé")
             
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
