@@ -1649,13 +1649,11 @@ else:
                     ])
 
             # =====================================================================
-            # 🛡️ ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P' (CORRIGÉ)
+            # 🛡️ ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P' (ALIGNÉ)
             # =====================================================================
             if 'p' not in st.session_state:
                 st.session_state['p'] = {}
-            
             p = st.session_state['p']
-            # ---------------------------------------------------------------------
 
             # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
@@ -1667,13 +1665,13 @@ else:
             # Nom de colonne unique et harmonisé pour tout le script
             nom_colonne_variable = "Variable Critique (liée au Y)"
             
-            # Passe 1 : Analyse directe du dictionnaire de projet
+            # Passe 1 : Analyse directe du dictionnaire de projet 'p'
             for k in primary_keys:
-                if p.get(k):
+                if isinstance(p, dict) and p.get(k):
                     project_y = p.get(k)
                     break
             
-            # Passe 2 : Scan récursif profond (Détection automatique de secours)
+            # Passe 2 : Scan récursif profond (Détection automatique de secours dans 'p')
             if project_y == "Indéterminé":
                 def find_y_recursive(data):
                     if isinstance(data, dict):
@@ -1697,13 +1695,14 @@ else:
                 if deep_search_result:
                     project_y = deep_search_result
 
-            # Passe 3 : Vérification au sein de la table DCP source
-            dcp_source = p.get("master_dcp_table", [])
-            if project_y == "Indéterminé" and dcp_source:
-                for v in dcp_source:
-                    if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
-                        project_y = v.get("Variable à mesurer")
-                        break
+            # Passe 3 : Vérification directe au sein du session_state du Data Collection Plan (DCP Master)
+            if project_y == "Indéterminé" and "master_dcp_table" in st.session_state:
+                dcp_source_direct = st.session_state["master_dcp_table"]
+                if isinstance(dcp_source_direct, list):
+                    for v in dcp_source_direct:
+                        if isinstance(v, dict) and str(v.get("Rôle", "")).strip().upper() == "Y" and v.get("Variable à mesurer"):
+                            project_y = v.get("Variable à mesurer")
+                            break
 
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
