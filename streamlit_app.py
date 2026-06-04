@@ -1958,12 +1958,14 @@ else:
                 if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                     
                     # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (NONE-CHECK)
-                    # Si la variable locale est perdue au clic, on tente de la récupérer via les clés d'état actives
-                    if 'edited_rep' not in locals() or edited_rep is None:
-                        edited_rep = st.session_state.get(dynamic_rep_key) or st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
+                    # Forçage systématique via le Session State pour parer les rafraîchissements de boutons
+                    edited_rep = st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
+                    if edited_rep is None or (isinstance(edited_rep, pd.DataFrame) and edited_rep.empty):
+                        edited_rep = st.session_state.get(dynamic_rep_key)
                         
-                    if 'edited_reprod' not in locals() or edited_reprod is None:
-                        edited_reprod = st.session_state.get(dynamic_reprod_key) or st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
+                    edited_reprod = st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
+                    if edited_reprod is None or (isinstance(edited_reprod, pd.DataFrame) and edited_reprod.empty):
+                        edited_reprod = st.session_state.get(dynamic_reprod_key)
 
                     # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P' (Uniquement si les données existent)
                     if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
