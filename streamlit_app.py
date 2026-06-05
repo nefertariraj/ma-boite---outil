@@ -2199,33 +2199,30 @@ else:
         st.caption("ℹ️ Cet écran a un rôle uniquement informatif. Utilisez l'Écran 2 pour insérer vos données terrain.")
 
        # =====================================================================
-        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF AVANCÉ
+        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR REMPLACEMENT STRICT
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
 
         st.markdown("#### 📥 Importation Intelligente Excel")
-        uploaded_file = st.file_uploader("Télécharger un fichier Excel de terrain (L'IA se charge d'aligner la structure)", type=["xlsx", "xls"], key="dc_excel_uploader_e2")
+        uploaded_file = st.file_uploader("Télécharger un fichier Excel de terrain (Écrase et remplace les données actuelles)", type=["xlsx", "xls"], key="dc_excel_uploader_e2")
 
         if uploaded_file:
             try:
-                # Importations de secours locales pour garantir la disponibilité des bibliothèques
                 import re
                 
-                # Lecture brute et suppression immédiate des lignes 100% vides du fichier Excel
+                # 1. Lecture brute et suppression immédiate des lignes 100% vides du fichier Excel
                 raw_imported_df = pd.read_excel(uploaded_file)
                 raw_imported_df = raw_imported_df.dropna(how="all").reset_index(drop=True)
                 
-                st.info("🧠 *Moteur IA : Analyse de proximité linguistique et injection des données en cours...*")
+                st.info("🧠 *Moteur IA : Analyse de proximité linguistique et remplacement de la base...*")
                 
                 def _structures_clean(text):
                     """Nettoie et normalise le texte pour gommer les variations de syntaxe"""
                     if pd.isna(text) or text is None:
                         return ""
                     t = str(text).lower().strip()
-                    # Remplace les séparateurs complexes (tirets, underscores, slashs) par des espaces
                     t = re.sub(r'[_\-\s\./\\]+', ' ', t)
-                    # Conserve uniquement les caractères alphanumériques et les espaces
                     t = "".join(c for c in t if c.isalnum() or c == ' ')
                     return t
 
@@ -2243,27 +2240,24 @@ else:
                     inter = w1.intersection(w2)
                     score = len(inter) / max(len(w1), len(w2))
                     
-                    # Bonus d'inclusion si l'un des titres contient entièrement l'autre
                     if clean1 in clean2 or clean2 in clean1:
                         score += 0.3
                     return score
 
                 cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
                 
-                # Reconstruction sécurisée du DataFrame d'alignement avec un index réinitialisé à neuf
+                # Reconstruction à neuf d'un DataFrame vierge indexé sur la taille exacte du fichier importé
                 aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
                 colonnes_excel = list(raw_imported_df.columns)
 
-                # 1. Alignement intelligent de la clé unique (ID Observation)
+                # 2. Alignement de l'ID observation réel
                 mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°", "nom"]
                 id_col_source = None
                 
-                # Test strict d'abord
                 for col in colonnes_excel:
                     if any(k == str(col).lower().strip() for k in mots_cles_id):
                         id_col_source = col
                         break
-                # Test flou si non trouvé
                 if not id_col_source:
                     for col in colonnes_excel:
                         if any(k in str(col).lower() for k in mots_cles_id):
@@ -2271,7 +2265,6 @@ else:
                             break
 
                 if id_col_source:
-                    # Extraction propre de l'ID réel : supprime les '.0' générés par Excel sur les ID numériques
                     aligned_df["ID observation"] = (
                         raw_imported_df[id_col_source]
                         .astype(str)
@@ -2281,9 +2274,9 @@ else:
                     st.caption(f"🎯 **Correspondance ID** : `{id_col_source}` associé à **ID observation**")
                 else:
                     aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
-                    st.caption("ℹ️ *Aucun ID détecté dans votre fichier. Génération automatique d'un index de secours.*")
+                    st.caption("ℹ️ *Aucun ID détecté. Génération automatique d'un index de secours.*")
 
-                # 2. Alignement flou des Variables Critiques Dynamiques
+                # 3. Alignement flou des Variables Critiques Dynamiques
                 for var_critique in liste_variables_dynamiques:
                     meilleur_match = None
                     meilleur_score = 0.0
@@ -2294,65 +2287,29 @@ else:
                             meilleur_score = score
                             meilleur_match = col
                     
-                    # Seuil de tolérance IA à 35% de ressemblance minimum
                     if meilleur_match and meilleur_score >= 0.35:
                         aligned_df[var_critique] = raw_imported_df[meilleur_match].values
-                        st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}** (Confiance: {int(min(meilleur_score, 1.0)*100)}%)")
+                        st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}**")
                     else:
                         aligned_df[var_critique] = None
-                        st.caption(f"❌ **Non mappé** : Aucun équivalent trouvé pour **{var_critique}** (Initialisé vide)")
 
-                # 3. Enregistrement de la date système au fuseau horaire GMT+3
+                # 4. Enregistrement de la date système au fuseau horaire GMT+3
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                 aligned_df["Date de modification"] = tz_gmt3
 
-                # Nettoyage des index avant toute opération de fusion
+                # Nettoyage final avant écrasement complet
                 aligned_df = aligned_df.reset_index(drop=True)
+                aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
 
-                # --- FUSION INTELLIGENTE DANS LE MASTER DATA ---
-                if not st.session_state.dc_master_data.empty:
-                    existing_ids = set(st.session_state.dc_master_data["ID observation"].dropna().astype(str))
-                    imported_ids = set(aligned_df["ID observation"].dropna().astype(str))
-                    conflits_ids = existing_ids.intersection(imported_ids)
-                else:
-                    conflits_ids = set()
-
-                if conflits_ids:
-                    st.warning(f"⚠️ **Données existantes** : {len(conflits_ids)} ID(s) détecté(s) en doublon.")
-                    c_b1, c_b2 = st.columns(2)
-                    
-                    if c_b1.button("🔄 Écraser & Mettre à jour"):
-                        master_df = st.session_state.dc_master_data.copy().reset_index(drop=True)
-                        # Suppression chirurgicale des anciennes lignes en doublon
-                        master_df = master_df[~master_df["ID observation"].isin(list(imported_ids))]
-                        st.session_state.dc_master_data = pd.concat([master_df, aligned_df], ignore_index=True).reset_index(drop=True)
-                        
-                        p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success(f"✅ Table maîtresse mise à jour avec succès. Total : {len(st.session_state.dc_master_data)} lignes.")
-                        st.rerun()
-                        
-                    if c_b2.button("🛑 Conserver les données existantes"):
-                        master_df = st.session_state.dc_master_data.copy().reset_index(drop=True)
-                        # On ne garde que les ID de l'importation qui n'existent pas encore du tout
-                        nouvelles_lignes = aligned_df[~aligned_df["ID observation"].isin(list(existing_ids))]
-                        st.session_state.dc_master_data = pd.concat([master_df, nouvelles_lignes], ignore_index=True).reset_index(drop=True)
-                        
-                        p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success(f"✅ Nouvelles lignes ajoutées sans écraser l'existant. Total : {len(st.session_state.dc_master_data)} lignes.")
-                        st.rerun()
-                else:
-                    if st.session_state.dc_master_data.empty:
-                        st.session_state.dc_master_data = aligned_df
-                    else:
-                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data.reset_index(drop=True), aligned_df], ignore_index=True).reset_index(drop=True)
-                    
-                    st.session_state.dc_master_data = st.session_state.dc_master_data.where(pd.notnull(st.session_state.dc_master_data), None)
-                    p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                    st.success(f"🚀 Importation réussie ! {len(aligned_df)} lignes réelles synchronisées.")
-                    st.rerun()
+                # 🔥 DESTRUCTION DU PASSÉ : On remplace l'état complet par le nouveau fichier
+                st.session_state.dc_master_data = aligned_df
+                p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+                
+                st.success(f"🚀 Base de données réinitialisée ! {len(aligned_df)} nouvelles lignes exclusives chargées.")
+                st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Erreur critique lors de l'indexation IA : {e}")
+                st.error(f"❌ Erreur critique lors du remplacement des données : {e}")
 
         # --- TABLEAU DE COLLECTE TERRAIN (ÉCRAN 2) ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
@@ -2376,7 +2333,7 @@ else:
                     diff_mask = (df1_clean != df2_clean).any(axis=1)
                     edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
                 else:
-                    # Gestion du bouton "+ Add row" de Streamlit
+                    # Ajout d'une ligne manuelle via l'éditeur
                     edited_master.loc[edited_master["Date de modification"].isna(), "Date de modification"] = tz_gmt3
             except Exception:
                 pass
