@@ -2392,17 +2392,20 @@ else:
         st.bar_chart(progress_df.set_index("Statut"))
 
         # =====================================================================
-        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (SÉCURISÉ)
+        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (CORRIGÉ & ULTRA-RAPIDE)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📊 Écran 5 : Statistiques Descriptives")
 
-        if not df_active.empty:
+        # Remplacement de df_active par la source directe et rapide
+        df_stats = st.session_state.dc_master_data
+
+        if not df_stats.empty:
             for variable in liste_variables_dynamiques:
-                if variable not in df_active.columns:
+                if variable not in df_stats.columns:
                     continue
                 st.markdown(f"#### Analyse descriptive : {variable}")
-                series_data = df_active[variable].dropna()
+                series_data = df_stats[variable].dropna()
                 
                 if series_data.empty:
                     st.info(f"Aucune observation exploitable pour la variable '{variable}'")
