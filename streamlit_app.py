@@ -2207,96 +2207,111 @@ else:
         st.markdown("#### 📥 Importation Intelligente Excel")
         uploaded_file = st.file_uploader("Télécharger un fichier Excel de terrain (Écrase et remplace les données actuelles)", type=["xlsx", "xls"], key="dc_excel_uploader_e2")
 
+        # Sécurisation anti-recalcul : on ne traite le fichier QUE s'il vient d'être chargé
         if uploaded_file:
-            try:
-                import re
-                
-                # 1. Lecture brute et suppression immédiate des lignes 100% vides
-                raw_imported_df = pd.read_excel(uploaded_file)
-                raw_imported_df = raw_imported_df.dropna(how="all").reset_index(drop=True)
-                
-                st.info("🧠 *Moteur IA : Analyse de proximité linguistique et remplacement de la base...*")
-                
-                def _structures_clean(text):
-                    if pd.isna(text) or text is None:
-                        return ""
-                    t = str(text).lower().strip()
-                    t = re.sub(r'[_\-\s\./\\]+', ' ', t)
-                    return "".join(c for c in t if c.isalnum() or c == ' ')
+            # On vérifie si ce fichier a déjà été traité pour éviter de relancer l'IA en boucle
+            file_cache_key = f"processed_{uploaded_file.name}_{uploaded_file.size}"
+            
+            if st.session_state.get("dc_last_processed_file") != file_cache_key:
+                try:
+                    import re
+                    
+                    # 1. Lecture brute rapide et suppression immédiate des lignes vides
+                    raw_imported_df = pd.read_excel(uploaded_file)
+                    raw_imported_df = raw_imported_df.dropna(how="all").reset_index(drop=True)
+                    
+                    st.info("🧠 *Moteur IA : Alignement de la structure en cours...*")
+                    
+                    # Optimisation locale des fonctions de nettoyage (compilées une seule fois)
+                    regex_clean = re.compile(r'[_\-\s\./\\]+')
+                    
+                    def _structures_clean(text):
+                        if pd.isna(text) or text is None:
+                            return ""
+                        t = str(text).lower().strip()
+                        t = regex_clean.sub(' ', t)
+                        return "".join(c for c in t if c.isalnum() or c == ' ')
 
-                def _calculer_proximite(txt1, txt2):
-                    clean1 = _structures_clean(txt1)
-                    clean2 = _structures_clean(txt2)
-                    w1, w2 = set(clean1.split()), set(clean2.split())
-                    if not w1 or not w2:
-                        return 0.0
-                    score = len(w1.intersection(w2)) / max(len(w1), len(w2))
-                    if clean1 in clean2 or clean2 in clean1:
-                        score += 0.3
-                    return score
+                    cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
+                    aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
+                    colonnes_excel = list(raw_imported_df.columns)
 
-                cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
-                aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
-                colonnes_excel = list(raw_imported_df.columns)
+                    # Pré-nettoyage des colonnes Excel pour accélérer les comparaisons
+                    colonnes_clean = [_structures_clean(c) for c in colonnes_excel]
 
-                # 2. Alignement de l'ID observation réel
-                mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°", "nom"]
-                id_col_source = None
-                
-                for col in colonnes_excel:
-                    if any(k == str(col).lower().strip() for k in mots_cles_id):
-                        id_col_source = col
-                        break
-                if not id_col_source:
+                    # 2. Alignement de l'ID observation réel (Recherche directe vectorielle)
+                    mots_cles_id = {"id", "observation", "code", "num", "index", "identifiant", "key", "n°", "nom"}
+                    id_col_source = None
+                    
                     for col in colonnes_excel:
-                        if any(k in str(col).lower() for k in mots_cles_id):
+                        if _structures_clean(col) in mots_cles_id:
                             id_col_source = col
                             break
-
-                if id_col_source:
-                    aligned_df["ID observation"] = (
-                        raw_imported_df[id_col_source]
-                        .astype(str)
-                        .str.replace(r'\.0$', '', regex=True)
-                        .str.strip()
-                    )
-                    st.caption(f"🎯 **Correspondance ID** : `{id_col_source}` associé à **ID observation**")
-                else:
-                    aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
-
-                # 3. Alignement flou des Variables Critiques
-                for var_critique in liste_variables_dynamiques:
-                    meilleur_match = None
-                    meilleur_score = 0.0
-                    for col in colonnes_excel:
-                        score = _calculer_proximite(var_critique, col)
-                        if score > meilleur_score:
-                            meilleur_score = score
-                            meilleur_match = col
                     
-                    if meilleur_match and meilleur_score >= 0.35:
-                        aligned_df[var_critique] = raw_imported_df[meilleur_match].values
+                    if not id_col_source:
+                        for col in colonnes_excel:
+                            c_clean = _structures_clean(col)
+                            if any(k in c_clean for k in mots_cles_id):
+                                id_col_source = col
+                                break
+
+                    if id_col_source:
+                        aligned_df["ID observation"] = (
+                            raw_imported_df[id_col_source]
+                            .astype(str)
+                            .str.replace(r'\.0$', '', regex=True)
+                            .str.strip()
+                        )
                     else:
-                        aligned_df[var_critique] = None
+                        aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
 
-                # 4. Fuseau horaire GMT+3
-                tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-                aligned_df["Date de modification"] = tz_gmt3
-                aligned_df = aligned_df.reset_index(drop=True).where(pd.notnull(aligned_df), None)
+                    # 3. Alignement flou des Variables Critiques (Optimisé)
+                    for var_critique in liste_variables_dynamiques:
+                        v_clean = _structures_clean(var_critique)
+                        w1 = set(v_clean.split())
+                        
+                        meilleur_match = None
+                        meilleur_score = 0.0
+                        
+                        for idx, col in enumerate(colonnes_excel):
+                            c_clean = colonnes_clean[idx]
+                            w2 = set(c_clean.split())
+                            if not w1 or not w2:
+                                continue
+                            
+                            score = len(w1.intersection(w2)) / max(len(w1), len(w2))
+                            if v_clean in c_clean or c_clean in v_clean:
+                                score += 0.3
+                                
+                            if score > meilleur_score:
+                                meilleur_score = score
+                                meilleur_match = col
+                        
+                        if meilleur_match and meilleur_score >= 0.35:
+                            aligned_df[var_critique] = raw_imported_df[meilleur_match].values
+                        else:
+                            aligned_df[var_critique] = None
 
-                # Remplacement strict
-                st.session_state.dc_master_data = aligned_df
-                p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                st.success(f"🚀 Base de données réinitialisée ! {len(aligned_df)} nouvelles lignes.")
-                st.rerun()
+                    # 4. Fuseau horaire GMT+3 et nettoyage
+                    tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                    aligned_df["Date de modification"] = tz_gmt3
+                    aligned_df = aligned_df.reset_index(drop=True).where(pd.notnull(aligned_df), None)
 
-            except Exception as e:
-                st.error(f"❌ Erreur critique lors du remplacement : {e}")
+                    # Remplacement strict en session de manière définitive
+                    st.session_state.dc_master_data = aligned_df
+                    p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+                    
+                    # Marquer ce fichier comme "traité" pour bloquer les futurs recalculs parasites
+                    st.session_state["dc_last_processed_file"] = file_cache_key
+                    st.success(f"🚀 Base de données réinitialisée ! {len(aligned_df)} nouvelles lignes exclusives chargées.")
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"❌ Erreur critique lors de l'alignement : {e}")
 
         # --- TABLEAU DE COLLECTE TERRAIN (ÉCRAN 2) ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
-        # Callback optimisé au maximum (ne fait pas de traitement lourd)
         def _sauvegarder_grille_callback():
             if "dc_master_grid_editor" in st.session_state:
                 grille_evenement = st.session_state["dc_master_grid_editor"]
@@ -2310,7 +2325,6 @@ else:
                         pass
                     p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
 
-        # Affichage direct connecté à la session state
         st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
