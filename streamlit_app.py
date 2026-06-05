@@ -2197,9 +2197,11 @@ else:
             
         st.caption("ℹ️ Cet écran a un rôle uniquement informatif. Utilisez l'Écran 2 pour insérer vos données terrain.")
 
+       # =====================================================================
+        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF AVANCÉ (CORRIGÉ)
         # =====================================================================
-        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF AVANCÉ
-        # =====================================================================
+        import re  # <-- L'import manquant est ici maintenant !
+        
         st.markdown("---")
         st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
 
@@ -2323,27 +2325,6 @@ else:
 
             except Exception as e:
                 st.error(f"❌ Erreur critique lors de l'indexation IA : {e}")
-
-        # --- TABLEAU DE COLLECTE TERRAIN ---
-        st.markdown("#### 🛠️ Tableau de Collecte Actuel")
-        
-        edited_master = st.data_editor(
-            st.session_state.dc_master_data,
-            num_rows="dynamic",
-            key="dc_master_grid_editor",
-            use_container_width=True
-        )
-
-        # Sauvegarde automatique lors des modifications directes sur la grille
-        if not edited_master.equals(st.session_state.dc_master_data):
-            tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-            diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
-                         st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore")).any(axis=1)
-            edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
-            
-            st.session_state.dc_master_data = edited_master
-            p["dc_saved_df_json"] = edited_master.to_json()
-            st.rerun()
 
         # =====================================================================
         # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (CALCULS SUR COLONNES INTERNES)
