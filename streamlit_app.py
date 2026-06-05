@@ -2336,41 +2336,39 @@ else:
             except Exception as e:
                 st.error(f"❌ Erreur critique lors de l'indexation IA : {e}")
 
-        # --- TABLEAU DE COLLECTE TERRAIN ---
+        # --- TABLEAU DE COLLECTE TERRAIN (ÉCRAN 2) ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
-        edited_master = st.data_editor(
+        # Fonction de rappel pour enregistrer instantanément les modifications dans la session state
+        def _sauvegarde_instantanee_callback():
+            if "dc_master_grid_editor" in st.session_state:
+                changes = st.session_state["dc_master_grid_editor"]
+                # Si l'utilisateur a modifié, ajouté ou supprimé des lignes
+                if changes["edited_rows"] or changes["added_rows"] or changes["deleted_rows"]:
+                    tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # On applique les modifications manuellement sur notre dataframe de session
+                    for row_idx, data in changes["edited_rows"].items():
+                        for col, val in data.items():
+                            st.session_state.dc_master_data.iloc[row_idx][col] = val
+                        st.session_state.dc_master_data.iloc[row_idx]["Date de modification"] = tz_gmt3
+                        
+                    for new_row in changes["added_rows"]:
+                        new_row["Date de modification"] = tz_gmt3
+                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, pd.DataFrame([new_row])], ignore_index=True)
+                        
+                    # Nettoyage et sauvegarde dans le dictionnaire p
+                    st.session_state.dc_master_data = st.session_state.dc_master_data.where(pd.notnull(st.session_state.dc_master_data), None)
+                    p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+
+        # Affichage de l'éditeur connecté au callback
+        st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
             key="dc_master_grid_editor",
-            use_container_width=True
+            use_container_width=True,
+            on_change=_sauvegarde_instantanee_callback
         )
-
-        # Sauvegarde automatique lors des modifications manuelles de la grille (Méthode Anti-Crash PyArrow)
-        if not edited_master.equals(st.session_state.dc_master_data):
-            tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Correction de la détection de différence : On aligne temporairement en chaînes de caractères lues par Pandas
-            try:
-                df1_clean = edited_master.drop(columns=["Date de modification"], errors="ignore").astype(str)
-                df2_clean = st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore").astype(str)
-                
-                # Identification sécurisée des lignes modifiées ou ajoutées
-                if len(df1_clean) == len(df2_clean):
-                    diff_mask = (df1_clean != df2_clean).any(axis=1)
-                    edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
-                else:
-                    # S'il y a des nouvelles lignes ajoutées via le bouton "+ Add row" de Streamlit
-                    edited_master.loc[edited_master["Date de modification"].isna(), "Date de modification"] = tz_gmt3
-            except Exception:
-                # Sécurité totale : si la comparaison vectorielle échoue encore, on applique l'heure sans bloquer l'application
-                pass
-            
-            # Nettoyage final anti-NaN et mise à jour de la persistance
-            edited_master = edited_master.where(pd.notnull(edited_master), None)
-            st.session_state.dc_master_data = edited_master
-            p["dc_saved_df_json"] = edited_master.to_json()
-            st.rerun()
 
         # =====================================================================
         # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (DIRECTEMENT SUR LE LIVE STATE)
@@ -2441,13 +2439,17 @@ else:
         total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
 
         # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (LIÉ DIRECTEMENT AU TABLEAU ACTUEL)
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (CONNECTÉ À LA SOURCE DE VÉRITÉ)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        # Calcul basé strictement sur ce qui est affiché à l'instant T dans le tableau
-        obs_collectees = len(df_active["ID observation"].dropna().unique()) if not df_active.empty else 0
+        # Source unique et ultra-synchrone
+        df_suivi = st.session_state.dc_master_data
+        total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
+
+        # Calcul basé strictement sur la session mise à jour par le callback
+        obs_collectees = len(df_suivi["ID observation"].dropna().unique()) if not df_suivi.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
