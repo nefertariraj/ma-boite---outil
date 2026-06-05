@@ -2211,42 +2211,31 @@ else:
             try:
                 import re
                 
-                # 1. Lecture brute et suppression immédiate des lignes 100% vides du fichier Excel
+                # 1. Lecture brute et suppression immédiate des lignes 100% vides
                 raw_imported_df = pd.read_excel(uploaded_file)
                 raw_imported_df = raw_imported_df.dropna(how="all").reset_index(drop=True)
                 
                 st.info("🧠 *Moteur IA : Analyse de proximité linguistique et remplacement de la base...*")
                 
                 def _structures_clean(text):
-                    """Nettoie et normalise le texte pour gommer les variations de syntaxe"""
                     if pd.isna(text) or text is None:
                         return ""
                     t = str(text).lower().strip()
                     t = re.sub(r'[_\-\s\./\\]+', ' ', t)
-                    t = "".join(c for c in t if c.isalnum() or c == ' ')
-                    return t
+                    return "".join(c for c in t if c.isalnum() or c == ' ')
 
                 def _calculer_proximite(txt1, txt2):
-                    """Calcule un score de proximité sémantique et structurelle entre deux en-têtes"""
                     clean1 = _structures_clean(txt1)
                     clean2 = _structures_clean(txt2)
-                    
-                    w1 = set(clean1.split())
-                    w2 = set(clean2.split())
-                    
+                    w1, w2 = set(clean1.split()), set(clean2.split())
                     if not w1 or not w2:
                         return 0.0
-                        
-                    inter = w1.intersection(w2)
-                    score = len(inter) / max(len(w1), len(w2))
-                    
+                    score = len(w1.intersection(w2)) / max(len(w1), len(w2))
                     if clean1 in clean2 or clean2 in clean1:
                         score += 0.3
                     return score
 
                 cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
-                
-                # Reconstruction à neuf d'un DataFrame vierge indexé sur la taille exacte du fichier importé
                 aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
                 colonnes_excel = list(raw_imported_df.columns)
 
@@ -2274,13 +2263,11 @@ else:
                     st.caption(f"🎯 **Correspondance ID** : `{id_col_source}` associé à **ID observation**")
                 else:
                     aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
-                    st.caption("ℹ️ *Aucun ID détecté. Génération automatique d'un index de secours.*")
 
-                # 3. Alignement flou des Variables Critiques Dynamiques
+                # 3. Alignement flou des Variables Critiques
                 for var_critique in liste_variables_dynamiques:
                     meilleur_match = None
                     meilleur_score = 0.0
-                    
                     for col in colonnes_excel:
                         score = _calculer_proximite(var_critique, col)
                         if score > meilleur_score:
@@ -2289,55 +2276,41 @@ else:
                     
                     if meilleur_match and meilleur_score >= 0.35:
                         aligned_df[var_critique] = raw_imported_df[meilleur_match].values
-                        st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}**")
                     else:
                         aligned_df[var_critique] = None
 
-                # 4. Enregistrement de la date système au fuseau horaire GMT+3
+                # 4. Fuseau horaire GMT+3
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                 aligned_df["Date de modification"] = tz_gmt3
+                aligned_df = aligned_df.reset_index(drop=True).where(pd.notnull(aligned_df), None)
 
-                # Nettoyage final avant écrasement complet
-                aligned_df = aligned_df.reset_index(drop=True)
-                aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
-
-                # 🔥 DESTRUCTION DU PASSÉ : On remplace l'état complet par le nouveau fichier
+                # Remplacement strict
                 st.session_state.dc_master_data = aligned_df
                 p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                
-                st.success(f"🚀 Base de données réinitialisée ! {len(aligned_df)} nouvelles lignes exclusives chargées.")
+                st.success(f"🚀 Base de données réinitialisée ! {len(aligned_df)} nouvelles lignes.")
                 st.rerun()
 
             except Exception as e:
-                st.error(f"❌ Erreur critique lors du remplacement des données : {e}")
+                st.error(f"❌ Erreur critique lors du remplacement : {e}")
 
         # --- TABLEAU DE COLLECTE TERRAIN (ÉCRAN 2) ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
-        # 1. Le Callback unique : TOUT se passe ici, et SEULEMENT en cas de clic/saisie
+        # Callback optimisé au maximum (ne fait pas de traitement lourd)
         def _sauvegarder_grille_callback():
-            # On vérifie si l'éditeur a envoyé des données
             if "dc_master_grid_editor" in st.session_state:
                 grille_evenement = st.session_state["dc_master_grid_editor"]
-                
-                # S'il y a un vrai changement (écriture, ajout ou suppression)
                 if grille_evenement["edited_rows"] or grille_evenement["added_rows"] or grille_evenement["deleted_rows"]:
                     tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # On applique les modifications directement sur notre DataFrame de session
                     try:
                         for row_idx in grille_evenement["edited_rows"].keys():
                             if row_idx < len(st.session_state.dc_master_data):
                                 st.session_state.dc_master_data.iloc[row_idx, st.session_state.dc_master_data.columns.get_loc("Date de modification")] = tz_gmt3
                     except Exception:
                         pass
-                    
-                    # On nettoie et on sauvegarde dans le JSON de persistance uniquement à cet instant T
-                    st.session_state.dc_master_data = st.session_state.dc_master_data.where(pd.notnull(st.session_state.dc_master_data), None)
                     p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
 
-        # 2. L'affichage épuré au maximum
-        # On ne réassigne plus 'edited_master = st.data_editor(...)', on laisse Streamlit gérer st.session_state.dc_master_data directement
+        # Affichage direct connecté à la session state
         st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
@@ -2345,74 +2318,53 @@ else:
             use_container_width=True,
             on_change=_sauvegarder_grille_callback
         )
-        
-        # ❌ ATTENTION : Supprime bien toutes les lignes qui étaient ici et qui faisaient :
-        # st.session_state.dc_master_data = edited_master...
-        # p["dc_saved_df_json"] = edited_master.to_json()
 
         # =====================================================================
-        # 🔍 ÉCRAN 3 : QUALITÉ DES DONNÉES (DYNAMIQUEMENT MIS À JOUR)
+        # 🔍 ÉCRAN 3 : QUALITÉ DES DONNÉES (OPTIMISÉ VECTORIELLEMENT)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 🔍 Écran 3 : Qualité des Données")
 
-        # Lecture de la source de vérité en direct
         df_qualite = st.session_state.dc_master_data
         total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
-
-        # 1. Calculs des indicateurs de base
         taille_echantillon_obs = len(df_qualite) if not df_qualite.empty else 0
-        
-        # Taux de complétude théorique : Observé vs Prévu
         taux_completude_theorique = min(100.0, (taille_echantillon_obs / total_prevu) * 100)
 
-        # Calcul des données manquantes (cellules vides ou None) sur les variables critiques
-        if not df_qualite.empty and liste_variables_dynamiques:
-            cols_calcul = [c for c in liste_variables_dynamiques if c in df_qualite.columns]
-            donnees_manquantes = df_qualite[cols_calcul].isna().sum().sum() + (df_qualite[cols_calcul] == "").sum().sum()
-        else:
-            donnees_manquantes = 0
-
-        # Calcul du nombre d'erreurs détectées (Statuts types NON OK / KO)
+        # Calculs ultra-rapides sans boucles imbriquées imbéciles
+        donnees_manquantes = 0
         erreurs_detectees = 0
-        if not df_qualite.empty:
-            for col in df_qualite.columns:
-                if col in liste_variables_dynamiques:
-                    erreurs_detectees += df_qualite[col].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
 
-        # 2. Affichage des KPIs de l'Écran 3
+        if taille_echantillon_obs > 0 and liste_variables_dynamiques:
+            cols_calcul = [c for c in liste_variables_dynamiques if c in df_qualite.columns]
+            if cols_calcul:
+                sub_df = df_qualite[cols_calcul]
+                # Manquants vectoriels
+                donnees_manquantes = int(sub_df.isna().sum().sum() + (sub_df == "").sum().sum())
+                
+                # Erreurs vectorielles ultra-rapides (Filtre global sur le sous-tableau)
+                sub_df_str = sub_df.astype(str).apply(lambda x: x.str.strip().str.upper())
+                erreurs_detectees = int(sub_df_str.isin(["NON OK", "KO", "RETOUCHE", "1"]).sum().sum())
+
+        # Affichage des KPIs
         eq1, eq2, eq3, eq4 = st.columns(4)
         eq1.metric("Taille échantillon (Obs.)", f"{taille_echantillon_obs} lignes")
         eq2.metric("Erreurs détectées", f"{erreurs_detectees} OK/KO")
         eq3.metric("Données manquantes", f"{donnees_manquantes} cellule(s)")
         eq4.metric("Complétude Théorique", f"{taux_completude_theorique:.1f} %")
-        
         st.caption("📈 *Complétude théorique basée sur l'objectif d'échantillonnage défini à l'Écran 1.*")
 
         # =====================================================================
-        # 🔄 SÉCURISATION DU RECHARGEMENT DE PAGE (ANTI-RESET F5)
-        # =====================================================================
-        # Si edited_master est absent ou vide suite à un refresh, on prend le master_data sauvegardé
-        if 'edited_master' in locals() and not edited_master.empty:
-            df_active = edited_master
-        else:
-            df_active = st.session_state.dc_master_data
-
-        # Récupération sécurisée de la taille prévue définie à l'Écran 1
-        total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
-
-        # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (DYNAMIQUE & LIÉ À L'IMPORT EXCEL)
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (ALLÉGÉ)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        # Connexion directe à la mémoire de la session mis à jour par l'Écran 2 et l'Import
-        df_suivi = st.session_state.dc_master_data
-        total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
+        # Utilisation de la taille déjà calculée pour éviter les redondances
+        obs_collectees = taille_echantillon_obs
+        if obs_collectees > 0 and "ID observation" in df_qualite.columns:
+            # Approche ultra-rapide pour les valeurs uniques
+            obs_collectees = df_qualite["ID observation"].nunique()
 
-        # Comptage exact des lignes d'observations uniques actuellement chargées
-        obs_collectees = len(df_suivi["ID observation"].dropna().unique()) if not df_suivi.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
@@ -2421,7 +2373,7 @@ else:
         e4_c2.metric("Restant à collecter", restant)
         e4_c3.metric("Taux d'avancement", f"{avancement:.1f} %")
 
-        # Graphique à barres synchronisé instantanément
+        # Graphique à barres optimisé
         progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
         st.bar_chart(progress_df.set_index("Statut"))
 
