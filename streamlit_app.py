@@ -2198,7 +2198,7 @@ else:
         st.caption("ℹ️ Cet écran a un rôle uniquement informatif. Utilisez l'Écran 2 pour insérer vos données terrain.")
 
         # =====================================================================
-        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ANALYSE COGNITIVE DES COLONNES
+        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF STRICT (IA)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
@@ -2208,91 +2208,104 @@ else:
 
         if uploaded_file:
             try:
-                imported_df = pd.read_excel(uploaded_file)
-                st.info("🧠 *Analyse sémantique du fichier par IA en cours...*")
+                # Lecture brute du fichier importé
+                raw_imported_df = pd.read_excel(uploaded_file)
+                st.info("🧠 *Analyse sémantique et reconstruction structurelle par IA...*")
                 
-                # --- LOGIQUE D'ANALYSE COGNITIVE / IA D'ALIGNEMENT ---
-                colonnes_excel = list(imported_df.columns)
-                mapping_ia = {}
+                # Création d'un DataFrame temporaire vierge calqué EXACTEMENT sur la structure attendue
+                cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
+                aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
                 
-                # 1. Recherche intelligente de l'ID observation
+                # --- LOGIQUE D'ANALYSE COGNITIVE & TRANSFERT DE DONNÉES ---
+                colonnes_excel = list(raw_imported_df.columns)
+                
+                # 1. Alignement de l'ID Observation
                 mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°"]
-                id_trouve = None
+                id_col_source = None
                 for col in colonnes_excel:
                     if any(k in str(col).lower() for k in mots_cles_id):
-                        id_trouve = col
+                        id_col_source = col
                         break
                 
-                if id_trouve:
-                    mapping_ia[id_trouve] = "ID observation"
-                    st.caption(f"💡 IA : Correspondance trouvée : `{id_trouve}` $\rightarrow$ **ID observation**")
+                if id_col_source:
+                    aligned_df["ID observation"] = raw_imported_df[id_col_source].astype(str)
+                    st.caption(f"💡 IA : Correspondance d'identité établie : `{id_col_source}` $\rightarrow$ **ID observation**")
                 else:
-                    # Si aucun ID n'est trouvé, l'IA génère un index auto pour éviter le crash
-                    imported_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(imported_df))]
-                    st.caption("💡 IA : Aucun identifiant détecté. Création automatique d'une colonne **ID observation** séquentielle.")
+                    aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
+                    st.caption("💡 IA : Aucun identifiant détecté. Génération automatique d'une séquence d'**ID observation**.")
 
-                # 2. Recherche intelligente pour chaque variable critique attendue
+                # 2. Alignement et transfert dynamique des variables critiques
                 for var_critique in liste_variables_dynamiques:
                     var_clean = str(var_critique).lower().strip()
-                    match_trouve = None
+                    match_col_source = None
                     
                     for col in colonnes_excel:
                         col_clean = str(col).lower().strip()
-                        # Correspondance exacte ou partielle (contenant le mot clé)
+                        # Match si les chaînes se croisent ou partagent des radicaux sémantiques significatifs
                         if col_clean in var_clean or var_clean in col_clean or any(word in var_clean for word in col_clean.split() if len(word) > 3):
-                            match_trouve = col
+                            match_col_source = col
                             break
                     
-                    if match_trouve:
-                        mapping_ia[match_trouve] = var_critique
-                        st.caption(f"💡 IA : Correspondance trouvée : `{match_trouve}` $\rightarrow$ **{var_critique}**")
+                    if match_col_source:
+                        # On extrait la donnée brute et on l'affecte directement à la bonne colonne
+                        aligned_df[var_critique] = raw_imported_df[match_col_source]
+                        st.caption(f"💡 IA : Alignement de flux validé : `{match_col_source}` $\rightarrow$ **{var_critique}**")
                     else:
-                        # La variable manque, l'IA prépare la colonne vide pour la saisie manuelle
-                        imported_df[var_critique] = None
-                
-                # Application du renommage intelligent
-                imported_df = imported_df.rename(columns=mapping_ia)
-                
-                # Ajout de l'horodatage obligatoire au fuseau horaire de l'équipe (GMT+3)
+                        # Si l'Excel ne contient rien de proche, on force des cases vides exploitables (pas de chaîne "None")
+                        aligned_df[var_critique] = None
+                        st.caption(f"⚠️ IA : Colonne manquante dans l'import $\rightarrow$ **{var_critique}** initialisée vide pour saisie.")
+
+                # 3. Horodatage système obligatoire en GMT+3
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-                imported_df["Date de modification"] = tz_gmt3
-                
-                # Filtrage pour ne garder que la structure officielle attendue
-                cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
-                imported_df = imported_df[[c for c in cols_finales if c in imported_df.columns]]
-                
-                # --- INTEGRATION SANS DOUBLONS ---
-                existing_ids = set(st.session_state.dc_master_data["ID observation"].dropna().astype(str))
-                imported_ids = set(imported_df["ID observation"].dropna().astype(str))
-                conflits_ids = existing_ids.intersection(imported_ids)
+                aligned_df["Date de modification"] = tz_gmt3
+
+                # Nettoyage final des valeurs de type NaN / None parasites pour Streamlit
+                aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
+
+                # --- FUSION DES DONNÉES SANS DOUBLONS DANS LA TABLE MAÎTRESSE ---
+                if not st.session_state.dc_master_data.empty:
+                    existing_ids = set(st.session_state.dc_master_data["ID observation"].dropna().astype(str))
+                    imported_ids = set(aligned_df["ID observation"].dropna().astype(str))
+                    conflits_ids = existing_ids.intersection(imported_ids)
+                else:
+                    conflits_ids = set()
                 
                 if conflits_ids:
-                    st.warning(f"⚠️ **Alignement IA Réussi** : Cependant, {len(conflits_ids)} ID(s) détecté(s) existent déjà dans la base maîtresse.")
-                    c_b1, c_b2, c_b3 = st.columns(3)
+                    st.warning(f"⚠️ **Conflit d'indexation** : {len(conflits_ids)} ID(s) importé(s) écraseraient des données existantes.")
+                    c_b1, c_b2 = st.columns(2)
                     
                     if c_b1.button("🔄 Écraser & Mettre à jour"):
-                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, imported_df], ignore_index=True).drop_duplicates(subset=["ID observation"], keep="last")
+                        combined = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
+                        # On garde la ligne importée (la plus récente) en cas de doublon d'ID
+                        st.session_state.dc_master_data = combined.drop_duplicates(subset=["ID observation"], keep="last")
                         p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success("✅ Table maîtresse mise à jour.")
+                        st.success("✅ Base mise à jour avec les données importées.")
                         st.rerun()
                         
                     if c_b2.button("🛑 Conserver les données existantes"):
-                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, imported_df], ignore_index=True).drop_duplicates(subset=["ID observation"], keep="first")
+                        combined = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
+                        # On garde la ligne déjà présente en base en cas de doublon
+                        st.session_state.dc_master_data = combined.drop_duplicates(subset=["ID observation"], keep="first")
                         p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success("✅ Nouvelles lignes ajoutées sans perte de l'existant.")
+                        st.success("✅ Nouvelles lignes insérées sans altération de l'historique.")
                         st.rerun()
                 else:
-                    st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, imported_df], ignore_index=True)
+                    if st.session_state.dc_master_data.empty:
+                        st.session_state.dc_master_data = aligned_df
+                    else:
+                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
+                    
                     p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                    st.success("🚀 Alignement IA et importation réussis avec succès !")
+                    st.success("🚀 Alignement structurel effectué. Les données sont injectées !")
                     st.rerun()
                     
             except Exception as e:
-                st.error(f"❌ Échec de l'analyse IA du fichier : {e}")
+                st.error(f"❌ Échec de l'analyse cognitive du fichier : {e}")
 
         # --- TABLEAU DE COLLECTE TERRAIN ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
+        # Affichage et édition directe dans la grille
         edited_master = st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
@@ -2300,7 +2313,7 @@ else:
             use_container_width=True
         )
 
-        # Sauvegarde automatique en cas d'édition directe
+        # Sauvegarde automatique instantanée en cas de modification manuelle
         if not edited_master.equals(st.session_state.dc_master_data):
             tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
             diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
@@ -2310,6 +2323,149 @@ else:
             st.session_state.dc_master_data = edited_master
             p["dc_saved_df_json"] = edited_master.to_json()
             st.rerun()
+
+        # =====================================================================
+        # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (CALCULS SUR COLONNES INTERNES)
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### 🔍 Écran 3 : Contrôle Qualité des Données")
+
+        df_cq = st.session_state.dc_master_data.copy()
+        num_erreurs = 0
+        num_manquants = 0
+        total_prevu = max(1, int(p["dc_plan"]["taille_prevue"]))
+        
+        if not df_cq.empty and len(df_cq.columns) > 2:
+            num_manquants = df_cq[liste_variables_dynamiques].isna().sum().sum() + (df_cq[liste_variables_dynamiques] == "").sum().sum()
+            
+            # Contrôles de cohérence basiques basés sur le nom ou type détecté
+            for var_name in liste_variables_dynamiques:
+                if var_name in df_cq.columns:
+                    for val in df_cq[var_name].dropna():
+                        val_str = str(val).strip()
+                        if any(k in var_name.lower() for k in ["temps", "délai", "durée", "coût"]):
+                            try:
+                                if float(val_str) < 0:
+                                    num_erreurs += 1
+                            except ValueError:
+                                if val_str and val_str.lower() != "nan":
+                                    num_erreurs += 1
+                                    
+            num_doublons = df_cq["ID observation"].duplicated().sum()
+            num_erreurs += num_doublons
+            taux_completude = (len(df_cq.dropna(subset=["ID observation"])) / total_prevu) * 100
+        else:
+            taux_completude = 0.0
+
+        st.metric("Nombre d'erreurs détectées", num_erreurs)
+        st.metric("Nombre de données manquantes", num_manquants)
+        st.metric("Taux de complétude théorique", f"{taux_completude:.1f} %")
+
+        if num_erreurs > 0:
+            st.error("🔴 Statut : Correction requise. Des anomalies de type, de format ou des doublons d'ID subsistent.")
+        elif num_manquants > 0 or taux_completude < 80:
+            st.warning("🟠 Statut : Attention. Base saine mais volume incomplet par rapport à l'échantillon cible.")
+        elif len(df_cq) == 0:
+            st.info("🔵 En attente d'injection de données terrain.")
+        else:
+            st.success("🟢 Statut : Données conformes. Prêt pour l'analyse statistique.")
+
+        # =====================================================================
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (CONSERVÉ)
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
+
+        obs_collectees = len(df_cq["ID observation"].dropna().unique()) if not df_cq.empty else 0
+        restant = max(0, total_prevu - obs_collectees)
+        avancement = min(100.0, (obs_collectees / total_prevu) * 100)
+
+        e4_c1, e4_c2, e4_c3 = st.columns(3)
+        e4_c1.metric("Observations collectées", obs_collectees)
+        e4_c2.metric("Restant à collecter", restant)
+        e4_c3.metric("Taux d'avancement", f"{avancement:.1f} %")
+
+        progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
+        st.bar_chart(progress_df.set_index("Statut"))
+
+        # =====================================================================
+        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (DYNAMIQUE SUR LES COMPTES RENDUS)
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### 📊 Écran 5 : Statistiques Descriptives")
+
+        if not df_cq.empty:
+            for variable in liste_variables_dynamiques:
+                if variable not in df_cq.columns:
+                    continue
+                st.markdown(f"#### Analyse descriptive : {variable}")
+                series_data = df_cq[variable].dropna()
+                
+                if series_data.empty:
+                    st.info(f"Aucune observation exploitable pour la variable '{variable}'")
+                    continue
+
+                # Essayer de deviner s'il s'agit d'une valeur numérique ou textuelle
+                numeric_series = pd.to_numeric(series_data, errors="coerce").dropna()
+                
+                if not numeric_series.empty and not any(k in variable.lower() for k in ["statut", "verdict", "code"]):
+                    stats_data = {
+                        "Métrique LSS": ["Moyenne", "Médiane", "Minimum", "Maximum", "Écart-type (σ)"],
+                        "Valeur": [
+                            f"{numeric_series.mean():.2f}",
+                            f"{numeric_series.median():.2f}",
+                            f"{numeric_series.min():.2f}",
+                            f"{numeric_series.max():.2f}",
+                            f"{numeric_series.std():.2f}" if len(numeric_series) > 1 else "0.00"
+                        ]
+                    }
+                    st.table(pd.DataFrame(stats_data))
+                    st.bar_chart(pd.DataFrame(numeric_series).reset_index(drop=True))
+                else:
+                    attr_counts = series_data.value_counts()
+                    attr_pct = series_data.value_counts(normalize=True) * 100
+                    attr_df = pd.DataFrame({
+                        "Fréquence (N)": attr_counts,
+                        "Pourcentage (%)": attr_pct.map("{:.2f} %".format)
+                    })
+                    st.table(attr_df)
+        else:
+            st.info("Aucune statistique disponible : le tableau de collecte est vide.")
+
+        # =====================================================================
+        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (CONSERVÉ)
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### 🎯 Écran 6 : Baseline du Processus")
+
+        if not df_cq.empty:
+            st.markdown("#### Situation de référence (KPI Générés depuis la base Terrain)")
+            baseline_metrics = []
+            
+            for variable in liste_variables_dynamiques:
+                if variable in df_cq.columns:
+                    num_series = pd.to_numeric(df_cq[variable], errors="coerce").dropna()
+                    if not num_series.empty and not any(k in variable.lower() for k in ["statut", "verdict"]):
+                        baseline_metrics.append({
+                            "KPI Courant": f"Moyenne globale [{variable}]", 
+                            "Niveau de performance actuel": f"{num_series.mean():.1f} min" if "temps" in variable.lower() else f"{num_series.mean():.2f}"
+                        })
+                    elif not num_series.empty:
+                        # Cas des attributaires comptabilisés en taux d'anomalies
+                        non_ok_count = df_cq[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
+                        pct_nok = (non_ok_count / len(df_cq[variable].dropna())) * 100 if len(df_cq[variable].dropna()) > 0 else 0
+                        baseline_metrics.append({
+                            "KPI Courant": f"Taux de défauts [{variable}]", 
+                            "Niveau de performance actuel": f"{pct_nok:.1f} %"
+                        })
+
+            if baseline_metrics:
+                st.table(pd.DataFrame(baseline_metrics))
+            else:
+                st.table(pd.DataFrame([{"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": "11.0 % (Par défaut)"}]))
+            st.caption("⚙️ Les calculs de cette table de référence se mettent à jour dynamiquement à chaque modification ou importation dans l'Écran 2.")
+        else:
+            st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
 
         # 6. Measure process capability
         st.divider()
