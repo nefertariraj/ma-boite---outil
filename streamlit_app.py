@@ -2498,19 +2498,79 @@ else:
         else:
             st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
 
-        # 6. Measure process capability
+        # =====================================================================
+        # 🎯 ÉTAPE 6 : MEASURE PROCESS CAPABILITY (DPMO & SIGMA AUTOMATIQUES)
+        # =====================================================================
         st.divider()
         st.subheader("6. Measure process capability")
+
+        # 1. Calcul automatique des métriques à partir du tableau de l'Écran 2
+        total_defauts_terrain = 0
+        unites_inspectees = len(edited_master.dropna(subset=["ID observation"])) if not edited_master.empty else 0
+
+        if unites_inspectees > 0:
+            for variable in liste_variables_dynamiques:
+                if variable in edited_master.columns:
+                    # On ignore les colonnes purement numériques/temporelles pour le comptage des défauts qualitatifs
+                    if any(k in variable.lower() for k in ["temps", "délai", "durée", "coût"]):
+                        continue
+                    
+                    # Comptage des chaînes textuelles marquant une non-conformité
+                    defauts_colonne = edited_master[variable].astype(str).str.strip().str.upper().isin(
+                        ["NON OK", "KO", "RETOUCHE", "1", "NON-CONFORME", "DÉFAUT"]
+                    ).sum()
+                    total_defauts_terrain += defauts_colonne
+
+        # Le nombre d'opportunités par unité correspond au nombre de critères (variables) analysés
+        opportunites_par_unite = max(1, len([v for v in liste_variables_dynamiques if v in edited_master.columns]))
+
+        # 2. Zone de contrôle et d'affichage des variables de calcul
         c1, c2 = st.columns(2)
         with c1:
-            defects = st.number_input("Défauts", min_value=0, value=0)
-            units = st.number_input("Unités", min_value=1, value=1)
-            opp = st.number_input("Opportunités/Unité", min_value=1, value=1)
+            st.markdown("**Paramètres de Capabilité (Générés depuis le terrain)**")
+            # Les champs affichent par défaut les calculs automatiques mais restent modifiables si besoin
+            defects = st.number_input("Nombre total de défauts constatés", min_value=0, value=int(total_defauts_terrain), key="cap_defects_auto")
+            units = st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=max(1, int(unites_inspectees)), key="cap_units_auto")
+            opp = st.number_input("Nombre d'opportunités de défaut par unité", min_value=1, value=int(opportunites_par_unite), key="cap_opp_auto")
         
-        dpmo = (defects / (units * opp)) * 1_000_000
+        # 3. Formule mathématique du Six Sigma : DPMO = (Défauts / (Unités * Opportunités)) * 1 000 000
+        dpmo_calculé = (defects / (units * opp)) * 1_000_000
+
+        # 4. Calcul de la Baseline Sigma avec la table de conversion de la loi normale (décalage de 1.5σ inclus)
+        import math
+        try:
+            if dpmo_calculé <= 0:
+                sigma_level = 6.0  # Perfection ou absence de données de défaut
+            else:
+                taux_defaut = dpmo_calculé / 1_000_000
+                p_val = taux_defaut if taux_defaut < 0.5 else 1 - taux_defaut
+                
+                # Transformation de loi normale inverse (Approximation de Hastings)
+                t = math.sqrt(-2.0 * math.log(p_val))
+                z = t - ((2.515517 + 0.802853 * t + 0.010328 * t * t) / (1.0 + 1.432788 * t + 0.189269 * t * t + 0.001308 * t * t * t))
+                sigma_brut = z if taux_defaut < 0.5 else -z
+                
+                # Ajout du shift de 1.5σ standard en Lean Six Sigma
+                sigma_level = round(sigma_brut + 1.5, 2)
+                sigma_level = max(0.0, min(6.0, sigma_level)) # Encapsulation des limites pratiques
+        except Exception:
+            sigma_level = "Évaluation impossible"
+
+        # 5. Affichage dynamique des résultats
         with c2:
-            st.metric("DPMO", f"{dpmo:,.0f}")
-            st.metric("Sigma Level", "À calculer selon rendement")
+            st.markdown("<br><br>", unsafe_allow_html=True)  # Calage de l'alignement visuel
+            st.metric("DPMO (Defects Per Million Opportunities)", f"{dpmo_calculé:,.0f}")
+            
+            # Application d'un code couleur sur le niveau de performance
+            if isinstance(sigma_level, float):
+                if sigma_level >= 4.0:
+                    st.metric("Niveau Sigma du Processus", f"🟢 {sigma_level} σ")
+                elif sigma_level >= 2.5:
+                    st.metric("Niveau Sigma du Processus", f"¼ {sigma_level} σ")
+                else:
+                    st.metric("Niveau Sigma du Processus", f"🔴 {sigma_level} σ")
+            else:
+                st.metric("Niveau Sigma du Processus", sigma_level)
 
 
     # --- AUTRES PHASES (Structure prête) ---
