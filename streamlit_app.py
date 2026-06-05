@@ -2394,22 +2394,40 @@ else:
             st.success("🟢 Statut : Données conformes. Prêt pour l'analyse statistique.")
 
         # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (TOTALEMENT SYNCHRONISÉ EN TEMPS RÉEL)
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (SYNCHRONISATION ET INTERCEPTION EN TEMPS RÉEL)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        # Lecture directe à partir du live session_state pour forcer le rafraîchissement instantané
-        obs_collectees = len(st.session_state.dc_master_data["ID observation"].dropna().unique()) if not st.session_state.dc_master_data.empty else 0
+        # 1. Récupération de la base de départ
+        base_df = st.session_state.dc_master_data
+
+        # 2. INTERCEPTION DU CACHE STREAMLIT : On ajuste le compte si l'utilisateur ajoute/supprime des lignes à l'écran 2
+        lignes_ajoutees = 0
+        lignes_supprimees = 0
+
+        if "dc_master_grid_editor" in st.session_state:
+            edits = st.session_state["dc_master_grid_editor"]
+            # On compte les lignes ajoutées manuellement ou via import non encore validées dans le state global
+            if "added_rows" in edits:
+                lignes_ajoutees = len(edits["added_rows"])
+            if "deleted_rows" in edits:
+                lignes_supprimees = len(edits["deleted_rows"])
+
+        # Calcul ultra-dynamique du nombre d'observations réelles présentes à l'écran
+        total_lignes_base = len(base_df["ID observation"].dropna().unique()) if not base_df.empty else 0
+        obs_collectees = max(0, total_lignes_base + lignes_ajoutees - lignes_supprimees)
+        
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
+        # Affichage des KPIs synchronisés
         e4_c1, e4_c2, e4_c3 = st.columns(3)
         e4_c1.metric("Observations collectées", obs_collectees)
         e4_c2.metric("Restant à collecter", restant)
         e4_c3.metric("Taux d'avancement", f"{avancement:.1f} %")
 
-        # Le graphique se met à jour instantanément
+        # Graphique dynamique mis à jour à la volée
         progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
         st.bar_chart(progress_df.set_index("Statut"))
 
