@@ -2198,9 +2198,9 @@ else:
         st.caption("ℹ️ Cet écran a un rôle uniquement informatif. Utilisez l'Écran 2 pour insérer vos données terrain.")
 
        # =====================================================================
-        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF AVANCÉ (CORRIGÉ)
+        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF AVANCÉ
         # =====================================================================
-        import re  
+        import re  # <-- L'import manquant est ici maintenant !
         
         st.markdown("---")
         st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
@@ -2213,34 +2213,42 @@ else:
                 raw_imported_df = pd.read_excel(uploaded_file)
                 st.info("🧠 *Moteur IA : Analyse de proximité linguistique et injection des données en cours...*")
                 
+                # Fonctions internes de l'IA pour nettoyer et comparer les textes
                 def _structures_clean(text):
+                    """Normalise le texte pour gommer les différences de syntaxe basiques"""
                     t = str(text).lower().strip()
-                    t = re.sub(r'[_\-\s\./\\]+', ' ', t)
+                    t = re.sub(r'[_\-\s\./\\]+', ' ', t) # Remplace les underscores, slashs par des espaces
                     t = "".join(c for c in t if c.isalnum() or c == ' ')
                     return t
 
                 def _calculer_proximite(txt1, txt2):
+                    """Calcule un score d'intersection sémantique entre deux en-têtes"""
                     w1 = set(_structures_clean(txt1).split())
                     w2 = set(_structures_clean(txt2).split())
                     if not w1 or not w2:
                         return 0.0
                     inter = w1.intersection(w2)
+                    # Union / Intersection + Bonus si l'un est inclus dans l'autre
                     score = len(inter) / max(len(w1), len(w2))
                     if _structures_clean(txt1) in _structures_clean(txt2) or _structures_clean(txt2) in _structures_clean(txt1):
                         score += 0.3
                     return score
 
+                # Reconstruction du dataframe calqué à 100% sur la cible officielle
                 cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
                 aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
                 colonnes_excel = list(raw_imported_df.columns)
 
+                # 1. Traitement de la clé unique (ID Observation)
                 mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°"]
                 id_col_source = None
                 
+                # Test direct d'abord
                 for col in colonnes_excel:
                     if any(k == str(col).lower().strip() for k in mots_cles_id):
                         id_col_source = col
                         break
+                # Test de proximité si non trouvé
                 if not id_col_source:
                     for col in colonnes_excel:
                         if any(k in str(col).lower() for k in mots_cles_id):
@@ -2254,6 +2262,7 @@ else:
                     aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
                     st.caption("ℹ️ *Aucun ID détecté dans votre fichier. Génération automatique d'index de secours.*")
 
+                # 2. Alignement des Variables Critiques Dynamiques via Logique Floue
                 for var_critique in liste_variables_dynamiques:
                     meilleur_match = None
                     meilleur_score = 0.0
@@ -2264,6 +2273,7 @@ else:
                             meilleur_score = score
                             meilleur_match = col
                     
+                    # Seuil d'acceptation de correspondance IA (35% de ressemblance structurelle minimum)
                     if meilleur_match and meilleur_score >= 0.35:
                         aligned_df[var_critique] = raw_imported_df[meilleur_match]
                         st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}** (Confiance: {int(min(meilleur_score, 1.0)*100)}%)")
@@ -2271,10 +2281,14 @@ else:
                         aligned_df[var_critique] = None
                         st.caption(f"❌ **Non mappé** : Aucun équivalent trouvé pour **{var_critique}** (Initialisé vide)")
 
+                # 3. Insertion de la date système au fuseau de l'équipe (GMT+3)
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                 aligned_df["Date de modification"] = tz_gmt3
+
+                # Nettoyage des objets NaN/None natifs de Pandas pour l'affichage propre dans Streamlit
                 aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
 
+                # --- DUPLICATION / INTELLIGENT MERGE ---
                 if not st.session_state.dc_master_data.empty:
                     existing_ids = set(st.session_state.dc_master_data["ID observation"].dropna().astype(str))
                     imported_ids = set(aligned_df["ID observation"].dropna().astype(str))
@@ -2312,50 +2326,29 @@ else:
             except Exception as e:
                 st.error(f"❌ Erreur critique lors de l'indexation IA : {e}")
 
-        # --- FONCTION CALLBACK POUR LA GRILLE DE SAISIE TERRAIN ---
-        def update_master_data():
-            """ Callback exécuté immédiatement à la modification de la grille """
-            if "dc_master_grid_editor" in st.session_state:
-                changes = st.session_state["dc_master_grid_editor"]
-                df = st.session_state.dc_master_data.copy()
-                tz_now = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-                
-                # Appliquer les modifications de cellules
-                if "edited_rows" in changes:
-                    for idx, row_changes in changes["edited_rows"].items():
-                        # Conversion de l'index string de Streamlit en entier si nécessaire
-                        int_idx = int(idx) if isinstance(idx, str) else idx
-                        for col, val in row_changes.items():
-                            df.iloc[int_idx, df.columns.get_loc(col)] = val
-                        df.iloc[int_idx, df.columns.get_loc("Date de modification")] = tz_now
-                
-                # Appliquer les lignes ajoutées
-                if "added_rows" in changes:
-                    for new_row in changes["added_rows"]:
-                        new_row["Date de modification"] = tz_now
-                        new_df_row = pd.DataFrame([new_row], columns=df.columns)
-                        df = pd.concat([df, new_df_row], ignore_index=True)
-                
-                # Appliquer les lignes supprimées
-                if "deleted_rows" in changes:
-                    df = df.drop(index=[int(idx) for idx in changes["deleted_rows"]]).reset_index(drop=True)
-                
-                st.session_state.dc_master_data = df
-                p["dc_saved_df_json"] = df.to_json()
-
+        # --- TABLEAU DE COLLECTE TERRAIN ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
-        # L'éditeur appelle maintenant directement la fonction synchrone de mise à jour
-        st.data_editor(
+        edited_master = st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
             key="dc_master_grid_editor",
-            use_container_width=True,
-            on_change=update_master_data
+            use_container_width=True
         )
 
+        # Sauvegarde automatique lors des modifications directes sur la grille
+        if not edited_master.equals(st.session_state.dc_master_data):
+            tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+            diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
+                         st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore")).any(axis=1)
+            edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
+            
+            st.session_state.dc_master_data = edited_master
+            p["dc_saved_df_json"] = edited_master.to_json()
+            st.rerun()
+
         # =====================================================================
-        # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES 
+        # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (CALCULS SUR COLONNES INTERNES)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 🔍 Écran 3 : Contrôle Qualité des Données")
@@ -2368,6 +2361,7 @@ else:
         if not df_cq.empty and len(df_cq.columns) > 2:
             num_manquants = df_cq[liste_variables_dynamiques].isna().sum().sum() + (df_cq[liste_variables_dynamiques] == "").sum().sum()
             
+            # Contrôles de cohérence basiques basés sur le nom ou type détecté
             for var_name in liste_variables_dynamiques:
                 if var_name in df_cq.columns:
                     for val in df_cq[var_name].dropna():
@@ -2400,13 +2394,13 @@ else:
             st.success("🟢 Statut : Données conformes. Prêt pour l'analyse statistique.")
 
         # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (TOTALEMENT SYNCHRONISÉ)
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (LIÉ DIRECTEMENT À L'ÉCRAN 2)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        # Lecture directe et instantanée depuis la base maîtresse synchronisée
-        obs_collectees = len(st.session_state.dc_master_data["ID observation"].dropna().unique()) if not st.session_state.dc_master_data.empty else 0
+        # Utilisation directe d'edited_master pour coller instantanément à l'écran 2
+        obs_collectees = len(edited_master["ID observation"].dropna().unique()) if not edited_master.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
@@ -2415,21 +2409,22 @@ else:
         e4_c2.metric("Restant à collecter", restant)
         e4_c3.metric("Taux d'avancement", f"{avancement:.1f} %")
 
+        # Graphique dynamique synchronisé
         progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
         st.bar_chart(progress_df.set_index("Statut"))
 
         # =====================================================================
-        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (VÉRIFIÉ ET SYNCHRONISÉ)
+        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (LIÉ DIRECTEMENT À L'ÉCRAN 2)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📊 Écran 5 : Statistiques Descriptives")
 
-        if not st.session_state.dc_master_data.empty:
+        if not edited_master.empty:
             for variable in liste_variables_dynamiques:
-                if variable not in st.session_state.dc_master_data.columns:
+                if variable not in edited_master.columns:
                     continue
                 st.markdown(f"#### Analyse descriptive : {variable}")
-                series_data = st.session_state.dc_master_data[variable].dropna()
+                series_data = edited_master[variable].dropna()
                 
                 if series_data.empty:
                     st.info(f"Aucune observation exploitable pour la variable '{variable}'")
@@ -2462,26 +2457,26 @@ else:
             st.info("Aucune statistique disponible : le tableau de collecte est vide.")
 
         # =====================================================================
-        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (VÉRIFIÉ ET SYNCHRONISÉ)
+        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (LIÉ DIRECTEMENT À L'ÉCRAN 2)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 🎯 Écran 6 : Baseline du Processus")
 
-        if not st.session_state.dc_master_data.empty:
+        if not edited_master.empty:
             st.markdown("#### Situation de référence (KPI Générés depuis la base Terrain)")
             baseline_metrics = []
             
             for variable in liste_variables_dynamiques:
-                if variable in st.session_state.dc_master_data.columns:
-                    num_series = pd.to_numeric(st.session_state.dc_master_data[variable], errors="coerce").dropna()
+                if variable in edited_master.columns:
+                    num_series = pd.to_numeric(edited_master[variable], errors="coerce").dropna()
                     if not num_series.empty and not any(k in variable.lower() for k in ["statut", "verdict"]):
                         baseline_metrics.append({
                             "KPI Courant": f"Moyenne globale [{variable}]", 
                             "Niveau de performance actuel": f"{num_series.mean():.1f} min" if "temps" in variable.lower() else f"{num_series.mean():.2f}"
                         })
-                    elif not st.session_state.dc_master_data[variable].dropna().empty:
-                        non_ok_count = st.session_state.dc_master_data[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
-                        pct_nok = (non_ok_count / len(st.session_state.dc_master_data[variable].dropna())) * 100 if len(st.session_state.dc_master_data[variable].dropna()) > 0 else 0
+                    elif not edited_master[variable].dropna().empty:
+                        non_ok_count = edited_master[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
+                        pct_nok = (non_ok_count / len(edited_master[variable].dropna())) * 100 if len(edited_master[variable].dropna()) > 0 else 0
                         baseline_metrics.append({
                             "KPI Courant": f"Taux de défauts [{variable}]", 
                             "Niveau de performance actuel": f"{pct_nok:.1f} %"
@@ -2491,7 +2486,7 @@ else:
                 st.table(pd.DataFrame(baseline_metrics))
             else:
                 st.table(pd.DataFrame([{"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": "11.0 % (Par défaut)"}]))
-            st.caption("⚙️ Les calculs de cette table de référence se mettent à jour dynamiquement à chaque modification ou importation dans l'Écran 2.")
+            st.caption("⚙️ Les calculs de cette table de référence se mettent à jour dynamiquement.")
         else:
             st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
 
@@ -2508,6 +2503,7 @@ else:
         with c2:
             st.metric("DPMO", f"{dpmo:,.0f}")
             st.metric("Sigma Level", "À calculer selon rendement")
+
 
     # --- AUTRES PHASES (Structure prête) ---
     with tabs[2]: st.info("Module ANALYZE : Ishikawa & Tests Statistiques IA en attente de données.")
