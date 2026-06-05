@@ -2118,6 +2118,16 @@ else:
         # =====================================================================
         # 5. DATA COLLECTION
         # =====================================================================
+        from datetime import datetime, timezone, timedelta
+
+        # Variables définies dans le DCP (Structure cible)
+        DCP_VARS_DEF = {
+            "Temps d'entretien": {"Type": "Continue", "Unité": "min"},
+            "Temps d'attente pièce": {"Type": "Continue", "Unité": "min"},
+            "Temps de réparation": {"Type": "Continue", "Unité": "min"},
+            "Statut retouche": {"Type": "Attributaire", "Unité": "OK / Non OK"},
+        }
+
         # ÉTAPE 0 : INITIALISATION DE LA PERSISTANCE (JSON & STATE)
         if "dc_plan" not in p:
             p["dc_plan"] = {
@@ -2126,28 +2136,27 @@ else:
                 "date_fin_est": "2026-06-15",
             }
 
-        # Initialisation de la table maîtresse dans le state si absente
+        # Initialisation de la table maîtresse structurée [ID, Var1, Var2, ...]
         if "dc_master_data" not in st.session_state:
             if "dc_saved_df_json" in p and p["dc_saved_df_json"]:
                 st.session_state.dc_master_data = pd.read_json(p["dc_saved_df_json"])
             else:
-                st.session_state.dc_master_data = pd.DataFrame(
-                    columns=["ID observation", "Date", "Variable mesurée", "Valeur", "Unité de mesure", "Commentaire"]
-                )
+                # La première colonne est obligatoirement ID, suivies des variables du DCP
+                cols = ["ID observation", "Date de modification"] + list(DCP_VARS_DEF.keys())
+                st.session_state.dc_master_data = pd.DataFrame(columns=cols)
 
-        # Variables par défaut adaptables (Garage, Industrie, Admin)
-        DCP_VARS_DEF = {
-            "Temps d'entretien": "Heures",
-            "Temps attente pièces": "Heures",
-            "Temps réparation": "Heures",
-            "Statut Retouche": "Attributaire",
-        }
+        # Assurer que toutes les colonnes requises sont présentes (en cas de mise à jour du code)
+        for target_col in ["ID observation", "Date de modification"] + list(DCP_VARS_DEF.keys()):
+            if target_col not in st.session_state.dc_master_data.columns:
+                st.session_state.dc_master_data[target_col] = None
 
-        # --- TITRE PRINCIPAL DE SECTION (SUITE DE 4-MSA) ---
+        # --- TITRE PRINCIPAL DE SECTION ---
         st.markdown("## 5 - Data collection")
         st.markdown("---")
 
-        # --- ÉCRAN 1 ---
+        # =====================================================================
+        # 📋 ÉCRAN 1 : RÉSUMÉ DE LA COLLECTE (INFORMATIF UNIQUEMENT)
+        # =====================================================================
         st.markdown("### 📋 Écran 1 : Résumé de la Collecte")
 
         e1_c1, e1_c2, e1_c3 = st.columns(3)
@@ -2164,84 +2173,113 @@ else:
                 "Date estimée de fin", value=p["dc_plan"]["date_fin_est"], key="dc_d_fin"
             )
 
-        st.markdown("#### Liste des variables définies dans le DCP")
+        st.markdown("#### Liste des variables définies dans le Data Collection Plan (DCP)")
         dcp_display = pd.DataFrame(
-            [{"Variable": k, "Type/Unité": v} for k, v in DCP_VARS_DEF.items()]
+            [{"Variable": k, "Type": v["Type"], "Unité / Modalités": v["Unité"]} for k, v in DCP_VARS_DEF.items()]
         )
         st.table(dcp_display)
+        st.caption("ℹ️ Cet écran a un rôle uniquement informatif. Aucune modification ou importation n'est réalisable ici.")
 
-        # Import global Excel
+        # =====================================================================
+        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION DES DONNÉES
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
+
+        # --- SECTION : IMPORTATION EXCEL ---
+        st.markdown("#### 📥 Importation Excel")
         uploaded_file = st.file_uploader(
-            "📥 Importer un fichier Excel pour compléter automatiquement les tableaux",
+            "Télécharger un fichier Excel terrain pour alimenter le tableau",
             type=["xlsx", "xls"],
-            key="dc_excel_uploader",
+            key="dc_excel_uploader_e2",
         )
 
         if uploaded_file:
             try:
                 imported_df = pd.read_excel(uploaded_file)
-                required_cols = ["ID observation", "Date", "Variable mesurée", "Valeur", "Unité de mesure", "Commentaire"]
-                for col in required_cols:
-                    if col not in imported_df.columns:
-                        imported_df[col] = None if col != "Commentaire" else ""
                 
-                imported_df = imported_df[required_cols]
-                st.session_state.dc_master_data = pd.concat(
-                    [st.session_state.dc_master_data, imported_df], ignore_index=True
-                ).drop_duplicates(subset=["ID observation", "Variable mesurée"], keep="last")
+                if "ID observation" not in imported_df.columns and "ID" in imported_df.columns:
+                    imported_df = imported_df.rename(columns={"ID": "ID observation"})
                 
-                p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                st.success("✅ Fichier Excel importé et synchronisé avec succès.")
-            except Exception as e:
-                st.error(f"Erreur lors de la lecture du fichier Excel : {e}")
-
-        # --- ÉCRAN 2 ---
-        st.markdown("---")
-        st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
-
-        st.markdown("#### Saisie manuelle rapide")
-        with st.form("dc_form_manual", clear_on_submit=True):
-            f_c1, f_c2, f_c3, f_c4 = st.columns(4)
-            with f_c1:
-                v_var = st.selectbox("Variable à mesurer", list(DCP_VARS_DEF.keys()))
-            with f_c2:
-                v_val = st.text_input("Valeur (Nombre si continue, Texte si attributaire)")
-            with f_c3:
-                v_obs = st.text_input("ID observation (ex: OBS-001)")
-            with f_c4:
-                v_comm = st.text_input("Commentaire")
-
-            if st.form_submit_button("＋ Ajouter la ligne"):
-                if v_obs and v_val:
-                    # Configuration explicite et robuste du fuseau horaire GMT+3
-                    from datetime import datetime, timezone, timedelta
-                    tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                if "ID observation" not in imported_df.columns:
+                    st.error("❌ Le fichier Excel doit obligatoirement contenir une colonne 'ID' ou 'ID observation'.")
+                else:
+                    # Aligner et nettoyer les colonnes importées par rapport au DCP
+                    for var_name in DCP_VARS_DEF.keys():
+                        if var_name not in imported_df.columns:
+                            imported_df[var_name] = None
                     
-                    new_row = {
-                        "ID observation": v_obs,
-                        "Date": tz_gmt3,
-                        "Variable mesurée": v_var,
-                        "Valeur": v_val,
-                        "Unité de mesure": DCP_VARS_DEF[v_var],
-                        "Commentaire": v_comm,
-                    }
-                    st.session_state.dc_master_data = pd.concat(
-                        [st.session_state.dc_master_data, pd.DataFrame([new_row])], ignore_index=True
-                    )
-                    p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                    st.rerun()
+                    tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                    imported_df["Date de modification"] = tz_gmt3
+                    
+                    cols_to_keep = ["ID observation", "Date de modification"] + list(DCP_VARS_DEF.keys())
+                    imported_df = imported_df[cols_to_keep]
+                    
+                    # Détection des doublons d'ID avec la base existante
+                    existing_ids = set(st.session_state.dc_master_data["ID observation"].dropna().astype(str))
+                    imported_ids = set(imported_df["ID observation"].dropna().astype(str))
+                    conflits_ids = existing_ids.intersection(imported_ids)
+                    
+                    if conflits_ids:
+                        st.warning(f"⚠️ **Gestion des Doublons** : {len(conflits_ids)} ID(s) importé(s) existent déjà dans la base maîtresse.")
+                        col_b1, col_b2, col_b3 = st.columns(3)
+                        
+                        if col_b1.button("🔄 Écraser et mettre à jour (Recommandé)"):
+                            st.session_state.dc_master_data = pd.concat(
+                                [st.session_state.dc_master_data, imported_df], ignore_index=True
+                            ).drop_duplicates(subset=["ID observation"], keep="last")
+                            p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+                            st.success("✅ Données mises à jour avec les dernières valeurs de l'import.")
+                            st.rerun()
+                            
+                        if col_b2.button("🛑 Conserver l'existant (Ignorer les doublons)"):
+                            st.session_state.dc_master_data = pd.concat(
+                                [st.session_state.dc_master_data, imported_df], ignore_index=True
+                            ).drop_duplicates(subset=["ID observation"], keep="first")
+                            p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+                            st.success("✅ Nouvelles lignes ajoutées. Les données existantes n'ont pas bougé.")
+                            st.rerun()
+                            
+                        if col_b3.button("❌ Annuler l'importation"):
+                            st.info("Importation annulée.")
+                    else:
+                        # Pas de doublon : concaténation directe
+                        st.session_state.dc_master_data = pd.concat(
+                            [st.session_state.dc_master_data, imported_df], ignore_index=True
+                        )
+                        p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+                        st.success("✅ Données Excel fusionnées avec succès.")
+                        st.rerun()
+                        
+            except Exception as e:
+                st.error(f"Erreur lors du traitement du fichier : {e}")
 
-        st.markdown("#### Édition en temps réel de la base maîtresse")
-        if not st.session_state.dc_master_data.empty:
-            edited_master = st.data_editor(
-                st.session_state.dc_master_data, num_rows="dynamic", key="dc_master_editor"
-            )
-            if not edited_master.equals(st.session_state.dc_master_data):
-                st.session_state.dc_master_data = edited_master
-                p["dc_saved_df_json"] = edited_master.to_json()
-                st.rerun()
+        # --- SECTION : EDITION MANUELLE ET TABLEAU STRUCTURE ---
+        st.markdown("#### 🛠️ Tableau de Collecte Terrain")
+        st.caption("Double-cliquez sur une cellule pour modifier, utilisez le bas du tableau pour ajouter de nouvelles lignes ou la touche 'Suppr'.")
+
+        # Éditeur en temps réel structuré selon le DCP
+        edited_master = st.data_editor(
+            st.session_state.dc_master_data,
+            num_rows="dynamic",
+            key="dc_master_grid_editor",
+            use_container_width=True
+        )
+
+        # Sauvegarde automatique si des modifications manuelles surviennent
+        if not edited_master.equals(st.session_state.dc_master_data):
+            # Mettre à jour automatiquement la date pour les lignes modifiées/ajoutées
+            tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+            diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
+                         st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore")).any(axis=1)
+            edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
             
-            # Export Excel
+            st.session_state.dc_master_data = edited_master
+            p["dc_saved_df_json"] = edited_master.to_json()
+            st.rerun()
+
+        # Export Excel complet du projet
+        if not st.session_state.dc_master_data.empty:
             @st.cache_data
             def convert_df_to_excel(df):
                 import io
@@ -2257,10 +2295,10 @@ else:
                 file_name="LSS_Data_Collection_Master.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
-        else:
-            st.info("La base de données est actuellement vide. Utilisez le formulaire ou l'import Excel.")
 
-        # --- ÉCRAN 3 ---
+        # =====================================================================
+        # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (LOGIQUE SANS CONFIG VISUELLE MODIFIÉE)
+        # =====================================================================
         st.markdown("---")
         st.markdown("### 🔍 Écran 3 : Contrôle Qualité des Données")
 
@@ -2269,25 +2307,28 @@ else:
         num_manquants = 0
         total_prevu = max(1, int(p["dc_plan"]["taille_prevue"]))
         
-        if not df_cq.empty:
-            num_manquants = df_cq["Valeur"].isna().sum() + (df_cq["Valeur"] == "").sum()
+        if not df_cq.empty and len(df_cq.columns) > 2:
+            # Calcul des manquants sur les colonnes variables du DCP
+            var_cols = list(DCP_VARS_DEF.keys())
+            num_manquants = df_cq[var_cols].isna().sum().sum() + (df_cq[var_cols] == "").sum().sum()
             
-            for idx, row in df_cq.iterrows():
-                val = str(row["Valeur"]).strip()
-                var_type = DCP_VARS_DEF.get(row["Variable mesurée"], "Heures")
-                
-                if var_type == "Heures":
-                    try:
-                        numeric_val = float(val)
-                        if numeric_val < 0:
-                            num_erreurs += 1
-                    except ValueError:
-                        if val and val.lower() != "nan":
-                            num_erreurs += 1
-            
-            num_doublons = df_cq.duplicated(subset=["ID observation", "Variable mesurée"]).sum()
+            # Détection des erreurs de formatage basées sur le type de variable
+            for var_name, var_info in DCP_VARS_DEF.items():
+                if var_name in df_cq.columns:
+                    for val in df_cq[var_name].dropna():
+                        val_str = str(val).strip()
+                        if var_info["Type"] == "Continue":
+                            try:
+                                numeric_val = float(val_str)
+                                if numeric_val < 0:
+                                    num_erreurs += 1
+                            except ValueError:
+                                if val_str and val_str.lower() != "nan":
+                                    num_erreurs += 1
+                                    
+            num_doublons = df_cq["ID observation"].duplicated().sum()
             num_erreurs += num_doublons
-            taux_completude = (len(df_cq) / total_prevu) * 100
+            taux_completude = (len(df_cq.dropna(subset=["ID observation"])) / total_prevu) * 100
         else:
             taux_completude = 0.0
 
@@ -2304,11 +2345,13 @@ else:
         else:
             st.success("🟢 Statut : Données conformes. Prêt pour l'établissement de la Baseline.")
 
-        # --- ÉCRAN 4 ---
+        # =====================================================================
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (FONCTIONNEMENT CONSERVÉ)
+        # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        obs_collectees = len(df_cq["ID observation"].unique()) if not df_cq.empty else 0
+        obs_collectees = len(df_cq["ID observation"].dropna().unique()) if not df_cq.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
@@ -2320,22 +2363,27 @@ else:
         progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
         st.bar_chart(progress_df.set_index("Statut"))
 
-        # --- ÉCRAN 5 ---
+        # =====================================================================
+        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (FONCTIONNEMENT CONSERVÉ)
+        # =====================================================================
         st.markdown("---")
         st.markdown("### 📊 Écran 5 : Statistiques Descriptives")
 
         if not df_cq.empty:
-            for variable, v_type in DCP_VARS_DEF.items():
+            for variable, var_info in DCP_VARS_DEF.items():
+                if variable not in df_cq.columns:
+                    continue
                 st.markdown(f"#### Analyse descriptive : {variable}")
-                df_var = df_cq[df_cq["Variable mesurée"] == variable]
                 
-                if df_var.empty:
+                # Extraction propre de la série de données
+                series_data = df_cq[variable].dropna()
+                
+                if series_data.empty:
                     st.info(f"Aucune donnée collectée pour {variable}")
                     continue
 
-                if v_type == "Heures":
-                    numeric_series = pd.to_numeric(df_var["Valeur"], errors="coerce").dropna()
-                    
+                if var_info["Type"] == "Continue":
+                    numeric_series = pd.to_numeric(series_data, errors="coerce").dropna()
                     if not numeric_series.empty:
                         stats_data = {
                             "Métrique LSS": ["Moyenne", "Médiane", "Minimum", "Maximum", "Écart-type (σ)"],
@@ -2348,59 +2396,58 @@ else:
                             ]
                         }
                         st.table(pd.DataFrame(stats_data))
-                        st.bar_chart(pd.DataFrame(numeric_series))
+                        st.bar_chart(pd.DataFrame(numeric_series).reset_index(drop=True))
                     else:
-                        st.error("Erreur d'analyse : Les données de cette variable continue ne sont pas numériques.")
+                        st.error("Erreur d'analyse : Les données ne sont pas au format numérique.")
                 else:
-                    attr_counts = df_var["Valeur"].value_counts()
-                    attr_pct = df_var["Valeur"].value_counts(normalize=True) * 100
-                    
+                    attr_counts = series_data.value_counts()
+                    attr_pct = series_data.value_counts(normalize=True) * 100
                     attr_df = pd.DataFrame({
                         "Fréquence (N)": attr_counts,
                         "Pourcentage (%)": attr_pct.map("{:.2f} %".format),
-                        "Taux d'occurrence": attr_counts / len(df_var)
+                        "Taux d'occurrence": attr_counts / len(series_data)
                     })
                     st.table(attr_df)
         else:
             st.info("Aucune statistique disponible : la base maîtresse est vide.")
 
-        # --- ÉCRAN 6 ---
+        # =====================================================================
+        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (FONCTIONNEMENT CONSERVÉ)
+        # =====================================================================
         st.markdown("---")
         st.markdown("### 🎯 Écran 6 : Baseline du Processus")
 
         if not df_cq.empty:
             st.markdown("#### Situation de référence avant amélioration (KPI Actuels)")
             
-            def format_to_hours_mins(decimal_hours):
-                if pd.isna(decimal_hours):
-                    return "0h00"
-                hours = int(decimal_hours)
-                minutes = int(round((decimal_hours - hours) * 60))
-                if minutes == 60:
-                    hours += 1
-                    minutes = 0
-                return f"{hours}h{minutes:02d}"
+            def format_to_hours_mins(decimal_mins):
+                if pd.isna(decimal_mins) or decimal_mins < 0:
+                    return "0 min"
+                return f"{int(round(decimal_mins))} min"
 
             baseline_metrics = []
             
-            for variable, v_type in DCP_VARS_DEF.items():
-                df_var = df_cq[df_cq["Variable mesurée"] == variable]
-                if v_type == "Heures" and not df_var.empty:
-                    num_series = pd.to_numeric(df_var["Valeur"], errors="coerce").dropna()
+            for variable, var_info in DCP_VARS_DEF.items():
+                if variable in df_cq.columns and var_info["Type"] == "Continue":
+                    num_series = pd.to_numeric(df_cq[variable], errors="coerce").dropna()
                     if not num_series.empty:
                         avg_formatted = format_to_hours_mins(num_series.mean())
-                        baseline_metrics.append({"KPI Courant": f"Temps moyen [{variable}]", "Niveau de performance actuel": avg_formatted})
+                        baseline_metrics.append({"KPI Courant": f"Moyenne [{variable}]", "Niveau de performance actuel": avg_formatted})
 
-            df_attr = df_cq[df_cq["Variable mesurée"] == "Statut Retouche"]
-            if not df_attr.empty:
-                retouche_count = df_attr["Valeur"].astype(str).str.lower().isin(["oui", "retouche", "true", "1"]).sum()
-                taux_retouche_calc = (retouche_count / len(df_attr)) * 100
-                baseline_metrics.append({"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": f"{taux_retouche_calc:.1f} %"})
+            # Taux de retouche ciblé spécifiquement
+            if "Statut retouche" in df_cq.columns:
+                df_attr = df_cq["Statut retouche"].dropna()
+                if not df_attr.empty:
+                    retouche_count = df_attr.astype(str).str.strip().str.upper().isin(["NON OK", "RETOUCHE", "KO", "1"]).sum()
+                    taux_retouche_calc = (retouche_count / len(df_attr)) * 100
+                    baseline_metrics.append({"KPI Courant": "Taux de retouches global (Non OK)", "Niveau de performance actuel": f"{taux_retouche_calc:.1f} %"})
+                else:
+                    baseline_metrics.append({"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": "11.0 % (Valeur par défaut)"})
             else:
-                baseline_metrics.append({"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": "11.0 % (Valeur cible par défaut)"})
+                baseline_metrics.append({"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": "11.0 % (Valeur par défaut)"})
 
             st.table(pd.DataFrame(baseline_metrics))
-            st.caption("⚙️ Les calculs de cette table de référence se mettent à jour dynamiquement à chaque modification des données de l'Écran 2.")
+            st.caption("⚙️ Les calculs de cette table de référence se mettent à jour dynamiquement à chaque modification ou importation dans l'Écran 2.")
         else:
             st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
 
