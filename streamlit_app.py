@@ -2355,9 +2355,28 @@ else:
                 # Manquants vectoriels
                 donnees_manquantes = int(sub_df.isna().sum().sum() + (sub_df == "").sum().sum())
                 
-                # Erreurs vectorielles ultra-rapides (Filtre global sur le sous-tableau)
-                sub_df_str = sub_df.astype(str).apply(lambda x: x.str.strip().str.upper())
-                erreurs_detectees = int(sub_df_str.isin(["NON OK", "KO", "RETOUCHE", "1"]).sum().sum())
+                # --- DÉTECTION EXCLUSIVE DES ANOMALIES ET ERREURS DE SAISIE ---
+                for col in cols_calcul:
+                    # On isole la colonne sans les cellules vides
+                    series_col = sub_df[col].dropna()
+                    series_col = series_col[series_col != ""]
+                    
+                    if not series_col.empty:
+                        # On tente de convertir en numérique pour piéger les textes parasites
+                        numeric_coerced = pd.to_numeric(series_col, errors="coerce")
+                        total_valeurs = len(series_col)
+                        total_numerique = numeric_coerced.notna().sum()
+                        
+                        # CAS 1 : C'est une colonne de chiffres, mais quelqu'un a écrit des lettres
+                        if total_numerique > 0 and (total_numerique / total_valeurs) > 0.30:
+                            anomalies_texte = int(numeric_coerced.isna().sum())
+                            erreurs_detectees += anomalies_texte
+                        
+                        # CAS 2 : C'est une colonne de texte, on cherche des anomalies de frappe (ex: un point ou un chiffre isolé)
+                        elif total_numerique == 0:
+                            # Repère les saisies suspectes ultra-courtes ou purement numériques là où on attend du texte
+                            anomalies_frappe = series_col.astype(str).str.strip().isin([".", ",", "-", "?", "0", "1"]).sum()
+                            erreurs_detectees += int(anomalies_frappe)
 
         # Affichage des KPIs
         eq1, eq2, eq3, eq4 = st.columns(4)
