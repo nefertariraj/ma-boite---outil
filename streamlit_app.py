@@ -2414,11 +2414,24 @@ else:
         total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
 
         # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (SÉCURISÉ)
+        # 🔄 REPRISE STRICTE DU FLUX DIRECT (ÉCRAN 2 -> ÉCRAN 4)
+        # =====================================================================
+        # Priorité absolue à 'edited_master' pour capter le tableau actuel en temps réel
+        if 'edited_master' in locals():
+            df_active = edited_master
+        else:
+            df_active = st.session_state.dc_master_data
+
+        # Récupération de la taille prévue
+        total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
+
+        # =====================================================================
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (LIÉ DIRECTEMENT AU TABLEAU ACTUEL)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
+        # Calcul basé strictement sur ce qui est affiché à l'instant T dans le tableau
         obs_collectees = len(df_active["ID observation"].dropna().unique()) if not df_active.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
