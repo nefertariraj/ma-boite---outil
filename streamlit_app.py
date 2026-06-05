@@ -2314,42 +2314,41 @@ else:
         # --- TABLEAU DE COLLECTE TERRAIN (ÉCRAN 2) ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
-        # 1. Fonction de rappel (Callback) : exécutée UNIQUEMENT lors d'une vraie action utilisateur
+        # 1. Le Callback unique : TOUT se passe ici, et SEULEMENT en cas de clic/saisie
         def _sauvegarder_grille_callback():
-            # Streamlit stocke temporairement les changements dans st.session_state["dc_master_grid_editor"]
+            # On vérifie si l'éditeur a envoyé des données
             if "dc_master_grid_editor" in st.session_state:
                 grille_evenement = st.session_state["dc_master_grid_editor"]
                 
-                # S'il y a eu des modifications, des ajouts ou des suppressions réelles
+                # S'il y a un vrai changement (écriture, ajout ou suppression)
                 if grille_evenement["edited_rows"] or grille_evenement["added_rows"] or grille_evenement["deleted_rows"]:
-                    # On récupère l'état actuel de l'éditeur pour mettre à jour la base
-                    # Note : On accède temporairement aux données sans déclencher de rerun infini
                     tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                     
-                    # Traitement de sécurité pour injecter la date GMT+3 sur les lignes touchées
-                    # (Cette logique s'exécute de manière isolée dans le callback)
+                    # On applique les modifications directement sur notre DataFrame de session
                     try:
-                        # On applique la date de modification sur les cellules éditées manuelles
                         for row_idx in grille_evenement["edited_rows"].keys():
                             if row_idx < len(st.session_state.dc_master_data):
                                 st.session_state.dc_master_data.iloc[row_idx, st.session_state.dc_master_data.columns.get_loc("Date de modification")] = tz_gmt3
                     except Exception:
                         pass
+                    
+                    # On nettoie et on sauvegarde dans le JSON de persistance uniquement à cet instant T
+                    st.session_state.dc_master_data = st.session_state.dc_master_data.where(pd.notnull(st.session_state.dc_master_data), None)
+                    p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
 
-        # 2. Affichage de l'éditeur de données optimisé (Sans aucun st.rerun() dans le flux principal)
-        # On utilise 'on_change' pour intercepter la modification de manière fluide
-        edited_master = st.data_editor(
+        # 2. L'affichage épuré au maximum
+        # On ne réassigne plus 'edited_master = st.data_editor(...)', on laisse Streamlit gérer st.session_state.dc_master_data directement
+        st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
             key="dc_master_grid_editor",
             use_container_width=True,
             on_change=_sauvegarder_grille_callback
         )
-
-        # 3. Sauvegarde silencieuse de l'état de l'éditeur dans la session globale
-        # Plus de condition "if not edited_master.equals(...): st.rerun()"
-        st.session_state.dc_master_data = edited_master.where(pd.notnull(edited_master), None)
-        p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+        
+        # ❌ ATTENTION : Supprime bien toutes les lignes qui étaient ici et qui faisaient :
+        # st.session_state.dc_master_data = edited_master...
+        # p["dc_saved_df_json"] = edited_master.to_json()
 
         # =====================================================================
         # 🔍 ÉCRAN 3 : QUALITÉ DES DONNÉES (DYNAMIQUEMENT MIS À JOUR)
