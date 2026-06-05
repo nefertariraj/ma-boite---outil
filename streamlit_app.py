@@ -2443,6 +2443,9 @@ else:
         st.markdown("---")
         st.markdown("### 🎯 Écran 6 : Baseline du Processus")
 
+        # 🎯 SÉCURITÉ ABSOLUE : Liaison directe pour alimenter df_active sans toucher aux écrans précédents
+        df_active = st.session_state.dc_master_data
+
         # Variables globales pour passer le relai à l'étape de calcul de capabilité
         total_defauts_terrain = 0
 
