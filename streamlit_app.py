@@ -2209,23 +2209,39 @@ else:
 
         if uploaded_file:
             try:
+                # Importations de secours locales pour garantir la disponibilité des bibliothèques
+                import re
+                
                 raw_imported_df = pd.read_excel(uploaded_file)
                 st.info("🧠 *Moteur IA : Analyse de proximité linguistique et injection des données en cours...*")
                 
                 def _structures_clean(text):
+                    """Nettoie et normalise le texte pour gommer les variations de syntaxe"""
+                    if pd.isna(text) or text is None:
+                        return ""
                     t = str(text).lower().strip()
+                    # Remplace les séparateurs complexes (tirets, underscores, slashs) par des espaces
                     t = re.sub(r'[_\-\s\./\\]+', ' ', t)
+                    # Conserve uniquement les caractères alphanumériques et les espaces
                     t = "".join(c for c in t if c.isalnum() or c == ' ')
                     return t
 
                 def _calculer_proximite(txt1, txt2):
-                    w1 = set(_structures_clean(txt1).split())
-                    w2 = set(_structures_clean(txt2).split())
+                    """Calcule un score de proximité sémantique et structurelle entre deux en-têtes"""
+                    clean1 = _structures_clean(txt1)
+                    clean2 = _structures_clean(txt2)
+                    
+                    w1 = set(clean1.split())
+                    w2 = set(clean2.split())
+                    
                     if not w1 or not w2:
                         return 0.0
+                        
                     inter = w1.intersection(w2)
                     score = len(inter) / max(len(w1), len(w2))
-                    if _structures_clean(txt1) in _structures_clean(txt2) or _structures_clean(txt2) in _structures_clean(txt1):
+                    
+                    # Bonus d'inclusion si l'un des titres contient entièrement l'autre
+                    if clean1 in clean2 or clean2 in clean1:
                         score += 0.3
                     return score
 
@@ -2233,14 +2249,16 @@ else:
                 aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
                 colonnes_excel = list(raw_imported_df.columns)
 
-                # 1. Traitement de l'ID Observation
+                # 1. Alignement intelligent de la clé unique (ID Observation)
                 mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°"]
                 id_col_source = None
                 
+                # Test strict d'abord
                 for col in colonnes_excel:
                     if any(k == str(col).lower().strip() for k in mots_cles_id):
                         id_col_source = col
                         break
+                # Test flou si non trouvé
                 if not id_col_source:
                     for col in colonnes_excel:
                         if any(k in str(col).lower() for k in mots_cles_id):
@@ -2252,18 +2270,20 @@ else:
                     st.caption(f"🎯 **Correspondance ID** : `{id_col_source}` associé à **ID observation**")
                 else:
                     aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
-                    st.caption("ℹ️ *Aucun ID détecté dans votre fichier. Génération automatique d'index de secours.*")
+                    st.caption("ℹ️ *Aucun ID détecté dans votre fichier. Génération automatique d'un index de secours.*")
 
-                # 2. Alignement des Variables Critiques
+                # 2. Alignement flou des Variables Critiques Dynamiques
                 for var_critique in liste_variables_dynamiques:
                     meilleur_match = None
                     meilleur_score = 0.0
+                    
                     for col in colonnes_excel:
                         score = _calculer_proximite(var_critique, col)
                         if score > meilleur_score:
                             meilleur_score = score
                             meilleur_match = col
                     
+                    # Seuil de tolérance IA à 35% de ressemblance minimum
                     if meilleur_match and meilleur_score >= 0.35:
                         aligned_df[var_critique] = raw_imported_df[meilleur_match]
                         st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}** (Confiance: {int(min(meilleur_score, 1.0)*100)}%)")
@@ -2271,12 +2291,14 @@ else:
                         aligned_df[var_critique] = None
                         st.caption(f"❌ **Non mappé** : Aucun équivalent trouvé pour **{var_critique}** (Initialisé vide)")
 
-                # 3. Insertion de la date système (GMT+3)
+                # 3. Enregistrement de la date système au fuseau horaire GMT+3
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                 aligned_df["Date de modification"] = tz_gmt3
+
+                # Nettoyage des objets NaN/NaT pour l'affichage Streamlit
                 aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
 
-                # --- DUPLICATION / INTELLIGENT MERGE ---
+                # --- FUSION INTELLIGENTE DANS LE MASTER DATA ---
                 if not st.session_state.dc_master_data.empty:
                     existing_ids = set(st.session_state.dc_master_data["ID observation"].dropna().astype(str))
                     imported_ids = set(aligned_df["ID observation"].dropna().astype(str))
@@ -2299,7 +2321,7 @@ else:
                         combined = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
                         st.session_state.dc_master_data = combined.drop_duplicates(subset=["ID observation"], keep="first")
                         p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success("✅ Lignes ajoutées sans modifier l'existant.")
+                        st.success("✅ Nouvelles lignes ajoutées sans écraser l'existant.")
                         st.rerun()
                 else:
                     if st.session_state.dc_master_data.empty:
@@ -2324,6 +2346,7 @@ else:
             use_container_width=True
         )
 
+        # Sauvegarde automatique lors des modifications manuelles de la grille
         if not edited_master.equals(st.session_state.dc_master_data):
             tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
             diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
