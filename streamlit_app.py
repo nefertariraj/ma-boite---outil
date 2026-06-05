@@ -2314,33 +2314,42 @@ else:
         # --- TABLEAU DE COLLECTE TERRAIN (ÉCRAN 2) ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
+        # 1. Fonction de rappel (Callback) : exécutée UNIQUEMENT lors d'une vraie action utilisateur
+        def _sauvegarder_grille_callback():
+            # Streamlit stocke temporairement les changements dans st.session_state["dc_master_grid_editor"]
+            if "dc_master_grid_editor" in st.session_state:
+                grille_evenement = st.session_state["dc_master_grid_editor"]
+                
+                # S'il y a eu des modifications, des ajouts ou des suppressions réelles
+                if grille_evenement["edited_rows"] or grille_evenement["added_rows"] or grille_evenement["deleted_rows"]:
+                    # On récupère l'état actuel de l'éditeur pour mettre à jour la base
+                    # Note : On accède temporairement aux données sans déclencher de rerun infini
+                    tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                    
+                    # Traitement de sécurité pour injecter la date GMT+3 sur les lignes touchées
+                    # (Cette logique s'exécute de manière isolée dans le callback)
+                    try:
+                        # On applique la date de modification sur les cellules éditées manuelles
+                        for row_idx in grille_evenement["edited_rows"].keys():
+                            if row_idx < len(st.session_state.dc_master_data):
+                                st.session_state.dc_master_data.iloc[row_idx, st.session_state.dc_master_data.columns.get_loc("Date de modification")] = tz_gmt3
+                    except Exception:
+                        pass
+
+        # 2. Affichage de l'éditeur de données optimisé (Sans aucun st.rerun() dans le flux principal)
+        # On utilise 'on_change' pour intercepter la modification de manière fluide
         edited_master = st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
             key="dc_master_grid_editor",
-            use_container_width=True
+            use_container_width=True,
+            on_change=_sauvegarder_grille_callback
         )
 
-        # Sauvegarde et synchronisation immédiate des modifications manuelles (Anti-Crash PyArrow)
-        if not edited_master.equals(st.session_state.dc_master_data):
-            tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-            
-            try:
-                df1_clean = edited_master.drop(columns=["Date de modification"], errors="ignore").astype(str)
-                df2_clean = st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore").astype(str)
-                
-                if len(df1_clean) == len(df2_clean):
-                    diff_mask = (df1_clean != df2_clean).any(axis=1)
-                    edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
-                else:
-                    # Ajout d'une ligne manuelle via l'éditeur
-                    edited_master.loc[edited_master["Date de modification"].isna(), "Date de modification"] = tz_gmt3
-            except Exception:
-                pass
-                
-            st.session_state.dc_master_data = edited_master.where(pd.notnull(edited_master), None)
-            p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-            st.rerun()
+        # 3. Sauvegarde silencieuse de l'état de l'éditeur dans la session globale
+        # Plus de condition "if not edited_master.equals(...): st.rerun()"
+        st.session_state.dc_master_data = edited_master.where(pd.notnull(edited_master), None)
+        p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
 
         # =====================================================================
         # 🔍 ÉCRAN 3 : QUALITÉ DES DONNÉES (DYNAMIQUEMENT MIS À JOUR)
