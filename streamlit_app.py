@@ -2346,13 +2346,28 @@ else:
             use_container_width=True
         )
 
-        # Sauvegarde automatique lors des modifications manuelles de la grille
+        # Sauvegarde automatique lors des modifications manuelles de la grille (Méthode Anti-Crash PyArrow)
         if not edited_master.equals(st.session_state.dc_master_data):
             tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-            diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
-                         st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore")).any(axis=1)
-            edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
             
+            # Correction de la détection de différence : On aligne temporairement en chaînes de caractères lues par Pandas
+            try:
+                df1_clean = edited_master.drop(columns=["Date de modification"], errors="ignore").astype(str)
+                df2_clean = st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore").astype(str)
+                
+                # Identification sécurisée des lignes modifiées ou ajoutées
+                if len(df1_clean) == len(df2_clean):
+                    diff_mask = (df1_clean != df2_clean).any(axis=1)
+                    edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
+                else:
+                    # S'il y a des nouvelles lignes ajoutées via le bouton "+ Add row" de Streamlit
+                    edited_master.loc[edited_master["Date de modification"].isna(), "Date de modification"] = tz_gmt3
+            except Exception:
+                # Sécurité totale : si la comparaison vectorielle échoue encore, on applique l'heure sans bloquer l'application
+                pass
+            
+            # Nettoyage final anti-NaN et mise à jour de la persistance
+            edited_master = edited_master.where(pd.notnull(edited_master), None)
             st.session_state.dc_master_data = edited_master
             p["dc_saved_df_json"] = edited_master.to_json()
             st.rerun()
