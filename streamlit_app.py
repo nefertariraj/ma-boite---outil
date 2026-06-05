@@ -2394,12 +2394,13 @@ else:
             st.success("🟢 Statut : Données conformes. Prêt pour l'analyse statistique.")
 
         # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (CONSERVÉ)
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (TOTALEMENT SYNCHRONISÉ EN TEMPS RÉEL)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        obs_collectees = len(df_cq["ID observation"].dropna().unique()) if not df_cq.empty else 0
+        # Lecture directe à partir du live session_state pour forcer le rafraîchissement instantané
+        obs_collectees = len(st.session_state.dc_master_data["ID observation"].dropna().unique()) if not st.session_state.dc_master_data.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
@@ -2408,27 +2409,27 @@ else:
         e4_c2.metric("Restant à collecter", restant)
         e4_c3.metric("Taux d'avancement", f"{avancement:.1f} %")
 
+        # Le graphique se met à jour instantanément
         progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
         st.bar_chart(progress_df.set_index("Statut"))
 
         # =====================================================================
-        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (DYNAMIQUE SUR LES COMPTES RENDUS)
+        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (DYNAMIQUE SUR LE LIVE STATE)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📊 Écran 5 : Statistiques Descriptives")
 
-        if not df_cq.empty:
+        if not st.session_state.dc_master_data.empty:
             for variable in liste_variables_dynamiques:
-                if variable not in df_cq.columns:
+                if variable not in st.session_state.dc_master_data.columns:
                     continue
                 st.markdown(f"#### Analyse descriptive : {variable}")
-                series_data = df_cq[variable].dropna()
+                series_data = st.session_state.dc_master_data[variable].dropna()
                 
                 if series_data.empty:
                     st.info(f"Aucune observation exploitable pour la variable '{variable}'")
                     continue
 
-                # Essayer de deviner s'il s'agit d'une valeur numérique ou textuelle
                 numeric_series = pd.to_numeric(series_data, errors="coerce").dropna()
                 
                 if not numeric_series.empty and not any(k in variable.lower() for k in ["statut", "verdict", "code"]):
@@ -2456,27 +2457,26 @@ else:
             st.info("Aucune statistique disponible : le tableau de collecte est vide.")
 
         # =====================================================================
-        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (CONSERVÉ)
+        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (DYNAMIQUE SUR LE LIVE STATE)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 🎯 Écran 6 : Baseline du Processus")
 
-        if not df_cq.empty:
+        if not st.session_state.dc_master_data.empty:
             st.markdown("#### Situation de référence (KPI Générés depuis la base Terrain)")
             baseline_metrics = []
             
             for variable in liste_variables_dynamiques:
-                if variable in df_cq.columns:
-                    num_series = pd.to_numeric(df_cq[variable], errors="coerce").dropna()
+                if variable in st.session_state.dc_master_data.columns:
+                    num_series = pd.to_numeric(st.session_state.dc_master_data[variable], errors="coerce").dropna()
                     if not num_series.empty and not any(k in variable.lower() for k in ["statut", "verdict"]):
                         baseline_metrics.append({
                             "KPI Courant": f"Moyenne globale [{variable}]", 
                             "Niveau de performance actuel": f"{num_series.mean():.1f} min" if "temps" in variable.lower() else f"{num_series.mean():.2f}"
                         })
-                    elif not num_series.empty:
-                        # Cas des attributaires comptabilisés en taux d'anomalies
-                        non_ok_count = df_cq[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
-                        pct_nok = (non_ok_count / len(df_cq[variable].dropna())) * 100 if len(df_cq[variable].dropna()) > 0 else 0
+                    elif not st.session_state.dc_master_data[variable].dropna().empty:
+                        non_ok_count = st.session_state.dc_master_data[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
+                        pct_nok = (non_ok_count / len(st.session_state.dc_master_data[variable].dropna())) * 100 if len(st.session_state.dc_master_data[variable].dropna()) > 0 else 0
                         baseline_metrics.append({
                             "KPI Courant": f"Taux de défauts [{variable}]", 
                             "Niveau de performance actuel": f"{pct_nok:.1f} %"
