@@ -2212,7 +2212,10 @@ else:
                 # Importations de secours locales pour garantir la disponibilité des bibliothèques
                 import re
                 
+                # Lecture brute et suppression immédiate des lignes 100% vides du fichier Excel
                 raw_imported_df = pd.read_excel(uploaded_file)
+                raw_imported_df = raw_imported_df.dropna(how="all").reset_index(drop=True)
+                
                 st.info("🧠 *Moteur IA : Analyse de proximité linguistique et injection des données en cours...*")
                 
                 def _structures_clean(text):
@@ -2246,11 +2249,13 @@ else:
                     return score
 
                 cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
+                
+                # Reconstruction sécurisée du DataFrame d'alignement avec un index réinitialisé à neuf
                 aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
                 colonnes_excel = list(raw_imported_df.columns)
 
                 # 1. Alignement intelligent de la clé unique (ID Observation)
-                mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°"]
+                mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°", "nom"]
                 id_col_source = None
                 
                 # Test strict d'abord
@@ -2266,7 +2271,13 @@ else:
                             break
 
                 if id_col_source:
-                    aligned_df["ID observation"] = raw_imported_df[id_col_source].astype(str)
+                    # Extraction propre de l'ID réel : supprime les '.0' générés par Excel sur les ID numériques
+                    aligned_df["ID observation"] = (
+                        raw_imported_df[id_col_source]
+                        .astype(str)
+                        .str.replace(r'\.0$', '', regex=True)
+                        .str.strip()
+                    )
                     st.caption(f"🎯 **Correspondance ID** : `{id_col_source}` associé à **ID observation**")
                 else:
                     aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
@@ -2285,7 +2296,7 @@ else:
                     
                     # Seuil de tolérance IA à 35% de ressemblance minimum
                     if meilleur_match and meilleur_score >= 0.35:
-                        aligned_df[var_critique] = raw_imported_df[meilleur_match]
+                        aligned_df[var_critique] = raw_imported_df[meilleur_match].values
                         st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}** (Confiance: {int(min(meilleur_score, 1.0)*100)}%)")
                     else:
                         aligned_df[var_critique] = None
@@ -2295,8 +2306,8 @@ else:
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                 aligned_df["Date de modification"] = tz_gmt3
 
-                # Nettoyage des objets NaN/NaT pour l'affichage Streamlit
-                aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
+                # Nettoyage des index avant toute opération de fusion
+                aligned_df = aligned_df.reset_index(drop=True)
 
                 # --- FUSION INTELLIGENTE DANS LE MASTER DATA ---
                 if not st.session_state.dc_master_data.empty:
@@ -2311,26 +2322,33 @@ else:
                     c_b1, c_b2 = st.columns(2)
                     
                     if c_b1.button("🔄 Écraser & Mettre à jour"):
-                        combined = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
-                        st.session_state.dc_master_data = combined.drop_duplicates(subset=["ID observation"], keep="last")
+                        master_df = st.session_state.dc_master_data.copy().reset_index(drop=True)
+                        # Suppression chirurgicale des anciennes lignes en doublon
+                        master_df = master_df[~master_df["ID observation"].isin(list(imported_ids))]
+                        st.session_state.dc_master_data = pd.concat([master_df, aligned_df], ignore_index=True).reset_index(drop=True)
+                        
                         p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success("✅ Table maîtresse mise à jour avec succès.")
+                        st.success(f"✅ Table maîtresse mise à jour avec succès. Total : {len(st.session_state.dc_master_data)} lignes.")
                         st.rerun()
                         
                     if c_b2.button("🛑 Conserver les données existantes"):
-                        combined = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
-                        st.session_state.dc_master_data = combined.drop_duplicates(subset=["ID observation"], keep="first")
+                        master_df = st.session_state.dc_master_data.copy().reset_index(drop=True)
+                        # On ne garde que les ID de l'importation qui n'existent pas encore du tout
+                        nouvelles_lignes = aligned_df[~aligned_df["ID observation"].isin(list(existing_ids))]
+                        st.session_state.dc_master_data = pd.concat([master_df, nouvelles_lignes], ignore_index=True).reset_index(drop=True)
+                        
                         p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success("✅ Nouvelles lignes ajoutées sans écraser l'existant.")
+                        st.success(f"✅ Nouvelles lignes ajoutées sans écraser l'existant. Total : {len(st.session_state.dc_master_data)} lignes.")
                         st.rerun()
                 else:
                     if st.session_state.dc_master_data.empty:
                         st.session_state.dc_master_data = aligned_df
                     else:
-                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
+                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data.reset_index(drop=True), aligned_df], ignore_index=True).reset_index(drop=True)
                     
+                    st.session_state.dc_master_data = st.session_state.dc_master_data.where(pd.notnull(st.session_state.dc_master_data), None)
                     p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                    st.success("🚀 Importation et alignement réussis !")
+                    st.success(f"🚀 Importation réussie ! {len(aligned_df)} lignes réelles synchronisées.")
                     st.rerun()
 
             except Exception as e:
@@ -2346,7 +2364,7 @@ else:
             use_container_width=True
         )
 
-        # Sauvegarde et synchronisation immédiate des modifications manuelles
+        # Sauvegarde et synchronisation immédiate des modifications manuelles (Anti-Crash PyArrow)
         if not edited_master.equals(st.session_state.dc_master_data):
             tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
             
@@ -2358,6 +2376,7 @@ else:
                     diff_mask = (df1_clean != df2_clean).any(axis=1)
                     edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
                 else:
+                    # Gestion du bouton "+ Add row" de Streamlit
                     edited_master.loc[edited_master["Date de modification"].isna(), "Date de modification"] = tz_gmt3
             except Exception:
                 pass
