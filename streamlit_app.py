@@ -2402,13 +2402,24 @@ else:
             st.success("🟢 Statut : Données conformes. Prêt pour l'analyse statistique.")
 
         # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (LIÉ DIRECTEMENT À L'ÉCRAN 2)
+        # 🔄 SÉCURISATION DU RECHARGEMENT DE PAGE (ANTI-RESET F5)
+        # =====================================================================
+        # Si edited_master est absent ou vide suite à un refresh, on prend le master_data sauvegardé
+        if 'edited_master' in locals() and not edited_master.empty:
+            df_active = edited_master
+        else:
+            df_active = st.session_state.dc_master_data
+
+        # Récupération sécurisée de la taille prévue définie à l'Écran 1
+        total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
+
+        # =====================================================================
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (SÉCURISÉ)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        # Utilisation directe d'edited_master pour coller instantanément à l'écran 2
-        obs_collectees = len(edited_master["ID observation"].dropna().unique()) if not edited_master.empty else 0
+        obs_collectees = len(df_active["ID observation"].dropna().unique()) if not df_active.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
 
@@ -2422,17 +2433,17 @@ else:
         st.bar_chart(progress_df.set_index("Statut"))
 
         # =====================================================================
-        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (LIÉ DIRECTEMENT À L'ÉCRAN 2)
+        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (SÉCURISÉ)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📊 Écran 5 : Statistiques Descriptives")
 
-        if not edited_master.empty:
+        if not df_active.empty:
             for variable in liste_variables_dynamiques:
-                if variable not in edited_master.columns:
+                if variable not in df_active.columns:
                     continue
                 st.markdown(f"#### Analyse descriptive : {variable}")
-                series_data = edited_master[variable].dropna()
+                series_data = df_active[variable].dropna()
                 
                 if series_data.empty:
                     st.info(f"Aucune observation exploitable pour la variable '{variable}'")
@@ -2465,29 +2476,36 @@ else:
             st.info("Aucune statistique disponible : le tableau de collecte est vide.")
 
         # =====================================================================
-        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (LIÉ DIRECTEMENT À L'ÉCRAN 2)
+        # 🎯 ÉCRAN 6 : BASELINE DU PROCESSUS (SÉCURISÉ)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 🎯 Écran 6 : Baseline du Processus")
 
-        if not edited_master.empty:
+        # Variables globales pour passer le relai à l'étape de calcul de capabilité
+        total_defauts_terrain = 0
+
+        if not df_active.empty:
             st.markdown("#### Situation de référence (KPI Générés depuis la base Terrain)")
             baseline_metrics = []
+            unites_inspectees_count = len(df_active.dropna(subset=["ID observation"]))
             
             for variable in liste_variables_dynamiques:
-                if variable in edited_master.columns:
-                    num_series = pd.to_numeric(edited_master[variable], errors="coerce").dropna()
-                    if not num_series.empty and not any(k in variable.lower() for k in ["statut", "verdict"]):
+                if variable in df_active.columns:
+                    num_series = pd.to_numeric(df_active[variable], errors="coerce").dropna()
+                    if not num_series.empty and not any(k in variable.lower() for k in ["statut", "verdict", "validation"]):
                         baseline_metrics.append({
                             "KPI Courant": f"Moyenne globale [{variable}]", 
                             "Niveau de performance actuel": f"{num_series.mean():.1f} min" if "temps" in variable.lower() else f"{num_series.mean():.2f}"
                         })
-                    elif not edited_master[variable].dropna().empty:
-                        non_ok_count = edited_master[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
-                        pct_nok = (non_ok_count / len(edited_master[variable].dropna())) * 100 if len(edited_master[variable].dropna()) > 0 else 0
+                    elif not df_active[variable].dropna().empty:
+                        # Comptage exact des défauts qualitatifs
+                        non_ok_count = df_active[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1", "NON-CONFORME"]).sum()
+                        total_defauts_terrain += non_ok_count
+                        
+                        pct_nok = (non_ok_count / len(df_active[variable].dropna())) * 100 if len(df_active[variable].dropna()) > 0 else 0
                         baseline_metrics.append({
                             "KPI Courant": f"Taux de défauts [{variable}]", 
-                            "Niveau de performance actuel": f"{pct_nok:.1f} %"
+                            "Niveau de performance actuel": f"{pct_nok:.1f} % ({non_ok_count} défauts)"
                         })
 
             if baseline_metrics:
@@ -2499,74 +2517,52 @@ else:
             st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
 
         # =====================================================================
-        # 🎯 ÉTAPE 6 : MEASURE PROCESS CAPABILITY (DPMO & SIGMA AUTOMATIQUES)
+        # 📊 ÉTAPE 6 : MEASURE PROCESS CAPABILITY (DPMO & SIGMA)
         # =====================================================================
         st.divider()
         st.subheader("6. Measure process capability")
 
-        # 1. Calcul automatique des métriques à partir du tableau de l'Écran 2
-        total_defauts_terrain = 0
-        unites_inspectees = len(edited_master.dropna(subset=["ID observation"])) if not edited_master.empty else 0
+        # Initialisation dynamique des dimensions pour le calcul Six Sigma
+        unites_calcul = len(df_active.dropna(subset=["ID observation"])) if not df_active.empty else 0
+        opportunites_par_unite = max(1, len([v for v in liste_variables_dynamiques if v in df_active.columns]))
 
-        if unites_inspectees > 0:
-            for variable in liste_variables_dynamiques:
-                if variable in edited_master.columns:
-                    # On ignore les colonnes purement numériques/temporelles pour le comptage des défauts qualitatifs
-                    if any(k in variable.lower() for k in ["temps", "délai", "durée", "coût"]):
-                        continue
-                    
-                    # Comptage des chaînes textuelles marquant une non-conformité
-                    defauts_colonne = edited_master[variable].astype(str).str.strip().str.upper().isin(
-                        ["NON OK", "KO", "RETOUCHE", "1", "NON-CONFORME", "DÉFAUT"]
-                    ).sum()
-                    total_defauts_terrain += defauts_colonne
-
-        # Le nombre d'opportunités par unité correspond au nombre de critères (variables) analysés
-        opportunites_par_unite = max(1, len([v for v in liste_variables_dynamiques if v in edited_master.columns]))
-
-        # 2. Zone de contrôle et d'affichage des variables de calcul
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Paramètres de Capabilité (Générés depuis le terrain)**")
-            # Les champs affichent par défaut les calculs automatiques mais restent modifiables si besoin
-            defects = st.number_input("Nombre total de défauts constatés", min_value=0, value=int(total_defauts_terrain), key="cap_defects_auto")
-            units = st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=max(1, int(unites_inspectees)), key="cap_units_auto")
-            opp = st.number_input("Nombre d'opportunités de défaut par unité", min_value=1, value=int(opportunites_par_unite), key="cap_opp_auto")
+            defects = st.number_input("Nombre total de défauts constatés", min_value=0, value=int(total_defauts_terrain), key="final_cap_defects")
+            units = st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=max(1, int(unites_calcul)), key="final_cap_units")
+            opp = st.number_input("Nombre d'opportunités de défaut par unité", min_value=1, value=int(opportunites_par_unite), key="final_cap_opp")
         
-        # 3. Formule mathématique du Six Sigma : DPMO = (Défauts / (Unités * Opportunités)) * 1 000 000
+        # Formule mathématique du Six Sigma : DPMO = (Défauts / (Unités * Opportunités)) * 1 000 000
         dpmo_calculé = (defects / (units * opp)) * 1_000_000
 
-        # 4. Calcul de la Baseline Sigma avec la table de conversion de la loi normale (décalage de 1.5σ inclus)
+        # Algorithme de calcul de la table de conversion de la loi normale inverse (+1.5σ de shift)
         import math
         try:
             if dpmo_calculé <= 0:
-                sigma_level = 6.0  # Perfection ou absence de données de défaut
+                sigma_level = 6.0
             else:
                 taux_defaut = dpmo_calculé / 1_000_000
                 p_val = taux_defaut if taux_defaut < 0.5 else 1 - taux_defaut
                 
-                # Transformation de loi normale inverse (Approximation de Hastings)
                 t = math.sqrt(-2.0 * math.log(p_val))
                 z = t - ((2.515517 + 0.802853 * t + 0.010328 * t * t) / (1.0 + 1.432788 * t + 0.189269 * t * t + 0.001308 * t * t * t))
                 sigma_brut = z if taux_defaut < 0.5 else -z
                 
-                # Ajout du shift de 1.5σ standard en Lean Six Sigma
                 sigma_level = round(sigma_brut + 1.5, 2)
-                sigma_level = max(0.0, min(6.0, sigma_level)) # Encapsulation des limites pratiques
+                sigma_level = max(0.0, min(6.0, sigma_level))
         except Exception:
-            sigma_level = "Évaluation impossible"
+            sigma_level = "Non évaluable"
 
-        # 5. Affichage dynamique des résultats
         with c2:
-            st.markdown("<br><br>", unsafe_allow_html=True)  # Calage de l'alignement visuel
+            st.markdown("<br><br>", unsafe_allow_html=True)
             st.metric("DPMO (Defects Per Million Opportunities)", f"{dpmo_calculé:,.0f}")
             
-            # Application d'un code couleur sur le niveau de performance
             if isinstance(sigma_level, float):
                 if sigma_level >= 4.0:
                     st.metric("Niveau Sigma du Processus", f"🟢 {sigma_level} σ")
                 elif sigma_level >= 2.5:
-                    st.metric("Niveau Sigma du Processus", f"¼ {sigma_level} σ")
+                    st.metric("Niveau Sigma du Processus", f"🟠 {sigma_level} σ")
                 else:
                     st.metric("Niveau Sigma du Processus", f"🔴 {sigma_level} σ")
             else:
