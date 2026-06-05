@@ -2339,80 +2339,71 @@ else:
         # --- TABLEAU DE COLLECTE TERRAIN (ÉCRAN 2) ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
-        # Fonction de rappel pour enregistrer instantanément les modifications dans la session state
-        def _sauvegarde_instantanee_callback():
-            if "dc_master_grid_editor" in st.session_state:
-                changes = st.session_state["dc_master_grid_editor"]
-                # Si l'utilisateur a modifié, ajouté ou supprimé des lignes
-                if changes["edited_rows"] or changes["added_rows"] or changes["deleted_rows"]:
-                    tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-                    
-                    # On applique les modifications manuellement sur notre dataframe de session
-                    for row_idx, data in changes["edited_rows"].items():
-                        for col, val in data.items():
-                            st.session_state.dc_master_data.iloc[row_idx][col] = val
-                        st.session_state.dc_master_data.iloc[row_idx]["Date de modification"] = tz_gmt3
-                        
-                    for new_row in changes["added_rows"]:
-                        new_row["Date de modification"] = tz_gmt3
-                        st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, pd.DataFrame([new_row])], ignore_index=True)
-                        
-                    # Nettoyage et sauvegarde dans le dictionnaire p
-                    st.session_state.dc_master_data = st.session_state.dc_master_data.where(pd.notnull(st.session_state.dc_master_data), None)
-                    p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-
-        # Affichage de l'éditeur connecté au callback
-        st.data_editor(
+        edited_master = st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
             key="dc_master_grid_editor",
-            use_container_width=True,
-            on_change=_sauvegarde_instantanee_callback
+            use_container_width=True
         )
 
+        # Sauvegarde et synchronisation immédiate des modifications manuelles
+        if not edited_master.equals(st.session_state.dc_master_data):
+            tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+            
+            try:
+                df1_clean = edited_master.drop(columns=["Date de modification"], errors="ignore").astype(str)
+                df2_clean = st.session_state.dc_master_data.drop(columns=["Date de modification"], errors="ignore").astype(str)
+                
+                if len(df1_clean) == len(df2_clean):
+                    diff_mask = (df1_clean != df2_clean).any(axis=1)
+                    edited_master.loc[diff_mask, "Date de modification"] = tz_gmt3
+                else:
+                    edited_master.loc[edited_master["Date de modification"].isna(), "Date de modification"] = tz_gmt3
+            except Exception:
+                pass
+                
+            st.session_state.dc_master_data = edited_master.where(pd.notnull(edited_master), None)
+            p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
+            st.rerun()
+
         # =====================================================================
-        # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (DIRECTEMENT SUR LE LIVE STATE)
+        # 🔍 ÉCRAN 3 : QUALITÉ DES DONNÉES (DYNAMIQUEMENT MIS À JOUR)
         # =====================================================================
         st.markdown("---")
-        st.markdown("### 🔍 Écran 3 : Contrôle Qualité des Données")
+        st.markdown("### 🔍 Écran 3 : Qualité des Données")
 
-        num_erreurs = 0
-        num_manquants = 0
-        total_prevu = max(1, int(p["dc_plan"]["taille_prevue"]))
+        # Lecture de la source de vérité en direct
+        df_qualite = st.session_state.dc_master_data
+        total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
+
+        # 1. Calculs des indicateurs de base
+        taille_echantillon_obs = len(df_qualite) if not df_qualite.empty else 0
         
-        if not st.session_state.dc_master_data.empty and len(st.session_state.dc_master_data.columns) > 2:
-            num_manquants = st.session_state.dc_master_data[liste_variables_dynamiques].isna().sum().sum() + (st.session_state.dc_master_data[liste_variables_dynamiques] == "").sum().sum()
-            
-            for var_name in liste_variables_dynamiques:
-                if var_name in st.session_state.dc_master_data.columns:
-                    for val in st.session_state.dc_master_data[var_name].dropna():
-                        val_str = str(val).strip()
-                        if any(k in var_name.lower() for k in ["temps", "délai", "durée", "coût"]):
-                            try:
-                                if float(val_str) < 0:
-                                    num_erreurs += 1
-                            except ValueError:
-                                if val_str and val_str.lower() != "nan":
-                                    num_erreurs += 1
-                                    
-            num_doublons = st.session_state.dc_master_data["ID observation"].duplicated().sum()
-            num_erreurs += num_doublons
-            taux_completude = (len(st.session_state.dc_master_data.dropna(subset=["ID observation"])) / total_prevu) * 100
-        else:
-            taux_completude = 0.0
+        # Taux de complétude théorique : Observé vs Prévu
+        taux_completude_theorique = min(100.0, (taille_echantillon_obs / total_prevu) * 100)
 
-        st.metric("Nombre d'erreurs détectées", num_erreurs)
-        st.metric("Nombre de données manquantes", num_manquants)
-        st.metric("Taux de complétude théorique", f"{taux_completude:.1f} %")
-
-        if num_erreurs > 0:
-            st.error("🔴 Statut : Correction requise. Des anomalies de type, de format ou des doublons d'ID subsistent.")
-        elif num_manquants > 0 or taux_completude < 80:
-            st.warning("🟠 Statut : Attention. Base saine mais volume incomplet par rapport à l'échantillon cible.")
-        elif st.session_state.dc_master_data.empty:
-            st.info("🔵 En attente d'injection de données terrain.")
+        # Calcul des données manquantes (cellules vides ou None) sur les variables critiques
+        if not df_qualite.empty and liste_variables_dynamiques:
+            cols_calcul = [c for c in liste_variables_dynamiques if c in df_qualite.columns]
+            donnees_manquantes = df_qualite[cols_calcul].isna().sum().sum() + (df_qualite[cols_calcul] == "").sum().sum()
         else:
-            st.success("🟢 Statut : Données conformes. Prêt pour l'analyse statistique.")
+            donnees_manquantes = 0
+
+        # Calcul du nombre d'erreurs détectées (Statuts types NON OK / KO)
+        erreurs_detectees = 0
+        if not df_qualite.empty:
+            for col in df_qualite.columns:
+                if col in liste_variables_dynamiques:
+                    erreurs_detectees += df_qualite[col].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1"]).sum()
+
+        # 2. Affichage des KPIs de l'Écran 3
+        eq1, eq2, eq3, eq4 = st.columns(4)
+        eq1.metric("Taille échantillon (Obs.)", f"{taille_echantillon_obs} lignes")
+        eq2.metric("Erreurs détectées", f"{erreurs_detectees} OK/KO")
+        eq3.metric("Données manquantes", f"{donnees_manquantes} cellule(s)")
+        eq4.metric("Complétude Théorique", f"{taux_completude_theorique:.1f} %")
+        
+        st.caption("📈 *Complétude théorique basée sur l'objectif d'échantillonnage défini à l'Écran 1.*")
 
         # =====================================================================
         # 🔄 SÉCURISATION DU RECHARGEMENT DE PAGE (ANTI-RESET F5)
@@ -2427,28 +2418,16 @@ else:
         total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
 
         # =====================================================================
-        # 🔄 REPRISE STRICTE DU FLUX DIRECT (ÉCRAN 2 -> ÉCRAN 4)
-        # =====================================================================
-        # Priorité absolue à 'edited_master' pour capter le tableau actuel en temps réel
-        if 'edited_master' in locals():
-            df_active = edited_master
-        else:
-            df_active = st.session_state.dc_master_data
-
-        # Récupération de la taille prévue
-        total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
-
-        # =====================================================================
-        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (CONNECTÉ À LA SOURCE DE VÉRITÉ)
+        # 📈 ÉCRAN 4 : SUIVI DE LA COLLECTE (DYNAMIQUE & LIÉ À L'IMPORT EXCEL)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📈 Écran 4 : Suivi de la Collecte")
 
-        # Source unique et ultra-synchrone
+        # Connexion directe à la mémoire de la session mis à jour par l'Écran 2 et l'Import
         df_suivi = st.session_state.dc_master_data
         total_prevu = max(1, int(p["dc_plan"].get("taille_prevue", 100)))
 
-        # Calcul basé strictement sur la session mise à jour par le callback
+        # Comptage exact des lignes d'observations uniques actuellement chargées
         obs_collectees = len(df_suivi["ID observation"].dropna().unique()) if not df_suivi.empty else 0
         restant = max(0, total_prevu - obs_collectees)
         avancement = min(100.0, (obs_collectees / total_prevu) * 100)
@@ -2458,7 +2437,7 @@ else:
         e4_c2.metric("Restant à collecter", restant)
         e4_c3.metric("Taux d'avancement", f"{avancement:.1f} %")
 
-        # Graphique dynamique synchronisé
+        # Graphique à barres synchronisé instantanément
         progress_df = pd.DataFrame({"Statut": ["Collecté", "Restant"], "Valeur": [obs_collectees, restant]})
         st.bar_chart(progress_df.set_index("Statut"))
 
