@@ -2183,7 +2183,7 @@ else:
                 required_cols = ["ID observation", "Date", "Variable mesurée", "Valeur", "Unité de mesure", "Commentaire"]
                 for col in required_cols:
                     if col not in imported_df.columns:
-                        imported_df[col] = np.nan if col != "Commentaire" else ""
+                        imported_df[col] = None if col != "Commentaire" else ""
                 
                 imported_df = imported_df[required_cols]
                 st.session_state.dc_master_data = pd.concat(
@@ -2213,7 +2213,10 @@ else:
 
             if st.form_submit_button("＋ Ajouter la ligne"):
                 if v_obs and v_val:
-                    tz_gmt3 = pd.Timestamp.now(tz="UTC").tz_convert("Etc/GMT-3").strftime("%Y-%m-%d %H:%M:%S")
+                    # Configuration explicite et robuste du fuseau horaire GMT+3
+                    from datetime import datetime, timezone, timedelta
+                    tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                    
                     new_row = {
                         "ID observation": v_obs,
                         "Date": tz_gmt3,
@@ -2345,7 +2348,7 @@ else:
                             ]
                         }
                         st.table(pd.DataFrame(stats_data))
-                        st.bar_chart(np.histogram(numeric_series, bins=10)[0])
+                        st.bar_chart(pd.DataFrame(numeric_series))
                     else:
                         st.error("Erreur d'analyse : Les données de cette variable continue ne sont pas numériques.")
                 else:
@@ -2401,14 +2404,9 @@ else:
         else:
             st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
 
-        # 6. Baseline performance
+        # 6. Measure process capability
         st.divider()
-        st.subheader("6. Baseline performance")
-        st.write("*(En attente d'explications supplémentaires)*")
-
-        # 7. Measure process capability
-        st.divider()
-        st.subheader("7. Measure process capability")
+        st.subheader("6. Measure process capability")
         c1, c2 = st.columns(2)
         with c1:
             defects = st.number_input("Défauts", min_value=0, value=0)
