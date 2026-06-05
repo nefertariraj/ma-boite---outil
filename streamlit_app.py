@@ -2200,8 +2200,6 @@ else:
        # =====================================================================
         # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF AVANCÉ
         # =====================================================================
-        import re  # <-- L'import manquant est ici maintenant !
-        
         st.markdown("---")
         st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
 
@@ -2213,42 +2211,35 @@ else:
                 raw_imported_df = pd.read_excel(uploaded_file)
                 st.info("🧠 *Moteur IA : Analyse de proximité linguistique et injection des données en cours...*")
                 
-                # Fonctions internes de l'IA pour nettoyer et comparer les textes
                 def _structures_clean(text):
-                    """Normalise le texte pour gommer les différences de syntaxe basiques"""
                     t = str(text).lower().strip()
-                    t = re.sub(r'[_\-\s\./\\]+', ' ', t) # Remplace les underscores, slashs par des espaces
+                    t = re.sub(r'[_\-\s\./\\]+', ' ', t)
                     t = "".join(c for c in t if c.isalnum() or c == ' ')
                     return t
 
                 def _calculer_proximite(txt1, txt2):
-                    """Calcule un score d'intersection sémantique entre deux en-têtes"""
                     w1 = set(_structures_clean(txt1).split())
                     w2 = set(_structures_clean(txt2).split())
                     if not w1 or not w2:
                         return 0.0
                     inter = w1.intersection(w2)
-                    # Union / Intersection + Bonus si l'un est inclus dans l'autre
                     score = len(inter) / max(len(w1), len(w2))
                     if _structures_clean(txt1) in _structures_clean(txt2) or _structures_clean(txt2) in _structures_clean(txt1):
                         score += 0.3
                     return score
 
-                # Reconstruction du dataframe calqué à 100% sur la cible officielle
                 cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
                 aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
                 colonnes_excel = list(raw_imported_df.columns)
 
-                # 1. Traitement de la clé unique (ID Observation)
+                # 1. Traitement de l'ID Observation
                 mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°"]
                 id_col_source = None
                 
-                # Test direct d'abord
                 for col in colonnes_excel:
                     if any(k == str(col).lower().strip() for k in mots_cles_id):
                         id_col_source = col
                         break
-                # Test de proximité si non trouvé
                 if not id_col_source:
                     for col in colonnes_excel:
                         if any(k in str(col).lower() for k in mots_cles_id):
@@ -2262,18 +2253,16 @@ else:
                     aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
                     st.caption("ℹ️ *Aucun ID détecté dans votre fichier. Génération automatique d'index de secours.*")
 
-                # 2. Alignement des Variables Critiques Dynamiques via Logique Floue
+                # 2. Alignement des Variables Critiques
                 for var_critique in liste_variables_dynamiques:
                     meilleur_match = None
                     meilleur_score = 0.0
-                    
                     for col in colonnes_excel:
                         score = _calculer_proximite(var_critique, col)
                         if score > meilleur_score:
                             meilleur_score = score
                             meilleur_match = col
                     
-                    # Seuil d'acceptation de correspondance IA (35% de ressemblance structurelle minimum)
                     if meilleur_match and meilleur_score >= 0.35:
                         aligned_df[var_critique] = raw_imported_df[meilleur_match]
                         st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}** (Confiance: {int(min(meilleur_score, 1.0)*100)}%)")
@@ -2281,11 +2270,9 @@ else:
                         aligned_df[var_critique] = None
                         st.caption(f"❌ **Non mappé** : Aucun équivalent trouvé pour **{var_critique}** (Initialisé vide)")
 
-                # 3. Insertion de la date système au fuseau de l'équipe (GMT+3)
+                # 3. Insertion de la date système (GMT+3)
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                 aligned_df["Date de modification"] = tz_gmt3
-
-                # Nettoyage des objets NaN/None natifs de Pandas pour l'affichage propre dans Streamlit
                 aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
 
                 # --- DUPLICATION / INTELLIGENT MERGE ---
@@ -2336,7 +2323,6 @@ else:
             use_container_width=True
         )
 
-        # Sauvegarde automatique lors des modifications directes sur la grille
         if not edited_master.equals(st.session_state.dc_master_data):
             tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
             diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
@@ -2348,23 +2334,21 @@ else:
             st.rerun()
 
         # =====================================================================
-        # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (CALCULS SUR COLONNES INTERNES)
+        # 🔍 ÉCRAN 3 : CONTRÔLE QUALITÉ DES DONNÉES (DIRECTEMENT SUR LE LIVE STATE)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 🔍 Écran 3 : Contrôle Qualité des Données")
 
-        df_cq = st.session_state.dc_master_data.copy()
         num_erreurs = 0
         num_manquants = 0
         total_prevu = max(1, int(p["dc_plan"]["taille_prevue"]))
         
-        if not df_cq.empty and len(df_cq.columns) > 2:
-            num_manquants = df_cq[liste_variables_dynamiques].isna().sum().sum() + (df_cq[liste_variables_dynamiques] == "").sum().sum()
+        if not st.session_state.dc_master_data.empty and len(st.session_state.dc_master_data.columns) > 2:
+            num_manquants = st.session_state.dc_master_data[liste_variables_dynamiques].isna().sum().sum() + (st.session_state.dc_master_data[liste_variables_dynamiques] == "").sum().sum()
             
-            # Contrôles de cohérence basiques basés sur le nom ou type détecté
             for var_name in liste_variables_dynamiques:
-                if var_name in df_cq.columns:
-                    for val in df_cq[var_name].dropna():
+                if var_name in st.session_state.dc_master_data.columns:
+                    for val in st.session_state.dc_master_data[var_name].dropna():
                         val_str = str(val).strip()
                         if any(k in var_name.lower() for k in ["temps", "délai", "durée", "coût"]):
                             try:
@@ -2374,9 +2358,9 @@ else:
                                 if val_str and val_str.lower() != "nan":
                                     num_erreurs += 1
                                     
-            num_doublons = df_cq["ID observation"].duplicated().sum()
+            num_doublons = st.session_state.dc_master_data["ID observation"].duplicated().sum()
             num_erreurs += num_doublons
-            taux_completude = (len(df_cq.dropna(subset=["ID observation"])) / total_prevu) * 100
+            taux_completude = (len(st.session_state.dc_master_data.dropna(subset=["ID observation"])) / total_prevu) * 100
         else:
             taux_completude = 0.0
 
@@ -2388,7 +2372,7 @@ else:
             st.error("🔴 Statut : Correction requise. Des anomalies de type, de format ou des doublons d'ID subsistent.")
         elif num_manquants > 0 or taux_completude < 80:
             st.warning("🟠 Statut : Attention. Base saine mais volume incomplet par rapport à l'échantillon cible.")
-        elif len(df_cq) == 0:
+        elif st.session_state.dc_master_data.empty:
             st.info("🔵 En attente d'injection de données terrain.")
         else:
             st.success("🟢 Statut : Données conformes. Prêt pour l'analyse statistique.")
