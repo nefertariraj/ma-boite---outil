@@ -2119,6 +2119,7 @@ else:
         # 5. DATA COLLECTION (WITH SENSITIVE AI ALIGNMENT & FILTERED E1)
         # =====================================================================
         from datetime import datetime, timezone, timedelta
+        import io  # <-- Obligatoire pour empêcher le crash FileNotFoundError de Pandas
 
         # --- RECUPÉRATION DYNAMIQUE DES VARIABLES VALIDÉES DANS LE MSA ---
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
@@ -2140,13 +2141,14 @@ else:
         if not liste_variables_dynamiques:
             liste_variables_dynamiques = ["Temps de traitement", "Statut conformité"]
 
-        # ÉTAPE 0 : INITIALISATION DE LA PERSISTANCE
+        # ÉTAPE 0 : INITIALISATION DE LA PERSISTANCE (CORRIGÉE SANS INTERPRÉTATION DE FICHIER)
         if "dc_plan" not in p:
             p["dc_plan"] = {"taille_prevue": 100, "date_debut": "2026-06-01", "date_fin_est": "2026-06-15"}
 
         if "dc_master_data" not in st.session_state:
             if "dc_saved_df_json" in p and p["dc_saved_df_json"]:
-                st.session_state.dc_master_data = pd.read_json(p["dc_saved_df_json"])
+                # io.StringIO force Pandas à lire la chaîne texte stockée directement, évitant le plantage
+                st.session_state.dc_master_data = pd.read_json(io.StringIO(p["dc_saved_df_json"]))
             else:
                 cols = ["ID observation", "Date de modification"] + liste_variables_dynamiques
                 st.session_state.dc_master_data = pd.DataFrame(columns=cols)
@@ -2182,7 +2184,6 @@ else:
         colonnes_affichage_e1 = ["Variable Critique (liée au Y)", "Nature de la Donnée"]
         
         if not df_msa_source.empty:
-            # On harmonise si la colonne a un nom légèrement différent dans l'état MSA
             if "Type de Donnée" in df_msa_source.columns and "Nature de la Donnée" not in df_msa_source.columns:
                 df_msa_source = df_msa_source.rename(columns={"Type de Donnée": "Nature de la Donnée"})
                 
