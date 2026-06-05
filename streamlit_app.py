@@ -2198,7 +2198,7 @@ else:
         st.caption("ℹ️ Cet écran a un rôle uniquement informatif. Utilisez l'Écran 2 pour insérer vos données terrain.")
 
         # =====================================================================
-        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF STRICT (IA)
+        # 📝 ÉCRAN 2 : SAISIE ET IMPORTATION PAR ALIGNEMENT COGNITIF AVANCÉ
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📝 Écran 2 : Saisie des Données (Tableaux Dynamiques)")
@@ -2208,86 +2208,108 @@ else:
 
         if uploaded_file:
             try:
-                # Lecture brute du fichier importé
                 raw_imported_df = pd.read_excel(uploaded_file)
-                st.info("🧠 *Analyse sémantique et reconstruction structurelle par IA...*")
+                st.info("🧠 *Moteur IA : Analyse de proximité linguistique et injection des données en cours...*")
                 
-                # Création d'un DataFrame temporaire vierge calqué EXACTEMENT sur la structure attendue
+                # Fonctions internes de l'IA pour nettoyer et comparer les textes
+                def _structures_clean(text):
+                    """Normalise le texte pour gommer les différences de syntaxe basiques"""
+                    t = str(text).lower().strip()
+                    t = re.sub(r'[_\-\s\./\\]+', ' ', t) # Remplace les underscores, slashs par des espaces
+                    t = "".join(c for c in t if c.isalnum() or c == ' ')
+                    return t
+
+                def _calculer_proximite(txt1, txt2):
+                    """Calcule un score d'intersection sémantique entre deux en-têtes"""
+                    w1 = set(_structures_clean(txt1).split())
+                    w2 = set(_structures_clean(txt2).split())
+                    if not w1 or not w2:
+                        return 0.0
+                    inter = w1.intersection(w2)
+                    # Union / Intersection + Bonus si l'un est inclus dans l'autre
+                    score = len(inter) / max(len(w1), len(w2))
+                    if _structures_clean(txt1) in _structures_clean(txt2) or _structures_clean(txt2) in _structures_clean(txt1):
+                        score += 0.3
+                    return score
+
+                # Reconstruction du dataframe calqué à 100% sur la cible officielle
                 cols_finales = ["ID observation", "Date de modification"] + liste_variables_dynamiques
                 aligned_df = pd.DataFrame(columns=cols_finales, index=range(len(raw_imported_df)))
-                
-                # --- LOGIQUE D'ANALYSE COGNITIVE & TRANSFERT DE DONNÉES ---
                 colonnes_excel = list(raw_imported_df.columns)
-                
-                # 1. Alignement de l'ID Observation
+
+                # 1. Traitement de la clé unique (ID Observation)
                 mots_cles_id = ["id", "observation", "code", "num", "index", "identifiant", "key", "n°"]
                 id_col_source = None
+                
+                # Test direct d'abord
                 for col in colonnes_excel:
-                    if any(k in str(col).lower() for k in mots_cles_id):
+                    if any(k == str(col).lower().strip() for k in mots_cles_id):
                         id_col_source = col
                         break
-                
+                # Test de proximité si non trouvé
+                if not id_col_source:
+                    for col in colonnes_excel:
+                        if any(k in str(col).lower() for k in mots_cles_id):
+                            id_col_source = col
+                            break
+
                 if id_col_source:
                     aligned_df["ID observation"] = raw_imported_df[id_col_source].astype(str)
-                    st.caption(f"💡 IA : Correspondance d'identité établie : `{id_col_source}` $\rightarrow$ **ID observation**")
+                    st.caption(f"🎯 **Correspondance ID** : `{id_col_source}` associé à **ID observation**")
                 else:
                     aligned_df["ID observation"] = [f"Obs_{i+1}" for i in range(len(raw_imported_df))]
-                    st.caption("💡 IA : Aucun identifiant détecté. Génération automatique d'une séquence d'**ID observation**.")
+                    st.caption("ℹ️ *Aucun ID détecté dans votre fichier. Génération automatique d'index de secours.*")
 
-                # 2. Alignement et transfert dynamique des variables critiques
+                # 2. Alignement des Variables Critiques Dynamiques via Logique Floue
                 for var_critique in liste_variables_dynamiques:
-                    var_clean = str(var_critique).lower().strip()
-                    match_col_source = None
+                    meilleur_match = None
+                    meilleur_score = 0.0
                     
                     for col in colonnes_excel:
-                        col_clean = str(col).lower().strip()
-                        # Match si les chaînes se croisent ou partagent des radicaux sémantiques significatifs
-                        if col_clean in var_clean or var_clean in col_clean or any(word in var_clean for word in col_clean.split() if len(word) > 3):
-                            match_col_source = col
-                            break
+                        score = _calculer_proximite(var_critique, col)
+                        if score > meilleur_score:
+                            meilleur_score = score
+                            meilleur_match = col
                     
-                    if match_col_source:
-                        # On extrait la donnée brute et on l'affecte directement à la bonne colonne
-                        aligned_df[var_critique] = raw_imported_df[match_col_source]
-                        st.caption(f"💡 IA : Alignement de flux validé : `{match_col_source}` $\rightarrow$ **{var_critique}**")
+                    # Seuil d'acceptation de correspondance IA (35% de ressemblance structurelle minimum)
+                    if meilleur_match and meilleur_score >= 0.35:
+                        aligned_df[var_critique] = raw_imported_df[meilleur_match]
+                        st.caption(f"✅ **Alignement IA** : `{meilleur_match}` $\rightarrow$ **{var_critique}** (Confiance: {int(min(meilleur_score, 1.0)*100)}%)")
                     else:
-                        # Si l'Excel ne contient rien de proche, on force des cases vides exploitables (pas de chaîne "None")
                         aligned_df[var_critique] = None
-                        st.caption(f"⚠️ IA : Colonne manquante dans l'import $\rightarrow$ **{var_critique}** initialisée vide pour saisie.")
+                        st.caption(f"❌ **Non mappé** : Aucun équivalent trouvé pour **{var_critique}** (Initialisé vide)")
 
-                # 3. Horodatage système obligatoire en GMT+3
+                # 3. Insertion de la date système au fuseau de l'équipe (GMT+3)
                 tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
                 aligned_df["Date de modification"] = tz_gmt3
 
-                # Nettoyage final des valeurs de type NaN / None parasites pour Streamlit
+                # Nettoyage des objets NaN/None natifs de Pandas pour l'affichage propre dans Streamlit
                 aligned_df = aligned_df.where(pd.notnull(aligned_df), None)
 
-                # --- FUSION DES DONNÉES SANS DOUBLONS DANS LA TABLE MAÎTRESSE ---
+                # --- DUPLICATION / INTELLIGENT MERGE ---
                 if not st.session_state.dc_master_data.empty:
                     existing_ids = set(st.session_state.dc_master_data["ID observation"].dropna().astype(str))
                     imported_ids = set(aligned_df["ID observation"].dropna().astype(str))
                     conflits_ids = existing_ids.intersection(imported_ids)
                 else:
                     conflits_ids = set()
-                
+
                 if conflits_ids:
-                    st.warning(f"⚠️ **Conflit d'indexation** : {len(conflits_ids)} ID(s) importé(s) écraseraient des données existantes.")
+                    st.warning(f"⚠️ **Données existantes** : {len(conflits_ids)} ID(s) détecté(s) en doublon.")
                     c_b1, c_b2 = st.columns(2)
                     
                     if c_b1.button("🔄 Écraser & Mettre à jour"):
                         combined = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
-                        # On garde la ligne importée (la plus récente) en cas de doublon d'ID
                         st.session_state.dc_master_data = combined.drop_duplicates(subset=["ID observation"], keep="last")
                         p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success("✅ Base mise à jour avec les données importées.")
+                        st.success("✅ Table maîtresse mise à jour avec succès.")
                         st.rerun()
                         
                     if c_b2.button("🛑 Conserver les données existantes"):
                         combined = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
-                        # On garde la ligne déjà présente en base en cas de doublon
                         st.session_state.dc_master_data = combined.drop_duplicates(subset=["ID observation"], keep="first")
                         p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                        st.success("✅ Nouvelles lignes insérées sans altération de l'historique.")
+                        st.success("✅ Lignes ajoutées sans modifier l'existant.")
                         st.rerun()
                 else:
                     if st.session_state.dc_master_data.empty:
@@ -2296,16 +2318,15 @@ else:
                         st.session_state.dc_master_data = pd.concat([st.session_state.dc_master_data, aligned_df], ignore_index=True)
                     
                     p["dc_saved_df_json"] = st.session_state.dc_master_data.to_json()
-                    st.success("🚀 Alignement structurel effectué. Les données sont injectées !")
+                    st.success("🚀 Importation et alignement réussis !")
                     st.rerun()
-                    
+
             except Exception as e:
-                st.error(f"❌ Échec de l'analyse cognitive du fichier : {e}")
+                st.error(f"❌ Erreur critique lors de l'indexation IA : {e}")
 
         # --- TABLEAU DE COLLECTE TERRAIN ---
         st.markdown("#### 🛠️ Tableau de Collecte Actuel")
         
-        # Affichage et édition directe dans la grille
         edited_master = st.data_editor(
             st.session_state.dc_master_data,
             num_rows="dynamic",
@@ -2313,7 +2334,7 @@ else:
             use_container_width=True
         )
 
-        # Sauvegarde automatique instantanée en cas de modification manuelle
+        # Sauvegarde automatique lors des modifications directes sur la grille
         if not edited_master.equals(st.session_state.dc_master_data):
             tz_gmt3 = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
             diff_mask = (edited_master.drop(columns=["Date de modification"], errors="ignore") != 
