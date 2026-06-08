@@ -256,9 +256,12 @@ with st.sidebar:
                     {"Section": "DEFINE", "Paramètre": "Bénéfices quantifiés", "Valeur": p_exp.get('benefices_saisie', '')}
                 ]).to_excel(writer, sheet_name='Charte Projet', index=False)
                 
-                # DEFINE : SIPOC complet
+                # DEFINE : SIPOC complet (Correction de la ligne 261)
                 sipoc_list = p_exp.get('sipoc_data', [])
-                pd.DataFrame(sipoc_list if sipoc_list else columns=["Supplier", "Input", "Process", "Output", "Customer"]).to_excel(writer, sheet_name='SIPOC', index=False)
+                if sipoc_list:
+                    pd.DataFrame(sipoc_list).to_excel(writer, sheet_name='SIPOC', index=False)
+                else:
+                    pd.DataFrame(columns=["Supplier", "Input", "Process", "Output", "Customer"]).to_excel(writer, sheet_name='SIPOC', index=False)
                 
                 # DEFINE : Matrice des compétences / Équipe
                 team_list = p_exp.get('team_data', [])
@@ -286,8 +289,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur Excel : {e}")
 
-
-        # --- 2. ENREGISTREMENT FORMAT POWERPOINT (Avec inclusion des vraies données et des figures) ---
+        # --- 2. ENREGISTREMENT FORMAT POWERPOINT (Avec inclusion des données et figures) ---
         try:
             from pptx import Presentation
             from pptx.util import Inches, Pt
@@ -329,19 +331,15 @@ with st.sidebar:
                     table.cell(r_idx+1, 4).text = str(row_data.get('Customer', row_data.get('C', '')))
 
             # Slide 4 : Rendu du Graphique SPC (Measure)
-            # Capture dynamique de la figure active générée dans l'état de l'application
             fig_spc = st.session_state.get("current_spc_figure")
             if fig_spc is not None:
                 slide = prs.slides.add_slide(prs.slide_layouts[5])
                 slide.shapes.title.text = "Phase MEASURE : Stabilité Statistique du Processus (T0)"
                 
-                # Conversion de la figure active (Plotly ou Matplotlib) en image binaire pour l'insertion
                 img_buf = io.BytesIO()
                 try:
-                    # Si c'est du Plotly (standard dans ton app)
                     fig_spc.write_image(img_buf, format="png", width=1000, height=600, engine="kalido")
                 except:
-                    # Alternative si c'est du Matplotlib
                     fig_spc.savefig(img_buf, format="png", bbox_inches='tight')
                 
                 img_buf.seek(0)
@@ -360,8 +358,7 @@ with st.sidebar:
         except Exception as e:
             st.info("Module PowerPoint prêt pour l'exportation des métadonnées graphiques.")
 
-
-        # --- 3. ENREGISTREMENT FORMAT PDF (Résolution définitive de l'erreur de format via ReportLab) ---
+        # --- 3. ENREGISTREMENT FORMAT PDF (ReportLab) ---
         try:
             from reportlab.lib.pagesizes import letter
             from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -369,7 +366,6 @@ with st.sidebar:
             from reportlab.lib import colors
 
             buffer_pdf = io.BytesIO()
-            # Initialisation d'un vrai document binaire PDF conforme
             doc = SimpleDocTemplate(buffer_pdf, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
             story = []
             
@@ -378,7 +374,6 @@ with st.sidebar:
             style_h2 = ParagraphStyle('H2Style', parent=styles['Heading2'], fontSize=14, leading=18, textColor=colors.HexColor('#0D9488'), spaceBefore=12, spaceAfter=8)
             style_corps = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6)
             
-            # Contenu du document
             story.append(Paragraph(f"RAPPORT FORMEL D'AUDIT LEAN SIX SIGMA", style_titre))
             story.append(Paragraph(f"<b>Projet :</b> {project_name.upper()} | <b>Statut :</b> Phase {p_exp.get('status', 'Define')}", style_corps))
             story.append(Paragraph(f"<b>Date d'extraction :</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", style_corps))
@@ -390,7 +385,6 @@ with st.sidebar:
             story.append(Paragraph(f"<b>Gains financiers / Réduction COPQ :</b> {p_exp.get('benefices_saisie', 'Non quantifiés')}", style_corps))
             story.append(Spacer(1, 10))
             
-            # Insertion du tableau SIPOC si existant
             if p_exp.get('sipoc_data'):
                 story.append(Paragraph("Alignement du Flux de Processus Macro (SIPOC) :", style_corps))
                 data_table = [["S", "I", "P", "O", "C"]]
@@ -420,7 +414,6 @@ with st.sidebar:
             story.append(Paragraph("Les variables quantitatives issues du Plan de Collecte de Données (DCP) alimentent en continu la ligne de référence T0.", style_corps))
             story.append(Paragraph("Les limites de contrôle (UCL, LCL) et la ligne centrale sont figées conformément aux standards de la Westgard et de la MSP.", style_corps))
             
-            # Construction finale du document
             doc.build(story)
             
             st.download_button(
