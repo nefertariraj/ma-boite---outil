@@ -2596,7 +2596,7 @@ else:
                     df_spc_master["Date_Parsed"] = pd.NaT
 
                 # Boucle de génération automatique : Une carte par variable quantitative
-                for var_quant] in variables_quantitatives:
+                for var_quant in variables_quantitatives:
                     st.markdown(f"---")
                     st.subheader(f"📈 Carte de contrôle I-MR : {var_quant}")
 
@@ -2663,6 +2663,7 @@ else:
 
                     # Règle 3 : Tendances prolongées (6 points consécutifs qui montent ou qui descendent)
                     diffs = df_grouped["Valeur"].diff()
+                    import numpy as np
                     signes = np.sign(diffs.fillna(0))
                     # Identification des changements de direction
                     df_grouped["Tendance_Id"] = (signes != signes.shift()).cumsum()
@@ -2673,7 +2674,6 @@ else:
                     df_grouped["Couleur_Point"] = df_grouped["Instable"].map({True: "#FF4B4B", False: "#0068C9"})
 
                     # 5. Affichage Graphique de la Carte Individuelle (I) via st.line_chart combiné
-                    # Pour afficher la ligne centrale et les limites proprement, on prépare un DataFrame dédié
                     chart_cols = ["Valeur", "CL - Moyenne", "UCL", "LCL"]
                     df_chart = df_grouped.set_index("Axe_X")[chart_cols]
                     
@@ -2684,14 +2684,13 @@ else:
                     pct_hors_controle = (points_hors_controle / len(df_grouped)) * 100
 
                     if points_hors_controle > 0:
-                        st.error(f"🔴 Attention : {points_hors_controle} point(s) ou série(s) d'instabilité détecté(s) ({pct_hors_controle:.1f} % des données). Le processus présente des causes spéciales de variation.")
+                        st.error(f"🔴 Attention : {points_hors_controle} point(s) ou série(s) d'instabilité détecté(s) ({pct_hors_controle:.1f} % des données). Le processus presents des causes spéciales de variation.")
                     else:
                         st.success("🟢 Processus statistiquement stable. Les variations observées relèvent uniquement de causes communes.")
 
                     # 6. Résumé Statistique de Référence T0
                     st.markdown("**📋 Résumé Statistique de Référence (Situation T0)**")
                     
-                    # Formatage des métriques pour affichage propre en tableau compact
                     ecart_type = df_grouped["Valeur"].std() if len(df_grouped) > 1 else 0.00
                     
                     stats_t0 = {
