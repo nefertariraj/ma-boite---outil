@@ -335,61 +335,61 @@ with st.sidebar:
         try:
             buffer_pdf = io.BytesIO()
             structure_texte_pdf = f"""========================================================================
-            📋 RAPPORT FORMEL D'AUDIT DE PROJET LEAN SIX SIGMA (SITUATION T0)
-            ========================================================================
-            Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}
-            Nom du Projet : {project_name.upper()}
-            Date d'initialisation historique : {p_exp.get('date_creation', '')}
-            Phase d'avancement méthodologique : Phase {p_exp.get('status', 'Define')}
+📋 RAPPORT FORMEL D'AUDIT DE PROJET LEAN SIX SIGMA (SITUATION T0)
+========================================================================
+Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}
+Nom du Projet : {project_name.upper()}
+Date d'initialisation historique : {p_exp.get('date_creation', '')}
+Phase d'avancement méthodologique : Phase {p_exp.get('status', 'Define')}
 
-            ------------------------------------------------------------------------
-            TABLE DES MATIÈRES DU LIVRABLE
-            ------------------------------------------------------------------------
-            1. Phase DEFINE (Charte Projet, VOC, CTQ cible, Flux SIPOC)
-            2. Phase MEASURE (Data Collection Plan, Base de Données, Baseline SPC T0)
-            3. Phase ANALYZE (Spécifications standards de variabilité)
-            4. Phase IMPROVE (Matrice de déploiement des gains)
-            5. Phase CONTROL (Standardisation & Suivi des KPI)
+------------------------------------------------------------------------
+TABLE DES MATIÈRES DU LIVRABLE
+------------------------------------------------------------------------
+1. Phase DEFINE (Charte Projet, VOC, CTQ cible, Flux SIPOC)
+2. Phase MEASURE (Data Collection Plan, Base de Données, Baseline SPC T0)
+3. Phase ANALYZE (Spécifications standards de variabilité)
+4. Phase IMPROVE (Matrice de déploiement des gains)
+5. Phase CONTROL (Standardisation & Suivi des KPI)
 
-            ========================================================================
-            1. PHASE DEFINE - CHARTE ET CADRAGE STRATÉGIQUE
-            ========================================================================
-            [PROBLEM STATEMENT / ÉNONCÉ DU PROBLÈME]
-            {p_exp.get('problem', 'Aucun énoncé saisi dans la charte de projet.')}
+========================================================================
+1. PHASE DEFINE - CHARTE ET CADRAGE STRATÉGIQUE
+========================================================================
+[PROBLEM STATEMENT / ÉNONCÉ DU PROBLÈME]
+{p_exp.get('problem', 'Aucun énoncé saisi dans la charte de projet.')}
 
-            [CRITICAL TO QUALITY / STRATÉGIE CLIENT]
-            - Indicateur CTQ retenu : {p_exp.get('selected_ctq', 'Non défini')}
-            - Alignement sur la réduction des COPQ et bénéfices métiers : 
-              {p_exp.get('benefices_saisie', 'Non listés')}
+[CRITICAL TO QUALITY / STRATÉGIE CLIENT]
+- Indicateur CTQ retenu : {p_exp.get('selected_ctq', 'Non défini')}
+- Alignement sur la réduction des COPQ et bénéfices métiers : 
+  {p_exp.get('benefices_saisie', 'Non listés')}
 
-            [SIPOC ET GESTION DES FLUX]
-            Tableau de processus synchronisé avec succès dans la base master du projet.
+[SIPOC ET GESTION DES FLUX]
+Tableau de processus synchronisé avec succès dans la base master du projet.
 
-            ========================================================================
-            2. PHASE MEASURE - CARTES DE CONTRÔLE ET STABILITÉ T0
-            ========================================================================
-            [STATUT DU DATA COLLECTION PLAN]
-            Les variables quantitatives du plan de collecte alimentent automatiquement
-            la situation de référence T0 (Carte I-MR).
+========================================================================
+2. PHASE MEASURE - CARTES DE CONTRÔLE ET STABILITÉ T0
+========================================================================
+[STATUT DU DATA COLLECTION PLAN]
+Les variables quantitatives du plan de collecte alimentent automatiquement
+la situation de référence T0 (Carte I-MR).
 
-            [STABILITÉ DU PROCESSUS AVANT AMÉLIORATION]
-            Calcul automatique de la Ligne Centrale (CL), des limites UCL et LCL.
-            Toute modification du tableau engendre la réévaluation immédiate des signaux 
-            d'instabilité sans intervention humaine.
+[STABILITÉ DU PROCESSUS AVANT AMÉLIORATION]
+Calcul automatique de la Ligne Centrale (CL), des limites UCL et LCL.
+Toute modification du tableau engendre la réévaluation immédiate des signaux 
+d'instabilité sans intervention humaine.
 
-            ========================================================================
-            SUPPORT DE CERTIFICATION - LEAN SIX SIGMA COPIE CONFORME
-            ========================================================================
-            """
-                        buffer_pdf.write(structure_texte_pdf.encode('utf-8'))
-                        st.download_button(
-                            label="📄 Enregistrer sous PDF (.pdf)",
-                            data=buffer_pdf.getvalue(),
-                            file_name=f"Rapport_LSS_{project_name}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True,
-                            key="sidebar_save_pdf_btn"
-                        )
+========================================================================
+SUPPORT DE CERTIFICATION - LEAN SIX SIGMA COPIE CONFORME
+========================================================================
+"""
+            buffer_pdf.write(structure_texte_pdf.encode('utf-8'))
+            st.download_button(
+                label="📄 Enregistrer sous PDF (.pdf)",
+                data=buffer_pdf.getvalue(),
+                file_name=f"Rapport_LSS_{project_name}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+                key="sidebar_save_pdf_btn"
+            )
         except Exception as e:
             st.error(f"Erreur lors de la génération du rapport PDF : {e}")
 
