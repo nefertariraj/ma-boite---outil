@@ -2551,7 +2551,174 @@ else:
                     st.metric("Niveau Sigma du Processus", f"🔴 {sigma_level} σ")
             else:
                 st.metric("Niveau Sigma du Processus", sigma_level)
+        # =====================================================================
+        # 📊 PARTIE 7 : SITUATION T0 (CARTE DE CONTRÔLE AVANT AMÉLIORATION)
+        # =====================================================================
+        st.markdown("---")
+        st.markdown("### 📊 Partie 7 : Situation T0 (Cartes de Contrôle SPC)")
+        st.caption("🔍 *Visualisation de la stabilité et performance historique de référence avant actions d'amélioration.*")
 
+        # Utilisation de la source unique et synchronisée de l'Écran 2
+        df_t0 = st.session_state.dc_master_data
+
+        if df_t0.empty:
+            st.info("💡 Alimentez la base de données à l'Écran 2 pour générer automatiquement les cartes de contrôle T0.")
+        else:
+            # 1. Filtrage strict des variables quantitatives uniquement
+            variables_quantitatives = []
+            for var in liste_variables_dynamiques:
+                if var in df_t0.columns:
+                    # On vérifie si la colonne contient des données numériques convertibles
+                    dropped_na = df_t0[var].dropna()
+                    if not dropped_na.empty:
+                        numeric_coerced = pd.to_numeric(dropped_na, errors="coerce").dropna()
+                        # Si la variable est majoritairement numérique et exclut les mots-clés attributaires
+                        if not numeric_coerced.empty and not any(k in var.lower() for k in ["statut", "verdict", "validation", "ok", "ko"]):
+                            variables_quantitatives.append(var)
+
+            if not variables_quantitatives:
+                st.warning("⚠️ Aucune variable quantitative (numérique) n'a été détectée dans le DCP pour générer des cartes I-MR.")
+            else:
+                # Options d'agrégation de l'Axe X (Temps / Observations)
+                st.markdown("#### ⚙️ Configuration de l'Axe X")
+                mode_axe_x = st.radio(
+                    "Regroupement des données :",
+                    ["Par observation (Individuel)", "Par jour", "Par semaine", "Par mois"],
+                    horizontal=True,
+                    key="spc_axe_x_mode"
+                )
+
+                # Préparation de l'axe temporel si demandé
+                df_spc_master = df_t0.copy()
+                if "Date de modification" in df_spc_master.columns:
+                    df_spc_master["Date_Parsed"] = pd.to_datetime(df_spc_master["Date de modification"], errors="coerce")
+                else:
+                    df_spc_master["Date_Parsed"] = pd.NaT
+
+                # Boucle de génération automatique : Une carte par variable quantitative
+                for var_quant] in variables_quantitatives:
+                    st.markdown(f"---")
+                    st.subheader(f"📈 Carte de contrôle I-MR : {var_quant}")
+
+                    # Nettoyage local de la série
+                    df_var = df_spc_master[["ID observation", "Date_Parsed", var_quant]].dropna(subset=[var_quant]).copy()
+                    df_var[var_quant] = pd.to_numeric(df_var[var_quant], errors="coerce")
+                    df_var = df_var.dropna(subset=[var_quant]).reset_index(drop=True)
+
+                    if len(df_var) < 2:
+                        st.info(f"Pas assez de données pour générer la carte I-MR pour '{var_quant}' (minimum 2 observations requises).")
+                        continue
+
+                    # 2. Gestion de l'agrégation de l'axe X selon le volume disponible
+                    if mode_axe_x == "Par jour" and df_var["Date_Parsed"].notna().any():
+                        df_grouped = df_var.groupby(df_var["Date_Parsed"].dt.date)[var_quant].mean().reset_index()
+                        df_grouped.columns = ["Axe_X", "Valeur"]
+                    elif mode_axe_x == "Par semaine" and df_var["Date_Parsed"].notna().any():
+                        df_var["Semaine"] = df_var["Date_Parsed"].dt.to_period("W").astype(str)
+                        df_grouped = df_var.groupby("Semaine")[var_quant].mean().reset_index()
+                        df_grouped.columns = ["Axe_X", "Valeur"]
+                    elif mode_axe_x == "Par mois" and df_var["Date_Parsed"].notna().any():
+                        df_var["Mois"] = df_var["Date_Parsed"].dt.to_period("M").astype(str)
+                        df_grouped = df_var.groupby("Mois")[var_quant].mean().reset_index()
+                        df_grouped.columns = ["Axe_X", "Valeur"]
+                    else:
+                        # Par défaut ou par observation individuelle
+                        df_grouped = df_var[["ID observation", var_quant]].copy()
+                        df_grouped.columns = ["Axe_X", "Valeur"]
+
+                    if len(df_grouped) < 2:
+                        st.warning(f"Le regroupement temporel choisi génère moins de 2 points. Affichage individuel par observation appliqué.")
+                        df_grouped = df_var[["ID observation", var_quant]].copy()
+                        df_grouped.columns = ["Axe_X", "Valeur"]
+
+                    # 3. Calculs Statistiques SPC (Carte I-MR avec constante d2 = 1.128 pour n=2)
+                    # Calcul des étendues mobiles (Moving Range - MR)
+                    df_grouped["MR"] = df_grouped["Valeur"].diff().abs()
+                    mr_moyenne = df_grouped["MR"].mean()
+                    
+                    # Ligne centrale (Moyenne CL)
+                    cl_moyenne = df_grouped["Valeur"].mean()
+                    
+                    # Calcul des limites UCL et LCL basées sur l'étendue mobile moyenne (Norme LSS)
+                    ucl_calculé = cl_moyenne + 2.66 * mr_moyenne
+                    lcl_calculé = cl_moyenne - 2.66 * mr_moyenne
+                    lcl_calculé = max(0.0, lcl_calculé) if df_grouped["Valeur"].min() >= 0 else lcl_calculé
+
+                    # Intégration des lignes de contrôle dans le DataFrame pour affichage graphique
+                    df_grouped["CL - Moyenne"] = cl_moyenne
+                    df_grouped["UCL"] = ucl_calculé
+                    df_grouped["LCL"] = lcl_calculé
+
+                    # 4. Détection Automatique des Signaux d'Instabilité (Règles SPC de Western Electric)
+                    df_grouped["Instable"] = False
+                    
+                    # Règle 1 : Points hors limites strictes (UCL/LCL)
+                    df_grouped.loc[(df_grouped["Valeur"] > ucl_calculé) | (df_grouped["Valeur"] < lcl_calculé), "Instable"] = True
+                    
+                    # Règle 2 : Séries anormales (7 points consécutifs du même côté de la ligne centrale)
+                    df_grouped["Position"] = df_grouped["Valeur"] > cl_moyenne
+                    df_grouped["Serie_Id"] = (df_grouped["Position"] != df_grouped["Position"].shift()).cumsum()
+                    tailles_series = df_grouped.groupby("Serie_Id")["Serie_Id"].transform("count")
+                    df_grouped.loc[tailles_series >= 7, "Instable"] = True
+
+                    # Règle 3 : Tendances prolongées (6 points consécutifs qui montent ou qui descendent)
+                    diffs = df_grouped["Valeur"].diff()
+                    signes = np.sign(diffs.fillna(0))
+                    # Identification des changements de direction
+                    df_grouped["Tendance_Id"] = (signes != signes.shift()).cumsum()
+                    tailles_tendances = df_grouped.groupby("Tendance_Id")["Tendance_Id"].transform("count")
+                    df_grouped.loc[tailles_tendances >= 6, "Instable"] = True
+
+                    # Préparation des couleurs pour la visualisation graphique
+                    df_grouped["Couleur_Point"] = df_grouped["Instable"].map({True: "#FF4B4B", False: "#0068C9"})
+
+                    # 5. Affichage Graphique de la Carte Individuelle (I) via st.line_chart combiné
+                    # Pour afficher la ligne centrale et les limites proprement, on prépare un DataFrame dédié
+                    chart_cols = ["Valeur", "CL - Moyenne", "UCL", "LCL"]
+                    df_chart = df_grouped.set_index("Axe_X")[chart_cols]
+                    
+                    st.line_chart(df_chart, color=["#0068C9", "#29B09D", "#FF4B4B", "#FF4B4B"])
+
+                    # Alerte visuelle en cas de points ou séries hors contrôle détectés
+                    points_hors_controle = df_grouped["Instable"].sum()
+                    pct_hors_controle = (points_hors_controle / len(df_grouped)) * 100
+
+                    if points_hors_controle > 0:
+                        st.error(f"🔴 Attention : {points_hors_controle} point(s) ou série(s) d'instabilité détecté(s) ({pct_hors_controle:.1f} % des données). Le processus présente des causes spéciales de variation.")
+                    else:
+                        st.success("🟢 Processus statistiquement stable. Les variations observées relèvent uniquement de causes communes.")
+
+                    # 6. Résumé Statistique de Référence T0
+                    st.markdown("**📋 Résumé Statistique de Référence (Situation T0)**")
+                    
+                    # Formatage des métriques pour affichage propre en tableau compact
+                    ecart_type = df_grouped["Valeur"].std() if len(df_grouped) > 1 else 0.00
+                    
+                    stats_t0 = {
+                        "Métrique SPC T0": [
+                            "Nombre d'observations (N)", 
+                            "Moyenne (Ligne Centrale)", 
+                            "Minimum constaté", 
+                            "Maximum constaté", 
+                            "Écart-type (σ)", 
+                            "Limite UCL (Upper Control Limit)", 
+                            "Limite LCL (Lower Control Limit)",
+                            "Nombre de points / séries hors contrôle",
+                            "Pourcentage d'instabilité globale"
+                        ],
+                        "Valeur T0": [
+                            f"{len(df_grouped)}",
+                            f"{cl_moyenne:.2f}",
+                            f"{df_grouped['Valeur'].min():.2f}",
+                            f"{df_grouped['Valeur'].max():.2f}",
+                            f"{ecart_type:.2f}",
+                            f"{ucl_calculé:.2f}",
+                            f"{lcl_calculé:.2f}",
+                            f"{points_hors_controle}",
+                            f"{pct_hors_controle:.1f} %"
+                        ]
+                    }
+                    st.table(pd.DataFrame(stats_t0))
 
     # --- AUTRES PHASES (Structure prête) ---
     with tabs[2]: st.info("Module ANALYZE : Ishikawa & Tests Statistiques IA en attente de données.")
