@@ -215,7 +215,7 @@ with st.sidebar:
     st.divider()
 
    # ------------------------------------------------
-    # 💾 MODULE "ENREGISTRER SOUS" (INTEGRALITÉ DES PROJETS)
+    # 💾 MODULE "ENREGISTRER SOUS" (INTEGRALITÉ DES PROJETS CORRIGÉE)
     # ------------------------------------------------
     st.subheader("💾 Enregistrer sous")
     if "projects" in st.session_state and len(st.session_state.projects) > 0:
@@ -243,7 +243,7 @@ with st.sidebar:
         * **Phase active :** {p_exp.get('status', 'Define')}
         """)
 
-        # --- 1. ENREGISTREMENT FORMAT EXCEL (Classeur Complet) ---
+        # --- 1. ENREGISTREMENT FORMAT EXCEL (Classeur Complet avec cartes de contrôle) ---
         try:
             buffer_xlsx = io.BytesIO()
             with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
@@ -264,20 +264,24 @@ with st.sidebar:
                 else:
                     pd.DataFrame(columns=["Supplier", "Input", "Process", "Output", "Customer"]).to_excel(writer, sheet_name='SIPOC', index=False)
                 
-                # DEFINE : Matrice des compétences / Équipe
-                team_list = p_exp.get('team_data', [])
-                if team_list:
-                    pd.DataFrame(team_list).to_excel(writer, sheet_name='Équipe & Rôles', index=False)
-                
-                # MEASURE : Données de Collecte Réelles
+                # MEASURE : Données brutes de Collecte
                 if "dc_master_data" in st.session_state and isinstance(st.session_state.dc_master_data, pd.DataFrame):
                     st.session_state.dc_master_data.to_excel(writer, sheet_name='Base de Collecte T0', index=False)
                 
-                # Onglets de structure pour la pérennité
-                pd.DataFrame([{"Statut": "Plan R&R validé en séance"}]).to_excel(writer, sheet_name='MSA', index=False)
-                pd.DataFrame([{"Analyse": "Causes Racines validées à l'écran Measure"}]).to_excel(writer, sheet_name='Analyze', index=False)
-                pd.DataFrame([{"Plan d'action": "Gains T1 attendus"}]).to_excel(writer, sheet_name='Improve', index=False)
-                pd.DataFrame([{"Contrôle": "Suivi MSP / SPC mis en place"}]).to_excel(writer, sheet_name='Control', index=False)
+                # MEASURE / CONTROL : Sauvegarde des données calculées des cartes de contrôles
+                # On vérifie si des calculs MSP existent en mémoire globale ou dans le projet
+                spc_data = st.session_state.get("current_spc_data") if st.session_state.get("current_spc_data") is not None else p_exp.get("spc_data")
+                if isinstance(spc_data, pd.DataFrame):
+                    spc_data.to_excel(writer, sheet_name='Données Cartes de Contrôle', index=False)
+                else:
+                    # Si aucun calcul actif, on génère un template pour l'utilisateur
+                    pd.DataFrame(columns=["Échantillon", "Valeur Mesurée", "Moyenne", "LCL (LSL)", "UCL (USL)", "Statut"]).to_excel(writer, sheet_name='Données Cartes de Contrôle', index=False)
+                
+                # ANALYZE & IMPROVE : Données qualitatives
+                pd.DataFrame([
+                    {"Phase": "ANALYZE", "Outil": "Ishikawa / 5 Pourquoi", "Constats": p_exp.get('causes_racines', 'Analyse validée en séance')},
+                    {"Phase": "IMPROVE", "Outil": "Plan d'actions Kaizen", "Constats": p_exp.get('plan_actions', 'Gains attendus à la mise en œuvre')}
+                ]).to_excel(writer, sheet_name='Analyze & Improve', index=False)
 
             st.download_button(
                 label="📊 Enregistrer sous Excel (.xlsx)", 
@@ -290,7 +294,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur Excel : {e}")
 
-        # --- 2. ENREGISTREMENT FORMAT POWERPOINT (Avec inclusion des données et figures) ---
+        # --- 2. ENREGISTREMENT FORMAT POWERPOINT (Complet : Titre + Define + SIPOC + Measure + Analyze + Control) ---
         try:
             from pptx import Presentation
             from pptx.util import Inches, Pt
@@ -312,7 +316,7 @@ with st.sidebar:
             body.text += f"• Objectif CTQ Client (Critical To Quality) :\n  {p_exp.get('selected_ctq', 'Non défini')}\n\n"
             body.text += f"• Impacts & Limites Financières (COPQ) :\n  {p_exp.get('benefices_saisie', 'Non modélisés')}"
             
-            # Slide 3 : Inclusion du flux SIPOC sous forme de tableau natif PPTX
+            # Slide 3 : Flux SIPOC
             if p_exp.get('sipoc_data'):
                 slide = prs.slides.add_slide(prs.slide_layouts[5])
                 slide.shapes.title.text = "Phase DEFINE : Cartographie macro SIPOC"
@@ -331,26 +335,38 @@ with st.sidebar:
                     table.cell(r_idx+1, 3).text = str(row_data.get('Output', row_data.get('O', '')))
                     table.cell(r_idx+1, 4).text = str(row_data.get('Customer', row_data.get('C', '')))
 
-            # Slide 4 : Rendu du Graphique SPC (Measure)
+            # Slide 4 : Graphique SPC (Measure)
             fig_spc = st.session_state.get("current_spc_figure")
             if fig_spc is not None:
                 slide = prs.slides.add_slide(prs.slide_layouts[5])
                 slide.shapes.title.text = "Phase MEASURE : Stabilité Statistique du Processus (T0)"
-                
                 img_buf = io.BytesIO()
                 try:
                     fig_spc.write_image(img_buf, format="png", width=1000, height=600)
                 except:
                     fig_spc.savefig(img_buf, format="png", bbox_inches='tight')
-                
                 img_buf.seek(0)
                 slide.shapes.add_picture(img_buf, Inches(0.5), Inches(1.8), Inches(9), Inches(4.8))
+
+            # Slide 5 : Phase ANALYZE (Nouveau)
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = "Phase ANALYZE : Identification des Causes Racines"
+            body_anz = slide.placeholders[1]
+            body_anz.text = f"• Analyse des Modes de Défaillances :\n  {p_exp.get('causes_racines', 'Feuille d\'analyse complétée à l\'écran.')}\n\n"
+            body_anz.text += f"• Facteurs d'influence identifiés (X's) vs Variabilité (Y) :\n  Standardisation des points de mesures validée."
+
+            # Slide 6 : Phase CONTROL / IMPROVE (Nouveau)
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = "Phase IMPROVE & CONTROL : Pérennisation"
+            body_ctrl = slide.placeholders[1]
+            body_ctrl.text = f"• Plan d'action et d'Amélioration :\n  {p_exp.get('plan_actions', 'Déploiement des détrompeurs (Poka-Yoke).')}\n\n"
+            body_ctrl.text += f"• Suivi MSP / SPC mis en place :\n  Suivi périodique via cartes de contrôle automatisées."
 
             buffer_pptx = io.BytesIO()
             prs.save(buffer_pptx)
             st.download_button(
                 label="📽️ Enregistrer sous PowerPoint (.pptx)", 
-                data=bytes(buffer_pptx.getvalue()), # Sécurisé en bytes standard
+                data=bytes(buffer_pptx.getvalue()), 
                 file_name=f"Presentation_LSS_{project_name}.pptx", 
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True,
@@ -359,7 +375,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur PowerPoint : {e}")
 
-        # --- 3. ENREGISTREMENT FORMAT PDF (fpdf2 corrigé pour forcer le type bytes) ---
+        # --- 3. ENREGISTREMENT FORMAT PDF (Complet avec toutes les phases DMAIC) ---
         try:
             from fpdf import FPDF
             
@@ -367,7 +383,7 @@ with st.sidebar:
                 def header(self):
                     self.set_font('Helvetica', 'B', 12)
                     self.set_text_color(30, 58, 138)
-                    self.cell(0, 10, "RAPPORT D'AUDIT METHODOLOGIQUE LEAN SIX SIGMA", border=0, ln=1, align='L')
+                    self.cell(0, 10, "RAPPORT D'AUDIT METHODOLOGIQUE INTEGRAL LEAN SIX SIGMA", border=0, ln=1, align='L')
                     self.line(10, 18, 200, 18)
                     self.ln(5)
                     
@@ -381,17 +397,17 @@ with st.sidebar:
             pdf.add_page()
             pdf.set_font("Helvetica", size=10)
             
-            # Métadonnées du Projet
+            # En-tête / Métadonnées
             pdf.set_font("Helvetica", 'B', 14)
             pdf.set_text_color(13, 148, 136)
-            pdf.cell(0, 10, f"Projet : {project_name.upper()}", ln=1)
+            pdf.cell(0, 10, f"Rapport de Projet : {project_name.upper()}", ln=1)
             pdf.set_font("Helvetica", size=10)
             pdf.set_text_color(0, 0, 0)
             pdf.cell(0, 6, f"Phase Actuelle du Cadrage : {p_exp.get('status', 'Define')}", ln=1)
             pdf.cell(0, 6, f"Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1)
             pdf.ln(5)
             
-            # Section 1 : Define
+            # --- PHASE 1 : DEFINE ---
             pdf.set_font("Helvetica", 'B', 12)
             pdf.set_text_color(30, 58, 138)
             pdf.cell(0, 10, "1. Phase DEFINE - Cadrage & Objectifs Client", ln=1)
@@ -403,20 +419,18 @@ with st.sidebar:
             pdf.multi_cell(0, 6, f"- Indicateur CTQ Cible : {p_exp.get('selected_ctq', 'Non défini.')}")
             pdf.ln(2)
             pdf.multi_cell(0, 6, f"- Alignement financier & COPQ : {p_exp.get('benefices_saisie', 'Non quantifié.')}")
-            pdf.ln(5)
+            pdf.ln(4)
             
-            # Section 2 : SIPOC
+            # SIPOC
             if p_exp.get('sipoc_data'):
-                pdf.set_font("Helvetica", 'B', 11)
-                pdf.cell(0, 8, "Alignement de la Cartographie macro du Processus (SIPOC) :", ln=1)
+                pdf.set_font("Helvetica", 'B', 10)
+                pdf.cell(0, 8, "Cartographie macro du Processus (SIPOC) :", ln=1)
                 pdf.set_font("Helvetica", 'B', 9)
-                
                 pdf.cell(35, 7, "Supplier", border=1)
                 pdf.cell(35, 7, "Input", border=1)
                 pdf.cell(45, 7, "Process", border=1)
                 pdf.cell(35, 7, "Output", border=1)
                 pdf.cell(35, 7, "Customer", border=1, ln=1)
-                
                 pdf.set_font("Helvetica", size=9)
                 for item in p_exp['sipoc_data']:
                     pdf.cell(35, 6, str(item.get('Supplier', item.get('S', '')))[0:18], border=1)
@@ -426,15 +440,34 @@ with st.sidebar:
                     pdf.cell(35, 6, str(item.get('Customer', item.get('C', '')))[0:18], border=1, ln=1)
                 pdf.ln(5)
 
-            # Section 3 : Measure
+            # --- PHASE 2 : MEASURE ---
             pdf.set_font("Helvetica", 'B', 12)
             pdf.set_text_color(30, 58, 138)
-            pdf.cell(0, 10, "2. Phase MEASURE - Plan de Collecte Statistique (T0)", ln=1)
+            pdf.cell(0, 10, "2. Phase MEASURE - Plan de Collecte Statistique & Stabilité", ln=1)
             pdf.set_font("Helvetica", size=10)
             pdf.set_text_color(0, 0, 0)
-            pdf.multi_cell(0, 6, "Les données collectées et enregistrées à l'écran 'Measure' servent d'historique de capabilité.\nLe calcul des limites (UCL/LCL) s'exécute automatiquement en tâche de fond pour garantir la conformité aux audits de certification interne.")
+            pdf.multi_cell(0, 6, "Les données collectées et enregistrées servent d'historique de capabilité.\nLe calcul des limites (UCL/LCL) s'exécute automatiquement en tâche de fond pour garantir la conformité aux exigences du processus.")
+            pdf.ln(3)
+
+            # --- PHASE 3 : ANALYZE (Ajoutée) ---
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.set_text_color(30, 58, 138)
+            pdf.cell(0, 10, "3. Phase ANALYZE - Analyse des Causes Racines", ln=1)
+            pdf.set_font("Helvetica", size=10)
+            pdf.set_text_color(0, 0, 0)
+            pdf.multi_cell(0, 6, f"- Synthèse d'analyse de la variabilité :\n{p_exp.get('causes_racines', 'Validée à l\'écran Analyze. Les causes prioritaires font l\'objet d\'un plan d\'action ciblé.')}")
+            pdf.ln(3)
+
+            # --- PHASE 4 & 5 : IMPROVE & CONTROL (Ajoutée) ---
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.set_text_color(30, 58, 138)
+            pdf.cell(0, 10, "4. Phase IMPROVE & CONTROL - Plans d'Actions & Suivi", ln=1)
+            pdf.set_font("Helvetica", size=10)
+            pdf.set_text_color(0, 0, 0)
+            pdf.multi_cell(0, 6, f"- Actions d'Amélioration Retenues :\n{p_exp.get('plan_actions', 'Mise en place de standards de travail et de systèmes Poka-Yoke.')}")
+            pdf.ln(2)
+            pdf.multi_cell(0, 6, "- Stratégie de Contrôle :\nSuivi régulier via les cartes de contrôle MSP (SPC) de l'application pour détecter rapidement toute dérive du processus.")
             
-            # Résolution de l'erreur bytearray -> conversion stricte en bytes pour Streamlit
             pdf_bytes = pdf.output()
             
             st.download_button(
