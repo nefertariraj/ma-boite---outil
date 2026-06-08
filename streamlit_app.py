@@ -214,7 +214,7 @@ with st.sidebar:
     st.session_state.primary_color = color
     st.divider()
 
-    # ------------------------------------------------
+   # ------------------------------------------------
     # 💾 MODULE "ENREGISTRER SOUS" (INTEGRALITÉ DES PROJETS)
     # ------------------------------------------------
     st.subheader("💾 Enregistrer sous")
@@ -359,7 +359,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur PowerPoint : {e}")
 
-        # --- 3. ENREGISTREMENT FORMAT PDF (fpdf2) ---
+        # --- 3. ENREGISTREMENT FORMAT PDF (fpdf2 sans puces Unicode problématiques) ---
         try:
             from fpdf import FPDF
             
@@ -398,11 +398,12 @@ with st.sidebar:
             pdf.set_font("Helvetica", size=10)
             pdf.set_text_color(0, 0, 0)
             
-            pdf.multi_cell(0, 6, f"• Problem Statement :\n{p_exp.get('problem', 'Non configuré.')}")
+            # Utilisation de tirets "-" standards au lieu du caractère Unicode "•"
+            pdf.multi_cell(0, 6, f"- Problem Statement :\n{p_exp.get('problem', 'Non configuré.')}")
             pdf.ln(2)
-            pdf.multi_cell(0, 6, f"• Indicateur CTQ Cible : {p_exp.get('selected_ctq', 'Non défini.')}")
+            pdf.multi_cell(0, 6, f"- Indicateur CTQ Cible : {p_exp.get('selected_ctq', 'Non défini.')}")
             pdf.ln(2)
-            pdf.multi_cell(0, 6, f"• Alignement financier & COPQ : {p_exp.get('benefices_saisie', 'Non quantifié.')}")
+            pdf.multi_cell(0, 6, f"- Alignement financier & COPQ : {p_exp.get('benefices_saisie', 'Non quantifié.')}")
             pdf.ln(5)
             
             # Section 2 : SIPOC
@@ -434,7 +435,6 @@ with st.sidebar:
             pdf.set_text_color(0, 0, 0)
             pdf.multi_cell(0, 6, "Les données collectées et enregistrées à l'écran 'Measure' servent d'historique de capabilité.\nLe calcul des limites (UCL/LCL) s'exécute automatiquement en tâche de fond pour garantir la conformité aux audits de certification interne.")
             
-            # Correction ici : fpdf2 renvoie déjà un objet bytes valide avec output()
             pdf_bytes = pdf.output()
             
             st.download_button(
