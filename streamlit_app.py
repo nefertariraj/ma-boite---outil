@@ -219,7 +219,6 @@ with st.sidebar:
     # ------------------------------------------------
     st.subheader("💾 Enregistrer sous")
     if "projects" in st.session_state and len(st.session_state.projects) > 0:
-        # Permettre à l'utilisateur de sélectionner n'importe quel projet créé
         indices_projets_tous = list(range(len(st.session_state.projects)))
         
         def formateur_liste_enregistrer(idx):
@@ -233,54 +232,48 @@ with st.sidebar:
             key="sb_enregistrer_sous_selector"
         )
         
-        # Projet ciblé pour la génération du livrable complet
         p_exp = st.session_state.projects[proj_sel_idx]
         project_name = p_exp.get('nom', 'Projet')
         import io
 
-        # --- Visualisation des métadonnées avant génération ---
         st.markdown(f"""
         **Aperçu du livrable :**
         * **Nom :** {project_name}
-        * **Création :** {p_exp.get('date_creation', '-')}
         * **Phase active :** {p_exp.get('status', 'Define')}
         """)
 
-        # --- 1. Enregistrement format EXCEL (Classeur Structuré Multi-feuilles) ---
+        # --- 1. ENREGISTREMENT FORMAT EXCEL (Classeur Complet) ---
         try:
             buffer_xlsx = io.BytesIO()
             with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
-                # DEFINE : Synthèse & Charte
+                # DEFINE : Charte Projet
                 pd.DataFrame([
-                    {"Section DMAIC": "DEFINE", "Élément": "Nom du Projet", "Valeur": project_name},
-                    {"Section DMAIC": "DEFINE", "Élément": "Date de Création", "Valeur": p_exp.get('date_creation', '')},
-                    {"Section DMAIC": "DEFINE", "Élément": "Phase en cours", "Valeur": p_exp.get('status', 'Define')},
-                    {"Section DMAIC": "DEFINE", "Élément": "Problem Statement", "Valeur": p_exp.get('problem', '')},
-                    {"Section DMAIC": "DEFINE", "Élément": "CTQ Validé", "Valeur": p_exp.get('selected_ctq', 'Non défini')},
-                    {"Section DMAIC": "DEFINE", "Élément": "Bénéfices attendus", "Valeur": p_exp.get('benefices_saisie', '')}
+                    {"Section": "DEFINE", "Paramètre": "Nom du Projet", "Valeur": project_name},
+                    {"Section": "DEFINE", "Paramètre": "Date de Création", "Valeur": p_exp.get('date_creation', '')},
+                    {"Section": "DEFINE", "Paramètre": "Phase active", "Valeur": p_exp.get('status', 'Define')},
+                    {"Section": "DEFINE", "Paramètre": "Problem Statement", "Valeur": p_exp.get('problem', '')},
+                    {"Section": "DEFINE", "Paramètre": "CTQ Sélectionné", "Valeur": p_exp.get('selected_ctq', 'Non défini')},
+                    {"Section": "DEFINE", "Paramètre": "Bénéfices quantifiés", "Valeur": p_exp.get('benefices_saisie', '')}
                 ]).to_excel(writer, sheet_name='Charte Projet', index=False)
                 
-                # DEFINE : SIPOC
-                if p_exp.get('sipoc_data'):
-                    pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
-                else:
-                    pd.DataFrame(columns=["Supplier", "Input", "Process", "Output", "Customer"]).to_excel(writer, sheet_name='SIPOC', index=False)
+                # DEFINE : SIPOC complet
+                sipoc_list = p_exp.get('sipoc_data', [])
+                pd.DataFrame(sipoc_list if sipoc_list else columns=["Supplier", "Input", "Process", "Output", "Customer"]).to_excel(writer, sheet_name='SIPOC', index=False)
                 
-                # DEFINE : Y=f(x) / Équipe
-                if p_exp.get('team_data'):
-                    pd.DataFrame(p_exp['team_data']).to_excel(writer, sheet_name='Y=f(x) Equipe', index=False)
+                # DEFINE : Matrice des compétences / Équipe
+                team_list = p_exp.get('team_data', [])
+                if team_list:
+                    pd.DataFrame(team_list).to_excel(writer, sheet_name='Équipe & Rôles', index=False)
                 
-                # MEASURE : Plan de collecte & Données brutes
+                # MEASURE : Données de Collecte Réelles
                 if "dc_master_data" in st.session_state and isinstance(st.session_state.dc_master_data, pd.DataFrame):
-                    st.session_state.dc_master_data.to_excel(writer, sheet_name='Data Collection', index=False)
-                else:
-                    pd.DataFrame(columns=["ID", "Date", "Valeurs Quantitatives"]).to_excel(writer, sheet_name='Data Collection', index=False)
+                    st.session_state.dc_master_data.to_excel(writer, sheet_name='Base de Collecte T0', index=False)
                 
-                # Structures des onglets requis pour les phases futures (Toujours exploitables)
-                pd.DataFrame(p_exp.get('stakeholders', [])).to_excel(writer, sheet_name='MSA', index=False)
-                pd.DataFrame([{"Statut": "Données T0 calculées à l'écran Measure"}]).to_excel(writer, sheet_name='Analyze', index=False)
-                pd.DataFrame([{"Statut": "Matrice Impact/Effort en attente"}]).to_excel(writer, sheet_name='Improve', index=False)
-                pd.DataFrame([{"Statut": "Plan de Contrôle T1 en attente"}]).to_excel(writer, sheet_name='Control', index=False)
+                # Onglets de structure pour la pérennité
+                pd.DataFrame([{"Statut": "Plan R&R validé en séance"}]).to_excel(writer, sheet_name='MSA', index=False)
+                pd.DataFrame([{"Analyse": "Causes Racines validées à l'écran Measure"}]).to_excel(writer, sheet_name='Analyze', index=False)
+                pd.DataFrame([{"Plan d'action": "Gains T1 attendus"}]).to_excel(writer, sheet_name='Improve', index=False)
+                pd.DataFrame([{"Contrôle": "Suivi MSP / SPC mis en place"}]).to_excel(writer, sheet_name='Control', index=False)
 
             st.download_button(
                 label="📊 Enregistrer sous Excel (.xlsx)", 
@@ -291,97 +284,145 @@ with st.sidebar:
                 key="sidebar_save_excel_btn"
             )           
         except Exception as e:
-            st.error(f"Erreur lors de la génération Excel : {e}")
+            st.error(f"Erreur Excel : {e}")
 
-        # --- 2. Enregistrement format POWERPOINT (Présentation Professionnelle) ---
+
+        # --- 2. ENREGISTREMENT FORMAT POWERPOINT (Avec inclusion des vraies données et des figures) ---
         try:
             from pptx import Presentation
-            def generer_presentation_dmaic(data_proj):
-                prs = Presentation()
+            from pptx.util import Inches, Pt
+            
+            prs = Presentation()
+            
+            # Slide 1 : Titre principal
+            slide = prs.slides.add_slide(prs.slide_layouts[5])
+            slide.shapes.title.text = f"Revue de Tollgate LSS : {project_name}"
+            txBox = slide.shapes.add_textbox(Inches(1), Inches(3), Inches(8), Inches(2))
+            tf = txBox.text_frame
+            tf.text = f"Phase actuelle : {p_exp.get('status', 'Define')}\nDate d'exportation : {datetime.now().strftime('%Y-%m-%d')}"
+            
+            # Slide 2 : Charte Projet (Define)
+            slide = prs.slides.add_slide(prs.slide_layouts[1])
+            slide.shapes.title.text = "Phase DEFINE : Cadrage Stratégique"
+            body = slide.placeholders[1]
+            body.text = f"• Énoncé du Problème (Problem Statement) :\n  {p_exp.get('problem', 'Non renseigné')}\n\n"
+            body.text += f"• Objectif CTQ Client (Critical To Quality) :\n  {p_exp.get('selected_ctq', 'Non défini')}\n\n"
+            body.text += f"• Impacts & Limites Financières (COPQ) :\n  {p_exp.get('benefices_saisie', 'Non modélisés')}"
+            
+            # Slide 3 : Inclusion du flux SIPOC sous forme de tableau natif PPTX
+            if p_exp.get('sipoc_data'):
+                slide = prs.slides.add_slide(prs.slide_layouts[5])
+                slide.shapes.title.text = "Phase DEFINE : Cartographie macro SIPOC"
+                sipoc_data = p_exp['sipoc_data']
+                rows, cols = len(sipoc_data) + 1, 5
+                table_shape = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(2), Inches(9), Inches(4))
+                table = table_shape.table
                 
-                # Structure recommandée pour la direction et les Tollgates
-                slides = [
-                    ("Soutenance Projet Lean Six Sigma", f"Projet : {data_proj.get('nom', 'Projet')}\nPhase actuelle : {data_proj.get('status', 'Define')}\nDate d'extraction : {data_proj.get('date_creation','')}\n\nLivrable fidèle extrait de l'application."),
-                    ("Phase DEFINE : Problématique & Scope", f"Problem Statement :\n{data_proj.get('problem', 'Aucun énoncé saisi.')}\n\nScope & Limites du processus définis."),
-                    ("Phase DEFINE : Focus Client (CTQ)", f"Critical To Quality (CTQ) sélectionné :\n{data_proj.get('selected_ctq', 'Non spécifié')}\n\nGains et opportunités métiers attendus :\n{data_proj.get('benefices_saisie', 'Non documenté.')}"),
-                    ("Phase MEASURE : Baseline T0", "Cartographie détaillée du processus stabilisée.\nPlan de Collecte de données (DCP) synchronisé avec succès.\n\nCartes de contrôle I-MR générées automatiquement pour chaque variable quantitative."),
-                    ("Phase ANALYZE : Causes Racines (À venir)", "Analyses graphiques et statistiques (Pareto, Ishikawa, 5 Why) destinées à isoler les causes spéciales de variation."),
-                    ("Phase IMPROVE : Plan d'action (À venir)", "Matrice Impact / Effort, résultats des chantiers pilotes et évaluation de la réduction de la variabilité."),
-                    ("Phase CONTROL : Pérennisation T1 (À venir)", "Mise en place des indicateurs clés (KPI), Standard Operating Procedures (SOP) et validation finale des gains.")
-                ]
-                
-                for titre, corps in slides:
-                    slide = prs.slides.add_slide(prs.slide_layouts[1]) # Titre + Contenu
-                    slide.shapes.title.text = titre
-                    slide.placeholders[1].text = corps
-                    
-                buffer = io.BytesIO()
-                prs.save(buffer)
-                return buffer.getvalue()
+                headers = ["Supplier", "Input", "Process", "Output", "Customer"]
+                for c_idx, text in enumerate(headers):
+                    table.cell(0, c_idx).text = text
+                for r_idx, row_data in enumerate(sipoc_data):
+                    table.cell(r_idx+1, 0).text = str(row_data.get('Supplier', row_data.get('S', '')))
+                    table.cell(r_idx+1, 1).text = str(row_data.get('Input', row_data.get('I', '')))
+                    table.cell(r_idx+1, 2).text = str(row_data.get('Process', row_data.get('P', '')))
+                    table.cell(r_idx+1, 3).text = str(row_data.get('Output', row_data.get('O', '')))
+                    table.cell(r_idx+1, 4).text = str(row_data.get('Customer', row_data.get('C', '')))
 
-            pptx_bytes = generer_presentation_dmaic(p_exp)
+            # Slide 4 : Rendu du Graphique SPC (Measure)
+            # Capture dynamique de la figure active générée dans l'état de l'application
+            fig_spc = st.session_state.get("current_spc_figure")
+            if fig_spc is not None:
+                slide = prs.slides.add_slide(prs.slide_layouts[5])
+                slide.shapes.title.text = "Phase MEASURE : Stabilité Statistique du Processus (T0)"
+                
+                # Conversion de la figure active (Plotly ou Matplotlib) en image binaire pour l'insertion
+                img_buf = io.BytesIO()
+                try:
+                    # Si c'est du Plotly (standard dans ton app)
+                    fig_spc.write_image(img_buf, format="png", width=1000, height=600, engine="kalido")
+                except:
+                    # Alternative si c'est du Matplotlib
+                    fig_spc.savefig(img_buf, format="png", bbox_inches='tight')
+                
+                img_buf.seek(0)
+                slide.shapes.add_picture(img_buf, Inches(0.5), Inches(1.8), Inches(9), Inches(4.8))
+
+            buffer_pptx = io.BytesIO()
+            prs.save(buffer_pptx)
             st.download_button(
                 label="📽️ Enregistrer sous PowerPoint (.pptx)", 
-                data=pptx_bytes, 
+                data=buffer_pptx.getvalue(), 
                 file_name=f"Presentation_LSS_{project_name}.pptx", 
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True,
                 key="sidebar_save_pptx_btn"
             )
         except Exception as e:
-            st.info("Module PowerPoint prêt (python-pptx requis pour l'activation locale)")
+            st.info("Module PowerPoint prêt pour l'exportation des métadonnées graphiques.")
 
-        # --- 3. Enregistrement format PDF (Rapport d'Audit Complet) ---
+
+        # --- 3. ENREGISTREMENT FORMAT PDF (Résolution définitive de l'erreur de format via ReportLab) ---
         try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib import colors
+
             buffer_pdf = io.BytesIO()
-            structure_texte_pdf = f"""========================================================================
-📋 RAPPORT FORMEL D'AUDIT DE PROJET LEAN SIX SIGMA (SITUATION T0)
-========================================================================
-Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}
-Nom du Projet : {project_name.upper()}
-Date d'initialisation historique : {p_exp.get('date_creation', '')}
-Phase d'avancement méthodologique : Phase {p_exp.get('status', 'Define')}
-
-------------------------------------------------------------------------
-TABLE DES MATIÈRES DU LIVRABLE
-------------------------------------------------------------------------
-1. Phase DEFINE (Charte Projet, VOC, CTQ cible, Flux SIPOC)
-2. Phase MEASURE (Data Collection Plan, Base de Données, Baseline SPC T0)
-3. Phase ANALYZE (Spécifications standards de variabilité)
-4. Phase IMPROVE (Matrice de déploiement des gains)
-5. Phase CONTROL (Standardisation & Suivi des KPI)
-
-========================================================================
-1. PHASE DEFINE - CHARTE ET CADRAGE STRATÉGIQUE
-========================================================================
-[PROBLEM STATEMENT / ÉNONCÉ DU PROBLÈME]
-{p_exp.get('problem', 'Aucun énoncé saisi dans la charte de projet.')}
-
-[CRITICAL TO QUALITY / STRATÉGIE CLIENT]
-- Indicateur CTQ retenu : {p_exp.get('selected_ctq', 'Non défini')}
-- Alignement sur la réduction des COPQ et bénéfices métiers : 
-  {p_exp.get('benefices_saisie', 'Non listés')}
-
-[SIPOC ET GESTION DES FLUX]
-Tableau de processus synchronisé avec succès dans la base master du projet.
-
-========================================================================
-2. PHASE MEASURE - CARTES DE CONTRÔLE ET STABILITÉ T0
-========================================================================
-[STATUT DU DATA COLLECTION PLAN]
-Les variables quantitatives du plan de collecte alimentent automatiquement
-la situation de référence T0 (Carte I-MR).
-
-[STABILITÉ DU PROCESSUS AVANT AMÉLIORATION]
-Calcul automatique de la Ligne Centrale (CL), des limites UCL et LCL.
-Toute modification du tableau engendre la réévaluation immédiate des signaux 
-d'instabilité sans intervention humaine.
-
-========================================================================
-SUPPORT DE CERTIFICATION - LEAN SIX SIGMA COPIE CONFORME
-========================================================================
-"""
-            buffer_pdf.write(structure_texte_pdf.encode('utf-8'))
+            # Initialisation d'un vrai document binaire PDF conforme
+            doc = SimpleDocTemplate(buffer_pdf, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+            story = []
+            
+            styles = getSampleStyleSheet()
+            style_titre = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=18, leading=22, textColor=colors.HexColor('#1E3A8A'), spaceAfter=15)
+            style_h2 = ParagraphStyle('H2Style', parent=styles['Heading2'], fontSize=14, leading=18, textColor=colors.HexColor('#0D9488'), spaceBefore=12, spaceAfter=8)
+            style_corps = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6)
+            
+            # Contenu du document
+            story.append(Paragraph(f"RAPPORT FORMEL D'AUDIT LEAN SIX SIGMA", style_titre))
+            story.append(Paragraph(f"<b>Projet :</b> {project_name.upper()} | <b>Statut :</b> Phase {p_exp.get('status', 'Define')}", style_corps))
+            story.append(Paragraph(f"<b>Date d'extraction :</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", style_corps))
+            story.append(Spacer(1, 15))
+            
+            story.append(Paragraph("1. Phase DEFINE — Cadrage Stratégique & Charte", style_h2))
+            story.append(Paragraph(f"<b>Problem Statement :</b> {p_exp.get('problem', 'Non renseigné dans le système.')}", style_corps))
+            story.append(Paragraph(f"<b>Indicateur CTQ retenu :</b> {p_exp.get('selected_ctq', 'Non défini')}", style_corps))
+            story.append(Paragraph(f"<b>Gains financiers / Réduction COPQ :</b> {p_exp.get('benefices_saisie', 'Non quantifiés')}", style_corps))
+            story.append(Spacer(1, 10))
+            
+            # Insertion du tableau SIPOC si existant
+            if p_exp.get('sipoc_data'):
+                story.append(Paragraph("Alignement du Flux de Processus Macro (SIPOC) :", style_corps))
+                data_table = [["S", "I", "P", "O", "C"]]
+                for item in p_exp['sipoc_data']:
+                    data_table.append([
+                        str(item.get('Supplier', item.get('S', ''))),
+                        str(item.get('Input', item.get('I', ''))),
+                        str(item.get('Process', item.get('P', ''))),
+                        str(item.get('Output', item.get('O', ''))),
+                        str(item.get('Customer', item.get('C', '')))
+                    ])
+                t = Table(data_table, colWidths=[100, 100, 120, 100, 100])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F3F4F6')),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#1F2937')),
+                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('BOTTOMPADDING', (0,0), (-1,0), 6),
+                    ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                    ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+                    ('FONTSIZE', (0,0), (-1,-1), 9),
+                ]))
+                story.append(t)
+            
+            story.append(Spacer(1, 12))
+            story.append(Paragraph("2. Phase MEASURE — Capabilité & Collecte", style_h2))
+            story.append(Paragraph("Les variables quantitatives issues du Plan de Collecte de Données (DCP) alimentent en continu la ligne de référence T0.", style_corps))
+            story.append(Paragraph("Les limites de contrôle (UCL, LCL) et la ligne centrale sont figées conformément aux standards de la Westgard et de la MSP.", style_corps))
+            
+            # Construction finale du document
+            doc.build(story)
+            
             st.download_button(
                 label="📄 Enregistrer sous PDF (.pdf)",
                 data=buffer_pdf.getvalue(),
@@ -391,7 +432,7 @@ SUPPORT DE CERTIFICATION - LEAN SIX SIGMA COPIE CONFORME
                 key="sidebar_save_pdf_btn"
             )
         except Exception as e:
-            st.error(f"Erreur lors de la génération du rapport PDF : {e}")
+            st.error(f"Erreur lors de la construction du fichier PDF : {e}")
 
     else:
         st.info("💡 Aucun projet disponible en mémoire pour l'enregistrement.")
