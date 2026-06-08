@@ -259,22 +259,18 @@ with st.sidebar:
                 if parametres_projets:
                     pd.DataFrame(parametres_projets).to_excel(writer, sheet_name='Formulaires & Synthèse', index=False)
                 
-                # Étape B : On parcourt et on extrait TOUS les DataFrames du projet (Données, MSA, SPC, Plans)
-                # S'ils sont imbriqués dans des listes ou dictionnaires, on les extrait aussi
+                # Étape B : On parcourt et on extrait TOUS les DataFrames du projet
                 df_trouves = 0
                 for cle, valeur in p_exp.items():
-                    # Cas direct : la valeur est un DataFrame
                     if isinstance(valeur, pd.DataFrame):
                         nom_onglet = str(cle)[:30] # Limite Excel de 31 caractères
                         valeur.to_excel(writer, sheet_name=f"DF_{nom_onglet}", index=False)
                         df_trouves += 1
-                    # Cas indirect : c'est une liste de dictionnaires (ex: SIPOC, équipe)
                     elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
                         nom_onglet = str(cle)[:30]
                         pd.DataFrame(valeur).to_excel(writer, sheet_name=f"LIST_{nom_onglet}", index=False)
                         df_trouves += 1
                         
-                # Sécurité : Si la table globale de collecte est dans le session_state, on l'embarque d'office
                 if "dc_master_data" in st.session_state and isinstance(st.session_state.dc_master_data, pd.DataFrame):
                     st.session_state.dc_master_data.to_excel(writer, sheet_name='Master_Data_Collecte_T0', index=False)
                 if "current_spc_data" in st.session_state and isinstance(st.session_state.current_spc_data, pd.DataFrame):
@@ -293,7 +289,7 @@ with st.sidebar:
 
 
         # =====================================================================
-        # 📽️ 2. EXPORTATION POWERPOINT INTEGRALE (Une diapositive par composant + Images)
+        # 📽️ 2. EXPORTATION POWERPOINT INTEGRALE (Sécurisée contre l'ambiguïté des DF)
         # =====================================================================
         try:
             from pptx import Presentation
@@ -308,27 +304,37 @@ with st.sidebar:
             tf = txBox.text_frame
             tf.text = f"Génération système : {datetime.now().strftime('%Y-%m-%d %H:%M')}\nStatut : Validation finale DMAIC"
 
-            # Balayage de TOUT le dictionnaire du projet pour générer le support de présentation
+            # Balayage du dictionnaire
             for cle, valeur in p_exp.items():
-                if valeur is None or valeur == "":
+                if valeur is None:
                     continue
                     
-                # Si c'est un texte long ou une zone de saisie utilisateur -> On crée une slide dédiée
-                if isinstance(valeur, str) and len(valeur) > 10 and cle not in ['nom', 'status', 'date_creation']:
-                    slide = prs.slides.add_slide(prs.slide_layouts[1])
-                    slide.shapes.title.text = f"Composant : {str(cle).upper()}"
-                    body = slide.placeholders[1]
-                    body.text = str(valeur)
+                # Protection : Si c'est un DataFrame, on gère son cas à part sans tester '== ""'
+                if isinstance(valeur, pd.DataFrame):
+                    if valeur.empty:
+                        continue
+                    slide = prs.slides.add_slide(prs.slide_layouts[5])
+                    slide.shapes.title.text = f"Tableau (DataFrame) : {str(cle).upper()}"
+                    
+                    nb_rows = min(len(valeur) + 1, 8)
+                    nb_cols = len(valeur.columns)
+                    table_shape = slide.shapes.add_table(nb_rows, nb_cols, Inches(0.5), Inches(1.5), Inches(9), Inches(4.5))
+                    table = table_shape.table
+                    
+                    for c_idx, col_name in enumerate(valeur.columns):
+                        table.cell(0, c_idx).text = str(col_name)
+                    for r_idx in range(nb_rows - 1):
+                        for c_idx, col_name in enumerate(valeur.columns):
+                            table.cell(r_idx+1, c_idx).text = str(valeur.iloc[r_idx][col_name])
                 
-                # Si c'est une liste ou un tableau (comme le SIPOC ou les plans d'actions) -> Intégration en tableau natif
+                # Si c'est une liste de dictionnaires (SIPOC, rôles...)
                 elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
                     slide = prs.slides.add_slide(prs.slide_layouts[5])
                     slide.shapes.title.text = f"Tableau : {str(cle).upper()}"
                     
                     df_temp = pd.DataFrame(valeur)
-                    nb_rows = min(len(df_temp) + 1, 8) # Sécurité affichage PPTX
+                    nb_rows = min(len(df_temp) + 1, 8)
                     nb_cols = len(df_temp.columns)
-                    
                     table_shape = slide.shapes.add_table(nb_rows, nb_cols, Inches(0.5), Inches(1.5), Inches(9), Inches(4.5))
                     table = table_shape.table
                     
@@ -337,9 +343,15 @@ with st.sidebar:
                     for r_idx in range(nb_rows - 1):
                         for c_idx, col_name in enumerate(df_temp.columns):
                             table.cell(r_idx+1, c_idx).text = str(df_temp.iloc[r_idx][col_name])
+                
+                # Si c'est un texte long (saisie utilisateur standard)
+                elif isinstance(valeur, str) and valeur != "" and len(valeur) > 10 and cle not in ['nom', 'status', 'date_creation']:
+                    slide = prs.slides.add_slide(prs.slide_layouts[1])
+                    slide.shapes.title.text = f"Composant : {str(cle).upper()}"
+                    body = slide.placeholders[1]
+                    body.text = str(valeur)
 
-            # Exportation systématique des graphiques (Cartes de contrôles, Pareto...) présents en Session
-            # On cherche dans le dictionnaire du projet ET dans la session globale
+            # Traitement des graphiques Plotly
             figures_a_importer = []
             if p_exp.get('spc_figure') is not None: figures_a_importer.append(("Carte SPC Projet", p_exp.get('spc_figure')))
             if st.session_state.get('current_spc_figure') is not None: figures_a_importer.append(("Carte SPC active", st.session_state.get('current_spc_figure')))
@@ -350,12 +362,11 @@ with st.sidebar:
                     slide = prs.slides.add_slide(prs.slide_layouts[5])
                     slide.shapes.title.text = f"Graphique Réel : {nom_fig}"
                     img_buf = io.BytesIO()
-                    # Tente une écriture au format vectoriel/image via Plotly
                     fig_obj.write_image(img_buf, format="png", width=1000, height=600)
                     img_buf.seek(0)
                     slide.shapes.add_picture(img_buf, Inches(0.5), Inches(1.5), Inches(9), Inches(5))
                 except:
-                    pass # Évite de bloquer l'export si un graphique est en cours de calcul
+                    pass
 
             buffer_pptx = io.BytesIO()
             prs.save(buffer_pptx)
@@ -372,7 +383,7 @@ with st.sidebar:
 
 
         # =====================================================================
-        # 📄 3. EXPORTATION PDF DE TYPE ARCHIVE DOCUMENTAIRE (ZÉRO INFORMATION OMISE)
+        # 📄 3. EXPORTATION PDF DE TYPE ARCHIVE (Sécurisée contre l'ambiguïté des DF)
         # =====================================================================
         try:
             from fpdf import FPDF
@@ -395,7 +406,7 @@ with st.sidebar:
             pdf.add_page()
             pdf.set_font("Helvetica", size=10)
             
-            # Titre Principal du Document
+            # En-tête de l'archive
             pdf.set_font("Helvetica", 'B', 14)
             pdf.set_text_color(13, 148, 136)
             pdf.cell(0, 10, f"PROJET DMAIC : {project_name.upper()}", ln=1)
@@ -405,52 +416,66 @@ with st.sidebar:
             pdf.cell(0, 6, f"Phase cible enregistrée : {p_exp.get('status', 'Define')}", ln=1)
             pdf.ln(6)
             
-            # PARCOURS DYNAMIQUE : On liste absolument tout ce qui est valorisé dans le projet
+            # Boucle d'extraction systématique du dictionnaire
             for cle, valeur in p_exp.items():
-                if valeur is None or valeur == "":
+                if valeur is None:
                     continue
                 
-                # Rendu des variables textuelles, commentaires et analyses
-                if not isinstance(valeur, (pd.DataFrame, list, dict)):
+                # CAS 1 : C'est un DataFrame brut (ex: calculs SPC, base de collecte interne)
+                if isinstance(valeur, pd.DataFrame):
+                    if valeur.empty:
+                        continue
                     pdf.set_font("Helvetica", 'B', 11)
                     pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Section / {str(cle).upper()} :", ln=1)
-                    pdf.set_font("Helvetica", size=10)
-                    pdf.set_text_color(0, 0, 0)
-                    pdf.multi_cell(0, 6, str(valeur))
-                    pdf.ln(3)
+                    pdf.cell(0, 8, f"Tableau Associé - {str(cle).upper()} :", ln=1)
+                    pdf.ln(2)
+                    
+                    pdf.set_font("Helvetica", 'B', 9)
+                    largeur_col = int(180 / max(len(valeur.columns), 1))
+                    for col in valeur.columns:
+                        pdf.cell(largeur_col, 7, str(col)[:15], border=1)
+                    pdf.ln()
+                    
+                    pdf.set_font("Helvetica", size=9)
+                    # On affiche les 15 premières lignes dans le PDF pour l'aperçu visuel (Excel contient l'intégralité)
+                    for _, row in valeur.head(15).iterrows():
+                        for col in valeur.columns:
+                            pdf.cell(largeur_col, 6, str(row[col])[:15], border=1)
+                        pdf.ln()
+                    if len(valeur) > 15:
+                        pdf.cell(0, 6, f"... (+ {len(valeur) - 15} lignes archivées intégralement dans l'onglet Excel correspondant)", ln=1)
+                    pdf.ln(4)
                 
-                # Rendu automatique de toutes les matrices sous forme de tableaux PDF structurés
+                # CAS 2 : C'est une liste de dictionnaires (SIPOC, etc.)
                 elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
                     pdf.set_font("Helvetica", 'B', 11)
                     pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Tableau de Données - {str(cle).upper()} :", ln=1)
+                    pdf.cell(0, 8, f"Tableau de Structure - {str(cle).upper()} :", ln=1)
                     pdf.ln(2)
                     
                     df_t = pd.DataFrame(valeur)
-                    # Impression des en-têtes de colonnes
                     pdf.set_font("Helvetica", 'B', 9)
                     largeur_col = int(180 / max(len(df_t.columns), 1))
                     for col in df_t.columns:
                         pdf.cell(largeur_col, 7, str(col)[:15], border=1)
                     pdf.ln()
                     
-                    # Impression des lignes
                     pdf.set_font("Helvetica", size=9)
                     for _, row in df_t.iterrows():
                         for col in df_t.columns:
                             pdf.cell(largeur_col, 6, str(row[col])[:15], border=1)
                         pdf.ln()
                     pdf.ln(4)
-
-            # Ajout des informations analytiques de la base de collecte
-            if "dc_master_data" in st.session_state and isinstance(st.session_state.dc_master_data, pd.DataFrame):
-                pdf.set_font("Helvetica", 'B', 11)
-                pdf.set_text_color(30, 58, 138)
-                pdf.cell(0, 8, "Registre de Collecte (Métrologie et mesures brutes) :", ln=1)
-                pdf.set_font("Helvetica", size=10)
-                pdf.set_text_color(0, 0, 0)
-                pdf.cell(0, 6, f"-> Inclus : {len(st.session_state.dc_master_data)} lignes complètes archivées dans le fichier Excel joint.", ln=1)
+                
+                # CAS 3 : C'est une chaîne de caractères (Commentaires, notes, Problem Statement)
+                elif isinstance(valeur, str) and valeur != "":
+                    pdf.set_font("Helvetica", 'B', 11)
+                    pdf.set_text_color(30, 58, 138)
+                    pdf.cell(0, 8, f"Saisie / {str(cle).upper()} :", ln=1)
+                    pdf.set_font("Helvetica", size=10)
+                    pdf.set_text_color(0, 0, 0)
+                    pdf.multi_cell(0, 6, str(valeur))
+                    pdf.ln(3)
 
             pdf_bytes = pdf.output()
             
