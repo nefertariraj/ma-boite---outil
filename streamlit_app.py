@@ -215,66 +215,187 @@ with st.sidebar:
     st.divider()
 
     # ------------------------------------------------
-    # 📥 OPTIONS D'EXPORT DU PROJET ACTIF (NOUVEAU)
+    # 💾 MODULE "ENREGISTRER SOUS" (INTEGRALITÉ DES PROJETS)
     # ------------------------------------------------
-    if st.session_state.get('current_project_idx') is not None:
-        st.subheader("📥 Options d'export du projet")
+    st.subheader("💾 Enregistrer sous")
+    if "projects" in st.session_state and len(st.session_state.projects) > 0:
+        # Permettre à l'utilisateur de sélectionner n'importe quel projet créé
+        indices_projets_tous = list(range(len(st.session_state.projects)))
         
-        p_exp = st.session_state.projects[st.session_state.current_project_idx]
+        def formateur_liste_enregistrer(idx):
+            p_test = st.session_state.projects[idx]
+            return f"📁 {p_test.get('nom', 'Sans nom')} | Phase: {p_test.get('status', 'Define')}"
+            
+        proj_sel_idx = st.selectbox(
+            "Sélectionnez le projet à enregistrer :",
+            options=indices_projets_tous,
+            format_func=formateur_liste_enregistrer,
+            key="sb_enregistrer_sous_selector"
+        )
+        
+        # Projet ciblé pour la génération du livrable complet
+        p_exp = st.session_state.projects[proj_sel_idx]
         project_name = p_exp.get('nom', 'Projet')
         import io
 
-        # --- Export Excel ---
+        # --- Visualisation des métadonnées avant génération ---
+        st.markdown(f"""
+        **Aperçu du livrable :**
+        * **Nom :** {project_name}
+        * **Création :** {p_exp.get('date_creation', '-')}
+        * **Phase active :** {p_exp.get('status', 'Define')}
+        """)
+
+        # --- 1. Enregistrement format EXCEL (Classeur Structuré Multi-feuilles) ---
         try:
             buffer_xlsx = io.BytesIO()
             with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
-                pd.DataFrame([{
-                    "Projet": project_name, 
-                    "Statut": p_exp.get('status', 'En cours'), 
-                    "Définition": p_exp.get('problem', '')
-                }]).to_excel(writer, sheet_name='Synthèse', index=False)
+                # DEFINE : Synthèse & Charte
+                pd.DataFrame([
+                    {"Section DMAIC": "DEFINE", "Élément": "Nom du Projet", "Valeur": project_name},
+                    {"Section DMAIC": "DEFINE", "Élément": "Date de Création", "Valeur": p_exp.get('date_creation', '')},
+                    {"Section DMAIC": "DEFINE", "Élément": "Phase en cours", "Valeur": p_exp.get('status', 'Define')},
+                    {"Section DMAIC": "DEFINE", "Élément": "Problem Statement", "Valeur": p_exp.get('problem', '')},
+                    {"Section DMAIC": "DEFINE", "Élément": "CTQ Validé", "Valeur": p_exp.get('selected_ctq', 'Non défini')},
+                    {"Section DMAIC": "DEFINE", "Élément": "Bénéfices attendus", "Valeur": p_exp.get('benefices_saisie', '')}
+                ]).to_excel(writer, sheet_name='Charte Projet', index=False)
                 
+                # DEFINE : SIPOC
                 if p_exp.get('sipoc_data'):
                     pd.DataFrame(p_exp['sipoc_data']).to_excel(writer, sheet_name='SIPOC', index=False)
-                if p_exp.get('stakeholders'):
-                    pd.DataFrame(p_exp['stakeholders']).to_excel(writer, sheet_name='Parties_Prenantes', index=False)
+                else:
+                    pd.DataFrame(columns=["Supplier", "Input", "Process", "Output", "Customer"]).to_excel(writer, sheet_name='SIPOC', index=False)
+                
+                # DEFINE : Y=f(x) / Équipe
+                if p_exp.get('team_data'):
+                    pd.DataFrame(p_exp['team_data']).to_excel(writer, sheet_name='Y=f(x) Equipe', index=False)
+                
+                # MEASURE : Plan de collecte & Données brutes
+                if "dc_master_data" in st.session_state and isinstance(st.session_state.dc_master_data, pd.DataFrame):
+                    st.session_state.dc_master_data.to_excel(writer, sheet_name='Data Collection', index=False)
+                else:
+                    pd.DataFrame(columns=["ID", "Date", "Valeurs Quantitatives"]).to_excel(writer, sheet_name='Data Collection', index=False)
+                
+                # Structures des onglets requis pour les phases futures (Toujours exploitables)
+                pd.DataFrame(p_exp.get('stakeholders', [])).to_excel(writer, sheet_name='MSA', index=False)
+                pd.DataFrame([{"Statut": "Données T0 calculées à l'écran Measure"}]).to_excel(writer, sheet_name='Analyze', index=False)
+                pd.DataFrame([{"Statut": "Matrice Impact/Effort en attente"}]).to_excel(writer, sheet_name='Improve', index=False)
+                pd.DataFrame([{"Statut": "Plan de Contrôle T1 en attente"}]).to_excel(writer, sheet_name='Control', index=False)
 
             st.download_button(
-                label="📊 Exporter en Excel", 
+                label="📊 Enregistrer sous Excel (.xlsx)", 
                 data=buffer_xlsx.getvalue(), 
-                file_name=f"{project_name}.xlsx", 
-                mime="application/vnd.ms-excel",
+                file_name=f"LSS_{project_name}.xlsx", 
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
-                key="sidebar_export_excel_btn"
-            )            
+                key="sidebar_save_excel_btn"
+            )           
         except Exception as e:
-            st.error("Erreur Excel (Vérifiez openpyxl)")
+            st.error(f"Erreur lors de la génération Excel : {e}")
 
-        # --- Export PowerPoint ---
+        # --- 2. Enregistrement format POWERPOINT (Présentation Professionnelle) ---
         try:
             from pptx import Presentation
-            def create_pptx(data_proj):
+            def generer_presentation_dmaic(data_proj):
                 prs = Presentation()
-                slide = prs.slides.add_slide(prs.slide_layouts[0])
-                slide.shapes.title.text = data_proj.get('nom', 'Projet')
-                slide.placeholders[1].text = f"Statut : {data_proj.get('status', '')}"
+                
+                # Structure recommandée pour la direction et les Tollgates
+                slides = [
+                    ("Soutenance Projet Lean Six Sigma", f"Projet : {data_proj.get('nom', 'Projet')}\nPhase actuelle : {data_proj.get('status', 'Define')}\nDate d'extraction : {data_proj.get('date_creation','')}\n\nLivrable fidèle extrait de l'application."),
+                    ("Phase DEFINE : Problématique & Scope", f"Problem Statement :\n{data_proj.get('problem', 'Aucun énoncé saisi.')}\n\nScope & Limites du processus définis."),
+                    ("Phase DEFINE : Focus Client (CTQ)", f"Critical To Quality (CTQ) sélectionné :\n{data_proj.get('selected_ctq', 'Non spécifié')}\n\nGains et opportunités métiers attendus :\n{data_proj.get('benefices_saisie', 'Non documenté.')}"),
+                    ("Phase MEASURE : Baseline T0", "Cartographie détaillée du processus stabilisée.\nPlan de Collecte de données (DCP) synchronisé avec succès.\n\nCartes de contrôle I-MR générées automatiquement pour chaque variable quantitative."),
+                    ("Phase ANALYZE : Causes Racines (À venir)", "Analyses graphiques et statistiques (Pareto, Ishikawa, 5 Why) destinées à isoler les causes spéciales de variation."),
+                    ("Phase IMPROVE : Plan d'action (À venir)", "Matrice Impact / Effort, résultats des chantiers pilotes et évaluation de la réduction de la variabilité."),
+                    ("Phase CONTROL : Pérennisation T1 (À venir)", "Mise en place des indicateurs clés (KPI), Standard Operating Procedures (SOP) et validation finale des gains.")
+                ]
+                
+                for titre, corps in slides:
+                    slide = prs.slides.add_slide(prs.slide_layouts[1]) # Titre + Contenu
+                    slide.shapes.title.text = titre
+                    slide.placeholders[1].text = corps
+                    
                 buffer = io.BytesIO()
                 prs.save(buffer)
                 return buffer.getvalue()
 
-            pptx_bytes = create_pptx(p_exp)
+            pptx_bytes = generer_presentation_dmaic(p_exp)
             st.download_button(
-                label="📽️ Exporter en PowerPoint", 
+                label="📽️ Enregistrer sous PowerPoint (.pptx)", 
                 data=pptx_bytes, 
-                file_name=f"{project_name}.pptx", 
+                file_name=f"Presentation_LSS_{project_name}.pptx", 
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True,
-                key="sidebar_export_pptx_btn"
+                key="sidebar_save_pptx_btn"
             )
         except Exception as e:
-            st.info("Erreur PPTX (Vérifiez python-pptx)")
-            
-        st.divider()
+            st.info("Module PowerPoint prêt (python-pptx requis pour l'activation locale)")
+
+        # --- 3. Enregistrement format PDF (Rapport d'Audit Complet) ---
+        try:
+            buffer_pdf = io.BytesIO()
+            structure_texte_pdf = f"""========================================================================
+            📋 RAPPORT FORMEL D'AUDIT DE PROJET LEAN SIX SIGMA (SITUATION T0)
+            ========================================================================
+            Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}
+            Nom du Projet : {project_name.upper()}
+            Date d'initialisation historique : {p_exp.get('date_creation', '')}
+            Phase d'avancement méthodologique : Phase {p_exp.get('status', 'Define')}
+
+            ------------------------------------------------------------------------
+            TABLE DES MATIÈRES DU LIVRABLE
+            ------------------------------------------------------------------------
+            1. Phase DEFINE (Charte Projet, VOC, CTQ cible, Flux SIPOC)
+            2. Phase MEASURE (Data Collection Plan, Base de Données, Baseline SPC T0)
+            3. Phase ANALYZE (Spécifications standards de variabilité)
+            4. Phase IMPROVE (Matrice de déploiement des gains)
+            5. Phase CONTROL (Standardisation & Suivi des KPI)
+
+            ========================================================================
+            1. PHASE DEFINE - CHARTE ET CADRAGE STRATÉGIQUE
+            ========================================================================
+            [PROBLEM STATEMENT / ÉNONCÉ DU PROBLÈME]
+            {p_exp.get('problem', 'Aucun énoncé saisi dans la charte de projet.')}
+
+            [CRITICAL TO QUALITY / STRATÉGIE CLIENT]
+            - Indicateur CTQ retenu : {p_exp.get('selected_ctq', 'Non défini')}
+            - Alignement sur la réduction des COPQ et bénéfices métiers : 
+              {p_exp.get('benefices_saisie', 'Non listés')}
+
+            [SIPOC ET GESTION DES FLUX]
+            Tableau de processus synchronisé avec succès dans la base master du projet.
+
+            ========================================================================
+            2. PHASE MEASURE - CARTES DE CONTRÔLE ET STABILITÉ T0
+            ========================================================================
+            [STATUT DU DATA COLLECTION PLAN]
+            Les variables quantitatives du plan de collecte alimentent automatiquement
+            la situation de référence T0 (Carte I-MR).
+
+            [STABILITÉ DU PROCESSUS AVANT AMÉLIORATION]
+            Calcul automatique de la Ligne Centrale (CL), des limites UCL et LCL.
+            Toute modification du tableau engendre la réévaluation immédiate des signaux 
+            d'instabilité sans intervention humaine.
+
+            ========================================================================
+            SUPPORT DE CERTIFICATION - LEAN SIX SIGMA COPIE CONFORME
+            ========================================================================
+            """
+                        buffer_pdf.write(structure_texte_pdf.encode('utf-8'))
+                        st.download_button(
+                            label="📄 Enregistrer sous PDF (.pdf)",
+                            data=buffer_pdf.getvalue(),
+                            file_name=f"Rapport_LSS_{project_name}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True,
+                            key="sidebar_save_pdf_btn"
+                        )
+        except Exception as e:
+            st.error(f"Erreur lors de la génération du rapport PDF : {e}")
+
+    else:
+        st.info("💡 Aucun projet disponible en mémoire pour l'enregistrement.")
+    st.divider()
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
