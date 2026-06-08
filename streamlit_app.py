@@ -383,7 +383,7 @@ with st.sidebar:
 
 
         # =====================================================================
-        # 📄 3. EXPORTATION PDF DE TYPE ARCHIVE (Sécurisée contre l'ambiguïté des DF)
+        # 📄 3. EXPORTATION PDF DE TYPE ARCHIVE (Sécurisée contre l'ambiguïté des DF et les caractères Unicode)
         # =====================================================================
         try:
             from fpdf import FPDF
@@ -402,6 +402,24 @@ with st.sidebar:
                     self.set_text_color(156, 163, 175)
                     self.cell(0, 10, f'Livrable d\'archive autonome - Page {self.page_no()}', 0, 0, 'C')
 
+            # Fonction de sécurisation des caractères non supportés par Helvetica
+            def nettoyer_texte(texte):
+                if not isinstance(texte, str):
+                    texte = str(texte)
+                remplacements = {
+                    "≥": ">=",
+                    "≤": "<=",
+                    "≠": "!=",
+                    "±": "+/-",
+                    "µ": "u",
+                    "²": "2",
+                    "³": "3"
+                }
+                for carac, subst in remplacements.items():
+                    texte = texte.replace(carac, subst)
+                # Encodage de sécurité pour nettoyer les résidus bizarres
+                return texte.encode('latin-1', 'replace').decode('latin-1')
+
             pdf = PDF()
             pdf.add_page()
             pdf.set_font("Helvetica", size=10)
@@ -409,7 +427,7 @@ with st.sidebar:
             # En-tête de l'archive
             pdf.set_font("Helvetica", 'B', 14)
             pdf.set_text_color(13, 148, 136)
-            pdf.cell(0, 10, f"PROJET DMAIC : {project_name.upper()}", ln=1)
+            pdf.cell(0, 10, f"PROJET DMAIC : {nettoyer_texte(project_name.upper())}", ln=1)
             pdf.set_font("Helvetica", size=10)
             pdf.set_text_color(0, 0, 0)
             pdf.cell(0, 6, f"Date de l'instantané d'impression : {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1)
@@ -427,43 +445,44 @@ with st.sidebar:
                         continue
                     pdf.set_font("Helvetica", 'B', 11)
                     pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Tableau Associé - {str(cle).upper()} :", ln=1)
+                    pdf.cell(0, 8, f"Tableau Associé - {nettoyer_texte(cle).upper()} :", ln=1)
                     pdf.ln(2)
                     
                     pdf.set_font("Helvetica", 'B', 9)
                     largeur_col = int(180 / max(len(valeur.columns), 1))
                     for col in valeur.columns:
-                        pdf.cell(largeur_col, 7, str(col)[:15], border=1)
+                        pdf.cell(largeur_col, 7, nettoyer_texte(col)[:15], border=1)
                     pdf.ln()
                     
                     pdf.set_font("Helvetica", size=9)
-                    # On affiche les 15 premières lignes dans le PDF pour l'aperçu visuel (Excel contient l'intégralité)
                     for _, row in valeur.head(15).iterrows():
                         for col in valeur.columns:
-                            pdf.cell(largeur_col, 6, str(row[col])[:15], border=1)
+                            cell_val = nettoyer_texte(row[col])
+                            pdf.cell(largeur_col, 6, cell_val[:15], border=1)
                         pdf.ln()
                     if len(valeur) > 15:
-                        pdf.cell(0, 6, f"... (+ {len(valeur) - 15} lignes archivées intégralement dans l'onglet Excel correspondant)", ln=1)
+                        pdf.cell(0, 6, nettoyer_texte(f"... (+ {len(valeur) - 15} lignes archivées intégralement dans l'onglet Excel correspondant)"), ln=1)
                     pdf.ln(4)
                 
                 # CAS 2 : C'est une liste de dictionnaires (SIPOC, etc.)
                 elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
                     pdf.set_font("Helvetica", 'B', 11)
                     pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Tableau de Structure - {str(cle).upper()} :", ln=1)
+                    pdf.cell(0, 8, f"Tableau de Structure - {nettoyer_texte(cle).upper()} :", ln=1)
                     pdf.ln(2)
                     
                     df_t = pd.DataFrame(valeur)
                     pdf.set_font("Helvetica", 'B', 9)
                     largeur_col = int(180 / max(len(df_t.columns), 1))
                     for col in df_t.columns:
-                        pdf.cell(largeur_col, 7, str(col)[:15], border=1)
+                        pdf.cell(largeur_col, 7, nettoyer_texte(col)[:15], border=1)
                     pdf.ln()
                     
                     pdf.set_font("Helvetica", size=9)
                     for _, row in df_t.iterrows():
                         for col in df_t.columns:
-                            pdf.cell(largeur_col, 6, str(row[col])[:15], border=1)
+                            cell_val = nettoyer_texte(row[col])
+                            pdf.cell(largeur_col, 6, cell_val[:15], border=1)
                         pdf.ln()
                     pdf.ln(4)
                 
@@ -471,10 +490,10 @@ with st.sidebar:
                 elif isinstance(valeur, str) and valeur != "":
                     pdf.set_font("Helvetica", 'B', 11)
                     pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Saisie / {str(cle).upper()} :", ln=1)
+                    pdf.cell(0, 8, f"Saisie / {nettoyer_texte(cle).upper()} :", ln=1)
                     pdf.set_font("Helvetica", size=10)
                     pdf.set_text_color(0, 0, 0)
-                    pdf.multi_cell(0, 6, str(valeur))
+                    pdf.multi_cell(0, 6, nettoyer_texte(valeur))
                     pdf.ln(3)
 
             pdf_bytes = pdf.output()
@@ -489,10 +508,6 @@ with st.sidebar:
             )
         except Exception as e:
             st.error(f"Erreur lors de l'extraction PDF : {e}")
-
-    else:
-        st.info("💡 Aucun projet initialisé ou détecté dans la mémoire de l'application.")
-    st.divider()
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
