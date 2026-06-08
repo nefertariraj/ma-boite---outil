@@ -235,6 +235,7 @@ with st.sidebar:
         p_exp = st.session_state.projects[proj_sel_idx]
         project_name = p_exp.get('nom', 'Projet')
         import io
+        from datetime import datetime
 
         st.markdown(f"""
         **Aperçu du livrable :**
@@ -256,7 +257,7 @@ with st.sidebar:
                     {"Section": "DEFINE", "Paramètre": "Bénéfices quantifiés", "Valeur": p_exp.get('benefices_saisie', '')}
                 ]).to_excel(writer, sheet_name='Charte Projet', index=False)
                 
-                # DEFINE : SIPOC complet (Correction de la ligne 261)
+                # DEFINE : SIPOC complet
                 sipoc_list = p_exp.get('sipoc_data', [])
                 if sipoc_list:
                     pd.DataFrame(sipoc_list).to_excel(writer, sheet_name='SIPOC', index=False)
@@ -338,7 +339,7 @@ with st.sidebar:
                 
                 img_buf = io.BytesIO()
                 try:
-                    fig_spc.write_image(img_buf, format="png", width=1000, height=600, engine="kalido")
+                    fig_spc.write_image(img_buf, format="png", width=1000, height=600)
                 except:
                     fig_spc.savefig(img_buf, format="png", bbox_inches='tight')
                 
@@ -356,69 +357,89 @@ with st.sidebar:
                 key="sidebar_save_pptx_btn"
             )
         except Exception as e:
-            st.info("Module PowerPoint prêt pour l'exportation des métadonnées graphiques.")
+            st.error(f"Erreur PowerPoint : {e}")
 
-        # --- 3. ENREGISTREMENT FORMAT PDF (ReportLab) ---
+        # --- 3. ENREGISTREMENT FORMAT PDF (fpdf2) ---
         try:
-            from reportlab.lib.pagesizes import letter
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-            from reportlab.lib import colors
+            from fpdf import FPDF
+            
+            class PDF(FPDF):
+                def header(self):
+                    self.set_font('Helvetica', 'B', 12)
+                    self.set_text_color(30, 58, 138)
+                    self.cell(0, 10, "RAPPORT D'AUDIT METHODOLOGIQUE LEAN SIX SIGMA", border=0, ln=1, align='L')
+                    self.line(10, 18, 200, 18)
+                    self.ln(5)
+                    
+                def footer(self):
+                    self.set_y(-15)
+                    self.set_font('Helvetica', 'I', 8)
+                    self.set_text_color(156, 163, 175)
+                    self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
 
-            buffer_pdf = io.BytesIO()
-            doc = SimpleDocTemplate(buffer_pdf, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
-            story = []
+            pdf = PDF()
+            pdf.add_page()
+            pdf.set_font("Helvetica", size=10)
             
-            styles = getSampleStyleSheet()
-            style_titre = ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=18, leading=22, textColor=colors.HexColor('#1E3A8A'), spaceAfter=15)
-            style_h2 = ParagraphStyle('H2Style', parent=styles['Heading2'], fontSize=14, leading=18, textColor=colors.HexColor('#0D9488'), spaceBefore=12, spaceAfter=8)
-            style_corps = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6)
+            # Métadonnées du Projet
+            pdf.set_font("Helvetica", 'B', 14)
+            pdf.set_text_color(13, 148, 136)
+            pdf.cell(0, 10, f"Projet : {project_name.upper()}", ln=1)
+            pdf.set_font("Helvetica", size=10)
+            pdf.set_text_color(0, 0, 0)
+            pdf.cell(0, 6, f"Phase Actuelle du Cadrage : {p_exp.get('status', 'Define')}", ln=1)
+            pdf.cell(0, 6, f"Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1)
+            pdf.ln(5)
             
-            story.append(Paragraph(f"RAPPORT FORMEL D'AUDIT LEAN SIX SIGMA", style_titre))
-            story.append(Paragraph(f"<b>Projet :</b> {project_name.upper()} | <b>Statut :</b> Phase {p_exp.get('status', 'Define')}", style_corps))
-            story.append(Paragraph(f"<b>Date d'extraction :</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", style_corps))
-            story.append(Spacer(1, 15))
+            # Section 1 : Define
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.set_text_color(30, 58, 138)
+            pdf.cell(0, 10, "1. Phase DEFINE - Cadrage & Objectifs Client", ln=1)
+            pdf.set_font("Helvetica", size=10)
+            pdf.set_text_color(0, 0, 0)
             
-            story.append(Paragraph("1. Phase DEFINE — Cadrage Stratégique & Charte", style_h2))
-            story.append(Paragraph(f"<b>Problem Statement :</b> {p_exp.get('problem', 'Non renseigné dans le système.')}", style_corps))
-            story.append(Paragraph(f"<b>Indicateur CTQ retenu :</b> {p_exp.get('selected_ctq', 'Non défini')}", style_corps))
-            story.append(Paragraph(f"<b>Gains financiers / Réduction COPQ :</b> {p_exp.get('benefices_saisie', 'Non quantifiés')}", style_corps))
-            story.append(Spacer(1, 10))
+            pdf.multi_cell(0, 6, f"• Problem Statement :\n{p_exp.get('problem', 'Non configuré.')}")
+            pdf.ln(2)
+            pdf.multi_cell(0, 6, f"• Indicateur CTQ Cible : {p_exp.get('selected_ctq', 'Non défini.')}")
+            pdf.ln(2)
+            pdf.multi_cell(0, 6, f"• Alignement financier & COPQ : {p_exp.get('benefices_saisie', 'Non quantifié.')}")
+            pdf.ln(5)
             
+            # Section 2 : SIPOC
             if p_exp.get('sipoc_data'):
-                story.append(Paragraph("Alignement du Flux de Processus Macro (SIPOC) :", style_corps))
-                data_table = [["S", "I", "P", "O", "C"]]
+                pdf.set_font("Helvetica", 'B', 11)
+                pdf.cell(0, 8, "Alignement de la Cartographie macro du Processus (SIPOC) :", ln=1)
+                pdf.set_font("Helvetica", 'B', 9)
+                
+                pdf.cell(35, 7, "Supplier", border=1)
+                pdf.cell(35, 7, "Input", border=1)
+                pdf.cell(45, 7, "Process", border=1)
+                pdf.cell(35, 7, "Output", border=1)
+                pdf.cell(35, 7, "Customer", border=1, ln=1)
+                
+                pdf.set_font("Helvetica", size=9)
                 for item in p_exp['sipoc_data']:
-                    data_table.append([
-                        str(item.get('Supplier', item.get('S', ''))),
-                        str(item.get('Input', item.get('I', ''))),
-                        str(item.get('Process', item.get('P', ''))),
-                        str(item.get('Output', item.get('O', ''))),
-                        str(item.get('Customer', item.get('C', '')))
-                    ])
-                t = Table(data_table, colWidths=[100, 100, 120, 100, 100])
-                t.setStyle(TableStyle([
-                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F3F4F6')),
-                    ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#1F2937')),
-                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                    ('BOTTOMPADDING', (0,0), (-1,0), 6),
-                    ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-                    ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
-                    ('FONTSIZE', (0,0), (-1,-1), 9),
-                ]))
-                story.append(t)
+                    pdf.cell(35, 6, str(item.get('Supplier', item.get('S', '')))[0:18], border=1)
+                    pdf.cell(35, 6, str(item.get('Input', item.get('I', '')))[0:18], border=1)
+                    pdf.cell(45, 6, str(item.get('Process', item.get('P', '')))[0:22], border=1)
+                    pdf.cell(35, 6, str(item.get('Output', item.get('O', '')))[0:18], border=1)
+                    pdf.cell(35, 6, str(item.get('Customer', item.get('C', '')))[0:18], border=1, ln=1)
+                pdf.ln(5)
+
+            # Section 3 : Measure
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.set_text_color(30, 58, 138)
+            pdf.cell(0, 10, "2. Phase MEASURE - Plan de Collecte Statistique (T0)", ln=1)
+            pdf.set_font("Helvetica", size=10)
+            pdf.set_text_color(0, 0, 0)
+            pdf.multi_cell(0, 6, "Les données collectées et enregistrées à l'écran 'Measure' servent d'historique de capabilité.\nLe calcul des limites (UCL/LCL) s'exécute automatiquement en tâche de fond pour garantir la conformité aux audits de certification interne.")
             
-            story.append(Spacer(1, 12))
-            story.append(Paragraph("2. Phase MEASURE — Capabilité & Collecte", style_h2))
-            story.append(Paragraph("Les variables quantitatives issues du Plan de Collecte de Données (DCP) alimentent en continu la ligne de référence T0.", style_corps))
-            story.append(Paragraph("Les limites de contrôle (UCL, LCL) et la ligne centrale sont figées conformément aux standards de la Westgard et de la MSP.", style_corps))
-            
-            doc.build(story)
+            # Correction ici : fpdf2 renvoie déjà un objet bytes valide avec output()
+            pdf_bytes = pdf.output()
             
             st.download_button(
                 label="📄 Enregistrer sous PDF (.pdf)",
-                data=buffer_pdf.getvalue(),
+                data=pdf_bytes,
                 file_name=f"Rapport_LSS_{project_name}.pdf",
                 mime="application/pdf",
                 use_container_width=True,
