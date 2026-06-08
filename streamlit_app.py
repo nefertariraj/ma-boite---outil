@@ -350,7 +350,7 @@ with st.sidebar:
             prs.save(buffer_pptx)
             st.download_button(
                 label="📽️ Enregistrer sous PowerPoint (.pptx)", 
-                data=buffer_pptx.getvalue(), 
+                data=bytes(buffer_pptx.getvalue()), # Sécurisé en bytes standard
                 file_name=f"Presentation_LSS_{project_name}.pptx", 
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True,
@@ -359,7 +359,7 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur PowerPoint : {e}")
 
-        # --- 3. ENREGISTREMENT FORMAT PDF (fpdf2 sans puces Unicode problématiques) ---
+        # --- 3. ENREGISTREMENT FORMAT PDF (fpdf2 corrigé pour forcer le type bytes) ---
         try:
             from fpdf import FPDF
             
@@ -398,7 +398,6 @@ with st.sidebar:
             pdf.set_font("Helvetica", size=10)
             pdf.set_text_color(0, 0, 0)
             
-            # Utilisation de tirets "-" standards au lieu du caractère Unicode "•"
             pdf.multi_cell(0, 6, f"- Problem Statement :\n{p_exp.get('problem', 'Non configuré.')}")
             pdf.ln(2)
             pdf.multi_cell(0, 6, f"- Indicateur CTQ Cible : {p_exp.get('selected_ctq', 'Non défini.')}")
@@ -435,11 +434,12 @@ with st.sidebar:
             pdf.set_text_color(0, 0, 0)
             pdf.multi_cell(0, 6, "Les données collectées et enregistrées à l'écran 'Measure' servent d'historique de capabilité.\nLe calcul des limites (UCL/LCL) s'exécute automatiquement en tâche de fond pour garantir la conformité aux audits de certification interne.")
             
+            # Résolution de l'erreur bytearray -> conversion stricte en bytes pour Streamlit
             pdf_bytes = pdf.output()
             
             st.download_button(
                 label="📄 Enregistrer sous PDF (.pdf)",
-                data=pdf_bytes,
+                data=bytes(pdf_bytes),
                 file_name=f"Rapport_LSS_{project_name}.pdf",
                 mime="application/pdf",
                 use_container_width=True,
