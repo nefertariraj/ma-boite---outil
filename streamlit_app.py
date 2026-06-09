@@ -1994,10 +1994,61 @@ else:
                 p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
                 st.rerun()
 
-            # =====================================================================
+           # =====================================================================
             # 🔄 PERSISTANCE DE LA VARIABLE POUR LE RESTE DU SCRIPT
             # =====================================================================
             df_classification_current = st.session_state[msa_classif_key]
+
+            # =====================================================================
+            # 🧪 SECTION TESTS TERRAIN (RÉPÉTABILITÉ & REPRODUCTIBILITÉ) SANS LATENCE
+            # =====================================================================
+            st.write("---")
+            st.markdown("##### 📊 Saisie des Essais Terrain (Gage R&R / Kappa)")
+            st.info("💡 **Saisie Fluide :** Vous pouvez modifier toutes les cases de vos tests ci-dessous. Aucun écran blanc ne se produira en changeant de cellule. Cliquez sur le bouton en bas pour valider vos calculs.")
+
+            # 📦 UN SEUL FORMULAIRE POUR TOUS LES TESTS TERRAIN
+            with st.form(key=f"form_tests_terrain_msa_{safe_idx}"):
+                
+                col_rep, col_reprod = st.columns(2)
+                
+                with col_rep:
+                    st.caption("🔍 **1. Test de Répétabilité (Même opérateur / Même pièce)**")
+                    # Ce tableau devient totalement fluide car il est isolé dans le formulaire
+                    edited_rep_df = st.data_editor(
+                        st.session_state[rep_key],
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"widget_rep_{safe_idx}"
+                    )
+                    
+                with col_reprod:
+                    st.caption("👥 **2. Test de Reproductibilité (Opérateurs différents / Même pièce)**")
+                    # Ce tableau devient également fluide
+                    edited_reprod_df = st.data_editor(
+                        st.session_state[reprod_key],
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"widget_reprod_{safe_idx}"
+                    )
+                
+                st.write("")
+                # Unique bouton pour enregistrer les deux tableaux d'un coup et lancer les calculs Six Sigma
+                calculer_msa = st.form_submit_button("⚡ Valider les Essais & Lancer les Calculs MSA", type="primary")
+
+            # 🔄 ENREGISTREMENT ET CALCULS UNIQUEMENT AU CLIC
+            if calculer_msa:
+                # Sauvegarde Répétabilité
+                st.session_state[rep_key] = edited_rep_df
+                if 'p' in locals() and isinstance(p, dict):
+                    p["rep_table_data"] = edited_rep_df.to_dict(orient="records")
+                
+                # Sauvegarde Reproductibilité
+                st.session_state[reprod_key] = edited_reprod_df
+                if 'p' in locals() and isinstance(p, dict):
+                    p["reprod_table_data"] = edited_reprod_df.to_dict(orient="records")
+                
+                st.toast("📊 Calculs MSA mis à jour !", icon="📈")
+                st.rerun()
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
