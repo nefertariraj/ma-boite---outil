@@ -1957,7 +1957,7 @@ else:
                         })
                     st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
-            # Sécurité de type : conversion forcée en DataFrame si c'était stocké sous forme de liste
+            # Sécurité de type : conversion forcée en DataFrame
             if isinstance(st.session_state[msa_classif_key], list):
                 st.session_state[msa_classif_key] = pd.DataFrame(st.session_state[msa_classif_key])
 
@@ -1966,28 +1966,34 @@ else:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Ajustez vos données librement. Les modifications s'enregistrent instantanément en tâche de fond.*")
-            
-            # 🚀 L'ÉDITEUR ASYNCHRONE NATIF ET ULTRA-RAPIDE
-            # Utiliser st.session_state[msa_classif_key] directement supprime le lag de saisie
-            df_classification_current = st.data_editor(
-                st.session_state[msa_classif_key],
-                num_rows="dynamic",
-                use_container_width=True,
-                key=f"editor_widget_{safe_idx}",
-                column_config={
-                    nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
-                    "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
-                    "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
-                    "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
-                    "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
-                }
-            )
+            # 📦 ISOLATION DANS UN FORMULAIRE POUR LE BLOCAGE DU RENDU EN DIRECT
+            with st.form(key=f"msa_form_{safe_idx}", clear_on_submit=False):
+                st.write("✏️ *Modifiez votre matrice ci-dessous. La saisie est totalement isolée et instantanée.*")
+                
+                # L'éditeur de données s'exécute désormais localement sans interaction serveur immédiate
+                edited_df = st.data_editor(
+                    st.session_state[msa_classif_key],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"editor_widget_{safe_idx}",
+                    column_config={
+                        nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
+                        "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
+                        "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
+                        "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
+                        "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
+                    }
+                )
+                
+                # Bouton unique de soumission qui applique les changements d'un seul coup
+                soumettre_changements = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
 
-            # 🔄 Synchronisation silencieuse en tâche de fond sans aucun st.rerun() agressif
-            if df_classification_current is not None:
-                st.session_state[msa_classif_key] = df_classification_current
-                p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
+            # 🔄 Traitement unique des données après validation du formulaire
+            if soumettre_changements and edited_df is not None:
+                st.session_state[msa_classif_key] = edited_df
+                p["msa_classification_table"] = edited_df.to_dict(orient="records")
+                st.toast("⚙️ Données enregistrées et synchronisées avec succès !", icon="✅")
+                st.rerun()
 
             # =====================================================================
             # 🔄 PERSISTANCE DE LA VARIABLE POUR LE RESTE DU SCRIPT
