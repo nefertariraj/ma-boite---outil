@@ -1970,35 +1970,37 @@ else:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Saisissez vos données en toute fluidité. Cliquez sur le bouton ci-dessous pour sauvegarder.*")
-            
-            # Récupération de la source de données directe et propre (Plus de boucle de vérification lente avant affichage)
             df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
 
             if not df_classification_current.empty and "statut validation" not in df_classification_current.columns:
                 df_classification_current["statut validation"] = "en attente de test"
 
-            # L'éditeur de données consomme maintenant le DataFrame de manière brute et ultra-rapide
-            edited_classification = st.data_editor(
-                df_classification_current,
-                num_rows="dynamic",
-                use_container_width=True,
-                column_config={
-                    nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
-                    "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
-                    "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
-                    "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
-                    "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
-                }
-            )
-            
-            # 💾 SAUVEGARDE PHYSIQUE ET POST-TRAITEMENT DES STATUTS
-            if st.button("💾 Enregistrer et Figer la Matrice de Qualification MSA", key=f"save_msa_classif_btn_{safe_idx}"):
+            # 🔒 INSULATION PAR FORMULAIRE : Bloque l'actualisation tant qu'on n'a pas validé
+            with st.form(key=f"msa_form_block_{safe_idx}"):
+                st.write("📝 **Zone de Saisie Isolée :** Modifiez vos lignes ci-dessous sans aucune coupure d'écran.")
+                
+                edited_classification = st.data_editor(
+                    df_classification_current,
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    column_config={
+                        nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
+                        "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
+                        "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
+                        "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
+                        "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
+                    }
+                )
+                
+                # Le bouton de soumission du formulaire qui déclenche l'unique rafraîchissement global
+                submit_button = st.form_submit_button(label="💾 Enregistrer et Figer la Matrice de Qualification MSA")
+
+            # Traitement de la sauvegarde uniquement après soumission du formulaire
+            if submit_button:
                 if edited_classification is not None:
-                    # On fige les données dans le session state et dans le dictionnaire du projet
                     st.session_state[msa_classif_key] = edited_classification
                     p["msa_classification_table"] = edited_classification.to_dict(orient="records")
-                    st.success("✅ Matrice de configuration MSA enregistrée avec succès !")
+                    st.success("✅ Configuration MSA enregistrée avec succès !")
                     st.rerun()
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
