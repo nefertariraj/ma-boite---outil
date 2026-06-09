@@ -1925,7 +1925,7 @@ else:
             
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-            # 🛠️ CORRECTION EXCLUSIVE : Intégration systématique du Y et des X du Plan de Collecte réel dans la table MSA
+            # Intégration systématique du Y et des X du Plan de Collecte réel dans la table MSA
             if msa_classif_key not in st.session_state:
                 saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
                 if saved_classif:
@@ -1973,7 +1973,7 @@ else:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
+            st.write("👉 *Ajustez vos données librement ci-dessous. Vos modifications ne sauteront plus pendant la saisie. Cliquez sur le bouton de sauvegarde pour figer le registre.*")
             
             df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
 
@@ -1993,6 +1993,8 @@ else:
                         else:
                             df_classification_current.at[idx_row, "statut validation"] = "en attente de test"
 
+            # 🛠️ CONFIGURATION FLUIDE : Pas de paramètre 'key=' lié à l'état global du widget
+            # afin de couper l'écriture intruisve et destructrice à la volée pendant votre saisie.
             edited_classification = st.data_editor(
                 df_classification_current,
                 num_rows="dynamic",
@@ -2003,13 +2005,16 @@ else:
                     "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
                     "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", disabled=True),
                     "statut validation": st.column_config.TextColumn("Statut Validation", disabled=True)
-                },
-                key=f"classification_editor_widget_{safe_idx}"
+                }
             )
             
-            if edited_classification is not None:
-                st.session_state[msa_classif_key] = edited_classification
-                df_classification_current = edited_classification
+            # 💾 SAUVEGARDE PHYSIQUE UNIQUE AU CLIC : Sécurise la persistance sans pertes
+            if st.button("💾 Enregistrer et Figer la Matrice de Qualification MSA", key=f"save_msa_classif_btn_{safe_idx}"):
+                if edited_classification is not None:
+                    st.session_state[msa_classif_key] = edited_classification
+                    p["msa_classification_table"] = edited_classification.to_dict(orient="records")
+                    st.success("✅ Matrice de configuration MSA enregistrée avec succès dans le projet !")
+                    st.rerun()
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
