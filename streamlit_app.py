@@ -1900,39 +1900,32 @@ else:
             # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
             
-            # Nom de colonne unique et harmonisé pour tout le script
             nom_colonne_variable = "Variable Critique (liée au Y)"
-            
-            # 🔍 RECHERCHE ULTRA-LARGE SANS MODIFICATION DE LA PHASE 1
             project_y = "Indéterminé"
             
-            # Étape A : On cherche dans toutes les versions de 'p' stockées en mémoire
             for p_env in [p, st.session_state.get('p', {}), st.session_state.get('project_dict', {})]:
                 if isinstance(p_env, dict) and p_env.get("selected_ctq"):
                     project_y = p_env.get("selected_ctq")
                     break
             
-            # Étape B : Si toujours indéterminé, on cherche n'importe quelle clé qui contient 'ctq' ou 'y' dans la session
             if project_y == "Indéterminé" or project_y == "Non défini":
                 for k, v in st.session_state.items():
                     if any(x in k.lower() for x in ["ctq", "project_y", "variable_y"]) and isinstance(v, str) and v != "Non défini":
                         project_y = v
                         break
 
-            # Étape C : Si Streamlit a tout effacé à cause du changement d'onglet, on affiche le Y par défaut ou un avertissement
             if project_y == "Indéterminé" or project_y == "Non défini":
                 project_y = st.session_state.get("ctq_v", "Indéterminé")
             
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-            # Intégration systématique du Y et des X du Plan de Collecte réel dans la table MSA
+            # Initialisation de la table en session state si elle n'existe pas
             if msa_classif_key not in st.session_state:
                 saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
                 if saved_classif:
-                    st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
+                    st.session_state[msa_classif_key] = saved_classif
                 else:
                     ai_analyzed_rows = []
-                    
                     for idx, row in enumerate(st.session_state["master_dcp_table"]):
                         var_name = row.get("Variable à mesurer", "")
                         type_brut = row.get("Type de donnée", "Continue (Temps)")
@@ -1962,46 +1955,93 @@ else:
                             "Criticité par rapport au Y": criticite,
                             "statut validation": "en attente de test"
                         })
-                    
-                    st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
+                    st.session_state[msa_classif_key] = ai_analyzed_rows
 
             if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
                 if msa_classif_key in st.session_state:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
+            # 🛠️ TECHNIQUE DE FIXATION ABSOLUE : Formulaire natif en colonnes unitaires (Zéro Scintillement)
+            st.write("👉 *Saisissez vos ajustements. L'écran restera totalement fixe pendant la frappe.*")
+            
+            current_data_list = st.session_state.get(msa_classif_key, [])
+            updated_data_list = []
 
-            if not df_classification_current.empty and "statut validation" not in df_classification_current.columns:
-                df_classification_current["statut validation"] = "en attente de test"
+            # Entêtes du tableau personnalisé
+            header_cols = st.columns([2.5, 2, 2.5, 2, 1.5])
+            header_cols[0].markdown("**Variable Critique (liée au Y)**")
+            header_cols[1].markdown("**Type de Donnée**")
+            header_cols[2].markdown("**MSA Recommandé**")
+            header_cols[3].markdown("**Alignement sémantique Y**")
+            header_cols[4].markdown("**Statut**")
 
-            # 🔒 INSULATION PAR FORMULAIRE : Bloque l'actualisation tant qu'on n'a pas validé
-            with st.form(key=f"msa_form_block_{safe_idx}"):
-                st.write("📝 **Zone de Saisie Isolée :** Modifiez vos lignes ci-dessous sans aucune coupure d'écran.")
+            type_options = ["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"]
+            msa_options = ["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"]
+            status_options = ["en attente de test", "test effectué"]
+
+            # Génération des champs de saisie ligne par ligne
+            for i, row in enumerate(current_data_list):
+                cols = st.columns([2.5, 2, 2.5, 2, 1.5])
                 
-                edited_classification = st.data_editor(
-                    df_classification_current,
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    column_config={
-                        nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
-                        "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
-                        "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
-                        "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
-                        "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
-                    }
+                # Saisie ou modification libre de la variable
+                v_critique = cols[0].text_input(
+                    label=f"var_{i}", 
+                    value=row.get(nom_colonne_variable, ""), 
+                    label_visibility="collapsed",
+                    key=f"msa_input_var_{i}_{safe_idx}"
                 )
                 
-                # Le bouton de soumission du formulaire qui déclenche l'unique rafraîchissement global
-                submit_button = st.form_submit_button(label="💾 Enregistrer et Figer la Matrice de Qualification MSA")
+                # Choix des listes déroulantes standard (zéro recharge)
+                t_donnee = cols[1].selectbox(
+                    label=f"type_{i}", 
+                    options=type_options, 
+                    index=type_options.index(row.get("Type de Donnée")) if row.get("Type de Donnée") in type_options else 0,
+                    label_visibility="collapsed",
+                    key=f"msa_select_type_{i}_{safe_idx}"
+                )
+                
+                m_recommande = cols[2].selectbox(
+                    label=f"msa_{i}", 
+                    options=msa_options, 
+                    index=msa_options.index(row.get("MSA Recommandé")) if row.get("MSA Recommandé") in msa_options else 0,
+                    label_visibility="collapsed",
+                    key=f"msa_select_msa_{i}_{safe_idx}"
+                )
+                
+                # Criticité (On la garde sous forme de texte éditable ou fixe)
+                c_alignement = cols[3].text_input(
+                    label=f"crit_{i}", 
+                    value=row.get("Criticité par rapport au Y", "Moyenne (Facteur X)"), 
+                    label_visibility="collapsed",
+                    key=f"msa_input_crit_{i}_{safe_idx}"
+                )
+                
+                s_validation = cols[4].selectbox(
+                    label=f"stat_{i}", 
+                    options=status_options, 
+                    index=status_options.index(row.get("statut validation")) if row.get("statut validation") in status_options else 0,
+                    label_visibility="collapsed",
+                    key=f"msa_select_stat_{i}_{safe_idx}"
+                )
+                
+                # On compile la ligne en cours de saisie
+                updated_data_list.append({
+                    nom_colonne_variable: v_critique,
+                    "Type de Donnée": t_donnee,
+                    "MSA Recommandé": m_recommande,
+                    "Criticité par rapport au Y": c_alignement,
+                    "statut validation": s_validation
+                })
 
-            # Traitement de la sauvegarde uniquement après soumission du formulaire
-            if submit_button:
-                if edited_classification is not None:
-                    st.session_state[msa_classif_key] = edited_classification
-                    p["msa_classification_table"] = edited_classification.to_dict(orient="records")
-                    st.success("✅ Configuration MSA enregistrée avec succès !")
-                    st.rerun()
+            st.write("") # Espacement visuel
+
+            # 💾 UN_SEUL_BOUTON_D_ENREGISTRERMENT
+            if st.button("💾 Enregistrer et Figer la Matrice de Qualification MSA", key=f"save_msa_rows_btn_{safe_idx}"):
+                st.session_state[msa_classif_key] = updated_data_list
+                p["msa_classification_table"] = updated_data_list
+                st.success("✅ Configuration MSA enregistrée avec succès dans le projet !")
+                st.rerun()
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
