@@ -1964,7 +1964,7 @@ else:
 
             st.write("👉 *Saisissez vos ajustements. L'écran restera totalement fixe pendant la frappe.*")
             
-            # 🛡️ SÉCURITÉ CONVERSION ANTI-BUG (DataFrame -> Liste de Dicts)
+            # SÉCURITÉ CONVERSION (DataFrame -> Liste de Dicts)
             raw_data = st.session_state.get(msa_classif_key, [])
             if isinstance(raw_data, pd.DataFrame):
                 current_data_list = raw_data.to_dict(orient="records")
@@ -2035,7 +2035,7 @@ else:
                     nom_colonne_variable: v_critique,
                     "Type de Donnée": t_donnee,
                     "MSA Recommandé": m_recommande,
-                    "Criticité par rapport au Y": c_alignement,
+                    "Criticité par rapport au Y": current_crit,
                     "statut validation": s_validation
                 })
 
@@ -2047,6 +2047,11 @@ else:
                 p["msa_classification_table"] = updated_data_list
                 st.success("✅ Configuration MSA enregistrée avec succès dans le projet !")
                 st.rerun()
+
+            # =====================================================================
+            # 🔄 RECONSTRUCTION SÉCURISÉE DU DATAFRAME POUR LE RESTE DU SCRIPT
+            # =====================================================================
+            df_classification_current = pd.DataFrame(updated_data_list)
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
