@@ -1867,23 +1867,6 @@ else:
             # 🔄 Si le plan existe, on extrait la liste des vraies variables validées
             liste_variables_valides = [row["Variable à mesurer"] for row in st.session_state["master_dcp_table"] if "Variable à mesurer" in row]
 
-            # Initialisation de la table MSA à partir du Plan de Collecte
-            if msa_classif_key not in st.session_state:
-                saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
-                if saved_classif:
-                    st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
-                else:
-                    nouvelle_table_msa = []
-                    for var in liste_variables_valides:
-                        est_temps = any(kw in var.lower() for kw in ["temps", "délai", "durée", "stagnation"])
-                        nouvelle_table_msa.append({
-                            "Variable Critique (liée au Y)": var,
-                            "Nature de la Donnée": "Continue (Chronomètre/SI)" if est_temps else "Attributaire (Humain/Saisie)",
-                            "Méthodologie MSA Requise": "Gage R&R (Variance < 10%)" if est_temps else "Attribute Agreement Analysis (Kappa > 0.70)",
-                            "Statut Validation": "En attente de test"
-                        })
-                    st.session_state[msa_classif_key] = pd.DataFrame(nouvelle_table_msa)
-
             # Initialisation des tables d'essais terrain
             if rep_key not in st.session_state:
                 saved_rep = p.get("rep_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
@@ -1938,59 +1921,52 @@ else:
 
             # Étape C : Si Streamlit a tout effacé à cause du changement d'onglet, on affiche le Y par défaut ou un avertissement
             if project_y == "Indéterminé" or project_y == "Non défini":
-                # On essaie de voir si une autre variable de ton script contient l'objectif
                 project_y = st.session_state.get("ctq_v", "Indéterminé")
             
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-            # Initialisation sécurisée du tableau d'analyse MSA
+            # 🛠️ CORRECTION EXCLUSIVE : Intégration systématique du Y et des X du Plan de Collecte réel dans la table MSA
             if msa_classif_key not in st.session_state:
-                ai_analyzed_rows = []
-                if dcp_source:
-                    for v in dcp_source:
-                        if isinstance(v, dict):
-                            var_name = v.get("Variable à mesurer", "")
-                            type_brut = v.get("Type de donnée", "Continue")
-                            role = v.get("Rôle", "X (Influent)")
-                            
-                            if var_name:
-                                if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
-                                    det_type = "Continue (Quantitative)"
-                                    rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
-                                else:
-                                    det_type = "Attributaire / Catégorielle"
-                                    rec_msa = "Attribute Agreement Analysis (Kappa)"
-                                
-                                ai_analyzed_rows.append({
-                                    nom_colonne_variable: var_name,
-                                    "Type de Donnée": det_type,
-                                    "MSA Recommandé": rec_msa,
-                                    "Criticité par rapport au Y": "Haute (Lien Direct)" if str(role).strip().upper() == "Y" or any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)",
-                                    "statut validation": "en attente de test"
-                                })
+                saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
+                if saved_classif:
+                    st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
+                else:
+                    ai_analyzed_rows = []
                     
-                ai_analyzed_rows = sorted(ai_analyzed_rows, key=lambda k: k["Criticité par rapport au Y"], reverse=True)[:4]
-
-                if not ai_analyzed_rows:
-                    if "temps" in str(project_y).lower() or "délai" in str(project_y).lower() or "lead time" in str(project_y).lower():
-                        ai_analyzed_rows = [
-                            {nom_colonne_variable: "Temps de traitement unitaire (Cycle Time)", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique (Directement lié au Y)", "statut validation": "en attente de test"},
-                            {nom_colonne_variable: "Horodatage de début/fin de tâche", "Type de Donnée": "Système / Log IT", "MSA Recommandé": "Audit de Stabilité & Exactitude", "Criticité par rapport au Y": "Haute (Source de la donnée)", "statut validation": "en attente de test"},
-                            {nom_colonne_variable: "Statut de mise en attente du dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Moyenne (Bruit potentiel)", "statut validation": "en attente de test"}
-                        ]
-                    elif "qualité" in str(project_y).lower() or "erreur" in str(project_y).lower() or "rebut" in str(project_y).lower() or "conform" in str(project_y).lower():
-                        ai_analyzed_rows = [
-                            {nom_colonne_variable: "Verdict de conformité de la pièce (Go / No-Go)", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Critique (Directement lié au Y)", "statut validation": "en attente de test"},
-                            {nom_colonne_variable: "Code défaut saisi par l'opérateur", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute (Fiabilité du Pareto)", "statut validation": "en attente de test"},
-                            {nom_colonne_variable: "Dimension ou écart mesuré au pied à coulisse", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Moyenne (Physique)", "statut validation": "en attente de test"}
-                        ]
-                    else:
-                        ai_analyzed_rows = [
-                            {nom_colonne_variable: f"Indicateur de Performance direct de: {project_y}", "Type de Donnée": "Continue (Quantitative)", "MSA Recommandé": "Gage R&R (Répétabilité & Reproductibilité)", "Criticité par rapport au Y": "Critique", "statut validation": "en attente de test"},
-                            {nom_colonne_variable: "Classification de la typologie client/dossier", "Type de Donnée": "Attributaire / Catégorielle", "MSA Recommandé": "Attribute Agreement Analysis (Kappa)", "Criticité par rapport au Y": "Haute", "statut validation": "en attente de test"}
-                        ]
-                
-                st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
+                    # On boucle directement sur le master_dcp_table généré à l'étape 3
+                    for idx, row in enumerate(st.session_state["master_dcp_table"]):
+                        var_name = row.get("Variable à mesurer", "")
+                        type_brut = row.get("Type de donnée", "Continue (Temps)")
+                        
+                        if not var_name:
+                            continue
+                            
+                        # Détermination du type de donnée pour le MSA
+                        if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
+                            det_type = "Continue (Quantitative)"
+                            rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
+                        elif "système" in type_brut.lower() or "log" in type_brut.lower():
+                            det_type = "Système / Log IT"
+                            rec_msa = "Audit de Stabilité & Exactitude"
+                        else:
+                            det_type = "Attributaire / Catégorielle"
+                            rec_msa = "Attribute Agreement Analysis (Kappa)"
+                        
+                        # Règle d'affectation de criticité : la toute première ligne est obligatoirement notre Y
+                        if idx == 0:
+                            criticite = "Critique (Directement lié au Y)"
+                        else:
+                            criticite = "Haute (Lien Direct)" if any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
+                        
+                        ai_analyzed_rows.append({
+                            nom_colonne_variable: var_name,
+                            "Type de Donnée": det_type,
+                            "MSA Recommandé": rec_msa,
+                            "Criticité par rapport au Y": criticite,
+                            "statut validation": "en attente de test"
+                        })
+                    
+                    st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
             if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
                 if msa_classif_key in st.session_state:
