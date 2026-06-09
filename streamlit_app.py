@@ -1919,11 +1919,11 @@ else:
             
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-            # Initialisation de la table en session state si elle n'existe pas
+            # Initialisation de la table en session state au format DataFrame natif
             if msa_classif_key not in st.session_state:
                 saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
                 if saved_classif:
-                    st.session_state[msa_classif_key] = saved_classif
+                    st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
                 else:
                     ai_analyzed_rows = []
                     for idx, row in enumerate(st.session_state["master_dcp_table"]):
@@ -1955,103 +1955,44 @@ else:
                             "Criticité par rapport au Y": criticite,
                             "statut validation": "en attente de test"
                         })
-                    st.session_state[msa_classif_key] = ai_analyzed_rows
+                    st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
+
+            # Sécurité de type : conversion forcée en DataFrame si c'était stocké sous forme de liste
+            if isinstance(st.session_state[msa_classif_key], list):
+                st.session_state[msa_classif_key] = pd.DataFrame(st.session_state[msa_classif_key])
 
             if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
                 if msa_classif_key in st.session_state:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Saisissez vos ajustements. L'écran restera totalement fixe pendant la frappe.*")
+            st.write("👉 *Ajustez vos données librement. Les modifications s'enregistrent instantanément en tâche de fond.*")
             
-            # SÉCURITÉ CONVERSION (DataFrame -> Liste de Dicts)
-            raw_data = st.session_state.get(msa_classif_key, [])
-            if isinstance(raw_data, pd.DataFrame):
-                current_data_list = raw_data.to_dict(orient="records")
-            else:
-                current_data_list = raw_data
-                
-            updated_data_list = []
+            # 🚀 L'ÉDITEUR ASYNCHRONE NATIF ET ULTRA-RAPIDE
+            # Utiliser st.session_state[msa_classif_key] directement supprime le lag de saisie
+            df_classification_current = st.data_editor(
+                st.session_state[msa_classif_key],
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"editor_widget_{safe_idx}",
+                column_config={
+                    nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
+                    "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
+                    "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
+                    "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
+                    "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
+                }
+            )
 
-            # Entêtes du tableau personnalisé
-            header_cols = st.columns([2.5, 2, 2.5, 2, 1.5])
-            header_cols[0].markdown("**Variable Critique (liée au Y)**")
-            header_cols[1].markdown("**Type de Donnée**")
-            header_cols[2].markdown("**MSA Recommandé**")
-            header_cols[3].markdown("**Alignement sémantique Y**")
-            header_cols[4].markdown("**Statut**")
-
-            type_options = ["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"]
-            msa_options = ["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"]
-            status_options = ["en attente de test", "test effectué"]
-
-            # Génération des champs de saisie ligne par ligne
-            for i, row in enumerate(current_data_list):
-                cols = st.columns([2.5, 2, 2.5, 2, 1.5])
-                
-                v_critique = cols[0].text_input(
-                    label=f"var_{i}", 
-                    value=row.get(nom_colonne_variable, "") if isinstance(row, dict) else "", 
-                    label_visibility="collapsed",
-                    key=f"msa_input_var_{i}_{safe_idx}"
-                )
-                
-                current_type = row.get("Type de Donnée", "") if isinstance(row, dict) else ""
-                t_donnee = cols[1].selectbox(
-                    label=f"type_{i}", 
-                    options=type_options, 
-                    index=type_options.index(current_type) if current_type in type_options else 0,
-                    label_visibility="collapsed",
-                    key=f"msa_select_type_{i}_{safe_idx}"
-                )
-                
-                current_msa = row.get("MSA Recommandé", "") if isinstance(row, dict) else ""
-                m_recommande = cols[2].selectbox(
-                    label=f"msa_{i}", 
-                    options=msa_options, 
-                    index=msa_options.index(current_msa) if current_msa in msa_options else 0,
-                    label_visibility="collapsed",
-                    key=f"msa_select_msa_{i}_{safe_idx}"
-                )
-                
-                current_crit = row.get("Criticité par rapport au Y", "Moyenne (Facteur X)") if isinstance(row, dict) else "Moyenne (Facteur X)"
-                c_alignement = cols[3].text_input(
-                    label=f"crit_{i}", 
-                    value=current_crit, 
-                    label_visibility="collapsed",
-                    key=f"msa_input_crit_{i}_{safe_idx}"
-                )
-                
-                current_stat = row.get("statut validation", "en attente de test") if isinstance(row, dict) else "en attente de test"
-                s_validation = cols[4].selectbox(
-                    label=f"stat_{i}", 
-                    options=status_options, 
-                    index=status_options.index(current_stat) if current_stat in status_options else 0,
-                    label_visibility="collapsed",
-                    key=f"msa_select_stat_{i}_{safe_idx}"
-                )
-                
-                updated_data_list.append({
-                    nom_colonne_variable: v_critique,
-                    "Type de Donnée": t_donnee,
-                    "MSA Recommandé": m_recommande,
-                    "Criticité par rapport au Y": current_crit,
-                    "statut validation": s_validation
-                })
-
-            st.write("") 
-
-            # 💾 BOUTON DE SAUVEGARDE
-            if st.button("💾 Enregistrer et Figer la Matrice de Qualification MSA", key=f"save_msa_rows_btn_{safe_idx}"):
-                st.session_state[msa_classif_key] = updated_data_list
-                p["msa_classification_table"] = updated_data_list
-                st.success("✅ Configuration MSA enregistrée avec succès dans le projet !")
-                st.rerun()
+            # 🔄 Synchronisation silencieuse en tâche de fond sans aucun st.rerun() agressif
+            if df_classification_current is not None:
+                st.session_state[msa_classif_key] = df_classification_current
+                p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
 
             # =====================================================================
-            # 🔄 RECONSTRUCTION SÉCURISÉE DU DATAFRAME POUR LE RESTE DU SCRIPT
+            # 🔄 PERSISTANCE DE LA VARIABLE POUR LE RESTE DU SCRIPT
             # =====================================================================
-            df_classification_current = pd.DataFrame(updated_data_list)
+            df_classification_current = st.session_state[msa_classif_key]
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
