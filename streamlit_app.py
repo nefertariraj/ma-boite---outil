@@ -1962,10 +1962,15 @@ else:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            # 🛠️ TECHNIQUE DE FIXATION ABSOLUE : Formulaire natif en colonnes unitaires (Zéro Scintillement)
             st.write("👉 *Saisissez vos ajustements. L'écran restera totalement fixe pendant la frappe.*")
             
-            current_data_list = st.session_state.get(msa_classif_key, [])
+            # 🛡️ SÉCURITÉ CONVERSION ANTI-BUG (DataFrame -> Liste de Dicts)
+            raw_data = st.session_state.get(msa_classif_key, [])
+            if isinstance(raw_data, pd.DataFrame):
+                current_data_list = raw_data.to_dict(orient="records")
+            else:
+                current_data_list = raw_data
+                
             updated_data_list = []
 
             # Entêtes du tableau personnalisé
@@ -1984,48 +1989,48 @@ else:
             for i, row in enumerate(current_data_list):
                 cols = st.columns([2.5, 2, 2.5, 2, 1.5])
                 
-                # Saisie ou modification libre de la variable
                 v_critique = cols[0].text_input(
                     label=f"var_{i}", 
-                    value=row.get(nom_colonne_variable, ""), 
+                    value=row.get(nom_colonne_variable, "") if isinstance(row, dict) else "", 
                     label_visibility="collapsed",
                     key=f"msa_input_var_{i}_{safe_idx}"
                 )
                 
-                # Choix des listes déroulantes standard (zéro recharge)
+                current_type = row.get("Type de Donnée", "") if isinstance(row, dict) else ""
                 t_donnee = cols[1].selectbox(
                     label=f"type_{i}", 
                     options=type_options, 
-                    index=type_options.index(row.get("Type de Donnée")) if row.get("Type de Donnée") in type_options else 0,
+                    index=type_options.index(current_type) if current_type in type_options else 0,
                     label_visibility="collapsed",
                     key=f"msa_select_type_{i}_{safe_idx}"
                 )
                 
+                current_msa = row.get("MSA Recommandé", "") if isinstance(row, dict) else ""
                 m_recommande = cols[2].selectbox(
                     label=f"msa_{i}", 
                     options=msa_options, 
-                    index=msa_options.index(row.get("MSA Recommandé")) if row.get("MSA Recommandé") in msa_options else 0,
+                    index=msa_options.index(current_msa) if current_msa in msa_options else 0,
                     label_visibility="collapsed",
                     key=f"msa_select_msa_{i}_{safe_idx}"
                 )
                 
-                # Criticité (On la garde sous forme de texte éditable ou fixe)
+                current_crit = row.get("Criticité par rapport au Y", "Moyenne (Facteur X)") if isinstance(row, dict) else "Moyenne (Facteur X)"
                 c_alignement = cols[3].text_input(
                     label=f"crit_{i}", 
-                    value=row.get("Criticité par rapport au Y", "Moyenne (Facteur X)"), 
+                    value=current_crit, 
                     label_visibility="collapsed",
                     key=f"msa_input_crit_{i}_{safe_idx}"
                 )
                 
+                current_stat = row.get("statut validation", "en attente de test") if isinstance(row, dict) else "en attente de test"
                 s_validation = cols[4].selectbox(
                     label=f"stat_{i}", 
                     options=status_options, 
-                    index=status_options.index(row.get("statut validation")) if row.get("statut validation") in status_options else 0,
+                    index=status_options.index(current_stat) if current_stat in status_options else 0,
                     label_visibility="collapsed",
                     key=f"msa_select_stat_{i}_{safe_idx}"
                 )
                 
-                # On compile la ligne en cours de saisie
                 updated_data_list.append({
                     nom_colonne_variable: v_critique,
                     "Type de Donnée": t_donnee,
@@ -2034,9 +2039,9 @@ else:
                     "statut validation": s_validation
                 })
 
-            st.write("") # Espacement visuel
+            st.write("") 
 
-            # 💾 UN_SEUL_BOUTON_D_ENREGISTRERMENT
+            # 💾 BOUTON DE SAUVEGARDE
             if st.button("💾 Enregistrer et Figer la Matrice de Qualification MSA", key=f"save_msa_rows_btn_{safe_idx}"):
                 st.session_state[msa_classif_key] = updated_data_list
                 p["msa_classification_table"] = updated_data_list
