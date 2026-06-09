@@ -1968,52 +1968,33 @@ else:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement.*")
+            st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement manuelle.*")
             
-            # 📦 FORMULAIRE NETTOYÉ : Utilise la clé directement pour éviter le recalcul de l'état "On Blur"
-            with st.form(key=f"form_msa_editeur_final_{safe_idx}"):
-                
-                st.data_editor(
-                    st.session_state[msa_classif_key],
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    key=f"editor_widget_{safe_idx}",  # Géré nativement par Streamlit
-                    column_config={
-                        nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
-                        "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
-                        "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
-                        "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
-                        "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
-                    }
-                )
-                
-                # Validation manuelle obligatoire pour déclencher l'écriture réseau
-                bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
-
-            # 🔄 Exécution de la persistance uniquement au clic sur le bouton de soumission
-            if bouton_sauvegarde:
-                # Récupération sécurisée du dictionnaire de modifications généré par le widget
-                if f"editor_widget_{safe_idx}" in st.session_state:
-                    edits = st.session_state[f"editor_widget_{safe_idx}"]
-                    # Si des modifications ont eu lieu, on applique les changements sur le DataFrame d'origine
-                    df_base = st.session_state[msa_classif_key].copy()
-                    
-                    # Application des lignes éditées
-                    for row_idx, changed_cols in edits.get("edited_rows", {}).items():
-                        for col, val in changed_cols.items():
-                            df_base.iat[int(row_idx), df_base.columns.get_loc(col)] = val
-                    
-                    # Prise en compte des ajouts de lignes
-                    for new_row in edits.get("added_rows", []):
-                        df_base = pd.concat([df_base, pd.DataFrame([new_row])], ignore_index=True)
-                        
-                    # Prise en compte des suppressions
-                    if edits.get("deleted_rows"):
-                        df_base = df_base.drop(edits["deleted_rows"]).reset_index(drop=True)
-                    
-                    st.session_state[msa_classif_key] = df_base
-                    p["msa_classification_table"] = df_base.to_dict(orient="records")
-                st.rerun()
+            # 💡 FLUIDITÉ TOTALE : On crée une simple copie déconnectée pour la saisie graphique.
+            # Aucune sauvegarde automatique ne peut se faire en tâche de fond.
+            df_temporaire_saisie = st.session_state[msa_classif_key].copy()
+            
+            df_classification_current = st.data_editor(
+                df_temporaire_saisie,
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"editor_widget_{safe_idx}",
+                column_config={
+                    nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
+                    "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
+                    "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
+                    "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
+                    "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
+                }
+            )
+            
+            # Le bouton unique pour enregistrer et appliquer au reste du logiciel
+            if st.button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary", key=f"btn_save_msa_{safe_idx}"):
+                if df_classification_current is not None:
+                    st.session_state[msa_classif_key] = df_classification_current
+                    p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
+                    st.toast("✅ Données enregistrées avec succès !", icon="🚀")
+                    st.rerun()
 
             # =====================================================================
             # 🔄 PERSISTANCE DE LA VARIABLE POUR LE RESTE DU SCRIPT
