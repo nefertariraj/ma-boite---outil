@@ -1867,7 +1867,7 @@ else:
             # 🔄 Si le plan existe, on extrait la liste des vraies variables validées
             liste_variables_valides = [row["Variable à mesurer"] for row in st.session_state["master_dcp_table"] if "Variable à mesurer" in row]
 
-            # Initialisation des tables d'essais terrain (CONSERVÉ)
+            # Initialisation des tables d'essais terrain
             if rep_key not in st.session_state:
                 saved_rep = p.get("rep_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
                 if saved_rep:
@@ -1903,7 +1903,6 @@ else:
             nom_colonne_variable = "Variable Critique (liée au Y)"
             project_y = "Indéterminé"
             
-            # --- BLOC DE RÉCUPÉRATION DU Y REPLACÉ À L'IDENTIQUE ---
             for p_env in [p, st.session_state.get('p', {}), st.session_state.get('project_dict', {})]:
                 if isinstance(p_env, dict) and p_env.get("selected_ctq"):
                     project_y = p_env.get("selected_ctq")
@@ -1920,7 +1919,7 @@ else:
             
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-            # Initialisation de la table en session state (Moteur IA contextuel d'origine)
+            # Initialisation de la table en session state au format DataFrame natif
             if msa_classif_key not in st.session_state:
                 saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
                 if saved_classif:
@@ -1958,63 +1957,46 @@ else:
                         })
                     st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
+            # Sécurité de type : conversion forcée en DataFrame si c'était stocké sous forme de liste
             if isinstance(st.session_state[msa_classif_key], list):
                 st.session_state[msa_classif_key] = pd.DataFrame(st.session_state[msa_classif_key])
 
-            # Bouton de ré-analyse d'origine (CONSERVÉ)
             if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
                 if msa_classif_key in st.session_state:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            # 🛠️ TRANSFORMATION TEXTE POUR LE BLOC-NOTES SANS TEMPS DE LATENCE
-            df_actuel = st.session_state[msa_classif_key]
-            lignes_texte = []
-            for _, r in df_actuel.iterrows():
-                lignes_texte.append(f"{r.get(nom_colonne_variable,'')}; {r.get('Type de Donnée','' )}; {r.get('MSA Recommandé','')}; {r.get('Criticité par rapport au Y','')}; {r.get('statut validation','')}")
-            texte_initial = "\n".join(lignes_texte)
-
-            # 📦 FORMULAIRE DE SAISIE SANS AUCUNE SAUVEGARDE EN TEMPS RÉEL
-            with st.form(key=f"msa_bloc_note_form_{safe_idx}"):
-                st.write("✏️ **Zone de modification (Zéro Latence) :** Changez vos valeurs ci-dessous. Séparez les colonnes par des points-virgules ( ; ). Aucun écran blanc ne se produira pendant la frappe.")
+            st.write("👉 *Modifiez le tableau ci-dessous. Les modifications seront appliquées uniquement après validation.*")
+            
+            # 📦 FORMULAIRE UNIQUE : Empêche toute mise à jour lors de la saisie ou au clic hors d'une case
+            with st.form(key=f"form_msa_editeur_{safe_idx}"):
                 
-                zone_texte = st.text_area(
-                    label="Données MSA",
-                    value=texte_initial,
-                    height=180,
-                    label_visibility="collapsed"
+                df_classification_current = st.data_editor(
+                    st.session_state[msa_classif_key],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"editor_widget_{safe_idx}",
+                    column_config={
+                        nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
+                        "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
+                        "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
+                        "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
+                        "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
+                    }
                 )
                 
-                # Unique actionneur d'enregistrement
-                soumettre_changements = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
+                # Le bouton de validation obligatoire pour déclencher l'écriture
+                bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
 
-            # 🔄 SYNCHRONISATION UNIQUE AU CLIC SUR LE BOUTON
-            if soumettre_changements and zone_texte:
-                nouvelles_lignes = []
-                for line in zone_texte.strip().split("\n"):
-                    if not line.strip(): 
-                        continue
-                    parts = [p.strip() for p in line.split(";")]
-                    while len(parts) < 5: 
-                        parts.append("")
-                    
-                    nouvelles_lignes.append({
-                        nom_colonne_variable: parts[0],
-                        "Type de Donnée": parts[1],
-                        "MSA Recommandé": parts[2],
-                        "Criticité par rapport au Y": parts[3],
-                        "statut validation": parts[4]
-                    })
-                
-                df_mis_a_jour = pd.DataFrame(nouvelles_lignes)
-                st.session_state[msa_classif_key] = df_mis_a_jour
-                p["msa_classification_table"] = nouvelles_lignes
-                st.toast("⚙️ Données enregistrées et synchronisées avec succès !", icon="✅")
+            # 🔄 Traitement de sauvegarde exécuté UNIQUEMENT quand on clique sur le bouton
+            if bouton_sauvegarde and df_classification_current is not None:
+                st.session_state[msa_classif_key] = df_classification_current
+                p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
                 st.rerun()
 
-            # 📊 AFFICHAGE DU TABLEAU PROPRE POUR LE RESTE DU LOGICIEL
-            st.markdown("**Matrice de Qualification Actuelle :**")
-            st.dataframe(st.session_state[msa_classif_key], use_container_width=True)
+            # =====================================================================
+            # 🔄 PERSISTANCE DE LA VARIABLE POUR LE RESTE DU SCRIPT
+            # =====================================================================
             df_classification_current = st.session_state[msa_classif_key]
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
