@@ -1970,15 +1970,14 @@ else:
 
             st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement.*")
             
-            # 📦 FORMULAIRE BRUT OPTIMISÉ SANS ÉCOUTE DES CLICS EXTÉRIEURS
+            # 📦 FORMULAIRE NETTOYÉ : Utilise la clé directement pour éviter le recalcul de l'état "On Blur"
             with st.form(key=f"form_msa_editeur_final_{safe_idx}"):
                 
-                df_classification_current = st.data_editor(
+                st.data_editor(
                     st.session_state[msa_classif_key],
                     num_rows="dynamic",
                     use_container_width=True,
-                    key=f"editor_widget_{safe_idx}",
-                    on_select="ignore",  # 🚀 FORCE STREAMLIT À IGNORER LE FOCUS (ZÉRO LATENCE)
+                    key=f"editor_widget_{safe_idx}",  # Géré nativement par Streamlit
                     column_config={
                         nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
                         "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
@@ -1992,9 +1991,28 @@ else:
                 bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
 
             # 🔄 Exécution de la persistance uniquement au clic sur le bouton de soumission
-            if bouton_sauvegarde and df_classification_current is not None:
-                st.session_state[msa_classif_key] = df_classification_current
-                p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
+            if bouton_sauvegarde:
+                # Récupération sécurisée du dictionnaire de modifications généré par le widget
+                if f"editor_widget_{safe_idx}" in st.session_state:
+                    edits = st.session_state[f"editor_widget_{safe_idx}"]
+                    # Si des modifications ont eu lieu, on applique les changements sur le DataFrame d'origine
+                    df_base = st.session_state[msa_classif_key].copy()
+                    
+                    # Application des lignes éditées
+                    for row_idx, changed_cols in edits.get("edited_rows", {}).items():
+                        for col, val in changed_cols.items():
+                            df_base.iat[int(row_idx), df_base.columns.get_loc(col)] = val
+                    
+                    # Prise en compte des ajouts de lignes
+                    for new_row in edits.get("added_rows", []):
+                        df_base = pd.concat([df_base, pd.DataFrame([new_row])], ignore_index=True)
+                        
+                    # Prise en compte des suppressions
+                    if edits.get("deleted_rows"):
+                        df_base = df_base.drop(edits["deleted_rows"]).reset_index(drop=True)
+                    
+                    st.session_state[msa_classif_key] = df_base
+                    p["msa_classification_table"] = df_base.to_dict(orient="records")
                 st.rerun()
 
             # =====================================================================
