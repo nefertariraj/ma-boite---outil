@@ -1970,7 +1970,7 @@ else:
 
             st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement.*")
             
-            # 📦 PROTECTION PAR FORMULAIRE COULISSANT : Empêche l'exécution "On Blur" (perte de focus)
+            # 📦 FORMULAIRE BRUT OPTIMISÉ SANS ÉCOUTE DES CLICS EXTÉRIEURS
             with st.form(key=f"form_msa_editeur_final_{safe_idx}"):
                 
                 df_classification_current = st.data_editor(
@@ -1978,6 +1978,7 @@ else:
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_widget_{safe_idx}",
+                    on_select="ignore",  # 🚀 FORCE STREAMLIT À IGNORER LE FOCUS (ZÉRO LATENCE)
                     column_config={
                         nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
                         "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
