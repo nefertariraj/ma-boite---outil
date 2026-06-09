@@ -1862,21 +1862,67 @@ else:
         plan_de_collecte_existe = "master_dcp_table" in st.session_state and len(st.session_state["master_dcp_table"]) > 0
 
         if not plan_de_collecte_existe:
-            st.warning("⚠️ **Jalon requis :** Veuillez d'abord valider votre **Plan de Collecte (Section 3)**.")
+            st.warning("⚠️ **Jalon requis :** Veuillez d'abord valider votre **Plan de Collecte (Section 3)** en cliquant sur le bouton rouge *'⚙️ Valider la pertinence & Générer le Data Collection Plan Master'*. Le module MSA se débloquera automatiquement avec vos variables validées.")
         else:
+            # 🔄 Si le plan existe, on extrait la liste des vraies variables validées
+            liste_variables_valides = [row["Variable à mesurer"] for row in st.session_state["master_dcp_table"] if "Variable à mesurer" in row]
+
+            # Initialisation des tables d'essais terrain (CONSERVÉ)
+            if rep_key not in st.session_state:
+                saved_rep = p.get("rep_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
+                if saved_rep:
+                    st.session_state[rep_key] = pd.DataFrame(saved_rep)
+                else:
+                    st.session_state[rep_key] = pd.DataFrame([
+                        {"Essai": 1, "Répétition A": 0.0, "Répétition B": 0.0}
+                    ])
+                    
+            if reprod_key not in st.session_state:
+                saved_reprod = p.get("reprod_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
+                if saved_reprod:
+                    st.session_state[reprod_key] = pd.DataFrame(saved_reprod)
+                else:
+                    st.session_state[reprod_key] = pd.DataFrame([
+                        {"Opérateur": "Opérateur 1", "Résultat": 0.0}, 
+                        {"Opérateur": "Opérateur 2", "Résultat": 0.0}
+                    ])
+
+            # =====================================================================
+            # 🛡️ ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P' (ALIGNÉ)
+            # =====================================================================
             if 'projects' in st.session_state and 'p_idx' in locals():
                 p = st.session_state.projects[p_idx]
             else:
-                if 'p' not in st.session_state: st.session_state['p'] = {}
+                if 'p' not in st.session_state:
+                    st.session_state['p'] = {}
                 p = st.session_state['p']
 
-            # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA ---
+            # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
-            nom_colonne_variable = "Variable Critique (liée au Y)"
             
-            # Initialisation rapide unique au format DataFrame si inexistant
+            nom_colonne_variable = "Variable Critique (liée au Y)"
+            project_y = "Indéterminé"
+            
+            # --- BLOC DE RÉCUPÉRATION DU Y REPLACÉ À L'IDENTIQUE ---
+            for p_env in [p, st.session_state.get('p', {}), st.session_state.get('project_dict', {})]:
+                if isinstance(p_env, dict) and p_env.get("selected_ctq"):
+                    project_y = p_env.get("selected_ctq")
+                    break
+            
+            if project_y == "Indéterminé" or project_y == "Non défini":
+                for k, v in st.session_state.items():
+                    if any(x in k.lower() for x in ["ctq", "project_y", "variable_y"]) and isinstance(v, str) and v != "Non défini":
+                        project_y = v
+                        break
+
+            if project_y == "Indéterminé" or project_y == "Non défini":
+                project_y = st.session_state.get("ctq_v", "Indéterminé")
+            
+            st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
+
+            # Initialisation de la table en session state (Moteur IA contextuel d'origine)
             if msa_classif_key not in st.session_state:
-                saved_classif = p.get("msa_classification_table", []) if isinstance(p, dict) else []
+                saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
                 if saved_classif:
                     st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
                 else:
@@ -1884,16 +1930,24 @@ else:
                     for idx, row in enumerate(st.session_state["master_dcp_table"]):
                         var_name = row.get("Variable à mesurer", "")
                         type_brut = row.get("Type de donnée", "Continue (Temps)")
-                        if not var_name: continue
+                        
+                        if not var_name:
+                            continue
                             
                         if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
-                            det_type, rec_msa = "Continue (Quantitative)", "Gage R&R (Répétabilité & Reproductibilité)"
+                            det_type = "Continue (Quantitative)"
+                            rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
                         elif "système" in type_brut.lower() or "log" in type_brut.lower():
-                            det_type, rec_msa = "Système / Log IT", "Audit de Stabilité & Exactitude"
+                            det_type = "Système / Log IT"
+                            rec_msa = "Audit de Stabilité & Exactitude"
                         else:
-                            det_type, rec_msa = "Attributaire / Catégorielle", "Attribute Agreement Analysis (Kappa)"
+                            det_type = "Attributaire / Catégorielle"
+                            rec_msa = "Attribute Agreement Analysis (Kappa)"
                         
-                        criticite = "Critique (Directement lié au Y)" if idx == 0 else "Moyenne (Facteur X)"
+                        if idx == 0:
+                            criticite = "Critique (Directement lié au Y)"
+                        else:
+                            criticite = "Haute (Lien Direct)" if any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
                         
                         ai_analyzed_rows.append({
                             nom_colonne_variable: var_name,
@@ -1907,64 +1961,60 @@ else:
             if isinstance(st.session_state[msa_classif_key], list):
                 st.session_state[msa_classif_key] = pd.DataFrame(st.session_state[msa_classif_key])
 
-            df_actuel = st.session_state[msa_classif_key]
-
-            # 🛠️ CRÉATION D'UN FORMULAIRE EN LIGNES (ZÉRO LATENCE, SANS TABLEAU BLANC)
-            # Utiliser des colonnes Streamlit classiques dans un formulaire bloque à 100% les requêtes serveurs au clic hors de la case.
-            with st.form(key=f"msa_classic_fluid_form_{safe_idx}"):
-                st.write("✏️ **Matrice de Saisie Isolée :** Modifiez les champs requis. Aucun rechargement ne se produira pendant la frappe ou au changement de case.")
-                
-                nouvelles_valeurs = []
-                
-                # En-têtes simulés pour clarté visuelle
-                hdr_col1, hdr_col2, hdr_col3, hdr_col4, hdr_col5 = st.columns([2.5, 2, 2.5, 2, 1.5])
-                hdr_col1.caption("**Variable Critique**")
-                hdr_col2.caption("**Type de Donnée**")
-                hdr_col3.caption("**MSA Recommandé**")
-                hdr_col4.caption("**Alignement Y**")
-                hdr_col5.caption("**Statut**")
-                
-                # Génération des lignes de saisie rétentionnaires
-                for i, row in df_actuel.iterrows():
-                    col1, col2, col3, col4, col5 = st.columns([2.5, 2, 2.5, 2, 1.5])
-                    
-                    # Chaque widget est indexé par sa ligne pour ne pas se mélanger
-                    v_crit = col1.text_input("Variable", value=row.get(nom_colonne_variable, ""), key=f"v_{safe_idx}_{i}", label_visibility="collapsed")
-                    
-                    opts_type = ["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"]
-                    idx_type = opts_type.index(row.get("Type de Donnée")) if row.get("Type de Donnée") in opts_type else 0
-                    t_donnee = col2.selectbox("Type", options=opts_type, index=idx_type, key=f"t_{safe_idx}_{i}", label_visibility="collapsed")
-                    
-                    opts_msa = ["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"]
-                    idx_msa = opts_msa.index(row.get("MSA Recommandé")) if row.get("MSA Recommandé") in opts_msa else 0
-                    msa_rec = col3.selectbox("MSA", options=opts_msa, index=idx_msa, key=f"m_{safe_idx}_{i}", label_visibility="collapsed")
-                    
-                    crit = col4.text_input("Criticité", value=row.get("Criticité par rapport au Y", ""), key=f"c_{safe_idx}_{i}", label_visibility="collapsed")
-                    
-                    opts_statut = ["en attente de test", "test effectué"]
-                    idx_statut = opts_statut.index(row.get("statut validation")) if row.get("statut validation") in opts_statut else 0
-                    statut = col5.selectbox("Statut", options=opts_statut, index=idx_statut, key=f"s_{safe_idx}_{i}", label_visibility="collapsed")
-                    
-                    nouvelles_valeurs.append({
-                        nom_colonne_variable: v_crit,
-                        "Type de Donnée": t_donnee,
-                        "MSA Recommandé": msa_rec,
-                        "Criticité par rapport au Y": crit,
-                        "statut validation": statut
-                    })
-                
-                st.write("")
-                bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Valider le Jalon MSA", type="primary")
-
-            # 🔄 APPLICATION UNIQUE AU MOMENT DU CLIC
-            if bouton_sauvegarde:
-                df_mis_a_jour = pd.DataFrame(nouvelles_valeurs)
-                st.session_state[msa_classif_key] = df_mis_a_jour
-                p["msa_classification_table"] = nouvelles_valeurs
-                st.toast("✅ Matrice MSA mise à jour avec succès !", icon="🚀")
+            # Bouton de ré-analyse d'origine (CONSERVÉ)
+            if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
+                if msa_classif_key in st.session_state:
+                    del st.session_state[msa_classif_key]
                 st.rerun()
 
-            # Assignation finale pour la suite de la logique du script
+            # 🛠️ TRANSFORMATION TEXTE POUR LE BLOC-NOTES SANS TEMPS DE LATENCE
+            df_actuel = st.session_state[msa_classif_key]
+            lignes_texte = []
+            for _, r in df_actuel.iterrows():
+                lignes_texte.append(f"{r.get(nom_colonne_variable,'')}; {r.get('Type de Donnée','' )}; {r.get('MSA Recommandé','')}; {r.get('Criticité par rapport au Y','')}; {r.get('statut validation','')}")
+            texte_initial = "\n".join(lignes_texte)
+
+            # 📦 FORMULAIRE DE SAISIE SANS AUCUNE SAUVEGARDE EN TEMPS RÉEL
+            with st.form(key=f"msa_bloc_note_form_{safe_idx}"):
+                st.write("✏️ **Zone de modification (Zéro Latence) :** Changez vos valeurs ci-dessous. Séparez les colonnes par des points-virgules ( ; ). Aucun écran blanc ne se produira pendant la frappe.")
+                
+                zone_texte = st.text_area(
+                    label="Données MSA",
+                    value=texte_initial,
+                    height=180,
+                    label_visibility="collapsed"
+                )
+                
+                # Unique actionneur d'enregistrement
+                soumettre_changements = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
+
+            # 🔄 SYNCHRONISATION UNIQUE AU CLIC SUR LE BOUTON
+            if soumettre_changements and zone_texte:
+                nouvelles_lignes = []
+                for line in zone_texte.strip().split("\n"):
+                    if not line.strip(): 
+                        continue
+                    parts = [p.strip() for p in line.split(";")]
+                    while len(parts) < 5: 
+                        parts.append("")
+                    
+                    nouvelles_lignes.append({
+                        nom_colonne_variable: parts[0],
+                        "Type de Donnée": parts[1],
+                        "MSA Recommandé": parts[2],
+                        "Criticité par rapport au Y": parts[3],
+                        "statut validation": parts[4]
+                    })
+                
+                df_mis_a_jour = pd.DataFrame(nouvelles_lignes)
+                st.session_state[msa_classif_key] = df_mis_a_jour
+                p["msa_classification_table"] = nouvelles_lignes
+                st.toast("⚙️ Données enregistrées et synchronisées avec succès !", icon="✅")
+                st.rerun()
+
+            # 📊 AFFICHAGE DU TABLEAU PROPRE POUR LE RESTE DU LOGICIEL
+            st.markdown("**Matrice de Qualification Actuelle :**")
+            st.dataframe(st.session_state[msa_classif_key], use_container_width=True)
             df_classification_current = st.session_state[msa_classif_key]
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
