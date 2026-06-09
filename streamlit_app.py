@@ -1585,7 +1585,7 @@ else:
         st.markdown("""
         ### 📊 Alignement Stratégique $Y = f(X)$ & Matrice de Collecte Phase Measure
         En tant que **Master Black Belt**, ce module structure votre plan de collecte de données terrain de manière rigoureuse. 
-        L'algorithme extrait automatiquement les **$X$ potentiels** de votre *Detailed Process Map* en isolant les **NVA**, les **gaspillages Lean (Muda)**, les **boucles de retouches (Rework)** et les **goulots d'entranglement**.
+        L'algorithme extrait automatiquement les **$X$ potentiels** de votre *Detailed Process Map* en isolant les **NVA**, les **gaspillages Lean (Muda)**, les **boucles de retouches (Rework)** et les **goulots d'étranglement**.
         """)
 
         # --------------------------------------------------
@@ -1671,7 +1671,7 @@ else:
                     "1. Influence fortement le Y ?": "Oui" if item["muda"] in ["Attente (Waiting)", "Défauts / Retouches", "Surproduction / Capacité"] else "Non",
                     "2. Apparaît souvent ?": "Oui",
                     "3. Peut-on mesurer fiablement ?": "Oui",
-                    "Utilité Analytique (Futur Test d'Hypothèse)": f"Démontrer la corrélation mathématique avec la variation du Lead Time global."
+                    "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time global."
                 })
             st.session_state["mbb_prioritization_matrix"] = initial_prio
 
@@ -1681,12 +1681,11 @@ else:
 
             df_prio = pd.DataFrame(st.session_state["mbb_prioritization_matrix"])
 
-            # Éditeur interactif de filtrage
+            # 🛠️ MODIFICATION : Retrait de la 'key' pour empêcher le recalcul en temps réel lors des saisies utilisateur
             edited_prio_df = st.data_editor(
                 df_prio,
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"mbb_prio_editor_{p_idx}",
                 column_config={
                     "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
                     "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
@@ -1698,17 +1697,16 @@ else:
                 }
             )
 
-            # Rerunning et mise à jour dynamique de la structure des X validés (avec insertion du Y)
+            # L'action d'enregistrement et de construction s'exécute de façon stricte au clic
             if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{p_idx}"):
                 st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
                 
-                # Récupération dynamique du Y du projet de la phase Define
+                # Récupération dynamique du Y configuré en amont
                 nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
                 
-                # Matrice réglementaire à 16 colonnes
                 dcp_final_rows = []
                 
-                # --- ÉVOLUTION : AJOUT DE LA VARIABLE DE SORTIE Y EN PREMIÈRE LIGNE ---
+                # Injection systématique de la variable maîtresse Y en tête du plan de collecte
                 dcp_final_rows.append({
                     "Variable à mesurer": nom_y_projet,
                     "Objectif de mesure": "Quantifier la performance globale et la variance du processus cible à optimiser.",
@@ -1728,7 +1726,7 @@ else:
                     "Méthode de contrôle qualité des données": "Validation de cohérence par rapprochement rapports financiers"
                 })
                 
-                # --- INTEGRATION DES VARIABLES X VALIDÉES ---
+                # Parcours des X filtrés et insertion si critères validés (Oui / Oui / Oui)
                 for row in st.session_state["mbb_prioritization_matrix"]:
                     if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
                         
@@ -1737,9 +1735,9 @@ else:
                         
                         dcp_final_rows.append({
                             "Variable à mesurer": var_name,
-                            "Objectif de mesure": f"Quantifier la variance et l'impact de ce Muda sur le processus.",
+                            "Objectif de mesure": "Quantifier la variance et l'impact de ce Muda sur le processus.",
                             "Lien avec le Y": "Contribution directe au Lead Time Global (Y) par allongement du temps de traversée.",
-                            "Définition opérationnelle exacte": f"Chrono démarré au moment exact du début de l'action/attente et stoppé à sa complétion complète.",
+                            "Définition opérationnelle exacte": "Chrono démarré au moment exact du début de l'action/attente et stoppé à sa complétion complète.",
                             "Type de donnée": "Continue (Temps)" if is_time else "Discrète (Défauts / Attributaire)",
                             "Unité": "Minutes" if is_time else "Nombre d'occurrences",
                             "Source de donnée": "Système d'information (Logs) / Saisie terrain",
@@ -1755,7 +1753,7 @@ else:
                         })
                 
                 st.session_state["master_dcp_table"] = dcp_final_rows
-                p["master_dcp_table"] = dcp_final_rows # Sécurité sauvegarde
+                p["master_dcp_table"] = dcp_final_rows
                 st.toast(f"🎯 Plan de collecte généré : 1 Variable Y et {len(dcp_final_rows)-1} variable(s) X critique(s) !", icon="🚀")
                 st.rerun()
 
@@ -1816,7 +1814,7 @@ else:
                     st.markdown("#### 🚨 Maîtrise des Risques de Subjectivité & Interprétation")
                     st.markdown("""
                     * **Suppression des définitions ambiguës :** Pour les données discrètes/attributaires (ex. Dossier non conforme), publiez un *catalogue des défauts* visuel. Si deux opérateurs interprètent un défaut différemment, votre système de mesure est inutile.
-                    * **Lutte contre l'Effet Hawthorne :** Lorsque les équipes se savent observées ou chronométrées, les performances s'améliorent artificiellement de 10 à 15%. Privilégiez les collectes en tâche de fond (système) ou automatisez l'enregistrement sans présence physique pesante du Black Belt.
+                    * **Lutte contre l'Effet Hawthorne :** Lorsque les équipes se savent observées ou chronométrées, les performances s'amenuisent ou s'améliorent artificiellement de 10 à 15%. Privilégiez les collectes en tâche de fond (système) ou automatisez l'enregistrement sans présence physique pesante du Black Belt.
                     * **Procédures de Contrôle Qualité :** Réalisez un audit complet des données dès le deuxième jour (*Day-2 Review*). Comparez les 20 premières lignes saisies avec la réalité pour corriger immédiatement les dérives de compréhension.
                     """)
             
@@ -1844,7 +1842,7 @@ else:
                     st.checkbox("Découplage des boucles de validation", value=False, help="Les délais d'attente de signature sont isolés du temps de traitement pur (Touch Time).")
                 with col_chk3:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
-                    st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.") 
+                    st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
                     
         # =========================================================================
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PLAN DE VALIDATION ET TESTS
