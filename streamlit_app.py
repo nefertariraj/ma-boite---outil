@@ -1577,14 +1577,15 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
+       # =====================================================================
         # 3. Lean Six Sigma Data Collection Plan (Y = f(X))
-        # ==========================================
+        # =====================================================================
         st.subheader("3. Master Black Belt Data Collection Plan")
         
         st.markdown("""
         ### 📊 Alignement Stratégique $Y = f(X)$ & Matrice de Collecte Phase Measure
         En tant que **Master Black Belt**, ce module structure votre plan de collecte de données terrain de manière rigoureuse. 
-        L'algorithme extrait automatiquement les **$X$ potentiels** de votre *Detailed Process Map* en isolant les **NVA**, les **gaspillages Lean (Muda)**, les **boucles de retouches (Rework)** et les **goulots d'étranglement**.
+        L'algorithme extrait automatiquement les **$X$ potentiels** de votre *Detailed Process Map* en isolant les **NVA**, les **gaspillages Lean (Muda)**, les **boucles de retouches (Rework)** et les **goulots d'entranglement**.
         """)
 
         # --------------------------------------------------
@@ -1697,16 +1698,40 @@ else:
                 }
             )
 
-            # Rerunning et mise à jour dynamique de la structure des X validés
+            # Rerunning et mise à jour dynamique de la structure des X validés (avec insertion du Y)
             if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{p_idx}"):
                 st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
                 
-                # Génération de la matrice réglementaire à 16 colonnes pour les éléments validés (Oui / Oui / Oui)
+                # Récupération dynamique du Y du projet de la phase Define
+                nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
+                
+                # Matrice réglementaire à 16 colonnes
                 dcp_final_rows = []
+                
+                # --- ÉVOLUTION : AJOUT DE LA VARIABLE DE SORTIE Y EN PREMIÈRE LIGNE ---
+                dcp_final_rows.append({
+                    "Variable à mesurer": nom_y_projet,
+                    "Objectif de mesure": "Quantifier la performance globale et la variance du processus cible à optimiser.",
+                    "Lien avec le Y": "Variable de sortie principale (Y) du projet Lean Six Sigma.",
+                    "Définition opérationnelle exacte": "Mesure standardisée de l'indicateur clé de performance validé lors du cadrage.",
+                    "Type de donnée": "Continue (Temps)",
+                    "Unité": "Minutes",
+                    "Source de donnée": "Système d'information / Base de données centrale",
+                    "Méthode de collecte": "Extraction automatique ou requête de production",
+                    "Point de mesure dans le processus": "Sortie globale du processus",
+                    "Responsable collecte": "Sponsor / Pilote du Processus",
+                    "Fréquence": "Mensuelle / Hebdomadaire",
+                    "Taille échantillon": "n ≥ 30 mesures historiques",
+                    "Période de collecte": "Historique sur 3 mois",
+                    "Outil utilisé": "Système ERP / BI",
+                    "Risques de biais": "Décalage de saisie temporelle",
+                    "Méthode de contrôle qualité des données": "Validation de cohérence par rapprochement rapports financiers"
+                })
+                
+                # --- INTEGRATION DES VARIABLES X VALIDÉES ---
                 for row in st.session_state["mbb_prioritization_matrix"]:
                     if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
                         
-                        # Déduction logique du type de métrique
                         var_name = str(row["Variable Potentielle (X)"])
                         is_time = any(kw in var_name.lower() for kw in ["temps", "délai", "stagnation", "durée"])
                         
@@ -1730,13 +1755,13 @@ else:
                         })
                 
                 st.session_state["master_dcp_table"] = dcp_final_rows
-                st.toast(f"🎯 Plan de collecte généré avec {len(dcp_final_rows)} variables critiques !", icon="🚀")
+                p["master_dcp_table"] = dcp_final_rows # Sécurité sauvegarde
+                st.toast(f"🎯 Plan de collecte généré : 1 Variable Y et {len(dcp_final_rows)-1} variable(s) X critique(s) !", icon="🚀")
                 st.rerun()
 
         # --------------------------------------------------
         # ETAPE 2 : LE TABLEAU OFFICIEL DU DATA COLLECTION PLAN (16 COLONNES)
         # --------------------------------------------------
-        # 🔄 RECHARGE INTELLIGENTE DU FICHIER SI EXISTANT (Correction pour importer le travail)
         if "master_dcp_table" not in st.session_state or not st.session_state["master_dcp_table"]:
             saved_dcp = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
             if saved_dcp:
@@ -1744,7 +1769,7 @@ else:
 
         if "master_dcp_table" in st.session_state and st.session_state["master_dcp_table"]:
             st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
-            st.caption("Cette matrice constitue le livrable réglementaire pour votre jalon de validation DMAIC. Modifiez les cellules pour affiner les paramètres terrain.")
+            st.caption("Cette matrice constitue le livrable réglementaire pour votre jalon de validation DMAIC. La première ligne correspond à votre Y. Modifiez les cellules pour affiner les paramètres terrain.")
             
             df_dcp = pd.DataFrame(st.session_state["master_dcp_table"])
             
@@ -1754,7 +1779,7 @@ else:
                 use_container_width=True,
                 key=f"mbb_dcp_matrix_editor_{p_idx}",
                 column_config={
-                    "Variable à mesurer": st.column_config.TextColumn("Variable (X)", required=True, width="large"),
+                    "Variable à mesurer": st.column_config.TextColumn("Variable à mesurer (X ou Y)", required=True, width="large"),
                     "Objectif de mesure": st.column_config.TextColumn("Objectif de mesure", width="medium"),
                     "Lien avec le Y": st.column_config.TextColumn("Lien avec le Y", width="medium"),
                     "Définition opérationnelle exacte": st.column_config.TextColumn("Définition Opérationnelle", width="large"),
@@ -1776,7 +1801,7 @@ else:
             if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{p_idx}"):
                 st.session_state["master_dcp_table"] = edited_dcp_df.to_dict('records')
                 p["master_dcp_table"] = st.session_state["master_dcp_table"]
-                st.success("🎯 Spécifications de collecte terrain enregistrées avec succès.")
+                st.success("🎯 Spécifications de collecte terrain (X & Y) enregistrées avec succès.")
 
             st.markdown("---")
 
@@ -1819,7 +1844,7 @@ else:
                     st.checkbox("Découplage des boucles de validation", value=False, help="Les délais d'attente de signature sont isolés du temps de traitement pur (Touch Time).")
                 with col_chk3:
                     st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
-                    st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
+                    st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.") 
                     
         # =========================================================================
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PLAN DE VALIDATION ET TESTS
