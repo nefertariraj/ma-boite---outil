@@ -1858,10 +1858,11 @@ else:
         reprod_key = f"reprod_table_{safe_idx}"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
-        # 🛑 VERROU RIGOUREUX LSS : On vérifie si le Plan de Collecte a été validé et généré
-        plan_de_collecte_existe = "master_dcp_table" in st.session_state and len(st.session_state["master_dcp_table"]) > 0
+        # 🛑 VERROU LÉGER : On vérifie l'existence de la table de manière stable
+        if "master_dcp_table" not in st.session_state:
+            st.session_state["master_dcp_table"] = []
 
-        if not plan_de_collecte_existe:
+        if len(st.session_state["master_dcp_table"]) == 0:
             st.warning("⚠️ **Jalon requis :** Veuillez d'abord valider votre **Plan de Collecte (Section 3)** en cliquant sur le bouton rouge *'⚙️ Valider la pertinence & Générer le Data Collection Plan Master'*. Le module MSA se débloquera automatiquement avec vos variables validées.")
         else:
             # 🔄 Si le plan existe, on extrait la liste des vraies variables validées
@@ -1918,7 +1919,6 @@ else:
             if project_y == "Indéterminé" or project_y == "Non défini":
                 project_y = st.session_state.get("ctq_v", "Indéterminé")
             
-            # Affichage de l'encadré d'alignement avec le Y
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
             # Initialisation de la table en session state au format DataFrame natif
@@ -1959,7 +1959,6 @@ else:
                         })
                     st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
-            # Sécurité de type : conversion forcée en DataFrame si c'était stocké sous forme de liste
             if isinstance(st.session_state[msa_classif_key], list):
                 st.session_state[msa_classif_key] = pd.DataFrame(st.session_state[msa_classif_key])
 
@@ -1970,10 +1969,9 @@ else:
 
             st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement.*")
             
-            # 📦 FORMULAIRE COMPORTEMENTAL STRICT : Bloque le signal de focus au niveau du navigateur
-            with st.form(key=f"form_msa_blocage_clignotement_{safe_idx}"):
+            # 📦 LE FORMULAIRE STRICT (SANS KEY) : Bloque à 100% le rafraîchissement au clic extérieur
+            with st.form(key=f"form_msa_blocage_complet_{safe_idx}"):
                 
-                # /!\ IMPORTANT : Pas de 'key' ici pour interdire à Streamlit de renvoyer les inputs à chaque clic extérieur
                 df_classification_current = st.data_editor(
                     st.session_state[msa_classif_key],
                     num_rows="dynamic",
@@ -1987,10 +1985,9 @@ else:
                     }
                 )
                 
-                # Bouton de soumission obligatoire pour libérer les données vers le script
                 bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
 
-            # 🔄 Traitement exécuté UNIQUEMENT lorsque le formulaire est soumis
+            # Enregistrement uniquement au clic
             if bouton_sauvegarde and df_classification_current is not None:
                 st.session_state[msa_classif_key] = df_classification_current
                 p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
