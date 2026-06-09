@@ -1874,7 +1874,7 @@ else:
             st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
             nom_colonne_variable = "Variable Critique (liée au Y)"
             
-            # Initialisation rapide unique au format DataFrame
+            # Initialisation rapide unique au format DataFrame si inexistant
             if msa_classif_key not in st.session_state:
                 saved_classif = p.get("msa_classification_table", []) if isinstance(p, dict) else []
                 if saved_classif:
@@ -1907,110 +1907,64 @@ else:
             if isinstance(st.session_state[msa_classif_key], list):
                 st.session_state[msa_classif_key] = pd.DataFrame(st.session_state[msa_classif_key])
 
-            # Preparation des données pour l'injection HTML
             df_actuel = st.session_state[msa_classif_key]
-            
-            # Injection d'un composant de saisie HTML pur (Zero interaction Streamlit pendant la frappe)
-            import streamlit.components.v1 as components
-            import json
 
-            # Création des lignes du tableau HTML
-            html_rows = ""
-            for i, r in df_actuel.iterrows():
-                v_crit = r.get(nom_colonne_variable, '').replace('"', '&quot;')
-                t_donnee = r.get('Type de Donnée', '')
-                msa_rec = r.get('MSA Recommandé', '')
-                crit = r.get('Criticité par rapport au Y', '').replace('"', '&quot;')
-                statut = r.get('statut validation', '')
+            # 🛠️ CRÉATION D'UN FORMULAIRE EN LIGNES (ZÉRO LATENCE, SANS TABLEAU BLANC)
+            # Utiliser des colonnes Streamlit classiques dans un formulaire bloque à 100% les requêtes serveurs au clic hors de la case.
+            with st.form(key=f"msa_classic_fluid_form_{safe_idx}"):
+                st.write("✏️ **Matrice de Saisie Isolée :** Modifiez les champs requis. Aucun rechargement ne se produira pendant la frappe ou au changement de case.")
+                
+                nouvelles_valeurs = []
+                
+                # En-têtes simulés pour clarté visuelle
+                hdr_col1, hdr_col2, hdr_col3, hdr_col4, hdr_col5 = st.columns([2.5, 2, 2.5, 2, 1.5])
+                hdr_col1.caption("**Variable Critique**")
+                hdr_col2.caption("**Type de Donnée**")
+                hdr_col3.caption("**MSA Recommandé**")
+                hdr_col4.caption("**Alignement Y**")
+                hdr_col5.caption("**Statut**")
+                
+                # Génération des lignes de saisie rétentionnaires
+                for i, row in df_actuel.iterrows():
+                    col1, col2, col3, col4, col5 = st.columns([2.5, 2, 2.5, 2, 1.5])
+                    
+                    # Chaque widget est indexé par sa ligne pour ne pas se mélanger
+                    v_crit = col1.text_input("Variable", value=row.get(nom_colonne_variable, ""), key=f"v_{safe_idx}_{i}", label_visibility="collapsed")
+                    
+                    opts_type = ["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"]
+                    idx_type = opts_type.index(row.get("Type de Donnée")) if row.get("Type de Donnée") in opts_type else 0
+                    t_donnee = col2.selectbox("Type", options=opts_type, index=idx_type, key=f"t_{safe_idx}_{i}", label_visibility="collapsed")
+                    
+                    opts_msa = ["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"]
+                    idx_msa = opts_msa.index(row.get("MSA Recommandé")) if row.get("MSA Recommandé") in opts_msa else 0
+                    msa_rec = col3.selectbox("MSA", options=opts_msa, index=idx_msa, key=f"m_{safe_idx}_{i}", label_visibility="collapsed")
+                    
+                    crit = col4.text_input("Criticité", value=row.get("Criticité par rapport au Y", ""), key=f"c_{safe_idx}_{i}", label_visibility="collapsed")
+                    
+                    opts_statut = ["en attente de test", "test effectué"]
+                    idx_statut = opts_statut.index(row.get("statut validation")) if row.get("statut validation") in opts_statut else 0
+                    statut = col5.selectbox("Statut", options=opts_statut, index=idx_statut, key=f"s_{safe_idx}_{i}", label_visibility="collapsed")
+                    
+                    nouvelles_valeurs.append({
+                        nom_colonne_variable: v_crit,
+                        "Type de Donnée": t_donnee,
+                        "MSA Recommandé": msa_rec,
+                        "Criticité par rapport au Y": crit,
+                        "statut validation": statut
+                    })
+                
+                st.write("")
+                bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Valider le Jalon MSA", type="primary")
 
-                html_rows += f"""
-                <tr>
-                    <td><input type="text" id="var_{i}" value="{v_crit}" style="width:95%; padding:4px;"></td>
-                    <td>
-                        <select id="type_{i}" style="width:95%; padding:4px;">
-                            <option value="Continue (Quantitative)" {"selected" if t_donnee=="Continue (Quantitative)" else ""}>Continue (Quantitative)</option>
-                            <option value="Attributaire / Catégorielle" {"selected" if t_donnee=="Attributaire / Catégorielle" else ""}>Attributaire / Catégorielle</option>
-                            <option value="Système / Log IT" {"selected" if t_donnee=="Système / Log IT" else ""}>Système / Log IT</option>
-                        </select>
-                    </td>
-                    <td>
-                        <select id="msa_{i}" style="width:95%; padding:4px;">
-                            <option value="Gage R&R (Répétabilité & Reproductibilité)" {"selected" if msa_rec=="Gage R&R (Répétabilité & Reproductibilité)" else ""}>Gage R&R (Répétabilité & Reproductibilité)</option>
-                            <option value="Attribute Agreement Analysis (Kappa)" {"selected" if msa_rec=="Attribute Agreement Analysis (Kappa)" else ""}>Attribute Agreement Analysis (Kappa)</option>
-                            <option value="Audit de Stabilité & Exactitude" {"selected" if msa_rec=="Audit de Stabilité & Exactitude" else ""}>Audit de Stabilité & Exactitude</option>
-                        </select>
-                    </td>
-                    <td><input type="text" id="crit_{i}" value="{crit}" style="width:95%; padding:4px;"></td>
-                    <td>
-                        <select id="stat_{i}" style="width:95%; padding:4px;">
-                            <option value="en attente de test" {"selected" if statut=="en attente de test" else ""}>en attente de test</option>
-                            <option value="test effectué" {"selected" if statut=="test effectué" else ""}>test effectué</option>
-                        </select>
-                    </td>
-                </tr>
-                """
-
-            # Code HTML / JS complet avec un seul bouton HTML natif qui envoie tout à Streamlit d'un coup
-            html_code = f"""
-            <div style="font-family: sans-serif; color: #31333F;">
-                <table style="width:100%; border-collapse: collapse; text-align: left; font-size:14px;">
-                    <thead>
-                        <tr style="border-bottom: 2px solid #ddd; background-faded: #f9f9f9;">
-                            <th style="padding:8px; width:25%;">Variable Critique (liée au Y)</th>
-                            <th style="padding:8px; width:20%;">Type de Donnée</th>
-                            <th style="padding:8px; width:25%;">MSA Recommandé</th>
-                            <th style="padding:8px; width:18%;">Alignement sémantique Y</th>
-                            <th style="padding:8px; width:12%;">Statut</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {html_rows}
-                    </tbody>
-                </table>
-                <br>
-                <button onclick="sendDataToStreamlit()" style="background-color: #FF4B4B; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size:14px;">
-                    💾 Enregistrer et Figer la Matrice MSA
-                </button>
-            </div>
-
-            <script>
-                function sendDataToStreamlit() {{
-                    var totalRows = {len(df_actuel)};
-                    var data = [];
-                    for (var i = 0; i < totalRows; i++) {{
-                        data.push({{
-                            "{nom_colonne_variable}": document.getElementById('var_' + i).value,
-                            "Type de Donnée": document.getElementById('type_' + i).value,
-                            "MSA Recommandé": document.getElementById('msa_' + i).value,
-                            "Criticité par rapport au Y": document.getElementById('crit_' + i).value,
-                            "statut validation": document.getElementById('stat_' + i).value
-                        }});
-                    }}
-                    // On envoie les données à Streamlit de manière unique au clic
-                    window.parent.postMessage({{type: 'streamlit:setComponentValue', value: data}}, '*');
-                }}
-            </script>
-            """
-
-            # Affichage du composant web (ajuster la hauteur si nécessaire)
-            st.write("✏️ *Modifiez vos cellules de manière instantanée. Aucun rechargement possible pendant la saisie.*")
-            hauteur_calculee = max(180, 60 + (len(df_actuel) * 45))
-            donnees_recues = components.html(html_code, height=hauteur_calculee, scroller=False)
-
-            # 🔄 Réception et traitement de la sauvegarde uniquement quand JS renvoie le tableau complet
-            # On utilise un composant caché pour attraper la valeur du postMessage sans utiliser de bouton Streamlit synchrone
-            import extra_streamlit_components as stx # sécurité standard ou fallback via session_state de clé
-            
-            # Pour éviter d'installer une lib tiers, on utilise une astuce de stockage par clé de composant iframe
-            # Si le composant renvoie une valeur (ce qui arrive au clic sur le bouton HTML)
-            if donnees_recues:
-                # Si les données reçues sont différentes de ce qu'on a déjà, on sauvegarde
-                df_recu = pd.DataFrame(donnees_recues)
-                st.session_state[msa_classif_key] = df_recu
-                p["msa_classification_table"] = donnees_recues
-                st.toast("✅ Modifications appliquées avec succès !", icon="🚀")
+            # 🔄 APPLICATION UNIQUE AU MOMENT DU CLIC
+            if bouton_sauvegarde:
+                df_mis_a_jour = pd.DataFrame(nouvelles_valeurs)
+                st.session_state[msa_classif_key] = df_mis_a_jour
+                p["msa_classification_table"] = nouvelles_valeurs
+                st.toast("✅ Matrice MSA mise à jour avec succès !", icon="🚀")
                 st.rerun()
 
+            # Assignation finale pour la suite de la logique du script
             df_classification_current = st.session_state[msa_classif_key]
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
