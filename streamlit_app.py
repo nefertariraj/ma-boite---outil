@@ -1933,7 +1933,6 @@ else:
                 else:
                     ai_analyzed_rows = []
                     
-                    # On boucle directement sur le master_dcp_table généré à l'étape 3
                     for idx, row in enumerate(st.session_state["master_dcp_table"]):
                         var_name = row.get("Variable à mesurer", "")
                         type_brut = row.get("Type de donnée", "Continue (Temps)")
@@ -1941,7 +1940,6 @@ else:
                         if not var_name:
                             continue
                             
-                        # Détermination du type de donnée pour le MSA
                         if any(x in type_brut.lower() for x in ["continue", "temps", "délai", "coût", "mesure", "valeur"]):
                             det_type = "Continue (Quantitative)"
                             rec_msa = "Gage R&R (Répétabilité & Reproductibilité)"
@@ -1952,7 +1950,6 @@ else:
                             det_type = "Attributaire / Catégorielle"
                             rec_msa = "Attribute Agreement Analysis (Kappa)"
                         
-                        # Règle d'affectation de criticité : la toute première ligne est obligatoirement notre Y
                         if idx == 0:
                             criticite = "Critique (Directement lié au Y)"
                         else:
@@ -1973,28 +1970,15 @@ else:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Ajustez vos données librement ci-dessous. Vos modifications ne sauteront plus pendant la saisie. Cliquez sur le bouton de sauvegarde pour figer le registre.*")
+            st.write("👉 *Saisissez vos données en toute fluidité. Cliquez sur le bouton ci-dessous pour sauvegarder.*")
             
+            # Récupération de la source de données directe et propre (Plus de boucle de vérification lente avant affichage)
             df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
 
-            # =====================================================================
-            # 🛠️ SYNCHRONISATION DU LIEN VISUEL AVANT L'AFFICHAGE DANS L'ÉDITEUR
-            # =====================================================================
-            if not df_classification_current.empty:
-                if "statut validation" not in df_classification_current.columns:
-                    df_classification_current["statut validation"] = "en attente de test"
-                
-                for idx_row, row in df_classification_current.iterrows():
-                    var_nom = row.get(nom_colonne_variable, "")
-                    if pd.notna(var_nom) and str(var_nom).strip() != "":
-                        v_c = "".join(e for e in str(var_nom) if e.isalnum())
-                        if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or p.get(f"validated_status_{v_c}_{safe_idx}", False):
-                            df_classification_current.at[idx_row, "statut validation"] = "test effectué"
-                        else:
-                            df_classification_current.at[idx_row, "statut validation"] = "en attente de test"
+            if not df_classification_current.empty and "statut validation" not in df_classification_current.columns:
+                df_classification_current["statut validation"] = "en attente de test"
 
-            # 🛠️ CONFIGURATION FLUIDE : Pas de paramètre 'key=' lié à l'état global du widget
-            # afin de couper l'écriture intruisve et destructrice à la volée pendant votre saisie.
+            # L'éditeur de données consomme maintenant le DataFrame de manière brute et ultra-rapide
             edited_classification = st.data_editor(
                 df_classification_current,
                 num_rows="dynamic",
@@ -2003,17 +1987,18 @@ else:
                     nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
                     "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
                     "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
-                    "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", disabled=True),
-                    "statut validation": st.column_config.TextColumn("Statut Validation", disabled=True)
+                    "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
+                    "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
                 }
             )
             
-            # 💾 SAUVEGARDE PHYSIQUE UNIQUE AU CLIC : Sécurise la persistance sans pertes
+            # 💾 SAUVEGARDE PHYSIQUE ET POST-TRAITEMENT DES STATUTS
             if st.button("💾 Enregistrer et Figer la Matrice de Qualification MSA", key=f"save_msa_classif_btn_{safe_idx}"):
                 if edited_classification is not None:
+                    # On fige les données dans le session state et dans le dictionnaire du projet
                     st.session_state[msa_classif_key] = edited_classification
                     p["msa_classification_table"] = edited_classification.to_dict(orient="records")
-                    st.success("✅ Matrice de configuration MSA enregistrée avec succès dans le projet !")
+                    st.success("✅ Matrice de configuration MSA enregistrée avec succès !")
                     st.rerun()
 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
