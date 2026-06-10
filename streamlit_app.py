@@ -1577,7 +1577,7 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-      # =====================================================================
+# =====================================================================
         # 3. Lean Six Sigma Data Collection Plan (Y = f(X))
         # =====================================================================
         st.subheader("3. Master Black Belt Data Collection Plan")
@@ -1710,55 +1710,55 @@ else:
                 )
                 submit_prio_btn = st.form_submit_button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True)
 
-            # L'action d'enregistrement s'exécute de façon stricte AU CLIC
-            if submit_prio_btn and edited_prio_df is not None:
-                st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
-                nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
-                dcp_final_rows = []
-                
-                # Injection systématique de la variable maîtresse Y en tête du plan de collecte
-                dcp_final_rows.append({
-                    "Variable à mesurer": nom_y_projet,
-                    "Objectif de mesure": "Quantifier la performance globale et la variance du processus cible à optimiser.",
-                    "Lien avec le Y": "Variable de sortie principale (Y) du projet Lean Six Sigma.",
-                    "Définition opérationnelle exacte": "Mesure standardisée de l'indicateur clé de performance validé lors du cadrage.",
-                    "Type de donnée": "Continue (Temps)", "Unité": "Minutes",
-                    "Source de donnée": "Système d'information / Base de données centrale",
-                    "Méthode de collecte": "Extraction automatique ou requête de production",
-                    "Point de mesure dans le processus": "Sortie globale du processus", "Responsable collecte": "Sponsor / Pilote du Processus",
-                    "Fréquence": "Mensuelle / Hebdomadaire", "Taille échantillon": "n ≥ 30 mesures historiques",
-                    "Période de collecte": "Historique sur 3 mois", "Outil utilisé": "Système ERP / BI",
-                    "Risques de biais": "Décalage de saisie temporelle",
-                    "Méthode de contrôle qualité des données": "Validation de coherence par rapprochement rapports financiers"
-                })
-                
-                # Parcours des X filtrés et insertion si critères validés (Oui / Oui / Oui)
-                for row in st.session_state["mbb_prioritization_matrix"]:
-                    if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
-                        var_name = str(row["Variable Potentielle (X)"])
-                        is_time = any(kw in var_name.lower() for kw in ["temps", "délai", "stagnation", "durée"])
-                        
-                        dcp_final_rows.append({
-                            "Variable à mesurer": var_name,
-                            "Objectif de mesure": "Quantifier la variance et l'impact de ce Muda sur le processus.",
-                            "Lien avec le Y": "Contribution directe au Lead Time Global (Y) par allongement du temps de traversée.",
-                            "Définition opérationnelle exacte": "Chrono démarré au moment exact du début de l'action/attente et stoppé à sa complétion complète.",
-                            "Type de donnée": "Continue (Temps)" if is_time else "Discrète (Défauts / Attributaire)",
-                            "Unité": "Minutes" if is_time else "Nombre d'occurrences",
-                            "Source de donnée": "Système d'information (Logs) / Saisie terrain",
-                            "Méthode de collecte": "Extraction automatique de base de données" if is_time else "Feuille de pointage standardisée (Checksheet)",
-                            "Point de mesure dans le processus": row["Étape Source"], "Responsable collecte": "Pilote du Processus / Opérateur Terrain",
-                            "Fréquence": "En continu (Temps réel)" if is_time else "Quotidienne",
-                            "Taille échantillon": "n ≥ 30 mesures minimum" if is_time else "n ≥ 100 transactions",
-                            "Période de collecte": "2 semaines glissantes", "Outil utilisé": "Application Web / Fiche Excel partagée",
-                            "Risques de biais": "Effet Hawthorne (modification du comportement des opérateurs observés)",
-                            "Méthode de contrôle qualité des données": "Audit à blanc au jour 2 / Test Gage R&R ou Kappa linguistique si saisie humaine"
-                        })
-                
-                st.session_state["master_dcp_table"] = dcp_final_rows
-                p["master_dcp_table"] = dcp_final_rows
-                st.toast(f"🎯 Plan de collecte généré : 1 Variable Y et {len(dcp_final_rows)-1} variable(s) X critique(s) !", icon="🚀")
-                st.rerun()
+        # L'action d'enregistrement s'exécute de façon stricte AU CLIC
+        if submit_prio_btn and edited_prio_df is not None:
+            st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
+            nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
+            dcp_final_rows = []
+            
+            # Injection systématique de la variable maîtresse Y en tête du plan de collecte
+            dcp_final_rows.append({
+                "Variable à mesurer": nom_y_projet,
+                "Objectif de mesure": "Quantifier la performance globale et la variance du processus cible à optimiser.",
+                "Lien avec le Y": "Variable de sortie principale (Y) du projet Lean Six Sigma.",
+                "Définition opérationnelle exacte": "Mesure standardisée de l'indicateur clé de performance validé lors du cadrage.",
+                "Type de donnée": "Continue (Temps)", "Unité": "Minutes",
+                "Source de donnée": "Système d'information / Base de données centrale",
+                "Méthode de collecte": "Extraction automatique ou requête de production",
+                "Point de mesure dans le processus": "Sortie globale du processus", "Responsable collecte": "Sponsor / Pilote du Processus",
+                "Fréquence": "Mensuelle / Hebdomadaire", "Taille échantillon": "n ≥ 30 mesures historiques",
+                "Période de collecte": "Historique sur 3 mois", "Outil utilisé": "Système ERP / BI",
+                "Risques de biais": "Décalage de saisie temporelle",
+                "Méthode de contrôle qualité des données": "Validation de coherence par rapprochement rapports financiers"
+            })
+            
+            # Parcours des X filtrés et insertion si critères validés (Oui / Oui / Oui)
+            for row in st.session_state["mbb_prioritization_matrix"]:
+                if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
+                    var_name = str(row["Variable Potentielle (X)"])
+                    is_time = any(kw in var_name.lower() for kw in ["temps", "délai", "stagnation", "durée"])
+                    
+                    dcp_final_rows.append({
+                        "Variable à mesurer": var_name,
+                        "Objectif de mesure": "Quantifier la variance et l'impact de ce Muda sur le processus.",
+                        "Lien avec le Y": "Contribution directe au Lead Time Global (Y) par allongement du temps de traversée.",
+                        "Définition opérationnelle exacte": "Chrono démarré au moment exact du début de l'action/attente et stoppé à sa complétion complète.",
+                        "Type de donnée": "Continue (Temps)" if is_time else "Discrète (Défauts / Attributaire)",
+                        "Unité": "Minutes" if is_time else "Nombre d'occurrences",
+                        "Source de donnée": "Système d'information (Logs) / Saisie terrain",
+                        "Méthode de collecte": "Extraction automatique de base de données" if is_time else "Feuille de pointage standardisée (Checksheet)",
+                        "Point de mesure dans le processus": row["Étape Source"], "Responsable collecte": "Pilote du Processus / Opérateur Terrain",
+                        "Fréquence": "En continu (Temps réel)" if is_time else "Quotidienne",
+                        "Taille échantillon": "n ≥ 30 mesures minimum" if is_time else "n ≥ 100 transactions",
+                        "Période de collecte": "2 semaines glissantes", "Outil utilisé": "Application Web / Fiche Excel partagée",
+                        "Risques de biais": "Effet Hawthorne (modification du comportement des opérateurs observés)",
+                        "Méthode de contrôle qualité des données": "Audit à blanc au jour 2 / Test Gage R&R ou Kappa linguistique si saisie humaine"
+                    })
+            
+            st.session_state["master_dcp_table"] = dcp_final_rows
+            p["master_dcp_table"] = dcp_final_rows
+            st.toast(f"🎯 Plan de collecte généré : 1 Variable Y et {len(dcp_final_rows)-1} variable(s) X critique(s) !", icon="🚀")
+            st.rerun()
 
         # --------------------------------------------------
         # ETAPE 2 : LE TABLEAU OFFICIEL DU DATA COLLECTION PLAN (16 COLONNES)
