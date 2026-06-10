@@ -1737,7 +1737,7 @@ else:
                                 "Rôle": "Y" if "Variable de sortie principale (Y)" in v_lien else "X",
                                 "Type de Donnée": "Continue" if "continue" in v_type_brut.lower() else "Attributaire",
                                 "MSA Recommandé": "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)",
-                                "Statut de validation": "En attente"  # CORRECTION : Changé "Statut Validation" par "Statut de validation"
+                                "Statut de validation": "En attente"
                             })
                         
                         st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
@@ -1767,7 +1767,7 @@ else:
                             "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
                             "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
                             "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                            "Statut de validation": st.column_config.SelectboxColumn(  # CORRECTION : Idem ici
+                            "Statut de validation": st.column_config.SelectboxColumn(
                                 "Statut de validation", 
                                 options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
                                 width="medium"
