@@ -1584,7 +1584,6 @@ else:
         
         st.markdown("""
         ### 📊 Alignement Stratégique $Y = f(X)$ & Matrice de Collecte Phase Measure
-        En tant que **Master Black Belt**, ce module structure votre plan de collecte de données terrain de manière rigoureuse.
         """)
 
         # --- ANCRAGE ET PERSISTANCE DU PROJET ---
@@ -1593,7 +1592,7 @@ else:
         else:
             p = st.session_state.setdefault('p', {})
 
-        # --- EXTRACTION SÉCURISÉE (SANS BOUCLE EN TEMPS RÉEL) ---
+        # --- EXTRACTION SÉCURISÉE DES VARIABLES ---
         if "mbb_prioritization_matrix" not in st.session_state:
             vsm_steps = st.session_state.get("vsm_macro_steps", [])
             vsm_detailed = st.session_state.get("vsm_detailed_map", {})
@@ -1649,79 +1648,74 @@ else:
                 })
             st.session_state["mbb_prioritization_matrix"] = initial_prio
 
-        # --- TABLEAU 1 : ENFERMÉ DANS UN FORMULAIRE POUR STOPPER LE REAL-TIME SAVE ---
-        with st.container(border=True):
-            st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
+        # --- TABLEAU 1 : MATRICE DE PRIORISATION ---
+        st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
+        with st.form(key=f"form_prio_perf_{p_idx}"):
+            df_prio = pd.DataFrame(st.session_state["mbb_prioritization_matrix"])
             
-            with st.form(key=f"form_prio_strict_{p_idx}"):
-                df_prio = pd.DataFrame(st.session_state["mbb_prioritization_matrix"])
-                
-                # Pas de liaison directe avec le session_state via 'key' ici pour éviter les lags
-                edited_prio_df = st.data_editor(
-                    df_prio,
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    column_config={
-                        "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True),
-                        "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True),
-                        "Gaspillage / Muda": st.column_config.TextColumn("Type de Muda", disabled=True),
-                        "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"]),
-                        "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"]),
-                        "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"]),
-                        "Utilité Analytique (Futur Test d'Hypothèse)": st.column_config.TextColumn("Utilité Future")
-                    }
-                )
-                
-                submit_prio = st.form_submit_button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True)
+            edited_prio_df = st.data_editor(
+                df_prio,
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"editor_raw_prio_{p_idx}",  # Clé unique pour figer l'UI
+                column_config={
+                    "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True),
+                    "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True),
+                    "Gaspillage / Muda": st.column_config.TextColumn("Type de Muda", disabled=True),
+                    "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"]),
+                    "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"]),
+                    "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"]),
+                    "Utilité Analytique (Futur Test d'Hypothèse)": st.column_config.TextColumn("Utilité Future")
+                }
+            )
+            submit_prio = st.form_submit_button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True)
 
-            # Traitement STRICTEMENT après le clic sur le bouton
-            if submit_prio and edited_prio_df is not None:
-                st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
-                nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
-                
-                dcp_final_rows = [{
-                    "Variable à mesurer": nom_y_projet,
-                    "Objectif de mesure": "Quantifier la performance globale du processus.",
-                    "Lien avec le Y": "Variable de sortie principale (Y).",
-                    "Type de donnée": "Continue (Temps)", "Unité": "Minutes"
-                }]
-                
-                for row in st.session_state["mbb_prioritization_matrix"]:
-                    if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
-                        var_name = str(row["Variable Potentielle (X)"])
-                        dcp_final_rows.append({
-                            "Variable à mesurer": var_name,
-                            "Objectif de mesure": "Quantifier la variance de ce Muda.",
-                            "Lien avec le Y": "Contribution directe au Lead Time.",
-                            "Type de donnée": "Continue (Temps)" if "temps" in var_name.lower() else "Discrète",
-                            "Unité": "Minutes" if "temps" in var_name.lower() else "U"
-                        })
-                
-                st.session_state["master_dcp_table"] = dcp_final_rows
-                p["master_dcp_table"] = dcp_final_rows
-                st.rerun()
+        if submit_prio and edited_prio_df is not None:
+            st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
+            nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
+            
+            dcp_final_rows = [{
+                "Variable à mesurer": nom_y_projet,
+                "Objectif de mesure": "Quantifier la performance globale du processus.",
+                "Lien avec le Y": "Variable de sortie principale (Y).",
+                "Type de donnée": "Continue (Temps)", "Unité": "Minutes"
+            }]
+            
+            for row in st.session_state["mbb_prioritization_matrix"]:
+                if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
+                    var_name = str(row["Variable Potentielle (X)"])
+                    dcp_final_rows.append({
+                        "Variable à mesurer": var_name,
+                        "Objectif de mesure": "Quantifier la variance de ce Muda.",
+                        "Lien avec le Y": "Contribution directe au Lead Time.",
+                        "Type de donnée": "Continue (Temps)" if "temps" in var_name.lower() else "Discrète",
+                        "Unité": "Minutes" if "temps" in var_name.lower() else "U"
+                    })
+            
+            st.session_state["master_dcp_table"] = dcp_final_rows
+            p["master_dcp_table"] = dcp_final_rows
+            st.rerun()
 
-        # --- TABLEAU 2 : ENFERMÉ ÉGALEMENT DANS UN FORMULAIRE ---
+        # --- TABLEAU 2 : PLAN DE COLLECTE ---
         if "master_dcp_table" not in st.session_state:
             st.session_state["master_dcp_table"] = p.get("master_dcp_table", [])
 
         if st.session_state["master_dcp_table"]:
-            st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
-            
-            with st.form(key=f"form_dcp_strict_{p_idx}"):
+            st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte")
+            with st.form(key=f"form_dcp_perf_{p_idx}"):
                 df_dcp = pd.DataFrame(st.session_state["master_dcp_table"])
                 
                 edited_dcp_df = st.data_editor(
                     df_dcp,
                     num_rows="dynamic",
                     use_container_width=True,
+                    key=f"editor_raw_dcp_{p_idx}",
                     column_config={
                         "Variable à mesurer": st.column_config.TextColumn("Variable à mesurer (X ou Y)", required=True),
                         "Type de donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Temps)", "Discrète"]),
                         "Unité": st.column_config.TextColumn("Unité")
                     }
                 )
-                
                 submit_dcp = st.form_submit_button("💾 Enregistrer les ajustements du Data Collection Plan", type="primary")
 
             if submit_dcp and edited_dcp_df is not None:
@@ -1729,33 +1723,8 @@ else:
                 p["master_dcp_table"] = st.session_state["master_dcp_table"]
                 st.success("🎯 Spécifications de collecte terrain enregistrées.")
 
-            st.markdown("---")
-
-            # --- RECOMMANDATIONS & CHECKLISTS EXTRA-LÉGÈRES (SANS IMPACT PERFORMANCE) ---
-            st.markdown("### 🗺️ 2. Recommandations de Collecte Terrain & Gestion des Biais")
-            c_rec1, c_rec2 = st.columns(2)
-            with c_rec1:
-                with st.container(border=True):
-                    st.markdown("#### 🚨 Maîtrise des Risques de Subjectivité\n* **Catalogue des défauts visuel :** Requis pour standardiser la saisie.")
-            with c_rec2:
-                with st.container(border=True):
-                    st.markdown("#### 📐 Validation de la Fiabilité (MSA)\n* **Gage R&R / Kappa :** À lancer avant la phase Analyze.")
-
-            st.markdown("### ⚠️ 3. Points Critiques à Surveiller")
-            with st.container(border=True):
-                col_chk1, col_chk2, col_chk3 = st.columns(3)
-                with col_chk1:
-                    st.checkbox("Zéro Donnée Inutile", value=True, disabled=True)
-                    st.checkbox("Définitions Opérationnelles figées", value=False, key=f"chk_def_{p_idx}")
-                with col_chk2:
-                    st.checkbox("Taille d'échantillon valide (n≥30)", value=False, key=f"chk_tcl_{p_idx}")
-                    st.checkbox("Découplage des boucles", value=False, key=f"chk_dec_{p_idx}")
-                with col_chk3:
-                    st.checkbox("Plan de contingence", value=False, key=f"chk_cont_{p_idx}")
-                    st.checkbox("Validation MSA engagée", value=False, key=f"chk_msa_{p_idx}")
-                    
         # =========================================================================
-        # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - AVEC RÉINTÉGRATION DU Y
         # =========================================================================
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
@@ -1767,57 +1736,73 @@ else:
         if not st.session_state.get("master_dcp_table"):
             st.warning("⚠️ **Jalon requis :** Veuillez d'abord valider votre Plan de Collecte (Section 3).")
         else:
+            # Initialisation ou reconstruction forcée de la table MSA
             if msa_classif_key not in st.session_state:
                 saved_classif = p.get("msa_classification_table", [])
                 if saved_classif:
                     st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
                 else:
                     ai_analyzed_rows = []
-                    for idx, row in enumerate(st.session_state["master_dcp_table"]):
+                    nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
+                    
+                    # 1. Injection Forcée du Y Principal en première ligne
+                    ai_analyzed_rows.append({
+                        nom_colonne_variable: nom_y_projet,
+                        "Type de Donnée": "Continue (Quantitative)",
+                        "MSA Recommandé": "Gage R&R",
+                        "Criticité par rapport au Y": "🎯 VARIABLE DE SORTIE PRINCIPALE (Y)",
+                        "statut validation": "en attente de test"
+                    })
+
+                    # 2. Injection des variables X issues du plan de collecte
+                    for row in st.session_state["master_dcp_table"]:
                         var_name = row.get("Variable à mesurer", "")
                         type_brut = row.get("Type de donnée", "Continue (Temps)")
                         
-                        if not var_name:
+                        # On évite de dupliquer le Y si déjà extrait
+                        if not var_name or var_name == nom_y_projet:
                             continue
                             
                         det_type = "Continue (Quantitative)" if "continue" in type_brut.lower() else "Attributaire"
                         rec_msa = "Gage R&R" if det_type == "Continue (Quantitative)" else "Attribute Agreement Analysis (Kappa)"
-                        criticite = "Critique (Directement lié au Y)" if idx == 0 else "Haute (Lien Direct)"
                         
                         ai_analyzed_rows.append({
                             nom_colonne_variable: var_name,
                             "Type de Donnée": det_type,
                             "MSA Recommandé": rec_msa,
-                            "Criticité par rapport au Y": criticite,
+                            "Criticité par rapport au Y": "Haute (Lien Direct)",
                             "statut validation": "en attente de test"
                         })
                     st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
-            if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
+            if st.button("🔄 Forcer la ré-analyse / Reset MSA", key=f"re_analyze_msa_ai_{safe_idx}"):
                 if msa_classif_key in st.session_state:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement.*")
+            st.write("👉 *Saisissez vos données. Aucun calcul ni ralentissement ne se fera avant d'appuyer sur Enregistrer.*")
             
-            # --- TABLEAU 3 : TOTALEMENT SÉCURISÉ DANS SON FORMULAIRE MSA ---
-            with st.form(key=f"form_msa_blocage_complet_{safe_idx}"):
+            # --- TABLEAU 3 : COMPOSANT ENTIÈREMENT BRIDÉ POUR LA FLUIDITÉ ---
+            with st.form(key=f"form_msa_strict_perf_{safe_idx}"):
                 df_classification_current = st.data_editor(
                     st.session_state[msa_classif_key],
                     num_rows="dynamic",
                     use_container_width=True,
+                    key=f"editor_raw_msa_{safe_idx}", # Verrou sémantique anti-lag
                     column_config={
                         nom_colonne_variable: st.column_config.TextColumn(nom_colonne_variable, disabled=True),
-                        "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle"]),
+                        "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire"]),
                         "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R", "Attribute Agreement Analysis (Kappa)"]),
+                        "Criticité par rapport au Y": st.column_config.TextColumn("Criticité", disabled=True),
                         "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"])
                     }
                 )
-                bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice MSA", type="primary")
+                bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice MSA", type="primary", use_container_width=True)
 
             if bouton_sauvegarde and df_classification_current is not None:
                 st.session_state[msa_classif_key] = df_classification_current
                 p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
+                st.success("Matrice MSA enregistrée avec succès.")
                 st.rerun()
             
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
