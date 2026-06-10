@@ -1772,6 +1772,9 @@ else:
                         st.session_state[msa_classif_key] = edited_msa_df
                         project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                         st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
+
+        # --- L'APPEL MANQUANT A ÉTÉ RAJOUTÉ ICI (8 ESPACES DU BORD) ---
+        render_data_collection_and_msa(p, safe_idx)
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
