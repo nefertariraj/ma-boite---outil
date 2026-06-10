@@ -1737,7 +1737,7 @@ else:
                                 "Rôle": "Y" if "Variable de sortie principale (Y)" in v_lien else "X",
                                 "Type de Donnée": "Continue" if "continue" in v_type_brut.lower() else "Attributaire",
                                 "MSA Recommandé": "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)",
-                                "Statut Validation": "En attente"
+                                "Statut de validation": "En attente"  # CORRECTION : Changé "Statut Validation" par "Statut de validation"
                             })
                         
                         st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
@@ -1745,22 +1745,19 @@ else:
                         st.rerun()
 
                 # --------------------------------------------------
-                # 4. VALIDATE MEASUREMENT SYSTEM (MSA) (DÉCOUPLÉ ET SANS KEY POUR LE ZÉRO FLICKER)
+                # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
                 # --------------------------------------------------
                 st.divider()
                 st.subheader("4. Validate Measurement System (MSA)")
 
-                # On affiche l'avertissement mais on n'enferme plus le st.data_editor dans un bloc conditionnel instable
                 if not st.session_state.get(lock_key, False):
                     st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
                 df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
-                # Le tableau ne s'affiche que s'il contient des données extraites, sans dépendre du verrou au runtime
                 if not df_msa_in_state.empty:
                     st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
-                    # Saisie 100% locale et fluide sans paramètre 'key' conflictuel
                     edited_msa_df = st.data_editor(
                         df_msa_in_state,
                         num_rows="fixed",
@@ -1770,9 +1767,9 @@ else:
                             "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
                             "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
                             "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                            "Statut Validation": st.column_config.SelectboxColumn(
-                                "Statut Validation", 
-                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté"],
+                            "Statut de validation": st.column_config.SelectboxColumn(  # CORRECTION : Idem ici
+                                "Statut de validation", 
+                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
                                 width="medium"
                             )
                         }
