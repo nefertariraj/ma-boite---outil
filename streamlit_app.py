@@ -1674,7 +1674,6 @@ else:
                     )
 
                     if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{component_idx}"):
-                        # CORRECTION ICI : Force la conversion en DataFrame au cas où Streamlit renvoie un type bâtard
                         df_prio_fixed = pd.DataFrame(edited_prio_df)
                         st.session_state[matrix_key] = df_prio_fixed.to_dict('records')
                         
@@ -1725,7 +1724,6 @@ else:
                     )
 
                     if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{component_idx}", type="secondary", use_container_width=True):
-                        # CORRECTION SIMILAIRE ICI : Sécurisation du deuxième Data Editor
                         df_dcp_fixed = pd.DataFrame(edited_dcp_df)
                         st.session_state[dcp_table_key] = df_dcp_fixed.to_dict('records')
                         project_dict["master_dcp_table"] = st.session_state[dcp_table_key]
@@ -1744,7 +1742,6 @@ else:
                             })
                         
                         st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
-                        df_classification_current = st.session_state[local_msa_key]
                         st.session_state[lock_key] = True
                         st.rerun()
 
@@ -1757,12 +1754,12 @@ else:
                 if not st.session_state.get(lock_key, False):
                     st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 else:
-                    df_classification_current = st.session_state.get(local_msa_key, pd.DataFrame())
-                    if not df_classification_current.empty:
+                    df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
+                    if not df_msa_in_state.empty:
                         st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                         
                         edited_msa_df = st.data_editor(
-                            df_classification_current,
+                            df_msa_in_state,
                             num_rows="fixed",
                             use_container_width=True,
                             key=f"msa_editor_flat_{component_idx}",
@@ -1782,13 +1779,16 @@ else:
                         if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
                             df_msa_fixed = pd.DataFrame(edited_msa_df)
                             st.session_state[local_msa_key] = df_msa_fixed
-                            df_classification_current = df_msa_fixed
                             project_dict["msa_table_saved"] = df_msa_fixed.to_dict('records')
                             st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
+                            st.rerun()
 
             render_data_collection_and_msa(p, safe_idx)
-            # Rafraîchissement final de la variable globale pour le code séquentiel externe qui suit
-            df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
+            
+            # --- SÉCURISATION ABSOLUE DU SCOPE EXTERNE ---
+            # On récupère l'état à jour depuis le session_state à chaque rafraîchissement global
+            raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
+            df_classification_current = pd.DataFrame(raw_saved_msa) if not isinstance(raw_saved_msa, pd.DataFrame) else raw_saved_msa
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
