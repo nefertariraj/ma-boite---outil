@@ -1756,8 +1756,9 @@ else:
         # =========================================================================
         dcp_est_valide_officiel = st.session_state.get(lock_key, False)
 
-        # INITIALISATION DU DF POUR LE CODE EN AVAL (Évite définitivement le NameError)
+        # INITIALISATION DES VARIABLES CRITIQUES POUR LE CODE EN AVAL (Évite les NameError)
         df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
+        nom_colonne_variable = "Variable Critique (liée au Y)" # S'assure que la variable attendue en bas existe
 
         if not dcp_est_valide_officiel:
             st.divider()
@@ -1777,7 +1778,7 @@ else:
                     disabled=True,
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable", width="large"),
-                        "Rôle": st.column_config.TextColumn("Rôle", width="small"), # Titre mis à jour (Problème n°4)
+                        "Rôle": st.column_config.TextColumn("Rôle", width="small"),
                         "Type de Donnée": st.column_config.TextColumn("Type de Donnée", width="medium"),
                         "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", width="large"),
                         "Statut Validation": st.column_config.TextColumn("Statut Validation", width="small")
