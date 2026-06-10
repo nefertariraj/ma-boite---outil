@@ -1773,8 +1773,10 @@ else:
                         project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                         st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
 
-        # Appel du fragment isolé
-        render_data_collection_and_msa(p, safe_idx)
+                    if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
+                        st.session_state[msa_classif_key] = edited_msa_df
+                        project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+                        st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
