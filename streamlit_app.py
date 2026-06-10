@@ -1674,7 +1674,10 @@ else:
                     )
 
                     if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{component_idx}"):
-                        st.session_state[matrix_key] = edited_prio_df.to_dict('records')
+                        # CORRECTION ICI : Force la conversion en DataFrame au cas où Streamlit renvoie un type bâtard
+                        df_prio_fixed = pd.DataFrame(edited_prio_df)
+                        st.session_state[matrix_key] = df_prio_fixed.to_dict('records')
+                        
                         nom_y_projet = project_dict.get("selected_ctq", "Indicateur de Performance Principal (Y)")
                         
                         dcp_final_rows = [{
@@ -1722,7 +1725,9 @@ else:
                     )
 
                     if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{component_idx}", type="secondary", use_container_width=True):
-                        st.session_state[dcp_table_key] = edited_dcp_df.to_dict('records')
+                        # CORRECTION SIMILAIRE ICI : Sécurisation du deuxième Data Editor
+                        df_dcp_fixed = pd.DataFrame(edited_dcp_df)
+                        st.session_state[dcp_table_key] = df_dcp_fixed.to_dict('records')
                         project_dict["master_dcp_table"] = st.session_state[dcp_table_key]
                         
                         msa_rows = []
@@ -1775,9 +1780,10 @@ else:
                         )
                         
                         if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
-                            st.session_state[local_msa_key] = edited_msa_df
-                            df_classification_current = edited_msa_df
-                            project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+                            df_msa_fixed = pd.DataFrame(edited_msa_df)
+                            st.session_state[local_msa_key] = df_msa_fixed
+                            df_classification_current = df_msa_fixed
+                            project_dict["msa_table_saved"] = df_msa_fixed.to_dict('records')
                             st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
 
             render_data_collection_and_msa(p, safe_idx)
