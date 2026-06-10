@@ -1590,7 +1590,7 @@ else:
             # Extraction propre de l'index du projet pour éviter les collisions de clés
             safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-            # --- INITIALISATION GLOBALE POUR LE CODE SUIVANT (ÉVITE LES NAMEERROR) ---
+            # --- INITIALISATION GLOBALE STATIQUE (EMPECHE LE CLIGNOTEMENT) ---
             msa_classif_key = f"msa_classification_table_{safe_idx}"
             if msa_classif_key not in st.session_state:
                 st.session_state[msa_classif_key] = pd.DataFrame()
@@ -1607,10 +1607,6 @@ else:
                 dcp_table_key = f"master_dcp_table_{component_idx}"
                 lock_key = f"dcp_validated_lock_{component_idx}"
                 local_msa_key = f"msa_classification_table_{component_idx}"
-                
-                editor_prio_key = f"prio_editor_flat_{component_idx}"
-                editor_dcp_key = f"dcp_editor_flat_{component_idx}"
-                editor_msa_key = f"msa_editor_flat_{component_idx}"
 
                 # --------------------------------------------------
                 # EXTRACTION UNIQUE INITIALE (ANTI-LENTEUR CPU)
@@ -1663,28 +1659,26 @@ else:
                     } for item in extracted_x])
 
                 # --------------------------------------------------
-                # INTERFACE ENCAPSULÉE DANS UN FORMULAIRE (ZERO LAG)
+                # 1. PRIORISATION DES X (ZÉRO LATENCE AU CLAVIER)
                 # --------------------------------------------------
                 st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
                 
-                with st.form(key=f"form_prio_{component_idx}", clear_on_submit=False):
-                    edited_prio_df = st.data_editor(
-                        st.session_state[matrix_key],
-                        num_rows="dynamic",
-                        use_container_width=True,
-                        key=editor_prio_key,
-                        column_config={
-                            "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
-                            "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
-                            "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"], width="small"),
-                            "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"], width="small"),
-                            "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"], width="small")
-                        }
-                    )
-                    
-                    submit_prio = st.form_submit_button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True)
-
-                if submit_prio:
+                # IMPORTANT: Pas de paramètre 'key' ici pour laisser le composant JS de Streamlit
+                # gérer la frappe au clavier de manière 100% locale, fluide et indépendante du serveur.
+                edited_prio_df = st.data_editor(
+                    st.session_state[matrix_key],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    column_config={
+                        "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
+                        "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
+                        "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"], width="small"),
+                        "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"], width="small"),
+                        "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"], width="small")
+                    }
+                )
+                
+                if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{component_idx}"):
                     st.session_state[matrix_key] = pd.DataFrame(edited_prio_df)
                     nom_y_projet = project_dict.get("selected_ctq", "Indicateur de Performance Principal (Y)")
                     
@@ -1720,21 +1714,18 @@ else:
                     st.rerun()
 
                 # --------------------------------------------------
-                # INTERFACE : TABLEAU OFFICIEL DU DCP (DANS UN FORMULAIRE)
+                # 2. TABLEAU OFFICIEL DU DCP (FLUIDE AU CLAVIER)
                 # --------------------------------------------------
                 if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
                     st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
                     
-                    with st.form(key=f"form_dcp_{component_idx}", clear_on_submit=False):
-                        edited_dcp_df = st.data_editor(
-                            st.session_state[dcp_table_key],
-                            num_rows="dynamic",
-                            use_container_width=True,
-                            key=editor_dcp_key
-                        )
-                        submit_dcp = st.form_submit_button("💾 Enregistrer les ajustements du Data Collection Plan", type="secondary", use_container_width=True)
+                    edited_dcp_df = st.data_editor(
+                        st.session_state[dcp_table_key],
+                        num_rows="dynamic",
+                        use_container_width=True
+                    )
 
-                    if submit_dcp:
+                    if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{component_idx}", type="secondary", use_container_width=True):
                         st.session_state[dcp_table_key] = pd.DataFrame(edited_dcp_df)
                         project_dict["master_dcp_table"] = st.session_state[dcp_table_key].to_dict('records')
                         
@@ -1756,7 +1747,7 @@ else:
                         st.rerun()
 
                 # --------------------------------------------------
-                # 4. VALIDATE MEASUREMENT SYSTEM (MSA) (DANS UN FORMULAIRE)
+                # 4. VALIDATE MEASUREMENT SYSTEM (MSA) (FLUIDE AU CLAVIER)
                 # --------------------------------------------------
                 st.divider()
                 st.subheader("4. Validate Measurement System (MSA)")
@@ -1768,27 +1759,24 @@ else:
                     if not df_msa_in_state.empty:
                         st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                         
-                        with st.form(key=f"form_msa_{component_idx}", clear_on_submit=False):
-                            edited_msa_df = st.data_editor(
-                                df_msa_in_state,
-                                num_rows="fixed",
-                                use_container_width=True,
-                                key=editor_msa_key,
-                                column_config={
-                                    "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                                    "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                                    "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                                    "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                                    "Statut Validation": st.column_config.SelectboxColumn(
-                                        "Statut Validation", 
-                                        options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté"],
-                                        width="medium"
-                                    )
-                                }
-                            )
-                            submit_msa = st.form_submit_button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", type="primary", use_container_width=True)
+                        edited_msa_df = st.data_editor(
+                            df_msa_in_state,
+                            num_rows="fixed",
+                            use_container_width=True,
+                            column_config={
+                                "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                                "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                                "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                                "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                                "Statut Validation": st.column_config.SelectboxColumn(
+                                    "Statut Validation", 
+                                    options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté"],
+                                    width="medium"
+                                )
+                            }
+                        )
                         
-                        if submit_msa:
+                        if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
                             st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
                             project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
                             st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
