@@ -1596,7 +1596,6 @@ else:
                 st.session_state[msa_classif_key] = pd.DataFrame()
             df_classification_current = st.session_state[msa_classif_key]
 
-            # Sécurisation de la variable qui fait crasher la ligne 1800
             if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
                 nom_colonne_variable = "Variable Critique (liée au Y)"
 
@@ -1608,9 +1607,14 @@ else:
                 dcp_table_key = f"master_dcp_table_{component_idx}"
                 lock_key = f"dcp_validated_lock_{component_idx}"
                 local_msa_key = f"msa_classification_table_{component_idx}"
+                
+                # Clés d'édition directes pour bypasser la lenteur des clics
+                editor_prio_key = f"prio_editor_flat_{component_idx}"
+                editor_dcp_key = f"dcp_editor_flat_{component_idx}"
+                editor_msa_key = f"msa_editor_flat_{component_idx}"
 
                 # --------------------------------------------------
-                # EXTRACTION UNIQUE INITIALE (ANTI-LENTEUR)
+                # EXTRACTION UNIQUE INITIALE (ANTI-LENTEUR CPU)
                 # --------------------------------------------------
                 if matrix_key not in st.session_state:
                     vsm_steps = st.session_state.get("vsm_macro_steps", [])
@@ -1649,7 +1653,7 @@ else:
                             {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation", "muda": "Attente (Waiting)"}
                         ]
 
-                    st.session_state[matrix_key] = [{
+                    st.session_state[matrix_key] = pd.DataFrame([{
                         "Étape Source": item["etape"],
                         "Variable Potentielle (X)": item["variable"],
                         "Gaspillage / Muda": item["muda"],
@@ -1657,19 +1661,20 @@ else:
                         "2. Apparaît souvent ?": "Oui",
                         "3. Peut-on mesurer fiablement ?": "Oui",
                         "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time."
-                    } for item in extracted_x]
+                    } for item in extracted_x])
 
                 # --------------------------------------------------
-                # INTERFACE : PRIORISATION DES X
+                # INTERFACE : PRIORISATION DES X (FLUIDE AU CLIC)
                 # --------------------------------------------------
                 with st.container(border=True):
                     st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
                     
-                    edited_prio_df = st.data_editor(
+                    # Utilisation directe du DataFrame stocké en State pour bloquer le lag
+                    st.data_editor(
                         st.session_state[matrix_key],
                         num_rows="dynamic",
                         use_container_width=True,
-                        key=f"prio_editor_flat_{component_idx}",
+                        key=editor_prio_key,
                         column_config={
                             "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
                             "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
@@ -1680,8 +1685,15 @@ else:
                     )
 
                     if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{component_idx}"):
-                        df_prio_fixed = pd.DataFrame(edited_prio_df)
-                        st.session_state[matrix_key] = df_prio_fixed.to_dict('records')
+                        # Si l'utilisateur a cliqué/modifié, st.session_state[editor_prio_key] contient les changements du data_editor
+                        if editor_prio_key in st.session_state:
+                            # On applique les modifications de manière ultra-rapide au clic final
+                            df_edited = st.session_state[matrix_key].copy()
+                            changes = st.session_state[editor_prio_key]
+                            for row_idx, edits in changes.get("edited_rows", {}).items():
+                                for col, val in edits.items():
+                                    df_edited.iloc[row_idx, df_edited.columns.get_loc(col)] = val
+                            st.session_state[matrix_key] = df_edited
                         
                         nom_y_projet = project_dict.get("selected_ctq", "Indicateur de Performance Principal (Y)")
                         
@@ -1697,7 +1709,8 @@ else:
                             "Méthode de contrôle qualité des données": "Validation financière"
                         }]
                         
-                        for row in st.session_state[matrix_key]:
+                        # Lecture rapide
+                        for _, row in st.session_state[matrix_key].iterrows():
                             if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
                                 dcp_final_rows.append({
                                     "Variable à mesurer": str(row["Variable Potentielle (X)"]),
@@ -1711,7 +1724,7 @@ else:
                                     "Méthode de contrôle qualité des données": "Audit à blanc"
                                 })
                         
-                        st.session_state[dcp_table_key] = dcp_final_rows
+                        st.session_state[dcp_table_key] = pd.DataFrame(dcp_final_rows)
                         project_dict["master_dcp_table"] = dcp_final_rows
                         st.session_state[lock_key] = False
                         st.rerun()
@@ -1719,23 +1732,29 @@ else:
                 # --------------------------------------------------
                 # INTERFACE : TABLEAU OFFICIEL DU DCP
                 # --------------------------------------------------
-                if dcp_table_key in st.session_state and st.session_state[dcp_table_key]:
+                if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
                     st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
                     
-                    edited_dcp_df = st.data_editor(
+                    st.data_editor(
                         st.session_state[dcp_table_key],
                         num_rows="dynamic",
                         use_container_width=True,
-                        key=f"dcp_editor_flat_{component_idx}"
+                        key=editor_dcp_key
                     )
 
                     if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{component_idx}", type="secondary", use_container_width=True):
-                        df_dcp_fixed = pd.DataFrame(edited_dcp_df)
-                        st.session_state[dcp_table_key] = df_dcp_fixed.to_dict('records')
-                        project_dict["master_dcp_table"] = st.session_state[dcp_table_key]
+                        if editor_dcp_key in st.session_state:
+                            df_dcp_edited = st.session_state[dcp_table_key].copy()
+                            dcp_changes = st.session_state[editor_dcp_key]
+                            for row_idx, edits in dcp_changes.get("edited_rows", {}).items():
+                                for col, val in edits.items():
+                                    df_dcp_edited.iloc[row_idx, df_dcp_edited.columns.get_loc(col)] = val
+                            st.session_state[dcp_table_key] = df_dcp_edited
+
+                        project_dict["master_dcp_table"] = st.session_state[dcp_table_key].to_dict('records')
                         
                         msa_rows = []
-                        for row in st.session_state[dcp_table_key]:
+                        for _, row in st.session_state[dcp_table_key].iterrows():
                             v_type_brut = str(row.get("Type de donnée", "Continue (Temps)"))
                             v_lien = str(row.get("Lien avec le Y", ""))
                             
@@ -1764,11 +1783,11 @@ else:
                     if not df_msa_in_state.empty:
                         st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                         
-                        edited_msa_df = st.data_editor(
+                        st.data_editor(
                             df_msa_in_state,
                             num_rows="fixed",
                             use_container_width=True,
-                            key=f"msa_editor_flat_{component_idx}",
+                            key=editor_msa_key,
                             column_config={
                                 "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                                 "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1783,22 +1802,21 @@ else:
                         )
                         
                         if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
-                            df_msa_fixed = pd.DataFrame(edited_msa_df)
-                            st.session_state[local_msa_key] = df_msa_fixed
-                            project_dict["msa_table_saved"] = df_msa_fixed.to_dict('records')
+                            if editor_msa_key in st.session_state:
+                                df_msa_edited = df_msa_in_state.copy()
+                                msa_changes = st.session_state[editor_msa_key]
+                                for row_idx, edits in msa_changes.get("edited_rows", {}).items():
+                                    for col, val in edits.items():
+                                        df_msa_edited.iloc[row_idx, df_msa_edited.columns.get_loc(col)] = val
+                                st.session_state[local_msa_key] = df_msa_edited
+                            
+                            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
                             st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
                             st.rerun()
 
             render_data_collection_and_msa(p, safe_idx)
             
-            # --- SÉCURISATION EXTÉRIEURE ABSOLUE CONTRE LE NAMEERROR LIGNE 1800 ---
-            raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
-            if isinstance(raw_saved_msa, pd.DataFrame):
-                df_classification_current = raw_saved_msa
-            else:
-                df_classification_current = pd.DataFrame(raw_saved_msa)
-            
-            # --- SÉCURISATION EXTÉRIEURE ABSOLUE CONTRE LE NAMEERROR LIGNE 1796 ---
+            # --- SÉCURISATION EXTÉRIEURE ABSOLUE (LIGNE 1800 VACCINÉE) ---
             raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
             if isinstance(raw_saved_msa, pd.DataFrame):
                 df_classification_current = raw_saved_msa
