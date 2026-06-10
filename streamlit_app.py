@@ -1588,7 +1588,7 @@ else:
         """)
 
         # --------------------------------------------------
-        # RECUPÉRATION & CACHING SÉCURISÉ DES DONNÉES DU PROCESS MAP (ANTI-LENTEUR)
+        # COUCHE CONFIGURATION & IDENTIFIANTS SÉCURISÉS
         # --------------------------------------------------
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
         matrix_key = f"mbb_prioritization_matrix_{safe_idx}"
@@ -1596,48 +1596,48 @@ else:
         lock_key = f"dcp_validated_lock_{safe_idx}"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
-        # L'extraction automatique du Process Map n'est exécutée qu'une seule fois à l'initialisation
+        # --------------------------------------------------
+        # ISOLATION ALGORITHMIQUE DE L'EXTRACTION UNIQUE (ANTI-LENTEUR)
+        # --------------------------------------------------
         if matrix_key not in st.session_state:
-            vsm_steps = st.session_state.get("vsm_macro_steps", [])
-            vsm_detailed = st.session_state.get("vsm_detailed_map", {})
-            vsm_totals = st.session_state.get("vsm_totals", {})
-            section_totals = vsm_totals.get("section_totals", {})
+            def _executer_extraction_process_map():
+                vsm_steps = st.session_state.get("vsm_macro_steps", [])
+                vsm_detailed = st.session_state.get("vsm_detailed_map", {})
+                vsm_totals = st.session_state.get("vsm_totals", {})
+                section_totals = vsm_totals.get("section_totals", {})
 
-            extracted_x_list = []
-            if vsm_steps:
-                if section_totals:
-                    highest_step = max(section_totals, key=section_totals.get)
-                    if section_totals[highest_step] > 0:
-                        extracted_x_list.append({
-                            "etape": highest_step,
-                            "variable": f"Temps de cycle unitaire sur le goulot - {highest_step}",
-                            "muda": "Surproduction / Capacité"
-                        })
+                extracted_x = []
+                if vsm_steps:
+                    if section_totals:
+                        highest_step = max(section_totals, key=section_totals.get)
+                        if section_totals[highest_step] > 0:
+                            extracted_x.append({
+                                "etape": highest_step,
+                                "variable": f"Temps de cycle unitaire sur le goulot - {highest_step}",
+                                "muda": "Surproduction / Capacité"
+                            })
 
-                for step in vsm_steps:
-                    tasks = vsm_detailed.get(step, [])
-                    for t in tasks:
-                        desc_tache = str(t.get("Détail de la tâche", ""))
-                        type_act = t.get("Type d'activité", "")
-                        desc_lower = desc_tache.lower()
-                        
-                        if not desc_tache or desc_tache in ["Sous-tâche initiale", "Première tâche à définir"]:
-                            continue
+                    for step in vsm_steps:
+                        for t in vsm_detailed.get(step, []):
+                            desc_tache = str(t.get("Détail de la tâche", ""))
+                            type_act = t.get("Type d'activité", "")
+                            desc_lower = desc_tache.lower()
+                            
+                            if not desc_tache or desc_tache in ["Sous-tâche initiale", "Première tâche à définir"]:
+                                continue
 
-                        if type_act == "Temps d'attente / Stock" or any(kw in desc_lower for kw in ["attente", "file", "stock"]):
-                            extracted_x_list.append({"etape": step, "variable": f"Temps de stagnation : {desc_tache}", "muda": "Attente (Waiting)"})
-                        elif type_act == "NVA (Non Valeur Ajoutée)" and any(kw in desc_lower for kw in ["retouche", "correction", "erreur", "rework"]):
-                            extracted_x_list.append({"etape": step, "variable": f"Fréquence de : {desc_tache}", "muda": "Défauts / Retouches"})
+                            if type_act == "Temps d'attente / Stock" or any(kw in desc_lower for kw in ["attente", "file", "stock"]):
+                                extracted_x.append({"etape": step, "variable": f"Temps de stagnation : {desc_tache}", "muda": "Attente (Waiting)"})
+                            elif type_act == "NVA (Non Valeur Ajoutée)" and any(kw in desc_lower for kw in ["retouche", "correction", "erreur", "rework"]):
+                                extracted_x.append({"etape": step, "variable": f"Fréquence de : {desc_tache}", "muda": "Défauts / Retouches"})
 
-            if not extracted_x_list:
-                extracted_x_list = [
-                    {"etape": "1. Réception & Tri", "variable": "Taux d'erreurs à l'entrée", "muda": "Défauts / Retouches"},
-                    {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation", "muda": "Attente (Waiting)"}
-                ]
+                if not extracted_x:
+                    extracted_x = [
+                        {"etape": "1. Réception & Tri", "variable": "Taux d'erreurs à l'entrée", "muda": "Défauts / Retouches"},
+                        {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation", "muda": "Attente (Waiting)"}
+                    ]
 
-            initial_prio = []
-            for item in extracted_x_list:
-                initial_prio.append({
+                return [{
                     "Étape Source": item["etape"],
                     "Variable Potentielle (X)": item["variable"],
                     "Gaspillage / Muda": item["muda"],
@@ -1645,16 +1645,19 @@ else:
                     "2. Apparaît souvent ?": "Oui",
                     "3. Peut-on mesurer fiablement ?": "Oui",
                     "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time."
-                })
-            st.session_state[matrix_key] = initial_prio
+                } for item in extracted_x]
 
+            st.session_state[matrix_key] = _executer_extraction_process_map()
+
+        # --------------------------------------------------
+        # INTERFACE GRAPHIQUE 1 : PRIORISATION DES X
+        # --------------------------------------------------
         with st.container(border=True):
             st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
             
-            # SUPPRESSION DE LA KEY RÉACTIVE POUR ÉVITER TOUT ÉCRAN BLANC/GRIS LORS DE LA SAISIE
-            df_prio = pd.DataFrame(st.session_state[matrix_key])
+            # Saisie locale fluide sans aucune sauvegarde en cours de frappe
             edited_prio_df = st.data_editor(
-                df_prio,
+                st.session_state[matrix_key],
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config={
@@ -1666,7 +1669,7 @@ else:
                 }
             )
 
-            # L'enregistrement et le traitement ne se déclenchent qu'ici
+            # Traitement différé uniquement sur action manuelle explicite
             if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{safe_idx}"):
                 st.session_state[matrix_key] = edited_prio_df.to_dict('records')
                 nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)") if ('p' in locals() and isinstance(p, dict)) else "Indicateur de Performance Principal (Y)"
@@ -1704,61 +1707,47 @@ else:
                 st.rerun()
 
         # --------------------------------------------------
-        # ETAPE 2 : LE TABLEAU OFFICIEL DU DATA COLLECTION PLAN
+        # INTERFACE GRAPHIQUE 2 : TABLEAU OFFICIEL DU DCP
         # --------------------------------------------------
         if dcp_table_key in st.session_state and st.session_state[dcp_table_key]:
             st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
             
-            # Pas de 'key' ici non plus pour garantir une saisie fluide et locale au clavier
-            df_dcp = pd.DataFrame(st.session_state[dcp_table_key])
             edited_dcp_df = st.data_editor(
-                df_dcp,
+                st.session_state[dcp_table_key],
                 num_rows="dynamic",
                 use_container_width=True
             )
 
-            # UNIQUE ACTION DE SAUVEGARDE ET DE SYNCHRONISATION MSA
+            # Événement d'enregistrement unique (aucune boucle d'écoute temps réel sur l'éditeur)
             if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{safe_idx}", type="secondary", use_container_width=True):
                 st.session_state[dcp_table_key] = edited_dcp_df.to_dict('records')
                 if 'p' in locals() and isinstance(p, dict):
                     p["master_dcp_table"] = st.session_state[dcp_table_key]
                 
-                # Alignement sémantique et génération miroir du MSA
                 msa_rows = []
-                for idx, row in enumerate(st.session_state[dcp_table_key]):
-                    v_name = row.get("Variable à mesurer", "Non définie")
+                for row in st.session_state[dcp_table_key]:
                     v_type_brut = row.get("Type de donnée", "Continue (Temps)")
                     v_lien = str(row.get("Lien avec le Y", ""))
                     
-                    # Identification stricte du Rôle Y ou X
-                    role_determine = "Y" if "Variable de sortie principale (Y)" in v_lien else "X"
-                    
-                    rec_msa = "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)"
-                    det_type = "Continue" if "continue" in v_type_brut.lower() else "Attributaire"
-
                     msa_rows.append({
-                        "Variable Critique (liée au Y)": v_name,
-                        "Rôle": role_determine,
-                        "Type de Donnée": det_type,
-                        "MSA Recommandé": rec_msa,
+                        "Variable Critique (liée au Y)": row.get("Variable à mesurer", "Non définie"),
+                        "Rôle": "Y" if "Variable de sortie principale (Y)" in v_lien else "X",
+                        "Type de Donnée": "Continue" if "continue" in v_type_brut.lower() else "Attributaire",
+                        "MSA Recommandé": "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)",
                         "Statut Validation": "En attente"
                     })
                 
                 st.session_state[msa_classif_key] = pd.DataFrame(msa_rows)
                 st.session_state[lock_key] = True
-                st.success("🎯 Spécifications du Data Collection Plan figées. MSA synchronisé.")
                 st.rerun()
 
         # =========================================================================
-        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - AFFICHAGE SANS PERTE D'ESPACE
+        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - CHARGEMENT DIRECT SANS RECALCUL
         # =========================================================================
-        dcp_est_valide_officiel = st.session_state.get(lock_key, False)
-
-        # Initialisation obligatoire pour votre code en aval
         df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
         nom_colonne_variable = "Variable Critique (liée au Y)"
 
-        if not dcp_est_valide_officiel:
+        if not st.session_state.get(lock_key, False):
             st.divider()
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
         else:
@@ -1768,18 +1757,17 @@ else:
             if not df_classification_current.empty:
                 st.markdown("##### 📋 Matrice de Référence MSA du Système de Mesure")
                 
-                # REDIMENSIONNEMENT INTELLIGENT STRICT SANS ESPACES VIDE (use_container_width déconnecté)
                 st.data_editor(
                     df_classification_current,
                     num_rows="fixed",
-                    use_container_width=False,  # Désactivé pour forcer l'ajustement strict aux pixels demandés
+                    use_container_width=False,
                     disabled=True,
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique (liée au Y)", width=320),
-                        "Rôle": st.column_config.TextColumn("Rôle", width=50),             # Largeur ultra-minimale pour X ou Y
+                        "Rôle": st.column_config.TextColumn("Rôle", width=50),
                         "Type de Donnée": st.column_config.TextColumn("Type de Donnée", width=110),
                         "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", width=260),
-                        "Statut Validation": st.column_config.TextColumn("Statut Validation", width=110) # Largeur exacte pour le texte affiché
+                        "Statut Validation": st.column_config.TextColumn("Statut Validation", width=110)
                     }
                 )
                 
