@@ -1577,7 +1577,7 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-            # =====================================================================
+           # =====================================================================
             # 3. Lean Six Sigma Data Collection Plan (Y = f(X)) & 4. MSA
             # =====================================================================
             st.subheader("3. Master Black Belt Data Collection Plan")
@@ -1587,19 +1587,18 @@ else:
             En tant que **Master Black Belt**, ce module structure votre plan de collecte de données terrain de manière rigoureuse.
             """)
 
-            # Extraction propre de l'index du projet pour éviter les collisions de clés
+            # Extraction propre de l'index du projet
             safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-            # --- INITIALISATION GLOBALE STATIQUE ---
+            # Clé globale pour le dictionnaire de session
             msa_classif_key = f"msa_classification_table_{safe_idx}"
             if msa_classif_key not in st.session_state:
                 st.session_state[msa_classif_key] = pd.DataFrame()
-            df_classification_current = st.session_state[msa_classif_key]
 
             if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
                 nom_colonne_variable = "Variable Critique (liée au Y)"
 
-            # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
+            # --- ISOLATION DANS UN FRAGMENT ANTI-FLICKER ---
             @st.fragment
             def render_data_collection_and_msa(project_dict, component_idx):
                 matrix_key = f"mbb_prioritization_matrix_{component_idx}"
@@ -1608,7 +1607,7 @@ else:
                 local_msa_key = f"msa_classification_table_{component_idx}"
 
                 # --------------------------------------------------
-                # EXTRACTION UNIQUE INITIALE (ANTI-LENTEUR CPU)
+                # EXTRACTION UNIQUE INITIALE
                 # --------------------------------------------------
                 if matrix_key not in st.session_state:
                     vsm_steps = st.session_state.get("vsm_macro_steps", [])
@@ -1658,7 +1657,7 @@ else:
                     } for item in extracted_x])
 
                 # --------------------------------------------------
-                # 1. PRIORISATION DES X (FLUIDE)
+                # 1. PRIORISATION DES X
                 # --------------------------------------------------
                 st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
                 
@@ -1711,7 +1710,7 @@ else:
                     st.rerun()
 
                 # --------------------------------------------------
-                # 2. TABLEAU OFFICIEL DU DCP (FLUIDE)
+                # 2. TABLEAU OFFICIEL DU DCP
                 # --------------------------------------------------
                 if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
                     st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
@@ -1778,13 +1777,15 @@ else:
                         st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
                         project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
                         st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
+                        
+                        # FORCE LE SCRIPT GLOBAL À SE RECHARGER POUR LE BAS DU CODE
                         st.rerun()
-                
-                # ICI : On renvoie les données pour que le reste du script s'ajuste en dehors du fragment
-                return df_msa_in_state
 
-            # On récupère directement le DataFrame mis à jour sans perturber le bas du code
-            df_classification_current = render_data_collection_and_msa(p, safe_idx)
+            # Exécution du fragment
+            render_data_collection_and_msa(p, safe_idx)
+            
+            # MAGIE : On synchronise la variable externe directement depuis le session_state
+            df_classification_current = st.session_state[msa_classif_key]
             
             # --- SÉCURISATION EXTÉRIEURE ABSOLUE ---
             # (Remets ton code d'origine exactement tel quel à partir d'ici !)
