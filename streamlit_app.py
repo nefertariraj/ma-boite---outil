@@ -1596,7 +1596,7 @@ else:
         lock_key = f"dcp_validated_lock_{safe_idx}"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
-        # On ne calcule l'extraction automatique QU'UNE SEULE FOIS pour éviter les lenteurs à chaque clic
+        # Calcul unique de l'extraction automatique pour bloquer le rafraîchissement au clavier
         if matrix_key not in st.session_state:
             vsm_steps = st.session_state.get("vsm_macro_steps", [])
             vsm_detailed = st.session_state.get("vsm_detailed_map", {})
@@ -1651,21 +1651,23 @@ else:
         with st.container(border=True):
             st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
             
+            # Pas de stockage d'état en direct au clavier : utilisation de la mémoire tampon locale
             df_prio = pd.DataFrame(st.session_state[matrix_key])
             edited_prio_df = st.data_editor(
                 df_prio,
                 num_rows="dynamic",
                 use_container_width=True,
                 column_config={
-                    "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True),
-                    "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True),
-                    "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"]),
-                    "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"]),
-                    "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"])
+                    "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
+                    "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
+                    "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"], width="small"),
+                    "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"], width="small"),
+                    "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"], width="small")
                 },
                 key=f"prio_editor_{safe_idx}"
             )
 
+            # L'enregistrement n'a lieu qu'au clic sur ce bouton unique
             if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{safe_idx}"):
                 st.session_state[matrix_key] = edited_prio_df.to_dict('records')
                 nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)") if ('p' in locals() and isinstance(p, dict)) else "Indicateur de Performance Principal (Y)"
@@ -1673,7 +1675,7 @@ else:
                 dcp_final_rows = [{
                     "Variable à mesurer": nom_y_projet,
                     "Objectif de mesure": "Quantifier la performance globale.",
-                    "Lien avec le Y": "Variable de sortie principale (Y) du projet Lean Six Sigma.", # <- Marqueur strict pour le Rôle Y
+                    "Lien avec le Y": "Variable de sortie principale (Y) du projet Lean Six Sigma.",
                     "Définition opérationnelle exacte": "Mesure standardisée de l'indicateur clé.",
                     "Type de donnée": "Continue (Temps)", "Unité": "Minutes", "Source de donnée": "Système d'information",
                     "Méthode de collecte": "Extraction automatique", "Point de mesure dans le processus": "Sortie globale",
@@ -1687,7 +1689,7 @@ else:
                         dcp_final_rows.append({
                             "Variable à mesurer": str(row["Variable Potentielle (X)"]),
                             "Objectif de mesure": "Quantifier l'impact de ce Muda.",
-                            "Lien avec le Y": "Contribution directe au Lead Time Global (Y).", # <- Sera identifié comme X
+                            "Lien avec le Y": "Contribution directe au Lead Time Global (Y).",
                             "Définition opérationnelle exacte": "Chrono de début et fin.",
                             "Type de donnée": "Continue (Temps)", "Unité": "Minutes", "Source de donnée": "Terrain",
                             "Méthode de collecte": "Saisie manuelle", "Point de mesure dans le processus": row["Étape Source"],
@@ -1713,23 +1715,22 @@ else:
                 df_dcp,
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"dcp_editor_{safe_idx}"
+                key=f"dcp_editor_{safe_idx}" # Clé fixe : la saisie reste fluide en local dans le navigateur
             )
 
-            # LE BOUTON DE VERROUILLAGE ET DE SYNCHRONISATION MSA
+            # L'UNIQUE POINT D'ENREGISTREMENT ET DE SYNCHRONISATION MSA
             if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{safe_idx}", type="secondary", use_container_width=True):
                 st.session_state[dcp_table_key] = edited_dcp_df.to_dict('records')
                 if 'p' in locals() and isinstance(p, dict):
                     p["master_dcp_table"] = st.session_state[dcp_table_key]
                 
-                # Génération miroir stricte du MSA avec règle d'identification Y/X
+                # Génération miroir instantanée du MSA
                 msa_rows = []
                 for idx, row in enumerate(st.session_state[dcp_table_key]):
                     v_name = row.get("Variable à mesurer", "Non définie")
                     v_type_brut = row.get("Type de donnée", "Continue (Temps)")
                     v_lien = str(row.get("Lien avec le Y", ""))
                     
-                    # CORRECTION PROBLÈME N°4 : Identification stricte à partir du DCP
                     if "Variable de sortie principale (Y)" in v_lien:
                         role_determine = "Y"
                     else:
@@ -1743,26 +1744,26 @@ else:
                         "Rôle": role_determine,
                         "Type de Donnée": det_type,
                         "MSA Recommandé": rec_msa,
-                        "Statut Validation": "En attente"
+                        "Statut Validation": "En attente"  # Colonne unique de statut standardisée
                     })
                 
                 st.session_state[msa_classif_key] = pd.DataFrame(msa_rows)
                 st.session_state[lock_key] = True
-                st.success("🎯 Spécifications du Data Collection Plan figées. MSA mis à jour.")
+                st.success("🎯 Spécifications du Data Collection Plan figées. MSA synchronisé.")
                 st.rerun()
 
         # =========================================================================
-        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - AFFICHAGE ET ASSIGNATION DU DF
+        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - MATRICE DE RÉFÉRENCE OPTIMISÉE
         # =========================================================================
         dcp_est_valide_officiel = st.session_state.get(lock_key, False)
 
-        # INITIALISATION DES VARIABLES CRITIQUES POUR LE CODE EN AVAL (Évite les NameError)
+        # Alimentation de la variable pour le code du bas (Zéro NameError)
         df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
-        nom_colonne_variable = "Variable Critique (liée au Y)" # S'assure que la variable attendue en bas existe
+        nom_colonne_variable = "Variable Critique (liée au Y)"
 
         if not dcp_est_valide_officiel:
             st.divider()
-            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton ci-dessus.")
+            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
         else:
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1770,18 +1771,18 @@ else:
             if not df_classification_current.empty:
                 st.markdown("##### 📋 Matrice de Référence MSA du Système de Mesure")
                 
-                # Affichage miroir non-modifiable (Problème n°3)
+                # AJUSTEMENT DES LARGEURS POUR SUPPRIMER LES ESPACES PERDUS ET ASSURER LE COUP D'OEIL
                 st.data_editor(
                     df_classification_current,
                     num_rows="fixed",
                     use_container_width=True,
                     disabled=True,
                     column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable", width="large"),
+                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium"),
                         "Rôle": st.column_config.TextColumn("Rôle", width="small"),
-                        "Type de Donnée": st.column_config.TextColumn("Type de Donnée", width="medium"),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", width="large"),
-                        "Statut Validation": st.column_config.TextColumn("Statut Validation", width="small")
+                        "Type de Donnée": st.column_config.TextColumn("Type de Donnée", width="small"),
+                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", width="medium"),
+                        "Statut Validation": st.column_config.TextColumn("Statut Validation", width="small") # Colonne unique et resserrée
                     },
                     key=f"msa_reference_viewer_{safe_idx}"
                 )
