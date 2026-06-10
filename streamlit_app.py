@@ -1773,8 +1773,11 @@ else:
                         project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                         st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
 
-        # --- L'APPEL MANQUANT A ÉTÉ RAJOUTÉ ICI (8 ESPACES DU BORD) ---
+        # Exécution de la fonction (Calée à 8 espaces du bord gauche)
         render_data_collection_and_msa(p, safe_idx)
+
+        # Ligne 1780 corrigée et réalignée (8 espaces du bord gauche)
+        st.markdown("##### 👟 Exécution du Protocole Terrain")
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
