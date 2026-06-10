@@ -1773,8 +1773,8 @@ else:
                         project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                         st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
 
-        # Appel du fragment isolé
-        render_data_collection_and_msa(p, safe_idx)
+            # Appel du fragment isolé
+            render_data_collection_and_msa(p, safe_idx)
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
