@@ -1577,7 +1577,7 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-       # =====================================================================
+      # =====================================================================
         # 3. Lean Six Sigma Data Collection Plan (Y = f(X))
         # =====================================================================
         st.subheader("3. Master Black Belt Data Collection Plan")
@@ -1588,80 +1588,89 @@ else:
         L'algorithme extrait automatiquement les **$X$ potentiels** de votre *Detailed Process Map* en isolant les **NVA**, les **gaspillages Lean (Muda)**, les **boucles de retouches (Rework)** et les **goulots d'étranglement**.
         """)
 
-        # --------------------------------------------------
-        # RECUPÉRATION SÉCURISÉE DES DONNÉES DU PROCESS MAP
-        # --------------------------------------------------
-        vsm_steps = st.session_state.get("vsm_macro_steps", [])
-        vsm_detailed = st.session_state.get("vsm_detailed_map", {})
-        vsm_totals = st.session_state.get("vsm_totals", {})
-        section_totals = vsm_totals.get("section_totals", {})
+        # --- ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P' ---
+        if 'projects' in st.session_state and 'p_idx' in locals():
+            p = st.session_state.projects[p_idx]
+        else:
+            if 'p' not in st.session_state:
+                st.session_state['p'] = {}
+            p = st.session_state['p']
 
-        # Inventaire automatique complet des X potentiels basés sur les gaspillages Lean
-        extracted_x_list = []
-        
-        if vsm_steps:
-            # 1. Identification du Goulot (Théorie des Contraintes)
-            if section_totals:
-                highest_step = max(section_totals, key=section_totals.get)
-                if section_totals[highest_step] > 0:
-                    extracted_x_list.append({
-                        "etape": highest_step,
-                        "variable": f"Temps de cycle unitaire sur le goulot - {highest_step}",
-                        "muda": "Surproduction / Capacité",
-                        "description": "L'étape la plus longue qui limite le débit global du processus."
-                    })
-
-            # 2. Scan sémantique et par catégorie de la carte détaillée
-            for step in vsm_steps:
-                tasks = vsm_detailed.get(step, [])
-                for t in tasks:
-                    desc_tache = str(t.get("Détail de la tâche", ""))
-                    type_act = t.get("Type d'activité", "")
-                    desc_lower = desc_tache.lower()
-                    
-                    if not desc_tache or desc_tache == "Sous-tâche initiale" or desc_tache == "Première tâche à définir":
-                        continue
-
-                    # Isolation des Attentes / Files d'attente
-                    if type_act == "Temps d'attente / Stock" or any(kw in desc_lower for kw in ["attente", "file", "stock", "bloqué", "en cours", "wip"]):
-                        extracted_x_list.append({
-                            "etape": step,
-                            "variable": f"Temps de stagnation de la tâche : {desc_tache}",
-                            "muda": "Attente (Waiting)",
-                            "description": "Temps mort générant des délais inter-processus et du gonflement d'en-cours."
-                        })
-                    
-                    # Isolation des Retouches / Corrections / Rework
-                    elif type_act == "NVA (Non Valeur Ajoutée)" and any(kw in desc_lower for kw in ["retouche", "correction", "refaire", "erreur", "rework", "rejet", "validation", "approbation", "signature"]):
-                        muda_type = "Défauts / Retouches" if "validation" not in desc_lower else "Sur-traitement (Overprocessing)"
-                        extracted_x_list.append({
-                            "etape": step,
-                            "variable": f"Fréquence et temps de traitement de : {desc_tache}",
-                            "muda": muda_type,
-                            "description": "Boucle de retravail ou rupture de flux pour validation hiérarchique."
-                        })
-                    
-                    # Isolation des Déplacements / Transports
-                    elif any(kw in desc_lower for kw in ["déplacement", "transport", "envoi", "transfert", "aller", "retour"]):
-                        extracted_x_list.append({
-                            "etape": step,
-                            "variable": f"Distance ou temps de transfert : {desc_tache}",
-                            "muda": "Transport / Mouvement",
-                            "description": "Rupture physique ou numérique obligeant au transfert d'informations."
-                        })
-
-        # Données de repli (Fallback réglementaire LSS) si le VSM est vide ou initial
-        if not extracted_x_list:
-            extracted_x_list = [
-                {"etape": "1. Réception & Tri", "variable": "Taux d'erreurs et de dossiers incomplets à l'entrée", "muda": "Défauts / Retouches", "description": "Qualité de l'information entrante générant des demandes de compléments."},
-                {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation par la hiérarchie", "muda": "Attente (Waiting)", "description": "Dossier en attente dans une file d'approbation numérique."},
-                {"etape": "3. Traitement & Analyse", "variable": "Nombre de boucles de retravail (Rework)", "muda": "Défauts / Retouches", "description": "Non-conformité obligeant à refaire l'analyse initiale."}
-            ]
+        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
         # --------------------------------------------------
-        # ETAPE 1 : MATRICE DE PRIORISATION INTELLIGENTE DES X (FILTRES MBB)
+        # RECUPÉRATION SÉCURISÉE ET ISOLATION DU CALCUL LOURD
         # --------------------------------------------------
+        # ON COMPUTE UNIQUEMENT SI LA MATRICE N'EXISTE PAS
         if "mbb_prioritization_matrix" not in st.session_state:
+            vsm_steps = st.session_state.get("vsm_macro_steps", [])
+            vsm_detailed = st.session_state.get("vsm_detailed_map", {})
+            vsm_totals = st.session_state.get("vsm_totals", {})
+            section_totals = vsm_totals.get("section_totals", {})
+
+            # Inventaire automatique complet des X potentiels basés sur les gaspillages Lean
+            extracted_x_list = []
+            
+            if vsm_steps:
+                # 1. Identification du Goulot (Théorie des Contraintes)
+                if section_totals:
+                    highest_step = max(section_totals, key=section_totals.get)
+                    if section_totals[highest_step] > 0:
+                        extracted_x_list.append({
+                            "etape": highest_step,
+                            "variable": f"Temps de cycle unitaire sur le goulot - {highest_step}",
+                            "muda": "Surproduction / Capacité",
+                            "description": "L'étape la plus longue qui limite le débit global du processus."
+                        })
+
+                # 2. Scan sémantique et par catégorie de la carte détaillée
+                for step in vsm_steps:
+                    tasks = vsm_detailed.get(step, [])
+                    for t in tasks:
+                        desc_tache = str(t.get("Détail de la tâche", ""))
+                        type_act = t.get("Type d'activité", "")
+                        desc_lower = desc_tache.lower()
+                        
+                        if not desc_tache or desc_tache == "Sous-tâche initiale" or desc_tache == "Première tâche à définir":
+                            continue
+
+                        # Isolation des Attentes / Files d'attente
+                        if type_act == "Temps d'attente / Stock" or any(kw in desc_lower for kw in ["attente", "file", "stock", "bloqué", "en cours", "wip"]):
+                            extracted_x_list.append({
+                                "etape": step,
+                                "variable": f"Temps de stagnation de la tâche : {desc_tache}",
+                                "muda": "Attente (Waiting)",
+                                "description": "Temps mort générant des délais inter-processus et du gonflement d'en-cours."
+                            })
+                        
+                        # Isolation des Retouches / Corrections / Rework
+                        elif type_act == "NVA (Non Valeur Ajoutée)" and any(kw in desc_lower for kw in ["retouche", "correction", "refaire", "erreur", "rework", "rejet", "validation", "approbation", "signature"]):
+                            muda_type = "Défauts / Retouches" if "validation" not in desc_lower else "Sur-traitement (Overprocessing)"
+                            extracted_x_list.append({
+                                "etape": step,
+                                "variable": f"Fréquence et temps de traitement de : {desc_tache}",
+                                "muda": muda_type,
+                                "description": "Boucle de retravail ou rupture de flux pour validation hiérarchique."
+                            })
+                        
+                        # Isolation des Déplacements / Transports
+                        elif any(kw in desc_lower for kw in ["déplacement", "transport", "envoi", "transfert", "aller", "retour"]):
+                            extracted_x_list.append({
+                                "etape": step,
+                                "variable": f"Distance ou temps de transfert : {desc_tache}",
+                                "muda": "Transport / Mouvement",
+                                "description": "Rupture physique ou numérique obligeant au transfert d'informations."
+                            })
+
+            # Données de repli (Fallback réglementaire LSS) si le VSM est vide ou initial
+            if not extracted_x_list:
+                extracted_x_list = [
+                    {"etape": "1. Réception & Tri", "variable": "Taux d'erreurs et de dossiers incomplets à l'entrée", "muda": "Défauts / Retouches", "description": "Qualité de l'information entrante générant des demandes de compléments."},
+                    {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation par la hiérarchie", "muda": "Attente (Waiting)", "description": "Dossier en attente dans une file d'approbation numérique."},
+                    {"etape": "3. Traitement & Analyse", "variable": "Nombre de boucles de retravail (Rework)", "muda": "Défauts / Retouches", "description": "Non-conformité obligeant à refaire l'analyse initiale."}
+                ]
+
+            # Transfert direct unique vers le state de priorisation
             initial_prio = []
             for item in extracted_x_list:
                 initial_prio.append({
@@ -1675,17 +1684,20 @@ else:
                 })
             st.session_state["mbb_prioritization_matrix"] = initial_prio
 
+        # --------------------------------------------------
+        # ETAPE 1 : MATRICE DE PRIORISATION VITESSE MAXIMALE
+        # --------------------------------------------------
         with st.container(border=True):
             st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
             st.caption("Passez chaque variable au crible des 3 questions filtres fondamentales. Seuls les X validant l'ensemble des critères passeront dans le Data Collection Plan final.")
 
             df_prio = pd.DataFrame(st.session_state["mbb_prioritization_matrix"])
 
-            # 🛠️ FIX EFFECTUÉ : Retrait de l'argument 'key' pour bloquer le rafraîchissement asynchrone lors de la saisie
             edited_prio_df = st.data_editor(
                 df_prio,
                 num_rows="dynamic",
                 use_container_width=True,
+                key=f"editor_prio_{safe_idx}",  # Clé unique pour isoler le cache mémoire du tableau
                 column_config={
                     "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
                     "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
@@ -1697,16 +1709,13 @@ else:
                 }
             )
 
-            # L'action d'enregistrement et de construction s'exécute de façon stricte au clic
-            if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{p_idx}"):
+            if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{safe_idx}"):
                 st.session_state["mbb_prioritization_matrix"] = edited_prio_df.to_dict('records')
                 
-                # Récupération dynamique du Y configuré en amont
                 nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)")
-                
                 dcp_final_rows = []
                 
-                # Injection systématique de la variable maîtresse Y en tête du plan de collecte
+                # Injection systématique de la variable maîtresse Y
                 dcp_final_rows.append({
                     "Variable à mesurer": nom_y_projet,
                     "Objectif de mesure": "Quantifier la performance globale et la variance du processus cible à optimiser.",
@@ -1726,7 +1735,7 @@ else:
                     "Méthode de contrôle qualité des données": "Validation de coherence par rapprochement rapports financiers"
                 })
                 
-                # Parcours des X filtrés et insertion si critères validés (Oui / Oui / Oui)
+                # Parcours des X filtrés (Oui / Oui / Oui)
                 for row in st.session_state["mbb_prioritization_matrix"]:
                     if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
                         
@@ -1758,24 +1767,24 @@ else:
                 st.rerun()
 
         # --------------------------------------------------
-        # ETAPE 2 : LE TABLEAU OFFICIEL DU DATA COLLECTION PLAN (16 COLONNES)
+        # ETAPE 2 : LE TABLEAU OFFICIEL DU DATA COLLECTION PLAN
         # --------------------------------------------------
         if "master_dcp_table" not in st.session_state or not st.session_state["master_dcp_table"]:
-            saved_dcp = p.get("master_dcp_table", []) if ('p' in locals() and isinstance(p, dict)) else []
+            saved_dcp = p.get("master_dcp_table", [])
             if saved_dcp:
                 st.session_state["master_dcp_table"] = saved_dcp
 
         if "master_dcp_table" in st.session_state and st.session_state["master_dcp_table"]:
             st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
-            st.caption("Cette matrice constitue le livrable réglementaire pour votre jalon de validation DMAIC. La première ligne correspond à votre Y. Modifiez les cellules pour affiner les paramètres terrain.")
+            st.caption("Cette matrice constitue le livrable réglementaire pour votre jalon de validation DMAIC.")
             
             df_dcp = pd.DataFrame(st.session_state["master_dcp_table"])
             
-            # 🛠️ FIX EFFECTUÉ : Retrait de la 'key' pour bloquer le rafraîchissement automatique de la page
             edited_dcp_df = st.data_editor(
                 df_dcp,
                 num_rows="dynamic",
                 use_container_width=True,
+                key=f"editor_dcp_{safe_idx}",  # Clé unique pour bloquer l'effet de freeze au scroll horizontal
                 column_config={
                     "Variable à mesurer": st.column_config.TextColumn("Variable à mesurer (X ou Y)", required=True, width="large"),
                     "Objectif de mesure": st.column_config.TextColumn("Objectif de mesure", width="medium"),
@@ -1796,7 +1805,7 @@ else:
                 }
             )
 
-            if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{p_idx}"):
+            if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{safe_idx}"):
                 st.session_state["master_dcp_table"] = edited_dcp_df.to_dict('records')
                 p["master_dcp_table"] = st.session_state["master_dcp_table"]
                 st.success("🎯 Spécifications de collecte terrain (X & Y) enregistrées avec succès.")
@@ -1804,126 +1813,66 @@ else:
             st.markdown("---")
 
             # --------------------------------------------------
-            # ETAPE 3 : RECOMMANDATIONS TERRAIN ET DIRECTIVES GAGE R&R
+            # ETAPE 3 : RECOMMANDATIONS TERRAIN ET DIRECTIVES
             # --------------------------------------------------
             st.markdown("### 🗺️ 2. Recommandations de Collecte Terrain & Gestion des Biais")
             
             c_rec1, c_rec2 = st.columns(2)
             with c_rec1:
                 with st.container(border=True):
-                    st.markdown("#### 🚨 Maîtrise des Risques de Subjectivité & Interprétation")
+                    st.markdown("#### 🚨 Maîtrise des Risques de Subjectivité")
                     st.markdown("""
-                    * **Suppression des définitions ambiguës :** Pour les données discrètes/attributaires (ex. Dossier non conforme), publiez un *catalogue des défauts* visuel. Si deux opérateurs interprètent un défaut différemment, votre système de mesure est inutile.
-                    * **Lutte contre l'Effet Hawthorne :** Lorsque les équipes se savent observées ou chronométrées, les performances s'amenuisent ou s'améliorent artificiellement de 10 à 15%. Privilégiez les collectes en tâche de fond (système) ou automatisez l'enregistrement sans présence physique pesante du Black Belt.
-                    * **Procédures de Contrôle Qualité :** Réalisez un audit complet des données dès le deuxième jour (*Day-2 Review*). Comparez les 20 premières lignes saisies avec la réalité pour corriger immédiatement les dérives de compréhension.
+                    * **Suppression des définitions ambiguës :** Publiez un *catalogue des défauts* visuel pour standardiser la saisie.
+                    * **Lutte contre l'Effet Hawthorne :** Privilégiez les collectes automatiques (logs SI) pour ne pas altérer les comportements.
                     """)
             
             with c_rec2:
                 with st.container(border=True):
-                    st.markdown("#### 📐 Validation de la Fiabilité (Rigueur Master Black Belt)")
+                    st.markdown("#### 📐 Validation de la Fiabilité (MSA)")
                     st.markdown("""
-                    Avant d'utiliser ces données pour des tests statistiques avancés dans la phase *Analyze*, vous devez obligatoirement valider la capabilité de votre système de mesure :
-                    * **Pour les Données Continues (Temps de cycle, délais) :** Réalisez une étude **Gage R&R (Répétabilité & Reproductibilité)**. La variance de votre outil de mesure doit représenter moins de 10% de la tolérance totale du processus.
-                    * **Pour les Données Attributaires (Conforme / Non conforme) :** Déployez un **Test d'accord d'attributs (Attribute Agreement Analysis)** en calculant le coefficient **Kappa de Fleiss**. Un score inférieur à **0.70** indique un besoin immédiat de standardisation et de requalification des contrôleurs.
+                    * **Données Continues :** Réalisez une étude **Gage R&R**. Tolérance cible < 10%.
+                    * **Données Attributaires :** Lancez une analyse de concordance avec calcul du **Kappa de Fleiss** (Cible ≥ 0.70).
                     """)
 
             # --------------------------------------------------
-            # ETAPE 4 : POINTS CRITIQUES À SURVEILLER (CHECKLIST)
+            # ETAPE 4 : CHECKLIST JALON MEASURE
             # --------------------------------------------------
             st.markdown("### ⚠️ 3. Points Critiques à Surveiller pour le Jalon Measure")
-            
             with st.container(border=True):
                 col_chk1, col_chk2, col_chk3 = st.columns(3)
                 with col_chk1:
-                    st.checkbox("Zéro Donnée Inutile (Muda de stockage)", value=True, disabled=True, help="Chaque ligne collectée est directement mappée à un futur test statistique d'impact sur le Y.")
-                    st.checkbox("Définitions Opérationnelles figées", value=False, help="Chaque contributeur de la collecte sait exactement à quelle milliseconde le chronomètre démarre et s'arrête.")
+                    st.checkbox("Zéro Donnée Inutile (Muda de stockage)", value=True, disabled=True)
+                    st.checkbox("Définitions Opérationnelles figées", value=False, key=f"chk_def_{safe_idx}")
                 with col_chk2:
-                    st.checkbox("Taille d'échantillon statistiquement valide", value=False, help="Règle du TCL respectée : n ≥ 30 pour les distributions continues, échantillon large pour le calcul du FTY.")
-                    st.checkbox("Découplage des boucles de validation", value=False, help="Les délais d'attente de signature sont isolés du temps de traitement pur (Touch Time).")
+                    st.checkbox("Taille d'échantillon statistiquement valide (n≥30)", value=False, key=f"chk_tcl_{safe_idx}")
+                    st.checkbox("Découplage des boucles de validation", value=False, key=f"chk_dec_{safe_idx}")
                 with col_chk3:
-                    st.checkbox("Plan de contingence en cas de données manquantes", value=False, help="Procédure claire si un opérateur oublie de remplir sa feuille de pointage journalière.")
-                    st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, help="Lancement planifié de l'étude Gage R&R ou du test de concordance Kappa.")
+                    st.checkbox("Plan de contingence (données manquantes)", value=False, key=f"chk_cont_{safe_idx}")
+                    st.checkbox("Validation du Système de Mesure engagée (MSA)", value=False, key=f"chk_msa_{safe_idx}")
                     
         # =========================================================================
-        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PLAN DE VALIDATION ET TESTS
+        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - PROTECTION CACHE COMPLET
         # =========================================================================
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
-        st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données avant la phase Analyze.")
+        st.caption("Norme Lean Six Sigma Black Belt — Qualification de la fiabilité des données.")
 
-        # ⚙️ SÉCURISATION ET NETTOYAGE DES INDEX ET CLÉS GLOBALES
-        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
-        
         rep_key = f"rep_table_{safe_idx}"
         reprod_key = f"reprod_table_{safe_idx}"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
-        # 🛑 VERROU LÉGER : On vérifie l'existence de la table de manière stable
-        if "master_dcp_table" not in st.session_state:
-            st.session_state["master_dcp_table"] = []
-
-        if len(st.session_state["master_dcp_table"]) == 0:
-            st.warning("⚠️ **Jalon requis :** Veuillez d'abord valider votre **Plan de Collecte (Section 3)** en cliquant sur le bouton rouge *'⚙️ Valider la pertinence & Générer le Data Collection Plan Master'*. Le module MSA se débloquera automatiquement avec vos variables validées.")
+        if "master_dcp_table" not in st.session_state or len(st.session_state["master_dcp_table"]) == 0:
+            st.warning("⚠️ **Jalon requis :** Veuillez d'abord valider votre **Plan de Collecte (Section 3)** pour débloquer automatiquement le module MSA.")
         else:
-            # 🔄 Si le plan existe, on extrait la liste des vraies variables validées
-            liste_variables_valides = [row["Variable à mesurer"] for row in st.session_state["master_dcp_table"] if "Variable à mesurer" in row]
-
-            # Initialisation des tables d'essais terrain
-            if rep_key not in st.session_state:
-                saved_rep = p.get("rep_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
-                if saved_rep:
-                    st.session_state[rep_key] = pd.DataFrame(saved_rep)
-                else:
-                    st.session_state[rep_key] = pd.DataFrame([
-                        {"Essai": 1, "Répétition A": 0.0, "Répétition B": 0.0}
-                    ])
-                    
-            if reprod_key not in st.session_state:
-                saved_reprod = p.get("reprod_table_data", []) if ('p' in locals() and isinstance(p, dict)) else []
-                if saved_reprod:
-                    st.session_state[reprod_key] = pd.DataFrame(saved_reprod)
-                else:
-                    st.session_state[reprod_key] = pd.DataFrame([
-                        {"Opérateur": "Opérateur 1", "Résultat": 0.0}, 
-                        {"Opérateur": "Opérateur 2", "Résultat": 0.0}
-                    ])
-
-            # =====================================================================
-            # 🛡️ ANCRAGE ET PERSISTANCE RIGIDE DU DICTIONNAIRE DE PROJET 'P' (ALIGNÉ)
-            # =====================================================================
-            if 'projects' in st.session_state and 'p_idx' in locals():
-                p = st.session_state.projects[p_idx]
-            else:
-                if 'p' not in st.session_state:
-                    st.session_state['p'] = {}
-                p = st.session_state['p']
-
-            # --- 1. CLASSIFICATION DES DONNÉES & CHOIX DU MSA (MOTEUR IA CONTEXTUEL) ---
-            st.markdown("##### 🧠 Analyse Cognitive & Sélection des Variables Critiques (Liées au Y)")
-            
-            nom_colonne_variable = "Variable Critique (liée au Y)"
+            # Récupération et affichage du Y
             project_y = "Indéterminé"
-            
-            # --- 🎯 RÉCUPÉRATION STRICTE DU Y DU PROJET ---
-            for p_env in [p, st.session_state.get('p', {}), st.session_state.get('project_dict', {})]:
-                if isinstance(p_env, dict) and p_env.get("selected_ctq"):
-                    project_y = p_env.get("selected_ctq")
-                    break
-            
-            if project_y == "Indéterminé" or project_y == "Non défini":
-                for k, v in st.session_state.items():
-                    if any(x in k.lower() for x in ["ctq", "project_y", "variable_y"]) and isinstance(v, str) and v != "Non défini":
-                        project_y = v
-                        break
-
-            if project_y == "Indéterminé" or project_y == "Non défini":
-                project_y = st.session_state.get("ctq_v", "Indéterminé")
-            
+            if isinstance(p, dict) and p.get("selected_ctq"):
+                project_y = p.get("selected_ctq")
             st.info(f"🎯 **Y ciblé par le projet :** `{project_y}`")
 
-            # Initialisation de la table en session state au format DataFrame natif
+            # INITIALISATION UNIQUE ET STRICTE DE LA MATRICE MSA POUR ÉVITER LES RERUNS EN BOUCLE
             if msa_classif_key not in st.session_state:
-                saved_classif = p.get("msa_classification_table", []) if ('p' in locals() and isinstance(p, dict)) else []
+                saved_classif = p.get("msa_classification_table", [])
                 if saved_classif:
                     st.session_state[msa_classif_key] = pd.DataFrame(saved_classif)
                 else:
@@ -1945,13 +1894,10 @@ else:
                             det_type = "Attributaire / Catégorielle"
                             rec_msa = "Attribute Agreement Analysis (Kappa)"
                         
-                        if idx == 0:
-                            criticite = "Critique (Directement lié au Y)"
-                        else:
-                            criticite = "Haute (Lien Direct)" if any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)"
+                        criticite = "Critique (Directement lié au Y)" if idx == 0 else ("Haute (Lien Direct)" if any(k in var_name.lower() for k in ["temps", "erreur", "qualité", "conformité"]) else "Moyenne (Facteur X)")
                         
                         ai_analyzed_rows.append({
-                            nom_colonne_variable: var_name,
+                            "Variable Critique (liée au Y)": var_name,
                             "Type de Donnée": det_type,
                             "MSA Recommandé": rec_msa,
                             "Criticité par rapport au Y": criticite,
@@ -1959,9 +1905,7 @@ else:
                         })
                     st.session_state[msa_classif_key] = pd.DataFrame(ai_analyzed_rows)
 
-            if isinstance(st.session_state[msa_classif_key], list):
-                st.session_state[msa_classif_key] = pd.DataFrame(st.session_state[msa_classif_key])
-
+            # Forcer la réinitialisation si nécessaire
             if st.button("🔄 Forcer la ré-analyse intelligente du Plan de Collecte", key=f"re_analyze_msa_ai_{safe_idx}"):
                 if msa_classif_key in st.session_state:
                     del st.session_state[msa_classif_key]
@@ -1969,34 +1913,27 @@ else:
 
             st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement.*")
             
-            # 📦 LE FORMULAIRE STRICT (SANS KEY DANS DATA_EDITOR) : Résout 100% du bug visuel au clic extérieur
+            # Utilisation du formulaire strict pour éliminer le lag de modification
             with st.form(key=f"form_msa_blocage_complet_{safe_idx}"):
-                
                 df_classification_current = st.data_editor(
                     st.session_state[msa_classif_key],
                     num_rows="dynamic",
                     use_container_width=True,
                     column_config={
-                        nom_colonne_variable: st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
+                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium", required=True),
                         "Type de Donnée": st.column_config.SelectboxColumn("Type de Donnée", options=["Continue (Quantitative)", "Attributaire / Catégorielle", "Système / Log IT"], required=True),
                         "MSA Recommandé": st.column_config.SelectboxColumn("MSA Recommandé", options=["Gage R&R (Répétabilité & Reproductibilité)", "Attribute Agreement Analysis (Kappa)", "Audit de Stabilité & Exactitude"], required=True),
                         "Criticité par rapport au Y": st.column_config.TextColumn("Alignement sémantique Y", width="medium"),
                         "statut validation": st.column_config.SelectboxColumn("Statut Validation", options=["en attente de test", "test effectué"], required=True)
                     }
                 )
-                
                 bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
 
-            # Enregistrement et persistance au clic
             if bouton_sauvegarde and df_classification_current is not None:
                 st.session_state[msa_classif_key] = df_classification_current
                 p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
+                st.success("Matrice MSA enregistrée.")
                 st.rerun()
-
-            # =====================================================================
-            # 🔄 PERSISTANCE DE LA VARIABLE POUR LE RESTE DU SCRIPT
-            # =====================================================================
-            df_classification_current = st.session_state[msa_classif_key]
             
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
