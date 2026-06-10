@@ -1578,7 +1578,7 @@ else:
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
         # =====================================================================
-        # 3. Lean Six Sigma Data Collection Plan (Y = f(X))
+        # 3. Lean Six Sigma Data Collection Plan (Y = f(X)) & 4. MSA
         # =====================================================================
         st.subheader("3. Master Black Belt Data Collection Plan")
         
@@ -1587,20 +1587,21 @@ else:
         En tant que **Master Black Belt**, ce module structure votre plan de collecte de données terrain de manière rigoureuse.
         """)
 
-        # --------------------------------------------------
-        # COUCHE CONFIGURATION & IDENTIFIANTS SÉCURISÉS
-        # --------------------------------------------------
+        # Extraction propre de l'index du projet pour éviter les collisions de clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
-        matrix_key = f"mbb_prioritization_matrix_{safe_idx}"
-        dcp_table_key = f"master_dcp_table_{safe_idx}"
-        lock_key = f"dcp_validated_lock_{safe_idx}"
-        msa_classif_key = f"msa_classification_table_{safe_idx}"
 
-        # --------------------------------------------------
-        # ISOLATION ALGORITHMIQUE DE L'EXTRACTION UNIQUE (ANTI-LENTEUR)
-        # --------------------------------------------------
-        if matrix_key not in st.session_state:
-            def _executer_extraction_process_map():
+        # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
+        @st.fragment
+        def render_data_collection_and_msa(project_dict, component_idx):
+            matrix_key = f"mbb_prioritization_matrix_{component_idx}"
+            dcp_table_key = f"master_dcp_table_{component_idx}"
+            lock_key = f"dcp_validated_lock_{component_idx}"
+            msa_classif_key = f"msa_classification_table_{component_idx}"
+
+            # --------------------------------------------------
+            # EXTRACTION UNIQUE INITIALE (ANTI-LENTEUR)
+            # --------------------------------------------------
+            if matrix_key not in st.session_state:
                 vsm_steps = st.session_state.get("vsm_macro_steps", [])
                 vsm_detailed = st.session_state.get("vsm_detailed_map", {})
                 vsm_totals = st.session_state.get("vsm_totals", {})
@@ -1637,7 +1638,7 @@ else:
                         {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation", "muda": "Attente (Waiting)"}
                     ]
 
-                return [{
+                st.session_state[matrix_key] = [{
                     "Étape Source": item["etape"],
                     "Variable Potentielle (X)": item["variable"],
                     "Gaspillage / Muda": item["muda"],
@@ -1647,129 +1648,133 @@ else:
                     "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time."
                 } for item in extracted_x]
 
-            st.session_state[matrix_key] = _executer_extraction_process_map()
-
-        # --------------------------------------------------
-        # INTERFACE GRAPHIQUE 1 : PRIORISATION DES X
-        # --------------------------------------------------
-        with st.container(border=True):
-            st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
-            
-            # Saisie locale fluide sans aucune sauvegarde en cours de frappe
-            edited_prio_df = st.data_editor(
-                st.session_state[matrix_key],
-                num_rows="dynamic",
-                use_container_width=True,
-                column_config={
-                    "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
-                    "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
-                    "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"], width="small"),
-                    "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"], width="small"),
-                    "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"], width="small")
-                }
-            )
-
-            # Traitement différé uniquement sur action manuelle explicite
-            if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{safe_idx}"):
-                st.session_state[matrix_key] = edited_prio_df.to_dict('records')
-                nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)") if ('p' in locals() and isinstance(p, dict)) else "Indicateur de Performance Principal (Y)"
+            # --------------------------------------------------
+            # INTERFACE : PRIORISATION DES X
+            # --------------------------------------------------
+            with st.container(border=True):
+                st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
                 
-                dcp_final_rows = [{
-                    "Variable à mesurer": nom_y_projet,
-                    "Objectif de mesure": "Quantifier la performance globale.",
-                    "Lien avec le Y": "Variable de sortie principale (Y) du projet Lean Six Sigma.",
-                    "Définition opérationnelle exacte": "Mesure standardisée de l'indicateur clé.",
-                    "Type de donnée": "Continue (Temps)", "Unité": "Minutes", "Source de donnée": "Système d'information",
-                    "Méthode de collecte": "Extraction automatique", "Point de mesure dans le processus": "Sortie globale",
-                    "Responsable collecte": "Sponsor", "Fréquence": "Mensuelle", "Taille échantillon": "n ≥ 30",
-                    "Période de collecte": "3 mois", "Outil utilisé": "ERP", "Risques de biais": "Aucun",
-                    "Méthode de contrôle qualité des données": "Validation financière"
-                }]
-                
-                for row in st.session_state[matrix_key]:
-                    if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
-                        dcp_final_rows.append({
-                            "Variable à mesurer": str(row["Variable Potentielle (X)"]),
-                            "Objectif de mesure": "Quantifier l'impact de ce Muda.",
-                            "Lien avec le Y": "Contribution directe au Lead Time Global (Y).",
-                            "Définition opérationnelle exacte": "Chrono de début et fin.",
-                            "Type de donnée": "Continue (Temps)", "Unité": "Minutes", "Source de donnée": "Terrain",
-                            "Méthode de collecte": "Saisie manuelle", "Point de mesure dans le processus": row["Étape Source"],
-                            "Responsable collecte": "Opérateur", "Fréquence": "Quotidienne", "Taille échantillon": "n ≥ 30",
-                            "Période de collecte": "2 semaines", "Outil utilisé": "Excel", "Risques de biais": "Effet Hawthorne",
-                            "Méthode de contrôle qualité des données": "Audit à blanc"
-                        })
-                
-                st.session_state[dcp_table_key] = dcp_final_rows
-                if 'p' in locals() and isinstance(p, dict):
-                    p["master_dcp_table"] = dcp_final_rows
-                st.session_state[lock_key] = False
-                st.rerun()
+                edited_prio_df = st.data_editor(
+                    st.session_state[matrix_key],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"prio_editor_flat_{component_idx}",
+                    column_config={
+                        "Étape Source": st.column_config.TextColumn("Étape Source", disabled=True, width="medium"),
+                        "Variable Potentielle (X)": st.column_config.TextColumn("Variable Potentielle (X)", disabled=True, width="large"),
+                        "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"], width="small"),
+                        "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"], width="small"),
+                        "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"], width="small")
+                    }
+                )
 
-        # --------------------------------------------------
-        # INTERFACE GRAPHIQUE 2 : TABLEAU OFFICIEL DU DCP
-        # --------------------------------------------------
-        if dcp_table_key in st.session_state and st.session_state[dcp_table_key]:
-            st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
-            
-            edited_dcp_df = st.data_editor(
-                st.session_state[dcp_table_key],
-                num_rows="dynamic",
-                use_container_width=True
-            )
-
-            # Événement d'enregistrement unique (aucune boucle d'écoute temps réel sur l'éditeur)
-            if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{safe_idx}", type="secondary", use_container_width=True):
-                st.session_state[dcp_table_key] = edited_dcp_df.to_dict('records')
-                if 'p' in locals() and isinstance(p, dict):
-                    p["master_dcp_table"] = st.session_state[dcp_table_key]
-                
-                msa_rows = []
-                for row in st.session_state[dcp_table_key]:
-                    v_type_brut = row.get("Type de donnée", "Continue (Temps)")
-                    v_lien = str(row.get("Lien avec le Y", ""))
+                if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{component_idx}"):
+                    st.session_state[matrix_key] = edited_prio_df.to_dict('records')
+                    nom_y_projet = project_dict.get("selected_ctq", "Indicateur de Performance Principal (Y)")
                     
-                    msa_rows.append({
-                        "Variable Critique (liée au Y)": row.get("Variable à mesurer", "Non définie"),
-                        "Rôle": "Y" if "Variable de sortie principale (Y)" in v_lien else "X",
-                        "Type de Donnée": "Continue" if "continue" in v_type_brut.lower() else "Attributaire",
-                        "MSA Recommandé": "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)",
-                        "Statut Validation": "En attente"
-                    })
+                    dcp_final_rows = [{
+                        "Variable à mesurer": nom_y_projet,
+                        "Objectif de mesure": "Quantifier la performance globale.",
+                        "Lien avec le Y": "Variable de sortie principale (Y) du projet Lean Six Sigma.",
+                        "Définition opérationnelle exacte": "Mesure standardisée de l'indicateur clé.",
+                        "Type de donnée": "Continue (Temps)", "Unité": "Minutes", "Source de donnée": "Système d'information",
+                        "Méthode de collecte": "Extraction automatique", "Point de mesure dans le processus": "Sortie globale",
+                        "Responsable collecte": "Sponsor", "Fréquence": "Mensuelle", "Taille échantillon": "n ≥ 30",
+                        "Période de collecte": "3 mois", "Outil utilisé": "ERP", "Risques de biais": "Aucun",
+                        "Méthode de contrôle qualité des données": "Validation financière"
+                    }]
+                    
+                    for row in st.session_state[matrix_key]:
+                        if row["1. Influence fortement le Y ?"] == "Oui" and row["2. Apparaît souvent ?"] == "Oui" and row["3. Peut-on mesurer fiablement ?"] == "Oui":
+                            dcp_final_rows.append({
+                                "Variable à mesurer": str(row["Variable Potentielle (X)"]),
+                                "Objectif de mesure": "Quantifier l'impact de ce Muda.",
+                                "Lien avec le Y": "Contribution directe au Lead Time Global (Y).",
+                                "Définition opérationnelle exacte": "Chrono de début et fin.",
+                                "Type de donnée": "Continue (Temps)", "Unité": "Minutes", "Source de donnée": "Terrain",
+                                "Méthode de collecte": "Saisie manuelle", "Point de mesure dans le processus": row["Étape Source"],
+                                "Responsable collecte": "Opérateur", "Fréquence": "Quotidienne", "Taille échantillon": "n ≥ 30",
+                                "Période de collecte": "2 semaines", "Outil utilisé": "Excel", "Risques de biais": "Effet Hawthorne",
+                                "Méthode de contrôle qualité des données": "Audit à blanc"
+                            })
+                    
+                    st.session_state[dcp_table_key] = dcp_final_rows
+                    project_dict["master_dcp_table"] = dcp_final_rows
+                    st.session_state[lock_key] = False
+                    st.rerun()
+
+            # --------------------------------------------------
+            # INTERFACE : TABLEAU OFFICIEL DU DCP
+            # --------------------------------------------------
+            if dcp_table_key in st.session_state and st.session_state[dcp_table_key]:
+                st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
                 
-                st.session_state[msa_classif_key] = pd.DataFrame(msa_rows)
-                st.session_state[lock_key] = True
-                st.rerun()
+                edited_dcp_df = st.data_editor(
+                    st.session_state[dcp_table_key],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"dcp_editor_flat_{component_idx}"
+                )
 
-        # =========================================================================
-        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - CHARGEMENT DIRECT SANS RECALCUL
-        # =========================================================================
-        df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
-        nom_colonne_variable = "Variable Critique (liée au Y)"
+                if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{component_idx}", type="secondary", use_container_width=True):
+                    st.session_state[dcp_table_key] = edited_dcp_df.to_dict('records')
+                    project_dict["master_dcp_table"] = st.session_state[dcp_table_key]
+                    
+                    msa_rows = []
+                    for row in st.session_state[dcp_table_key]:
+                        v_type_brut = str(row.get("Type de donnée", "Continue (Temps)"))
+                        v_lien = str(row.get("Lien avec le Y", ""))
+                        
+                        msa_rows.append({
+                            "Variable Critique (liée au Y)": row.get("Variable à mesurer", "Non définie"),
+                            "Rôle": "Y" if "Variable de sortie principale (Y)" in v_lien else "X",
+                            "Type de Donnée": "Continue" if "continue" in v_type_brut.lower() else "Attributaire",
+                            "MSA Recommandé": "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)",
+                            "Statut Validation": "En attente"
+                        })
+                    
+                    st.session_state[msa_classif_key] = pd.DataFrame(msa_rows)
+                    st.session_state[lock_key] = True
+                    st.rerun()
 
-        if not st.session_state.get(lock_key, False):
-            st.divider()
-            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
-        else:
+            # --------------------------------------------------
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+            # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            if not df_classification_current.empty:
-                st.markdown("##### 📋 Matrice de Référence MSA du Système de Mesure")
-                
-                st.data_editor(
-                    df_classification_current,
-                    num_rows="fixed",
-                    use_container_width=False,
-                    disabled=True,
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique (liée au Y)", width=320),
-                        "Rôle": st.column_config.TextColumn("Rôle", width=50),
-                        "Type de Donnée": st.column_config.TextColumn("Type de Donnée", width=110),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", width=260),
-                        "Statut Validation": st.column_config.TextColumn("Statut Validation", width=110)
-                    }
-                )
+            if not st.session_state.get(lock_key, False):
+                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+            else:
+                df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
+                if not df_classification_current.empty:
+                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+                    
+                    edited_msa_df = st.data_editor(
+                        df_classification_current,
+                        num_rows="fixed",
+                        use_container_width=True,
+                        key=f"msa_editor_flat_{component_idx}",
+                        column_config={
+                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                            "Statut Validation": st.column_config.SelectboxColumn(
+                                "Statut Validation", 
+                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté"],
+                                width="medium"
+                            )
+                        }
+                    )
+                    
+                    if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
+                        st.session_state[msa_classif_key] = edited_msa_df
+                        project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+                        st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
+
+        # Appel du fragment isolé
+        render_data_collection_and_msa(p, safe_idx)
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
