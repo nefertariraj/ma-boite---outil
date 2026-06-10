@@ -1590,11 +1590,15 @@ else:
             # Extraction propre de l'index du projet pour éviter les collisions de clés
             safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-            # --- INITIALISATION GLOBALE POUR LE CODE SUIVANT (ÉVITE NAMEERROR) ---
+            # --- INITIALISATION GLOBALE POUR LE CODE SUIVANT (ÉVITE LES NAMEERROR) ---
             msa_classif_key = f"msa_classification_table_{safe_idx}"
             if msa_classif_key not in st.session_state:
                 st.session_state[msa_classif_key] = pd.DataFrame()
             df_classification_current = st.session_state[msa_classif_key]
+
+            # Sécurisation de la variable qui fait crasher la ligne 1800
+            if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
+                nom_colonne_variable = "Variable Critique (liée au Y)"
 
             # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
             @st.fragment
@@ -1786,6 +1790,13 @@ else:
                             st.rerun()
 
             render_data_collection_and_msa(p, safe_idx)
+            
+            # --- SÉCURISATION EXTÉRIEURE ABSOLUE CONTRE LE NAMEERROR LIGNE 1800 ---
+            raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
+            if isinstance(raw_saved_msa, pd.DataFrame):
+                df_classification_current = raw_saved_msa
+            else:
+                df_classification_current = pd.DataFrame(raw_saved_msa)
             
             # --- SÉCURISATION EXTÉRIEURE ABSOLUE CONTRE LE NAMEERROR LIGNE 1796 ---
             raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
