@@ -1681,7 +1681,7 @@ else:
 
             df_prio = pd.DataFrame(st.session_state["mbb_prioritization_matrix"])
 
-            # 🛠️ MODIFICATION : Retrait de la 'key' pour empêcher le recalcul en temps réel lors des saisies utilisateur
+            # 🛠️ FIX EFFECTUÉ : Retrait de l'argument 'key' pour bloquer le rafraîchissement asynchrone lors de la saisie
             edited_prio_df = st.data_editor(
                 df_prio,
                 num_rows="dynamic",
@@ -1723,7 +1723,7 @@ else:
                     "Période de collecte": "Historique sur 3 mois",
                     "Outil utilisé": "Système ERP / BI",
                     "Risques de biais": "Décalage de saisie temporelle",
-                    "Méthode de contrôle qualité des données": "Validation de cohérence par rapprochement rapports financiers"
+                    "Méthode de contrôle qualité des données": "Validation de coherence par rapprochement rapports financiers"
                 })
                 
                 # Parcours des X filtrés et insertion si critères validés (Oui / Oui / Oui)
@@ -1771,11 +1771,11 @@ else:
             
             df_dcp = pd.DataFrame(st.session_state["master_dcp_table"])
             
+            # 🛠️ FIX EFFECTUÉ : Retrait de la 'key' pour bloquer le rafraîchissement automatique de la page
             edited_dcp_df = st.data_editor(
                 df_dcp,
                 num_rows="dynamic",
                 use_container_width=True,
-                key=f"mbb_dcp_matrix_editor_{p_idx}",
                 column_config={
                     "Variable à mesurer": st.column_config.TextColumn("Variable à mesurer (X ou Y)", required=True, width="large"),
                     "Objectif de mesure": st.column_config.TextColumn("Objectif de mesure", width="medium"),
@@ -1969,7 +1969,7 @@ else:
 
             st.write("👉 *Modifiez la matrice ci-dessous. Les changements seront appliqués uniquement après enregistrement.*")
             
-            # 📦 LE FORMULAIRE STRICT (SANS KEY) : Bloque à 100% le rafraîchissement au clic extérieur
+            # 📦 LE FORMULAIRE STRICT (SANS KEY DANS DATA_EDITOR) : Résout 100% du bug visuel au clic extérieur
             with st.form(key=f"form_msa_blocage_complet_{safe_idx}"):
                 
                 df_classification_current = st.data_editor(
@@ -1987,7 +1987,7 @@ else:
                 
                 bouton_sauvegarde = st.form_submit_button("💾 Enregistrer la Matrice & Lancer les Calculs MSA", type="primary")
 
-            # Enregistrement uniquement au clic
+            # Enregistrement et persistance au clic
             if bouton_sauvegarde and df_classification_current is not None:
                 st.session_state[msa_classif_key] = df_classification_current
                 p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
