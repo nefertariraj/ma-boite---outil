@@ -1938,9 +1938,6 @@ else:
                 st.session_state[msa_classif_key] = df_classification_current
                 p["msa_classification_table"] = df_classification_current.to_dict(orient="records")
                 st.rerun()
-
-            df_classification_current = st.session_state[msa_classif_key]
-            st.markdown("##### 👟 Exécution du Protocole Terrain")
             
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
