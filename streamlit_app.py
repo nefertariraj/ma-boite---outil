@@ -1592,7 +1592,9 @@ else:
 
             # --- INITIALISATION GLOBALE POUR LE CODE SUIVANT (ÉVITE NAMEERROR) ---
             msa_classif_key = f"msa_classification_table_{safe_idx}"
-            df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
+            if msa_classif_key not in st.session_state:
+                st.session_state[msa_classif_key] = pd.DataFrame()
+            df_classification_current = st.session_state[msa_classif_key]
 
             # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
             @st.fragment
@@ -1785,10 +1787,12 @@ else:
 
             render_data_collection_and_msa(p, safe_idx)
             
-            # --- SÉCURISATION ABSOLUE DU SCOPE EXTERNE ---
-            # On récupère l'état à jour depuis le session_state à chaque rafraîchissement global
+            # --- SÉCURISATION EXTÉRIEURE ABSOLUE CONTRE LE NAMEERROR LIGNE 1796 ---
             raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
-            df_classification_current = pd.DataFrame(raw_saved_msa) if not isinstance(raw_saved_msa, pd.DataFrame) else raw_saved_msa
+            if isinstance(raw_saved_msa, pd.DataFrame):
+                df_classification_current = raw_saved_msa
+            else:
+                df_classification_current = pd.DataFrame(raw_saved_msa)
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
