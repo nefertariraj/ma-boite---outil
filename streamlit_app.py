@@ -1681,7 +1681,7 @@ else:
 
             df_prio = pd.DataFrame(st.session_state["mbb_prioritization_matrix"])
 
-            # 🛠️ MODIFICATION : Retrait de la 'key' pour empêcher le recalcul en temps réel lors des saisies utilisateur
+            # Éditeur déconnecté du rechargement en temps réel
             edited_prio_df = st.data_editor(
                 df_prio,
                 num_rows="dynamic",
@@ -1796,6 +1796,7 @@ else:
                 }
             )
 
+            # Enregistrement explicite sur bouton uniquement
             if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{p_idx}"):
                 st.session_state["master_dcp_table"] = edited_dcp_df.to_dict('records')
                 p["master_dcp_table"] = st.session_state["master_dcp_table"]
@@ -1815,7 +1816,7 @@ else:
                     st.markdown("""
                     * **Suppression des définitions ambiguës :** Pour les données discrètes/attributaires (ex. Dossier non conforme), publiez un *catalogue des défauts* visuel. Si deux opérateurs interprètent un défaut différemment, votre système de mesure est inutile.
                     * **Lutte contre l'Effet Hawthorne :** Lorsque les équipes se savent observées ou chronométrées, les performances s'amenuisent ou s'améliorent artificiellement de 10 à 15%. Privilégiez les collectes en tâche de fond (système) ou automatisez l'enregistrement sans présence physique pesante du Black Belt.
-                    * **Procédures de Contrôle Qualité :** Réalisez un audit complet des données dès le deuxième jour (*Day-2 Review*). Comparez les 20 premières lignes saisies avec la réalité pour corriger immédiatement les dérives de compréhension.
+                    * **Procédures de Contrôle Qualité :** Réalisez un audit complet des données dès le deuxième jour (*Day-2 Review*). Comparez les 20 premières lignes saisies avec la reality pour corriger immédiatement les dérives de compréhension.
                     """)
             
             with c_rec2:
@@ -1973,7 +1974,7 @@ else:
                     del st.session_state[msa_classif_key]
                 st.rerun()
 
-            st.write("👉 *Tableau généré par IA. Vous pouvez manuellement ajuster, ajouter (`+`) ou supprimer (`🗑️`) des lignes.*")
+            st.write("👉 *Tableau éditable. Les modifications ne seront enregistrées qu'au clic sur le bouton de sauvegarde ci-dessous.*")
             
             df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
 
@@ -1993,6 +1994,7 @@ else:
                         else:
                             df_classification_current.at[idx_row, "statut validation"] = "en attente de test"
 
+            # Éditeur déconnecté des écritures à la volée
             edited_classification = st.data_editor(
                 df_classification_current,
                 num_rows="dynamic",
@@ -2007,9 +2009,13 @@ else:
                 key=f"classification_editor_widget_{safe_idx}"
             )
             
-            if edited_classification is not None:
-                st.session_state[msa_classif_key] = edited_classification
-                df_classification_current = edited_classification
+            # Bouton de sauvegarde dédié pour figer l'état modifié du MSA classification
+            if st.button("💾 Enregistrer la classification MSA", key=f"save_msa_classif_btn_{safe_idx}"):
+                if edited_classification is not None:
+                    st.session_state[msa_classif_key] = edited_classification
+                    if 'p' in locals() and isinstance(p, dict):
+                        p["msa_classification_table"] = edited_classification.to_dict('records')
+                    st.success("🎯 Table de classification et choix des tests MSA enregistrée.")
             
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
