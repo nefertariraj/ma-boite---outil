@@ -1596,7 +1596,7 @@ else:
         lock_key = f"dcp_validated_lock_{safe_idx}"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
-        # Calcul unique de l'extraction automatique pour bloquer le rafraîchissement au clavier
+        # L'extraction automatique du Process Map n'est exécutée qu'une seule fois à l'initialisation
         if matrix_key not in st.session_state:
             vsm_steps = st.session_state.get("vsm_macro_steps", [])
             vsm_detailed = st.session_state.get("vsm_detailed_map", {})
@@ -1651,7 +1651,7 @@ else:
         with st.container(border=True):
             st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
             
-            # Pas de stockage d'état en direct au clavier : utilisation de la mémoire tampon locale
+            # SUPPRESSION DE LA KEY RÉACTIVE POUR ÉVITER TOUT ÉCRAN BLANC/GRIS LORS DE LA SAISIE
             df_prio = pd.DataFrame(st.session_state[matrix_key])
             edited_prio_df = st.data_editor(
                 df_prio,
@@ -1663,11 +1663,10 @@ else:
                     "1. Influence fortement le Y ?": st.column_config.SelectboxColumn("Influence Y ?", options=["Oui", "Non"], width="small"),
                     "2. Apparaît souvent ?": st.column_config.SelectboxColumn("Fréquent ?", options=["Oui", "Non"], width="small"),
                     "3. Peut-on mesurer fiablement ?": st.column_config.SelectboxColumn("Mesurable ?", options=["Oui", "Non"], width="small")
-                },
-                key=f"prio_editor_{safe_idx}"
+                }
             )
 
-            # L'enregistrement n'a lieu qu'au clic sur ce bouton unique
+            # L'enregistrement et le traitement ne se déclenchent qu'ici
             if st.button("⚙️ Valider la pertinence & Générer le Data Collection Plan Master", type="primary", use_container_width=True, key=f"btn_gen_dcp_{safe_idx}"):
                 st.session_state[matrix_key] = edited_prio_df.to_dict('records')
                 nom_y_projet = p.get("selected_ctq", "Indicateur de Performance Principal (Y)") if ('p' in locals() and isinstance(p, dict)) else "Indicateur de Performance Principal (Y)"
@@ -1710,31 +1709,29 @@ else:
         if dcp_table_key in st.session_state and st.session_state[dcp_table_key]:
             st.markdown("### 📋 1. Matrice Officielle du Plan de Collecte (Phase Measure)")
             
+            # Pas de 'key' ici non plus pour garantir une saisie fluide et locale au clavier
             df_dcp = pd.DataFrame(st.session_state[dcp_table_key])
             edited_dcp_df = st.data_editor(
                 df_dcp,
                 num_rows="dynamic",
-                use_container_width=True,
-                key=f"dcp_editor_{safe_idx}" # Clé fixe : la saisie reste fluide en local dans le navigateur
+                use_container_width=True
             )
 
-            # L'UNIQUE POINT D'ENREGISTREMENT ET DE SYNCHRONISATION MSA
+            # UNIQUE ACTION DE SAUVEGARDE ET DE SYNCHRONISATION MSA
             if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{safe_idx}", type="secondary", use_container_width=True):
                 st.session_state[dcp_table_key] = edited_dcp_df.to_dict('records')
                 if 'p' in locals() and isinstance(p, dict):
                     p["master_dcp_table"] = st.session_state[dcp_table_key]
                 
-                # Génération miroir instantanée du MSA
+                # Alignement sémantique et génération miroir du MSA
                 msa_rows = []
                 for idx, row in enumerate(st.session_state[dcp_table_key]):
                     v_name = row.get("Variable à mesurer", "Non définie")
                     v_type_brut = row.get("Type de donnée", "Continue (Temps)")
                     v_lien = str(row.get("Lien avec le Y", ""))
                     
-                    if "Variable de sortie principale (Y)" in v_lien:
-                        role_determine = "Y"
-                    else:
-                        role_determine = "X"
+                    # Identification stricte du Rôle Y ou X
+                    role_determine = "Y" if "Variable de sortie principale (Y)" in v_lien else "X"
                     
                     rec_msa = "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)"
                     det_type = "Continue" if "continue" in v_type_brut.lower() else "Attributaire"
@@ -1744,7 +1741,7 @@ else:
                         "Rôle": role_determine,
                         "Type de Donnée": det_type,
                         "MSA Recommandé": rec_msa,
-                        "Statut Validation": "En attente"  # Colonne unique de statut standardisée
+                        "Statut Validation": "En attente"
                     })
                 
                 st.session_state[msa_classif_key] = pd.DataFrame(msa_rows)
@@ -1753,11 +1750,11 @@ else:
                 st.rerun()
 
         # =========================================================================
-        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - MATRICE DE RÉFÉRENCE OPTIMISÉE
+        # 4. VALIDATE MEASUREMENT SYSTEM (MSA) - AFFICHAGE SANS PERTE D'ESPACE
         # =========================================================================
         dcp_est_valide_officiel = st.session_state.get(lock_key, False)
 
-        # Alimentation de la variable pour le code du bas (Zéro NameError)
+        # Initialisation obligatoire pour votre code en aval
         df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
         nom_colonne_variable = "Variable Critique (liée au Y)"
 
@@ -1771,20 +1768,19 @@ else:
             if not df_classification_current.empty:
                 st.markdown("##### 📋 Matrice de Référence MSA du Système de Mesure")
                 
-                # AJUSTEMENT DES LARGEURS POUR SUPPRIMER LES ESPACES PERDUS ET ASSURER LE COUP D'OEIL
+                # REDIMENSIONNEMENT INTELLIGENT STRICT SANS ESPACES VIDE (use_container_width déconnecté)
                 st.data_editor(
                     df_classification_current,
                     num_rows="fixed",
-                    use_container_width=True,
+                    use_container_width=False,  # Désactivé pour forcer l'ajustement strict aux pixels demandés
                     disabled=True,
                     column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique (liée au Y)", width="medium"),
-                        "Rôle": st.column_config.TextColumn("Rôle", width="small"),
-                        "Type de Donnée": st.column_config.TextColumn("Type de Donnée", width="small"),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", width="medium"),
-                        "Statut Validation": st.column_config.TextColumn("Statut Validation", width="small") # Colonne unique et resserrée
-                    },
-                    key=f"msa_reference_viewer_{safe_idx}"
+                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique (liée au Y)", width=320),
+                        "Rôle": st.column_config.TextColumn("Rôle", width=50),             # Largeur ultra-minimale pour X ou Y
+                        "Type de Donnée": st.column_config.TextColumn("Type de Donnée", width=110),
+                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", width=260),
+                        "Statut Validation": st.column_config.TextColumn("Statut Validation", width=110) # Largeur exacte pour le texte affiché
+                    }
                 )
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
