@@ -1577,7 +1577,7 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-       # =====================================================================
+           # =====================================================================
             # 3. Lean Six Sigma Data Collection Plan (Y = f(X)) & 4. MSA
             # =====================================================================
             st.subheader("3. Master Black Belt Data Collection Plan")
@@ -1590,13 +1590,18 @@ else:
             # Extraction propre de l'index du projet pour éviter les collisions de clés
             safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
+            # --- INITIALISATION GLOBALE POUR LE CODE SUIVANT (ÉVITE NAMEERROR) ---
+            msa_classif_key = f"msa_classification_table_{safe_idx}"
+            df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
+
             # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
             @st.fragment
             def render_data_collection_and_msa(project_dict, component_idx):
+                global df_classification_current
                 matrix_key = f"mbb_prioritization_matrix_{component_idx}"
                 dcp_table_key = f"master_dcp_table_{component_idx}"
                 lock_key = f"dcp_validated_lock_{component_idx}"
-                msa_classif_key = f"msa_classification_table_{component_idx}"
+                local_msa_key = f"msa_classification_table_{component_idx}"
 
                 # --------------------------------------------------
                 # EXTRACTION UNIQUE INITIALE (ANTI-LENTEUR)
@@ -1733,7 +1738,8 @@ else:
                                 "Statut Validation": "En attente"
                             })
                         
-                        st.session_state[msa_classif_key] = pd.DataFrame(msa_rows)
+                        st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
+                        df_classification_current = st.session_state[local_msa_key]
                         st.session_state[lock_key] = True
                         st.rerun()
 
@@ -1746,7 +1752,7 @@ else:
                 if not st.session_state.get(lock_key, False):
                     st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 else:
-                    df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
+                    df_classification_current = st.session_state.get(local_msa_key, pd.DataFrame())
                     if not df_classification_current.empty:
                         st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                         
@@ -1769,11 +1775,14 @@ else:
                         )
                         
                         if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
-                            st.session_state[msa_classif_key] = edited_msa_df
+                            st.session_state[local_msa_key] = edited_msa_df
+                            df_classification_current = edited_msa_df
                             project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                             st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
 
             render_data_collection_and_msa(p, safe_idx)
+            # Rafraîchissement final de la variable globale pour le code séquentiel externe qui suit
+            df_classification_current = st.session_state.get(msa_classif_key, pd.DataFrame())
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
