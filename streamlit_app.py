@@ -1602,7 +1602,6 @@ else:
             # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
             @st.fragment
             def render_data_collection_and_msa(project_dict, component_idx):
-                global df_classification_current
                 matrix_key = f"mbb_prioritization_matrix_{component_idx}"
                 dcp_table_key = f"master_dcp_table_{component_idx}"
                 lock_key = f"dcp_validated_lock_{component_idx}"
@@ -1745,22 +1744,19 @@ else:
                         st.rerun()
 
                 # --------------------------------------------------
-                # 4. VALIDATE MEASUREMENT SYSTEM (MSA) (DÉCOUPLÉ ET SANS KEY POUR LE ZÉRO FLICKER)
+                # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
                 # --------------------------------------------------
                 st.divider()
                 st.subheader("4. Validate Measurement System (MSA)")
 
-                # On affiche l'avertissement mais on n'enferme plus le st.data_editor dans un bloc conditionnel instable
                 if not st.session_state.get(lock_key, False):
                     st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
                 df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
-                # Le tableau ne s'affiche que s'il contient des données extraites, sans dépendre du verrou au runtime
                 if not df_msa_in_state.empty:
                     st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
-                    # Saisie 100% locale et fluide sans paramètre 'key' conflictuel
                     edited_msa_df = st.data_editor(
                         df_msa_in_state,
                         num_rows="fixed",
@@ -1783,15 +1779,15 @@ else:
                         project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
                         st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
                         st.rerun()
+                
+                # ICI : On renvoie les données pour que le reste du script s'ajuste en dehors du fragment
+                return df_msa_in_state
 
-            render_data_collection_and_msa(p, safe_idx)
+            # On récupère directement le DataFrame mis à jour sans perturber le bas du code
+            df_classification_current = render_data_collection_and_msa(p, safe_idx)
             
             # --- SÉCURISATION EXTÉRIEURE ABSOLUE ---
-            raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
-            if isinstance(raw_saved_msa, pd.DataFrame):
-                df_classification_current = raw_saved_msa
-            else:
-                df_classification_current = pd.DataFrame(raw_saved_msa)
+            # (Remets ton code d'origine exactement tel quel à partir d'ici !)
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
