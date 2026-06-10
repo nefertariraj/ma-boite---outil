@@ -1587,27 +1587,29 @@ else:
             En tant que **Master Black Belt**, ce module structure votre plan de collecte de données terrain de manière rigoureuse.
             """)
 
-            # Extraction propre de l'index du projet
+            # Extraction propre de l'index du projet pour éviter les collisions de clés
             safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-            # Clé globale pour le dictionnaire de session
+            # --- INITIALISATION GLOBALE STATIQUE ---
             msa_classif_key = f"msa_classification_table_{safe_idx}"
             if msa_classif_key not in st.session_state:
                 st.session_state[msa_classif_key] = pd.DataFrame()
+            df_classification_current = st.session_state[msa_classif_key]
 
             if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
                 nom_colonne_variable = "Variable Critique (liée au Y)"
 
-            # --- ISOLATION DANS UN FRAGMENT ANTI-FLICKER ---
+            # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
             @st.fragment
             def render_data_collection_and_msa(project_dict, component_idx):
+                global df_classification_current
                 matrix_key = f"mbb_prioritization_matrix_{component_idx}"
                 dcp_table_key = f"master_dcp_table_{component_idx}"
                 lock_key = f"dcp_validated_lock_{component_idx}"
                 local_msa_key = f"msa_classification_table_{component_idx}"
 
                 # --------------------------------------------------
-                # EXTRACTION UNIQUE INITIALE
+                # EXTRACTION UNIQUE INITIALE (ANTI-LENTEUR CPU)
                 # --------------------------------------------------
                 if matrix_key not in st.session_state:
                     vsm_steps = st.session_state.get("vsm_macro_steps", [])
@@ -1657,7 +1659,7 @@ else:
                     } for item in extracted_x])
 
                 # --------------------------------------------------
-                # 1. PRIORISATION DES X
+                # 1. PRIORISATION DES X (FLUIDE)
                 # --------------------------------------------------
                 st.markdown("### 🧠 1. Filtrage et Priorisation des $X$ ($Y = f(X)$)")
                 
@@ -1710,7 +1712,7 @@ else:
                     st.rerun()
 
                 # --------------------------------------------------
-                # 2. TABLEAU OFFICIEL DU DCP
+                # 2. TABLEAU OFFICIEL DU DCP (FLUIDE)
                 # --------------------------------------------------
                 if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
                     st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
@@ -1743,19 +1745,22 @@ else:
                         st.rerun()
 
                 # --------------------------------------------------
-                # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+                # 4. VALIDATE MEASUREMENT SYSTEM (MSA) (DÉCOUPLÉ ET SANS KEY POUR LE ZÉRO FLICKER)
                 # --------------------------------------------------
                 st.divider()
                 st.subheader("4. Validate Measurement System (MSA)")
 
+                # On affiche l'avertissement mais on n'enferme plus le st.data_editor dans un bloc conditionnel instable
                 if not st.session_state.get(lock_key, False):
                     st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
                 df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
+                # Le tableau ne s'affiche que s'il contient des données extraites, sans dépendre du verrou au runtime
                 if not df_msa_in_state.empty:
                     st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
+                    # Saisie 100% locale et fluide sans paramètre 'key' conflictuel
                     edited_msa_df = st.data_editor(
                         df_msa_in_state,
                         num_rows="fixed",
@@ -1777,18 +1782,16 @@ else:
                         st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
                         project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
                         st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
-                        
-                        # FORCE LE SCRIPT GLOBAL À SE RECHARGER POUR LE BAS DU CODE
                         st.rerun()
 
-            # Exécution du fragment
             render_data_collection_and_msa(p, safe_idx)
             
-            # MAGIE : On synchronise la variable externe directement depuis le session_state
-            df_classification_current = st.session_state[msa_classif_key]
-            
             # --- SÉCURISATION EXTÉRIEURE ABSOLUE ---
-            # (Remets ton code d'origine exactement tel quel à partir d'ici !)
+            raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
+            if isinstance(raw_saved_msa, pd.DataFrame):
+                df_classification_current = raw_saved_msa
+            else:
+                df_classification_current = pd.DataFrame(raw_saved_msa)
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
