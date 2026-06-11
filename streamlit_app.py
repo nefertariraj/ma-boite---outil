@@ -1753,18 +1753,18 @@ else:
                 if not st.session_state.get(lock_key, False):
                     st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
+                # Récupération sécurisée des lignes générées par le DCP
                 df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
-                if not df_msa_in_state.empty:
-                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA (les modifications sont enregistrées automatiquement) :")
+                if isinstance(df_msa_in_state, pd.DataFrame) and not df_msa_in_state.empty:
+                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
-                    # On utilise directement local_msa_key comme "key" du data_editor.
-                    # Streamlit gère maintenant la persistance tout seul à chaque changement de case.
+                    # Rendu de l'éditeur sans bouton : les changements sont mémorisés en direct
                     edited_msa_df = st.data_editor(
                         df_msa_in_state,
                         num_rows="fixed",
                         use_container_width=True,
-                        key=f"msa_editor_live_{component_idx}", # Nouvelle clé unique pour l'éditeur
+                        key=f"msa_editor_direct_{component_idx}", # Clé unique pour l'état du widget
                         column_config={
                             "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                             "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1778,7 +1778,8 @@ else:
                         }
                     )
                     
-                    # SÉCURITÉ AUTOMATIQUE : On synchronise les modifications en arrière-plan sans bouton
+                    # SAUVEGARDE AUTOMATIQUE EMQUÉE
+                    # Dès qu'une cellule change, on met à jour le session_state et le dictionnaire projet
                     st.session_state[local_msa_key] = edited_msa_df
                     project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                 
