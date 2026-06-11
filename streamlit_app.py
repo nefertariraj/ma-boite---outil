@@ -1750,25 +1750,18 @@ else:
                 st.divider()
                 st.subheader("4. Validate Measurement System (MSA)")
 
-                # 1. Vérification du verrou du DCP pour afficher l'info si nécessaire
-                if not st.session_state.get(lock_key, False) and "msa_table_saved" not in project_dict:
+                if not st.session_state.get(lock_key, False):
                     st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
-                
-                # 2. Récupération persistante du tableau (depuis le session_state ou le dictionnaire projet)
-                if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
-                    st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
                 
                 df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
-                # 3. Affichage du tableau et sauvegarde automatique (SANS LE BOUTON)
-                if isinstance(df_msa_in_state, pd.DataFrame) and not df_msa_in_state.empty:
-                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA (sauvegarde automatique) :")
+                if not df_msa_in_state.empty:
+                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
                     edited_msa_df = st.data_editor(
                         df_msa_in_state,
                         num_rows="fixed",
                         use_container_width=True,
-                        key=f"msa_editor_final_{component_idx}", # Clé unique pour stabiliser le widget
                         column_config={
                             "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                             "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1782,9 +1775,13 @@ else:
                         }
                     )
                     
-                    # Synchronisation silencieuse en tâche de fond à chaque clic/changement
-                    st.session_state[local_msa_key] = edited_msa_df
-                    project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+                    if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
+                        st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+                        project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                        st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
+                        st.rerun()
+
+            render_data_collection_and_msa(p, safe_idx)
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
