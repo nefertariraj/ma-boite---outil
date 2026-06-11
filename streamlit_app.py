@@ -1756,12 +1756,15 @@ else:
                 df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
                 if not df_msa_in_state.empty:
-                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA (les modifications sont enregistrées automatiquement) :")
                     
+                    # On utilise directement local_msa_key comme "key" du data_editor.
+                    # Streamlit gère maintenant la persistance tout seul à chaque changement de case.
                     edited_msa_df = st.data_editor(
                         df_msa_in_state,
                         num_rows="fixed",
                         use_container_width=True,
+                        key=f"msa_editor_live_{component_idx}", # Nouvelle clé unique pour l'éditeur
                         column_config={
                             "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                             "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1775,20 +1778,9 @@ else:
                         }
                     )
                     
-                    if st.button("💾 Enregistrer la Conformité du Système de Mesure (MSA)", key=f"save_msa_btn_{component_idx}", type="primary", use_container_width=True):
-                        st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                        project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
-                        st.toast("🎯 Alignement DCP & Métrologie MSA sauvegardé !", icon="🛡️")
-                        st.rerun()
-
-            render_data_collection_and_msa(p, safe_idx)
-            
-            # --- SÉCURISATION EXTÉRIEURE ABSOLUE ---
-            raw_saved_msa = st.session_state.get(msa_classif_key, pd.DataFrame())
-            if isinstance(raw_saved_msa, pd.DataFrame):
-                df_classification_current = raw_saved_msa
-            else:
-                df_classification_current = pd.DataFrame(raw_saved_msa)
+                    # SÉCURITÉ AUTOMATIQUE : On synchronise les modifications en arrière-plan sans bouton
+                    st.session_state[local_msa_key] = edited_msa_df
+                    project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                 
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
