@@ -1815,7 +1815,7 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — VERSION SÉCURISÉE SANS DISPARITION
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — CORRECTIF IMPORTATION
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,14 +1823,16 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # 1. RESTAURATION ANTI-DISPARITION (Reconnexion et Sauvegarde)
-            if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty:
-                saved_msa = project_dict.get("msa_table_saved", [])
-                if saved_msa:
-                    st.session_state[buffer_msa_key] = pd.DataFrame(saved_msa)
-                    st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
-                elif not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
-                    st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
+            # FORCE LA RESTAURATION DEPUIS L'IMPORTATION DU FICHIER
+            saved_msa = project_dict.get("msa_table_saved", [])
+            if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
+                st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
+                st.session_state[buffer_msa_key] = pd.DataFrame(saved_msa)
+                st.session_state[msa_classif_key] = pd.DataFrame(saved_msa)
+
+            # Synchronisation classique du tampon
+            if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
+                st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
 
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
@@ -1856,7 +1858,7 @@ else:
                     }
                 )
                 
-                # 2. ENREGISTREMENT CONTINU ET FLUIDE DANS LA MÉMOIRE STABLE
+                # ENREGISTREMENT CONTINU EN ARRIÈRE-PLAN
                 df_stabilise = pd.DataFrame(edited_msa_df)
                 st.session_state[buffer_msa_key] = df_stabilise
                 st.session_state[local_msa_key] = df_stabilise
@@ -1865,18 +1867,12 @@ else:
                 project_dict["msa_table_saved"] = df_stabilise.to_dict('records')
                 if 'projects' in st.session_state and 'p_idx' in locals():
                     st.session_state.projects[p_idx]["msa_table_saved"] = df_stabilise.to_dict('records')
-
-                # --------------------------------------------------
-                # 🛠️ PARTIE : EXÉCUTION DU PROTOCOLE TERRAIN
-                # --------------------------------------------------
-                # FIX SÉCURITÉ : On utilise 'st.session_state[local_msa_key]' pour que cette partie
-                # reste TOUJOURS visible et stable lors des sauvegardes et reconnexions.
-                if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
-                    st.markdown("#### 📋 Exécution du protocole terrain")
-                    
-                    # Ici se trouvent tes tableaux et champs pour l'exécution du protocole terrain.
-                    # Ils utiliseront les données stables de st.session_state[local_msa_key] 
-                    # sans jamais disparaître au rechargement.
+                
+                # PASSERELLE POUR LE RESTE DE TON SCRIPT :
+                # On s'assure que si la variable 'edited_msa_df' est lue par le reste de ton code,
+                # elle contient toujours les données stables et ne se vide jamais, même après import.
+                if edited_msa_df is None or len(edited_msa_df) == 0:
+                    edited_msa_df = df_stabilise
 
         render_data_collection_and_msa(p, safe_idx)
         
