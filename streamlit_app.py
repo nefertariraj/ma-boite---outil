@@ -1590,15 +1590,20 @@ else:
         # Extraction propre de l'index du projet pour éviter les collisions de clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-        # --- INITIALISATION STATIQUE SÉCURISÉE SANS NAMEERROR ---
+        # --- INITIALISATION STATIQUE SÉCURISÉE ---
         msa_classif_key = f"msa_classification_table_{safe_idx}"
+        msa_static_view_key = f"msa_static_view_{safe_idx}"
 
         if msa_classif_key not in st.session_state:
             st.session_state[msa_classif_key] = pd.DataFrame()
+            
+        if msa_static_view_key not in st.session_state:
+            st.session_state[msa_static_view_key] = st.session_state[msa_classif_key].copy()
 
-        # FIX SÉCURITÉ : On s'assure que la variable locale existe toujours pour le reste du script principal,
-        # en pointant directement sur la clé de session initialisée.
-        df_classification_current = st.session_state[msa_classif_key]
+        # FIX ULTRA-CIBLÉ POUR LA LIGNE 1873 : 
+        # On alimente le reste de ton application avec une vue déconnectée.
+        # Ainsi, cliquer hors du tableau ne déclenchera plus aucun rafraîchissement d'écran.
+        df_classification_current = st.session_state[msa_static_view_key]
 
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
@@ -1611,6 +1616,7 @@ else:
             lock_key = f"dcp_validated_lock_{component_idx}"
             local_msa_key = f"msa_classification_table_{component_idx}"
             buffer_msa_key = f"msa_buffer_{component_idx}"
+            static_view_key = f"msa_static_view_{component_idx}"
 
             # =====================================================================
             # 🛡️ RESTAURATION DES DONNÉES (JSON / SESSION STATE)
@@ -1674,6 +1680,7 @@ else:
             if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
                 st.session_state[msa_classif_key] = pd.DataFrame(saved_msa)
+                st.session_state[static_view_key] = pd.DataFrame(saved_msa)
 
             if saved_msa or project_dict.get("dcp_validated_lock", False):
                 st.session_state[lock_key] = True
@@ -1799,6 +1806,7 @@ else:
                     st.session_state[local_msa_key] = df_msa_nouveau
                     st.session_state[msa_classif_key] = df_msa_nouveau
                     st.session_state[buffer_msa_key] = df_msa_nouveau.copy()
+                    st.session_state[static_view_key] = df_msa_nouveau.copy()
                     
                     project_dict["msa_table_saved"] = df_msa_nouveau.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
@@ -1858,6 +1866,7 @@ else:
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
+                    st.session_state[static_view_key] = df_captured  # On met à jour le miroir statique au clic final
                     
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
