@@ -1815,31 +1815,33 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — CORRECTIF IMPORTATION
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — BLOC UNIFIÉ ET INDIVISIBLE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
+            # 1. GESTION DU VERROU DU JALON (DCP)
             if not st.session_state.get(lock_key, False):
-                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module complet MSA (Tableau et Protocole) se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # FORCE LA RESTAURATION DEPUIS L'IMPORTATION DU FICHIER
+            # 2. RESTAURATION ABSOLUE (Anti-disparition lors de l'import JSON ou d'une sauvegarde)
             saved_msa = project_dict.get("msa_table_saved", [])
             if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
                 st.session_state[buffer_msa_key] = pd.DataFrame(saved_msa)
                 st.session_state[msa_classif_key] = pd.DataFrame(saved_msa)
 
-            # Synchronisation classique du tampon
+            # Synchronisation du tampon d'affichage
             if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
                 st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
 
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
+            # 3. AFFICHAGE DU BLOC MSA INTEGRAL (Le Tableau ET le Protocole Terrain apparaissent ensemble)
             if not df_msa_affichage.empty:
                 st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
                     
-                # Éditeur de données en direct (sans lag)
+                # A. Affichage du tableau d'édition MSA (Sans Lag)
                 edited_msa_df = st.data_editor(
                     df_msa_affichage,
                     num_rows="fixed",
@@ -1858,7 +1860,7 @@ else:
                     }
                 )
                 
-                # ENREGISTREMENT CONTINU EN ARRIÈRE-PLAN
+                # B. Synchronisation automatique et invisible en tâche de fond (Dictionnaires & Sessions)
                 df_stabilise = pd.DataFrame(edited_msa_df)
                 st.session_state[buffer_msa_key] = df_stabilise
                 st.session_state[local_msa_key] = df_stabilise
@@ -1868,11 +1870,22 @@ else:
                 if 'projects' in st.session_state and 'p_idx' in locals():
                     st.session_state.projects[p_idx]["msa_table_saved"] = df_stabilise.to_dict('records')
                 
-                # PASSERELLE POUR LE RESTE DE TON SCRIPT :
-                # On s'assure que si la variable 'edited_msa_df' est lue par le reste de ton code,
-                # elle contient toujours les données stables et ne se vide jamais, même après import.
+                # Passerelle de secours pour les variables du reste du script
                 if edited_msa_df is None or len(edited_msa_df) == 0:
                     edited_msa_df = df_stabilise
+
+                # ---------------------------------------------------------------------
+                # C. EXÉCUTION DU PROTOCOLE TERRAIN (SOUDÉE ET INSERÉE DIRECTEMENT ICI)
+                # ---------------------------------------------------------------------
+                # En plaçant cette partie ici, sans aucune condition 'if' intermédiaire,
+                # le protocole terrain partage STRICTEMENT les mêmes propriétés d'affichage que le tableau.
+                
+                st.markdown("#### 📋 Exécution du protocole terrain")
+                
+                # [Insérez/Laissez ici vos lignes de code d'origine qui génèrent les tableaux, 
+                # inputs et graphiques de la partie exécution du protocole terrain]
+                
+                # ---------------------------------------------------------------------
 
         render_data_collection_and_msa(p, safe_idx)
         
