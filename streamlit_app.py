@@ -1590,14 +1590,20 @@ else:
         # Extraction propre de l'index du projet pour éviter les collisions de clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-        # --- INITIALISATION GLOBALE STATIQUE ---
+        # --- INITIALISATION GLOBALE STATIQUE & SÉCURISÉE ---
+        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
+
+        # 1. On s'assure que la clé existe dans le session_state
         if msa_classif_key not in st.session_state:
             st.session_state[msa_classif_key] = pd.DataFrame()
 
+        # 2. FIX NAMEERROR : On force l'affectation globale et locale immédiate
+        df_classification_current = st.session_state[msa_classif_key]
+        globals()['df_classification_current'] = st.session_state[msa_classif_key]
+
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
-
         # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
         @st.fragment
         def render_data_collection_and_msa(project_dict, component_idx):
