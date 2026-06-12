@@ -1762,10 +1762,15 @@ else:
                             "Statut de validation": statut_recupere
                         })
                         
-                    # 5. Sauvegarde de la table MSA mise à jour
+                   # 5. Sauvegarde de la table MSA mise à jour
                     df_msa_nouveau = pd.DataFrame(msa_rows)
-                    st.session_state[local_msa_key] = df_msa_nouveau
                     
+                    # --- RECONNEXION & SYNCHRONISATION BLINDÉE ---
+                    # On alimente TOUTES les clés de session pour que la section 4 (MSA) capte les données immédiatement
+                    st.session_state[local_msa_key] = df_msa_nouveau
+                    st.session_state[msa_classif_key] = df_msa_nouveau
+                    
+                    # Enregistrement permanent dans la structure maîtresse du projet global
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_msa_nouveau.to_dict('records')
                     else:
