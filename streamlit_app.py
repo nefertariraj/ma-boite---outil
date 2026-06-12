@@ -1825,11 +1825,38 @@ else:
             if not df_msa_affichage.empty:
                 st.success("⚡ Mode Tableur Ultra-Fluide Activé. Saisie kilométrique instantanée (zéro latence réseau) :")
 
-                # Options du selectbox pour le code HTML
+                # --- 1. INTERCEPTION DES DONNÉES ENTRANTES VIA QUERY PARAMS ---
+                # Si le bouton HTML a été cliqué, les données transitent par l'URL de manière invisible
+                if "msa_payload" in st.query_params:
+                    try:
+                        import json
+                        raw_payload = st.query_params["msa_payload"]
+                        changes = json.loads(raw_payload)
+                        
+                        df_captured = df_msa_affichage.copy()
+                        for row_idx_str, new_status in changes.items():
+                            df_captured.at[int(row_idx_str), "Statut de validation"] = new_status
+                        
+                        # Sauvegarde et synchronisation immédiate
+                        st.session_state[buffer_msa_key] = df_captured
+                        st.session_state[local_msa_key] = df_captured
+                        st.session_state[msa_classif_key] = df_captured
+                        
+                        project_dict["msa_table_saved"] = df_captured.to_dict('records')
+                        if 'projects' in st.session_state and 'p_idx' in locals():
+                            st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
+                        
+                        # Nettoyage propre du paramètre pour éviter les boucles infinies au prochain rerun
+                        del st.query_params["msa_payload"]
+                        st.toast("✅ Modifications appliquées instantanément !", icon="📊")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erreur lors de la synchronisation : {str(e)}")
+
+                # --- 2. GENERATION DU TABLEAU HTML AUTONOME ---
                 options_statut = ["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"]
-                
-                # Construction d'un tableau HTML natif ultra-rapide avec injecteur de données
                 html_rows = ""
+                
                 for idx, row in df_msa_affichage.iterrows():
                     var_name = row.get("Variable Critique (liée au Y)", "")
                     role = row.get("Rôle", "")
@@ -1844,21 +1871,20 @@ else:
                     
                     html_rows += f"""
                     <tr>
-                        <td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;">{var_name}</td>
+                        <td style="padding:8px; border:1px solid #ddd; background:#f9f9f9; font-weight:500;">{var_name}</td>
                         <td style="padding:8px; border:1px solid #ddd; text-align:center;">{role}</td>
                         <td style="padding:8px; border:1px solid #ddd;">{t_data}</td>
                         <td style="padding:8px; border:1px solid #ddd;">{msa_rec}</td>
                         <td style="padding:8px; border:1px solid #ddd;">
-                            <select class="msa-status-select" data-row="{idx}" style="width:100%; padding:4px; border-radius:4px; border:1px solid #ccc;">
+                            <select class="msa-status-select" data-row="{idx}" style="width:100%; padding:6px; border-radius:4px; border:1px solid #ccc; font-family:sans-serif;">
                                 {options_html}
                             </select>
                         </td>
                     </tr>
                     """
 
-                # Injection du composant dans le DOM local (aucun aller-retour serveur pendant la navigation)
                 html_component = f"""
-                <div style="font-family:sans-serif; color:#333;">
+                <div style="font-family:sans-serif; color:#333; padding:2px;">
                     <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:14px;">
                         <thead>
                             <tr style="background-color:#f1f3f5; border-bottom:2px solid #dee2e6;">
@@ -1873,14 +1899,13 @@ else:
                             {html_rows}
                         </tbody>
                     </table>
-                    <button id="submit-html-msa" style="width:100%; background-color:#ff4b4b; color:white; border:none; padding:10px; font-size:15px; font-weight:bold; border-radius:8px; cursor:pointer;">
+                    <button id="submit-html-msa" style="width:100%; background-color:#ff4b4b; color:white; border:none; padding:12px; font-size:15px; font-weight:bold; border-radius:8px; cursor:pointer; transition: background 0.2s;">
                         💾 Sauvegarder et Verrouiller les modifications MSA
                     </button>
                 </div>
 
                 <script>
-                    const button = document.getElementById('submit-html-msa');
-                    button.addEventListener('click', function() {{
+                    document.getElementById('submit-html-msa').addEventListener('click', function() {{
                         const selects = document.querySelectorAll('.msa-status-select');
                         const data_changes = {{}};
                         selects.forEach(select => {{
@@ -1888,43 +1913,21 @@ else:
                             data_changes[rowIdx] = select.value;
                         }});
                         
-                        // Envoi global en un seul bloc à Streamlit
-                        window.parent.postMessage({{
-                            type: 'streamlit:setComponentValue',
-                            value: data_changes
-                        }}, '*');
+                        // Envoi sécurisé via l'URL parente (Query Param)
+                        const payload = encodeURIComponent(JSON.stringify(data_changes));
+                        const parentUrl = new URL(window.parent.location.href);
+                        parentUrl.searchParams.set('msa_payload', JSON.stringify(data_changes));
+                        window.parent.location.href = parentUrl.href;
                     }});
                 </script>
                 """
 
-                # Affichage du composant HTML autonome
+                # --- 3. AFFICHAGE DU COMPOSANT SANS RISQUE DE BLOCAGE ---
                 import streamlit.components.v1 as components
+                calculated_height = max(200, 120 + (len(df_msa_affichage) * 45))
                 
-                # Hauteur dynamique calculée pour éviter les barres de défilement internes
-                calculated_height = max(180, 100 + (len(df_msa_affichage) * 45))
-                
-                # Capture de la réponse HTML uniquement au clic du bouton interne
-                response_data = components.html(html_component, height=calculated_height, scrolling=False)
-
-                # Traitement du bloc de données UNIQUEMENT si le bouton HTML a été cliqué
-                if response_data:
-                    df_captured = df_msa_affichage.copy()
-                    
-                    # On applique toutes les modifications reçues d'un coup sec
-                    for row_idx_str, new_status in response_data.items():
-                        df_captured.at[int(row_idx_str), "Statut de validation"] = new_status
-                    
-                    # Mise à jour des structures de données
-                    st.session_state[buffer_msa_key] = df_captured
-                    st.session_state[local_msa_key] = df_captured
-                    st.session_state[msa_classif_key] = df_captured
-                    
-                    project_dict["msa_table_saved"] = df_captured.to_dict('records')
-                    if 'projects' in st.session_state and 'p_idx' in locals():
-                        st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                        
-                    st.toast("✅ Modifications appliquées instantanément !", icon="📊")
-                    st.rerun()
+                # Rendu autonome isolé
+                components.html(html_component, height=calculated_height, scrolling=False)
 
         render_data_collection_and_msa(p, safe_idx)
                 
