@@ -1815,7 +1815,7 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — COPIE STRICTE DU FONCTIONNEMENT DU DCP
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,18 +1823,18 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # Initialisation et synchronisation transparente (sans couper le flux)
+            # Restauration directe depuis le JSON si la session s'est vidée accidentellement
             if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
                 saved_msa = project_dict.get("msa_table_saved", [])
                 if saved_msa:
                     st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
 
-            # Si le tableau MSA est prêt dans le session_state, on l'affiche directement
+            # Affichage immédiat et persistant si le tableau contient des données
             if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
-                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité :")
+                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
                 
-                # EXACTEMENT LE MÊME FONCTIONNEMENT QUE LE DCP :
-                # On passe directement la clé de session au data_editor pour bloquer le lag d'affichage
+                # COPIE CONFORME DE LA LOGIQUE DU DCP :
+                # On lie l'éditeur directement à la clé de session pour bloquer le lag et figer l'affichage du DCP
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed",
@@ -1853,11 +1853,11 @@ else:
                     }
                 )
                 
-                # Bouton de validation final (identique au DCP)
+                # Bouton de validation final (Exactement identique au bouton de sauvegarde du DCP)
                 if st.button("💾 Valider et verrouiller définitivement les données", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Sauvegarde et persistance
+                    # Persistance et synchronisation globale
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
                     if buffer_msa_key in st.session_state:
