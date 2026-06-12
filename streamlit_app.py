@@ -1762,6 +1762,7 @@ else:
                     df_msa_in_state,
                     num_rows="fixed",
                     use_container_width=True,
+                    key=f"editor_msa_classif_UI_{component_idx}", # Clé isolée pour bloquer le clignotement automatique
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                         "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1775,9 +1776,17 @@ else:
                     }
                 )
                     
-                # --- SAUVEGARDE EN DIRECT (LE BOUTON A ÉTÉ SUPPRIMÉ ICI) ---
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                # --- CORRECTION : SAUVEGARDE SÉCURISÉE PAR BOUTON (FINI LE DIRECT LIVE LENT) ---
+                if st.button("💾 Enregistrer les statuts de validation MSA", key=f"save_msa_status_btn_{component_idx}", use_container_width=True):
+                    df_captured = pd.DataFrame(edited_msa_df)
+                    st.session_state[local_msa_key] = df_captured
+                    project_dict["msa_table_saved"] = df_captured.to_dict('records')
+                    
+                    # On met aussi à jour la table globale pour que le sélecteur du protocole terrain en dessous soit synchro
+                    st.session_state[msa_classif_key] = df_captured
+                    
+                    st.toast("✅ Statuts de validation mis à jour !", icon="📊")
+                    st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
                 
