@@ -1815,44 +1815,41 @@ else:
                     st.rerun()
 
           # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — BLOC INDIVISIBLE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # Affichage si le DCP est validé OU si des données MSA existent déjà (reprise)
-            est_valide = st.session_state.get(lock_key, False)
-            a_des_donnees = not pd.DataFrame(project_dict.get("msa_table_saved", [])).empty
-
-            if not est_valide and not a_des_donnees:
-                st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
-            else:
-                # Initialisation lors de l'import JSON si nécessaire
-                if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
-                    st.session_state[local_msa_key] = pd.DataFrame(project_dict.get("msa_table_saved", []))
-
-                # Éditeur MSA (Aucune interaction continue)
+            if not st.session_state.get(lock_key, False):
+                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+                
+            df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
+                
+            if not df_msa_in_state.empty:
+                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+                    
                 edited_msa_df = st.data_editor(
-                    st.session_state[local_msa_key],
+                    df_msa_in_state,
                     num_rows="fixed",
                     use_container_width=True,
-                    key=f"msa_editor_final_{component_idx}"
+                    column_config={
+                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                        "Statut de validation": st.column_config.SelectboxColumn(
+                            "Statut de validation", 
+                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                            width="medium"
+                        )
+                    }
                 )
-
-                # EXÉCUTION DU PROTOCOLE TERRAIN (Indivisible : s'affiche ici)
-                st.markdown("#### 📋 Exécution du protocole terrain")
-                render_data_collection_and_msa(p, safe_idx)
-
-                # BOUTON UNIQUE DE SAUVEGARDE
-                if st.button("💾 Enregistrer tout le bloc MSA (Tableau + Protocole)", key=f"btn_save_msa_{component_idx}", type="primary", use_container_width=True):
-                    df_to_save = pd.DataFrame(edited_msa_df)
-                    st.session_state[local_msa_key] = df_to_save
-                    project_dict["msa_table_saved"] = df_to_save.to_dict('records')
                     
-                    if 'projects' in st.session_state and 'p_idx' in locals():
-                        st.session_state.projects[p_idx]["msa_table_saved"] = df_to_save.to_dict('records')
-                    
-                    st.toast("✅ Données sauvegardées avec succès !", icon="💾")
+                # --- SAUVEGARDE EN DIRECT (LE BOUTON A ÉTÉ SUPPRIMÉ ICI) ---
+                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+
+        render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
