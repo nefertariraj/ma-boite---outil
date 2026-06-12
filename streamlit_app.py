@@ -1614,10 +1614,58 @@ else:
             # =====================================================================
             # 🛡️ SÉCURITÉ IMPORT JSON : RESTAURATION ET SÉQUENÇAGE STRICT
             # =====================================================================
-            # Restauration Partie 1 : Priorisation des X
-            if matrix_key not in st.session_state:
+            # FIX PARTIE 1 : Force le chargement ou l'extraction si la session est absente ou vide
+            if matrix_key not in st.session_state or st.session_state[matrix_key].empty:
                 saved_prio = project_dict.get("prio_matrix_saved", [])
-                st.session_state[matrix_key] = pd.DataFrame(saved_prio) if saved_prio else pd.DataFrame()
+                if saved_prio:
+                    st.session_state[matrix_key] = pd.DataFrame(saved_prio)
+                else:
+                    # On réactive le calcul d'extraction automatique depuis le VSM
+                    vsm_steps = st.session_state.get("vsm_macro_steps", [])
+                    vsm_detailed = st.session_state.get("vsm_detailed_map", {})
+                    vsm_totals = st.session_state.get("vsm_totals", {})
+                    section_totals = vsm_totals.get("section_totals", {})
+
+                    extracted_x = []
+                    if vsm_steps:
+                        if section_totals:
+                            highest_step = max(section_totals, key=section_totals.get)
+                            if section_totals[highest_step] > 0:
+                                extracted_x.append({
+                                    "etape": highest_step,
+                                    "variable": f"Temps de cycle unitaire sur le goulot - {highest_step}",
+                                    "muda": "Surproduction / Capacité"
+                                })
+
+                        for step in vsm_steps:
+                            for t in vsm_detailed.get(step, []):
+                                desc_tache = str(t.get("Détail de la tâche", ""))
+                                type_act = t.get("Type d'activité", "")
+                                desc_lower = desc_tache.lower()
+                                    
+                                if not desc_tache or desc_tache in ["Sous-tâche initiale", "Première tâche à définir"]:
+                                    continue
+
+                                if type_act == "Temps d'attente / Stock" or any(kw in desc_lower for kw in ["attente", "file", "stock"]):
+                                    extracted_x.append({"etape": step, "variable": f"Temps de stagnation : {desc_tache}", "muda": "Attente (Waiting)"})
+                                elif type_act == "NVA (Non Valeur Ajoutée)" and any(kw in desc_lower for kw in ["retouche", "correction", "erreur", "rework"]):
+                                    extracted_x.append({"etape": step, "variable": f"Fréquence de : {desc_tache}", "muda": "Défauts / Retouches"})
+
+                    if not extracted_x:
+                        extracted_x = [
+                            {"etape": "1. Réception & Tri", "variable": "Taux d'erreurs à l'entrée", "muda": "Défauts / Retouches"},
+                            {"etape": "2. Saisie & Vérification", "variable": "Temps d'attente de validation", "muda": "Attente (Waiting)"}
+                        ]
+
+                    st.session_state[matrix_key] = pd.DataFrame([{
+                        "Étape Source": item["etape"],
+                        "Variable Potentielle (X)": item["variable"],
+                        "Gaspillage / Muda": item["muda"],
+                        "1. Influence fortement le Y ?": "Oui",
+                        "2. Apparaît souvent ?": "Oui",
+                        "3. Peut-on mesurer fiablement ?": "Oui",
+                        "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time."
+                    } for item in extracted_x])
 
             # Restauration Partie 2 : DCP Officiel
             if dcp_table_key not in st.session_state:
