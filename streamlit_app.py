@@ -1590,11 +1590,15 @@ else:
         # Extraction propre de l'index du projet pour éviter les collisions de clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-        # --- INITIALISATION STATIQUE ---
+        # --- INITIALISATION STATIQUE SÉCURISÉE SANS NAMEERROR ---
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
         if msa_classif_key not in st.session_state:
             st.session_state[msa_classif_key] = pd.DataFrame()
+
+        # FIX SÉCURITÉ : On s'assure que la variable locale existe toujours pour le reste du script principal,
+        # en pointant directement sur la clé de session initialisée.
+        df_classification_current = st.session_state[msa_classif_key]
 
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
@@ -1824,8 +1828,6 @@ else:
                 
                 with st.form(key=f"msa_form_blocker_{component_idx}", clear_on_submit=False):
                     
-                    # RETRAIT TOTAL DES VARIABLES GLOBALES OU DE SYNC EN TEMPS RÉEL : 
-                    # L'éditeur est purement alimenté par le DataFrame d'affichage statique local.
                     edited_msa_df = st.data_editor(
                         df_msa_affichage,
                         num_rows="fixed",
@@ -1850,7 +1852,6 @@ else:
                         use_container_width=True
                     )
                 
-                # UNIQUE ENREGISTREMENT AUTORISÉ (Batch post-clic uniquement)
                 if submit_button:
                     df_captured = pd.DataFrame(edited_msa_df)
                     
