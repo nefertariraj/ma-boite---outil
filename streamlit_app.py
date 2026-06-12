@@ -1712,7 +1712,7 @@ else:
                 st.rerun()
 
             # --------------------------------------------------
-            # 2. TABLEAU OFFICIEL DU DCP (FLUIDE)
+            # 2. TABLEAU OFFICIEL DU DCP (FLUIDE ET SÉCURISÉ)
             # --------------------------------------------------
             if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
                 st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
@@ -1720,28 +1720,59 @@ else:
                 edited_dcp_df = st.data_editor(
                     st.session_state[dcp_table_key],
                     num_rows="dynamic",
-                    use_container_width=True
+                    use_container_width=True,
+                    key=f"dcp_editor_ui_{component_idx}" # Clé isolée pour éviter les lags à la saisie
                 )
 
                 if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{component_idx}", type="secondary", use_container_width=True):
-                    st.session_state[dcp_table_key] = pd.DataFrame(edited_dcp_df)
-                    project_dict["master_dcp_table"] = st.session_state[dcp_table_key].to_dict('records')
+                    # 1. Sauvegarde et mise à jour de l'état de session local
+                    df_ajuste = pd.DataFrame(edited_dcp_df)
+                    st.session_state[dcp_table_key] = df_ajuste
+                    
+                    # 2. SÉCURITÉ PERSISTANCE BLINDÉE : On écrit directement à la racine du projet global
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        st.session_state.projects[p_idx]["master_dcp_table"] = df_ajuste.to_dict('records')
+                    else:
+                        project_dict["master_dcp_table"] = df_ajuste.to_dict('records')
                         
+                    # 3. Récupération des statuts MSA existants pour NE PAS les écraser
+                    current_msa_df = st.session_state.get(local_msa_key, pd.DataFrame())
+                    existing_status = {}
+                    if not current_msa_df.empty and "Variable Critique (liée au Y)" in current_msa_df.columns:
+                        existing_status = dict(zip(
+                            current_msa_df["Variable Critique (liée au Y)"].astype(str).str.strip(),
+                            current_msa_df["Statut de validation"]
+                        ))
+                        
+                    # 4. Régénération de la table MSA basée sur le nouveau DCP
                     msa_rows = []
-                    for _, row in st.session_state[dcp_table_key].iterrows():
+                    for _, row in df_ajuste.iterrows():
+                        var_nom = str(row.get("Variable à mesurer", "Non définie")).strip()
                         v_type_brut = str(row.get("Type de donnée", "Continue (Temps)"))
                         v_lien = str(row.get("Lien avec le Y", ""))
+                            
+                        # Si la variable existait déjà, on garde son statut (ex: "Validé", "Test effectué"), sinon "En attente"
+                        statut_recupere = existing_status.get(var_nom, "En attente")
                             
                         msa_rows.append({
                             "Variable Critique (liée au Y)": row.get("Variable à mesurer", "Non définie"),
                             "Rôle": "Y" if "Variable de sortie principale (Y)" in v_lien else "X",
                             "Type de Donnée": "Continue" if "continue" in v_type_brut.lower() else "Attributaire",
                             "MSA Recommandé": "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)",
-                            "Statut de validation": "En attente"
+                            "Statut de validation": statut_recupere
                         })
                         
-                    st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
+                    # 5. Sauvegarde de la table MSA mise à jour
+                    df_msa_nouveau = pd.DataFrame(msa_rows)
+                    st.session_state[local_msa_key] = df_msa_nouveau
+                    
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        st.session_state.projects[p_idx]["msa_table_saved"] = df_msa_nouveau.to_dict('records')
+                    else:
+                        project_dict["msa_table_saved"] = df_msa_nouveau.to_dict('records')
+                        
                     st.session_state[lock_key] = True
+                    st.toast("💾 Plan de collecte et alignement MSA sauvegardés de manière permanente !", icon="🛡️")
                     st.rerun()
 
             # --------------------------------------------------
