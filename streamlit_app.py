@@ -1596,8 +1596,11 @@ else:
         if msa_classif_key not in st.session_state:
             st.session_state[msa_classif_key] = pd.DataFrame()
 
+        # FIX PERFORMANCE 1 : On lit la session state localement, mais on ne force pas l'écriture 
+        # dans globals() à chaque cycle d'interaction de l'utilisateur.
         df_classification_current = st.session_state[msa_classif_key]
-        globals()['df_classification_current'] = st.session_state[msa_classif_key]
+        if 'df_classification_current' not in globals():
+            globals()['df_classification_current'] = st.session_state[msa_classif_key]
 
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
@@ -1614,13 +1617,11 @@ else:
             # =====================================================================
             # 🛡️ SÉCURITÉ IMPORT JSON : RESTAURATION ET SÉQUENÇAGE STRICT
             # =====================================================================
-            # FIX PARTIE 1 : Force le chargement ou l'extraction si la session est absente ou vide
             if matrix_key not in st.session_state or st.session_state[matrix_key].empty:
                 saved_prio = project_dict.get("prio_matrix_saved", [])
                 if saved_prio:
                     st.session_state[matrix_key] = pd.DataFrame(saved_prio)
                 else:
-                    # On réactive le calcul d'extraction automatique depuis le VSM
                     vsm_steps = st.session_state.get("vsm_macro_steps", [])
                     vsm_detailed = st.session_state.get("vsm_detailed_map", {})
                     vsm_totals = st.session_state.get("vsm_totals", {})
@@ -1667,25 +1668,21 @@ else:
                         "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time."
                     } for item in extracted_x])
 
-            # Restauration Partie 2 : DCP Officiel
             if dcp_table_key not in st.session_state:
                 saved_dcp = project_dict.get("master_dcp_table", [])
                 st.session_state[dcp_table_key] = pd.DataFrame(saved_dcp) if saved_dcp else pd.DataFrame()
 
-            # FIX PARTIE 2 : Force la restauration depuis le JSON même si la clé a été initialisée vide plus haut
             saved_msa = project_dict.get("msa_table_saved", [])
             if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
                 st.session_state[msa_classif_key] = pd.DataFrame(saved_msa)
 
-            # Restauration du verrou de jalon automatique
             if saved_msa or project_dict.get("dcp_validated_lock", False):
                 st.session_state[lock_key] = True
                 project_dict["dcp_validated_lock"] = True
             elif lock_key not in st.session_state:
                 st.session_state[lock_key] = False
 
-            # Initialisation du tampon de saisie pour bloquer le lag du MSA
             if buffer_msa_key not in st.session_state:
                 if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
                     st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
@@ -1805,6 +1802,9 @@ else:
                     st.session_state[msa_classif_key] = df_msa_nouveau
                     st.session_state[buffer_msa_key] = df_msa_nouveau.copy()
                     
+                    # FIX PERFORMANCE 2 : On isole l'écriture globale uniquement lors des phases d'enregistrement dures
+                    globals()['df_classification_current'] = df_msa_nouveau
+                    
                     project_dict["msa_table_saved"] = df_msa_nouveau.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_msa_nouveau.to_dict('records')
@@ -1823,7 +1823,6 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # Synchronisation initiale et unique du tampon
             if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
                 st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
 
@@ -1832,18 +1831,13 @@ else:
             if not df_msa_affichage.empty:
                 st.success("✅ Système de mesure disponible. Remplissez vos tests de répétabilité et reproductibilité ci-dessous :")
                 
-                # --- LE FORMULAIRE DE BLOCAGE GLOBAL ---
-                # On enveloppe l'éditeur dans un formulaire UNIQUE. 
-                # Streamlit gèle TOUS les recalculs et rerenders tant qu'on ne clique pas sur le bouton de soumission.
                 with st.form(key=f"msa_form_blocker_{component_idx}", clear_on_submit=False):
                     
-                    # L'éditeur utilise le DataFrame tampon. L'utilisateur peut taper 10, 20, 50 valeurs à la suite,
-                    # utiliser les flèches du clavier et faire 'Entrée' sans AUCUN lag, car l'état reste purement côté navigateur (JS).
                     edited_msa_df = st.data_editor(
                         df_msa_affichage,
                         num_rows="fixed",
                         use_container_width=True,
-                        key=f"msa_editor_pure_buffer_{component_idx}", # Clé statique pour le cache de l'UI
+                        key=f"msa_editor_pure_buffer_{component_idx}",
                         column_config={
                             "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                             "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1857,15 +1851,12 @@ else:
                         }
                     )
                     
-                    # Unique déclencheur des traitements lourds, recalculs et sauvegardes
                     submit_button = st.form_submit_button(
                         "💾 Valider et verrouiller définitivement les données", 
                         type="primary", 
                         use_container_width=True
                     )
                 
-                # --- EXÉCUTION DIFFÉRÉE DES TRAITEMENTS ---
-                # Aucun calcul, aucun enregistrement JSON, aucune mise à jour de statut ne s'exécute avant ce 'if'
                 if submit_button:
                     df_captured = pd.DataFrame(edited_msa_df)
                     
@@ -1874,12 +1865,15 @@ else:
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
                     
+                    # FIX PERFORMANCE 3 : On n'injecte dans le dictionnaire global qu'au clic final, 
+                    # ce qui empêche le rafraîchissement d'écran intempestif pendant que tu saisis tes cases.
+                    globals()['df_classification_current'] = df_captured
+                    
                     # 2. Sauvegarde définitive dans le dictionnaire du projet pour l'export JSON
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
                     
-                    # 3. Notification et rafraîchissement unique de l'interface
                     st.toast("✅ Données MSA enregistrées et indicateurs mis à jour avec succès !", icon="📊")
                     st.rerun()
 
