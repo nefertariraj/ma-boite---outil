@@ -1820,52 +1820,38 @@ else:
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # 1. CHARGEMENT AUTOMATIQUE DES DONNÉES (JSON ou Session)
-            # Cette étape assure que les données importées sont immédiatement prêtes.
+            # 1. INITIALISATION FORCÉE : On s'assure que la variable existe toujours
             saved_msa = project_dict.get("msa_table_saved", [])
-            if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
-                st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
+            if local_msa_key not in st.session_state:
+                st.session_state[local_msa_key] = pd.DataFrame(saved_msa) if saved_msa else pd.DataFrame()
 
-            # 2. AFFICHAGE DU BLOC MSA (Indivisible : Tableau + Protocole Terrain)
-            # Si les données existent, le bloc MSA et tout son contenu s'affichent.
-            if not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
+            # 2. AFFICHAGE DU BLOC (Tableau + Protocole Terrain)
+            # ON CHANGE LA CONDITION : On affiche si le DCP est validé OU si on a déjà des données (reprise)
+            est_valide = st.session_state.get(lock_key, False)
+            a_des_donnees = not st.session_state[local_msa_key].empty
+
+            if est_valide or a_des_donnees:
                 st.success("✅ Système de mesure disponible.")
                 
-                # Éditeur MSA (Sauvegarde automatique en tâche de fond)
+                # Éditeur MSA
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed",
                     use_container_width=True,
-                    key=f"msa_editor_final_{component_idx}",
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                        "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation",
-                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                            width="medium"
-                        )
-                    }
+                    key=f"msa_editor_final_{component_idx}"
                 )
 
-                # Synchronisation des données (pour la sauvegarde globale)
+                # Mise à jour continue
                 st.session_state[local_msa_key] = edited_msa_df
                 project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
-                if 'projects' in st.session_state and 'p_idx' in locals():
-                    st.session_state.projects[p_idx]["msa_table_saved"] = edited_msa_df.to_dict('records')
 
-                # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Affichage immédiat)
-                # Tout ce qui est placé ici s'affichera automatiquement avec le tableau.
+                # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Affiche TOUT ici, sans aucune condition)
                 st.markdown("#### 📋 Exécution du protocole terrain")
                 
-                # [VOTRE CODE PROTOCOLE TERRAIN ICI]
+                # [PLACEZ ICI TOUT VOTRE CODE DE PROTOCOLE TERRAIN]
                 
             else:
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
-
-        render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
