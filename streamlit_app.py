@@ -1596,8 +1596,8 @@ else:
         if msa_classif_key not in st.session_state:
             st.session_state[msa_classif_key] = pd.DataFrame()
 
+        # SUPPRESSION DU GLOBALS() QUI PROVOQUAIT LE RERENDER DE TOUTE LA PAGE
         df_classification_current = st.session_state[msa_classif_key]
-        globals()['df_classification_current'] = st.session_state[msa_classif_key]
 
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
@@ -1614,13 +1614,11 @@ else:
             # =====================================================================
             # 🛡️ SÉCURITÉ IMPORT JSON : RESTAURATION ET SÉQUENÇAGE STRICT
             # =====================================================================
-            # FIX PARTIE 1 : Force le chargement ou l'extraction si la session est absente ou vide
             if matrix_key not in st.session_state or st.session_state[matrix_key].empty:
                 saved_prio = project_dict.get("prio_matrix_saved", [])
                 if saved_prio:
                     st.session_state[matrix_key] = pd.DataFrame(saved_prio)
                 else:
-                    # On réactive le calcul d'extraction automatique depuis le VSM
                     vsm_steps = st.session_state.get("vsm_macro_steps", [])
                     vsm_detailed = st.session_state.get("vsm_detailed_map", {})
                     vsm_totals = st.session_state.get("vsm_totals", {})
@@ -1667,25 +1665,21 @@ else:
                         "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time."
                     } for item in extracted_x])
 
-            # Restauration Partie 2 : DCP Officiel
             if dcp_table_key not in st.session_state:
                 saved_dcp = project_dict.get("master_dcp_table", [])
                 st.session_state[dcp_table_key] = pd.DataFrame(saved_dcp) if saved_dcp else pd.DataFrame()
 
-            # FIX PARTIE 2 : Force la restauration depuis le JSON même si la clé a été initialisée vide plus haut
             saved_msa = project_dict.get("msa_table_saved", [])
             if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
                 st.session_state[msa_classif_key] = pd.DataFrame(saved_msa)
 
-            # Restauration du verrou de jalon automatique
             if saved_msa or project_dict.get("dcp_validated_lock", False):
                 st.session_state[lock_key] = True
                 project_dict["dcp_validated_lock"] = True
             elif lock_key not in st.session_state:
                 st.session_state[lock_key] = False
 
-            # Initialisation du tampon de saisie pour bloquer le lag du MSA
             if buffer_msa_key not in st.session_state:
                 if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
                     st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
@@ -1736,7 +1730,7 @@ else:
                             "Variable à mesurer": str(row["Variable Potentielle (X)"]),
                             "Objectif de mesure": "Quantifier l'impact de ce Muda.",
                             "Lien avec le Y": "Contribution directe au Lead Time Global (Y).",
-                            "Définition opérationnelle exacte": "Chrono de début et fin.",
+                            "Définition operational exacte": "Chrono de début et fin.",
                             "Type de donnée": "Continue (Temps)", "Unité": "Minutes", "Source de donnée": "Terrain",
                             "Méthode de collecte": "Saisie manuelle", "Point de mesure dans le processus": row["Étape Source"],
                             "Responsable collecte": "Opérateur", "Fréquence": "Quotidienne", "Taille échantillon": "n ≥ 30",
@@ -1815,7 +1809,7 @@ else:
                     st.rerun()
 
             # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — COMPORTEMENT EXCEL 100% FLUIDE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,27 +1817,25 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # Synchronisation initiale et unique du tampon
             if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
                 st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
 
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
             if not df_msa_affichage.empty:
-                st.success("✅ Système de mesure disponible. Remplissez vos tests de répétabilité et reproductibilité ci-dessous :")
+                st.success("✅ Mode saisie rapide actif. Remplissez le tableau MSA continuellement, puis sauvegardez en fin de saisie :")
                 
-                # --- LE FORMULAIRE DE BLOCAGE GLOBAL ---
-                # On enveloppe l'éditeur dans un formulaire UNIQUE. 
-                # Streamlit gèle TOUS les recalculs et rerenders tant qu'on ne clique pas sur le bouton de soumission.
-                with st.form(key=f"msa_form_blocker_{component_idx}", clear_on_submit=False):
+                # --- PROTECTION NATIVE FIXE ---
+                # L'astuce ultime pour bloquer le lag de st.data_editor consiste à ne JAMAIS lier sa sortie 'edited_msa_df =' 
+                # en direct à un traitement ou à un affichage conditionnel. On utilise une clé matérielle purement statique.
+                with st.form(key=f"msa_pure_excel_sheet_{component_idx}", clear_on_submit=False):
                     
-                    # L'éditeur utilise le DataFrame tampon. L'utilisateur peut taper 10, 20, 50 valeurs à la suite,
-                    # utiliser les flèches du clavier et faire 'Entrée' sans AUCUN lag, car l'état reste purement côté navigateur (JS).
-                    edited_msa_df = st.data_editor(
+                    # Saisie instantanée gérée par le moteur JavaScript local de ton navigateur
+                    st.data_editor(
                         df_msa_affichage,
                         num_rows="fixed",
                         use_container_width=True,
-                        key=f"msa_editor_pure_buffer_{component_idx}", # Clé statique pour le cache de l'UI
+                        key=f"msa_editor_static_hardware_key", # CLE COMMUNE TOUS PROJETS : Force Streamlit à bloquer les reruns de cellules
                         column_config={
                             "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                             "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1857,31 +1849,36 @@ else:
                         }
                     )
                     
-                    # Unique déclencheur des traitements lourds, recalculs et sauvegardes
                     submit_button = st.form_submit_button(
-                        "💾 Valider et verrouiller définitivement les données", 
+                        "💾 Enregistrer définitivement les données et validations MSA", 
                         type="primary", 
                         use_container_width=True
                     )
                 
-                # --- EXÉCUTION DIFFÉRÉE DES TRAITEMENTS ---
-                # Aucun calcul, aucun enregistrement JSON, aucune mise à jour de statut ne s'exécute avant ce 'if'
                 if submit_button:
-                    df_captured = pd.DataFrame(edited_msa_df)
-                    
-                    # 1. Mise à jour des sessions states de calculs
-                    st.session_state[buffer_msa_key] = df_captured
-                    st.session_state[local_msa_key] = df_captured
-                    st.session_state[msa_classif_key] = df_captured
-                    
-                    # 2. Sauvegarde définitive dans le dictionnaire du projet pour l'export JSON
-                    project_dict["msa_table_saved"] = df_captured.to_dict('records')
-                    if 'projects' in st.session_state and 'p_idx' in locals():
-                        st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                    
-                    # 3. Notification et rafraîchissement unique de l'interface
-                    st.toast("✅ Données MSA enregistrées et indicateurs mis à jour avec succès !", icon="📊")
-                    st.rerun()
+                    # On va chercher les modifications directement dans le dictionnaire d'état de l'éditeur statique
+                    # pour contourner le moteur de rendu de flux
+                    if f"msa_editor_static_hardware_key" in st.session_state:
+                        edits = st.session_state[f"msa_editor_static_hardware_key"]
+                        
+                        # Application des modifications manuelles (lignes éditées) sur le DataFrame original
+                        df_captured = df_msa_affichage.copy()
+                        if "edited_rows" in edits:
+                            for row_idx, changed_cols in edits["edited_rows"].items():
+                                for col_name, new_val in changed_cols.items():
+                                    df_captured.at[int(row_idx), col_name] = new_val
+                        
+                        # Sauvegarde globale asynchrone (uniquement déclenchée ici)
+                        st.session_state[buffer_msa_key] = df_captured
+                        st.session_state[local_msa_key] = df_captured
+                        st.session_state[msa_classif_key] = df_captured
+                        
+                        project_dict["msa_table_saved"] = df_captured.to_dict('records')
+                        if 'projects' in st.session_state and 'p_idx' in locals():
+                            st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
+                            
+                        st.toast("✅ Données enregistrées dans le protocole terrain !", icon="📊")
+                        st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
                 
