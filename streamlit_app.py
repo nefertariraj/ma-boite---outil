@@ -1815,52 +1815,43 @@ else:
                     st.rerun()
 
           # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — UNIFICATION FINALE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — CORRECTIF D'AFFICHAGE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # 1. CHARGEMENT DES DONNÉES MSA
-            saved_msa = project_dict.get("msa_table_saved", [])
-            if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
-                st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
+            # 1. RÉCUPÉRATION SÉCURISÉE (On force la lecture du projet si vide)
+            if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
+                saved_msa = project_dict.get("msa_table_saved", [])
+                st.session_state[local_msa_key] = pd.DataFrame(saved_msa) if saved_msa else pd.DataFrame()
 
-            # 2. AFFICHAGE UNIQUE (Si MSA existe, tout s'affiche)
-            if not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
+            # 2. AFFICHAGE DU BLOC (Tableau + Protocole Terrain)
+            if not st.session_state[local_msa_key].empty:
                 st.success("✅ Système de mesure disponible.")
                 
-                # A. Tableau MSA
+                # Éditeur MSA (Passif : il se contente d'afficher et de mettre à jour la session)
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed", use_container_width=True,
                     key=f"msa_editor_final_{component_idx}"
                 )
                 
-                # Sauvegarde en temps réel pour le dictionnaire
+                # Mise à jour immédiate de la mémoire stable
                 st.session_state[local_msa_key] = edited_msa_df
                 project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
 
-                # B. EXÉCUTION DU PROTOCOLE TERRAIN
+                # 3. AFFICHAGE DU PROTOCOLE TERRAIN (Directement en dessous)
+                # Il ne dépend plus d'une condition externe, il est dans le même bloc
                 st.markdown("#### 📋 Exécution du protocole terrain")
                 
-                # --- CORRECTION CRITIQUE ---
-                # Si vos données de test (répétabilité, etc.) ne sont pas chargées, 
-                # il faut les initialiser ici à partir du project_dict.
+                # [PLACEZ ICI TOUT VOTRE CODE DE PROTOCOLE TERRAIN]
+                # (Graphiques, tests de répétabilité, etc.)
                 
-                if "test_repetabilite_key" not in st.session_state:
-                     # On récupère les données du JSON importé s'il existe
-                     saved_tests = project_dict.get("tests_terrain_saved", {})
-                     st.session_state["test_repetabilite_key"] = pd.DataFrame(saved_tests.get("repetabilite", []))
-                     # ... (répétez pour chaque tableau de test)
-
-                # Maintenant, affichez vos tableaux de test en utilisant st.session_state["test_repetabilite_key"]
-                # C'est cette liaison explicite qui fera apparaître vos données après l'import JSON.
-                
-                # Exemple de tableau de test :
-                # st.data_editor(st.session_state["test_repetabilite_key"], key="test_rep_editor")
-
             else:
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
+
+        # Appel du fragment (invariable)
+        render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
