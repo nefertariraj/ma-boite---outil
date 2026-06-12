@@ -1577,7 +1577,7 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-        # =====================================================================
+       # =====================================================================
         # 3. Lean Six Sigma Data Collection Plan (Y = f(X)) & 4. MSA
         # =====================================================================
         st.subheader("3. Master Black Belt Data Collection Plan")
@@ -1590,23 +1590,19 @@ else:
         # Extraction propre de l'index du projet pour éviter les collisions de clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-        # --- INITIALISATION STATIQUE ---
+        # --- INITIALISATION GLOBALE STATIQUE & SÉCURISÉE ---
         msa_classif_key = f"msa_classification_table_{safe_idx}"
-        msa_static_view_key = f"msa_static_view_{safe_idx}"
 
         if msa_classif_key not in st.session_state:
             st.session_state[msa_classif_key] = pd.DataFrame()
-            
-        if msa_static_view_key not in st.session_state:
-            st.session_state[msa_static_view_key] = st.session_state[msa_classif_key].copy()
 
-        # ISOLATION : Alimentation découplée pour le reste de l'application
-        df_classification_current = st.session_state[msa_static_view_key]
+        df_classification_current = st.session_state[msa_classif_key]
+        globals()['df_classification_current'] = st.session_state[msa_classif_key]
 
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
 
-        # --- ISOLATION DANS LE FRAGMENT ---
+        # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
         @st.fragment
         def render_data_collection_and_msa(project_dict, component_idx):
             matrix_key = f"mbb_prioritization_matrix_{component_idx}"
@@ -1614,16 +1610,17 @@ else:
             lock_key = f"dcp_validated_lock_{component_idx}"
             local_msa_key = f"msa_classification_table_{component_idx}"
             buffer_msa_key = f"msa_buffer_{component_idx}"
-            static_view_key = f"msa_static_view_{component_idx}"
 
             # =====================================================================
-            # 🛡️ RESTAURATION DES DONNÉES (JSON / SESSION STATE)
+            # 🛡️ SÉCURITÉ IMPORT JSON : RESTAURATION ET SÉQUENÇAGE STRICT
             # =====================================================================
+            # FIX PARTIE 1 : Force le chargement ou l'extraction si la session est absente ou vide
             if matrix_key not in st.session_state or st.session_state[matrix_key].empty:
                 saved_prio = project_dict.get("prio_matrix_saved", [])
                 if saved_prio:
                     st.session_state[matrix_key] = pd.DataFrame(saved_prio)
                 else:
+                    # On réactive le calcul d'extraction automatique depuis le VSM
                     vsm_steps = st.session_state.get("vsm_macro_steps", [])
                     vsm_detailed = st.session_state.get("vsm_detailed_map", {})
                     vsm_totals = st.session_state.get("vsm_totals", {})
@@ -1670,22 +1667,25 @@ else:
                         "Utilité Analytique (Futur Test d'Hypothèse)": "Démontrer la corrélation mathématique avec la variation du Lead Time."
                     } for item in extracted_x])
 
+            # Restauration Partie 2 : DCP Officiel
             if dcp_table_key not in st.session_state:
                 saved_dcp = project_dict.get("master_dcp_table", [])
                 st.session_state[dcp_table_key] = pd.DataFrame(saved_dcp) if saved_dcp else pd.DataFrame()
 
+            # FIX PARTIE 2 : Force la restauration depuis le JSON même si la clé a été initialisée vide plus haut
             saved_msa = project_dict.get("msa_table_saved", [])
             if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
                 st.session_state[msa_classif_key] = pd.DataFrame(saved_msa)
-                st.session_state[static_view_key] = pd.DataFrame(saved_msa)
 
+            # Restauration du verrou de jalon automatique
             if saved_msa or project_dict.get("dcp_validated_lock", False):
                 st.session_state[lock_key] = True
                 project_dict["dcp_validated_lock"] = True
             elif lock_key not in st.session_state:
                 st.session_state[lock_key] = False
 
+            # Initialisation du tampon de saisie pour bloquer le lag du MSA
             if buffer_msa_key not in st.session_state:
                 if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
                     st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
@@ -1804,7 +1804,6 @@ else:
                     st.session_state[local_msa_key] = df_msa_nouveau
                     st.session_state[msa_classif_key] = df_msa_nouveau
                     st.session_state[buffer_msa_key] = df_msa_nouveau.copy()
-                    st.session_state[static_view_key] = df_msa_nouveau.copy()
                     
                     project_dict["msa_table_saved"] = df_msa_nouveau.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
@@ -1816,7 +1815,7 @@ else:
                     st.rerun()
 
             # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — FORMULAIRE SÉCURISÉ
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1824,53 +1823,48 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
+            # Synchronisation du tampon d'affichage MSA
             if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
                 st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
 
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
             if not df_msa_affichage.empty:
-                st.success("✅ Système de mesure disponible. Remplissez vos tests de répétabilité et reproductibilité ci-dessous :")
-                
-                with st.form(key=f"msa_form_blocker_{component_idx}", clear_on_submit=False):
+                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
                     
-                    edited_msa_df = st.data_editor(
-                        df_msa_affichage,
-                        num_rows="fixed",
-                        use_container_width=True,
-                        key=f"msa_editor_pure_buffer_{component_idx}",
-                        column_config={
-                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                            "Statut de validation": st.column_config.SelectboxColumn(
-                                "Statut de validation", 
-                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                                width="medium"
-                            )
-                        }
-                    )
-                    
-                    submit_button = st.form_submit_button(
-                        "💾 Valider et verrouiller définitivement les données", 
-                        type="primary", 
-                        use_container_width=True
-                    )
+                # FIX ULTIME ANTI-LAG : Utilisation du tampon déconnecté des cycles de rendu globaux
+                edited_msa_df = st.data_editor(
+                    df_msa_affichage,
+                    num_rows="fixed",
+                    use_container_width=True,
+                    key=f"msa_editor_isolated_fluid_{component_idx}", 
+                    column_config={
+                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                        "Statut de validation": st.column_config.SelectboxColumn(
+                            "Statut de validation", 
+                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                            width="medium"
+                        )
+                    }
+                )
                 
-                if submit_button:
+                # Sauvegarde manuelle volontaire pour figer l'état de l'analyse
+                if st.button("💾 Enregistrer définitivement les statuts de validation MSA", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
                     df_captured = pd.DataFrame(edited_msa_df)
                     
+                    # Propagation dans toutes les instances de sessions
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
-                    st.session_state[static_view_key] = df_captured  
                     
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                    
-                    st.toast("✅ Données MSA enregistrées avec succès !", icon="📊")
+                        
+                    st.toast("✅ Données protocoles et validations enregistrées dans le fichier de sauvegarde !", icon="📊")
                     st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
