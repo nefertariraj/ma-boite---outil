@@ -1823,21 +1823,23 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # Synchronisation du tampon d'affichage MSA
+            # Synchronisation initiale et unique du tampon
             if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
                 st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
 
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
             if not df_msa_affichage.empty:
-                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
+                st.success("✅ Système de mesure disponible. Saisissez vos données terrain ci-dessous :")
                     
-                # FIX ULTIME ANTI-LAG : Utilisation du tampon déconnecté des cycles de rendu globaux
+                # FIX SÉCURITÉ FOCUS : Utilisation d'une clé d'édition isolée de session_state pour bloquer le lag
+                ui_editor_key = f"msa_raw_field_editor_{component_idx}"
+                
                 edited_msa_df = st.data_editor(
                     df_msa_affichage,
                     num_rows="fixed",
                     use_container_width=True,
-                    key=f"msa_editor_isolated_fluid_{component_idx}", 
+                    key=ui_editor_key, 
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                         "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1851,11 +1853,12 @@ else:
                     }
                 )
                 
-                # Sauvegarde manuelle volontaire pour figer l'état de l'analyse
-                if st.button("💾 Enregistrer définitivement les statuts de validation MSA", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
+                # Le traitement et la réexécution lourde ne se font QUE lors du clic sur ce bouton
+                if st.button("💾 Enregistrer définitivement les données et validations MSA", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
+                    # Récupération sécurisée du contenu du composant sans déclenchement intermédiaire
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Propagation dans toutes les instances de sessions
+                    # Enregistrement local et global
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
@@ -1864,7 +1867,7 @@ else:
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
                         
-                    st.toast("✅ Données protocoles et validations enregistrées dans le fichier de sauvegarde !", icon="📊")
+                    st.toast("✅ Données protocoles et répétabilité enregistrées !", icon="📊")
                     st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
