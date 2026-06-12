@@ -1809,7 +1809,7 @@ else:
                     st.rerun()
 
             # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — COMPORTEMENT EXCEL 100% FLUIDE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — INPUT HAUTE PERFORMANCE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,62 +1823,108 @@ else:
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
             if not df_msa_affichage.empty:
-                st.success("✅ Mode saisie rapide actif. Remplissez le tableau MSA continuellement, puis sauvegardez en fin de saisie :")
+                st.success("⚡ Mode Tableur Ultra-Fluide Activé. Saisie kilométrique instantanée (zéro latence réseau) :")
+
+                # Options du selectbox pour le code HTML
+                options_statut = ["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"]
                 
-                # --- PROTECTION NATIVE FIXE ---
-                # L'astuce ultime pour bloquer le lag de st.data_editor consiste à ne JAMAIS lier sa sortie 'edited_msa_df =' 
-                # en direct à un traitement ou à un affichage conditionnel. On utilise une clé matérielle purement statique.
-                with st.form(key=f"msa_pure_excel_sheet_{component_idx}", clear_on_submit=False):
+                # Construction d'un tableau HTML natif ultra-rapide avec injecteur de données
+                html_rows = ""
+                for idx, row in df_msa_affichage.iterrows():
+                    var_name = row.get("Variable Critique (liée au Y)", "")
+                    role = row.get("Rôle", "")
+                    t_data = row.get("Type de Donnée", "")
+                    msa_rec = row.get("MSA Recommandé", "")
+                    current_status = row.get("Statut de validation", "En attente")
                     
-                    # Saisie instantanée gérée par le moteur JavaScript local de ton navigateur
-                    st.data_editor(
-                        df_msa_affichage,
-                        num_rows="fixed",
-                        use_container_width=True,
-                        key=f"msa_editor_static_hardware_key", # CLE COMMUNE TOUS PROJETS : Force Streamlit à bloquer les reruns de cellules
-                        column_config={
-                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                            "Statut de validation": st.column_config.SelectboxColumn(
-                                "Statut de validation", 
-                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                                width="medium"
-                            )
-                        }
-                    )
+                    options_html = "".join([
+                        f'<option value="{opt}" {"selected" if opt == current_status else ""}>{opt}</option>'
+                        for opt in options_statut
+                    ])
                     
-                    submit_button = st.form_submit_button(
-                        "💾 Enregistrer définitivement les données et validations MSA", 
-                        type="primary", 
-                        use_container_width=True
-                    )
+                    html_rows += f"""
+                    <tr>
+                        <td style="padding:8px; border:1px solid #ddd; background:#f9f9f9;">{var_name}</td>
+                        <td style="padding:8px; border:1px solid #ddd; text-align:center;">{role}</td>
+                        <td style="padding:8px; border:1px solid #ddd;">{t_data}</td>
+                        <td style="padding:8px; border:1px solid #ddd;">{msa_rec}</td>
+                        <td style="padding:8px; border:1px solid #ddd;">
+                            <select class="msa-status-select" data-row="{idx}" style="width:100%; padding:4px; border-radius:4px; border:1px solid #ccc;">
+                                {options_html}
+                            </select>
+                        </td>
+                    </tr>
+                    """
+
+                # Injection du composant dans le DOM local (aucun aller-retour serveur pendant la navigation)
+                html_component = f"""
+                <div style="font-family:sans-serif; color:#333;">
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:14px;">
+                        <thead>
+                            <tr style="background-color:#f1f3f5; border-bottom:2px solid #dee2e6;">
+                                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Variable Critique</th>
+                                <th style="padding:10px; border:1px solid #ddd; width:80px;">Rôle</th>
+                                <th style="padding:10px; border:1px solid #ddd; width:100px;">Type</th>
+                                <th style="padding:10px; border:1px solid #ddd;">MSA Recommandé</th>
+                                <th style="padding:10px; border:1px solid #ddd; width:250px;">Statut de validation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {html_rows}
+                        </tbody>
+                    </table>
+                    <button id="submit-html-msa" style="width:100%; background-color:#ff4b4b; color:white; border:none; padding:10px; font-size:15px; font-weight:bold; border-radius:8px; cursor:pointer;">
+                        💾 Sauvegarder et Verrouiller les modifications MSA
+                    </button>
+                </div>
+
+                <script>
+                    const button = document.getElementById('submit-html-msa');
+                    button.addEventListener('click', function() {{
+                        const selects = document.querySelectorAll('.msa-status-select');
+                        const data_changes = {{}};
+                        selects.forEach(select => {{
+                            const rowIdx = select.getAttribute('data-row');
+                            data_changes[rowIdx] = select.value;
+                        }});
+                        
+                        // Envoi global en un seul bloc à Streamlit
+                        window.parent.postMessage({{
+                            type: 'streamlit:setComponentValue',
+                            value: data_changes
+                        }}, '*');
+                    }});
+                </script>
+                """
+
+                # Affichage du composant HTML autonome
+                import streamlit.components.v1 as components
                 
-                if submit_button:
-                    # On va chercher les modifications directement dans le dictionnaire d'état de l'éditeur statique
-                    # pour contourner le moteur de rendu de flux
-                    if f"msa_editor_static_hardware_key" in st.session_state:
-                        edits = st.session_state[f"msa_editor_static_hardware_key"]
+                # Hauteur dynamique calculée pour éviter les barres de défilement internes
+                calculated_height = max(180, 100 + (len(df_msa_affichage) * 45))
+                
+                # Capture de la réponse HTML uniquement au clic du bouton interne
+                response_data = components.html(html_component, height=calculated_height, scrolling=False)
+
+                # Traitement du bloc de données UNIQUEMENT si le bouton HTML a été cliqué
+                if response_data:
+                    df_captured = df_msa_affichage.copy()
+                    
+                    # On applique toutes les modifications reçues d'un coup sec
+                    for row_idx_str, new_status in response_data.items():
+                        df_captured.at[int(row_idx_str), "Statut de validation"] = new_status
+                    
+                    # Mise à jour des structures de données
+                    st.session_state[buffer_msa_key] = df_captured
+                    st.session_state[local_msa_key] = df_captured
+                    st.session_state[msa_classif_key] = df_captured
+                    
+                    project_dict["msa_table_saved"] = df_captured.to_dict('records')
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
                         
-                        # Application des modifications manuelles (lignes éditées) sur le DataFrame original
-                        df_captured = df_msa_affichage.copy()
-                        if "edited_rows" in edits:
-                            for row_idx, changed_cols in edits["edited_rows"].items():
-                                for col_name, new_val in changed_cols.items():
-                                    df_captured.at[int(row_idx), col_name] = new_val
-                        
-                        # Sauvegarde globale asynchrone (uniquement déclenchée ici)
-                        st.session_state[buffer_msa_key] = df_captured
-                        st.session_state[local_msa_key] = df_captured
-                        st.session_state[msa_classif_key] = df_captured
-                        
-                        project_dict["msa_table_saved"] = df_captured.to_dict('records')
-                        if 'projects' in st.session_state and 'p_idx' in locals():
-                            st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                            
-                        st.toast("✅ Données enregistrées dans le protocole terrain !", icon="📊")
-                        st.rerun()
+                    st.toast("✅ Modifications appliquées instantanément !", icon="📊")
+                    st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
                 
