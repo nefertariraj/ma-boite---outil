@@ -1577,7 +1577,7 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-        # =====================================================================
+       # =====================================================================
         # 3. Lean Six Sigma Data Collection Plan (Y = f(X)) & 4. MSA
         # =====================================================================
         st.subheader("3. Master Black Belt Data Collection Plan")
@@ -1591,7 +1591,6 @@ else:
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
         # --- INITIALISATION GLOBALE STATIQUE & SÉCURISÉE ---
-        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
         # 1. On s'assure que la clé existe dans le session_state
@@ -1604,6 +1603,7 @@ else:
 
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
+
         # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
         @st.fragment
         def render_data_collection_and_msa(project_dict, component_idx):
@@ -1760,7 +1760,6 @@ else:
                 )
 
                 if st.button("💾 Enregistrer les ajustements du Data Collection Plan", key=f"save_mbb_dcp_{component_idx}", type="secondary", use_container_width=True):
-                    # FIX : On utilise le DataFrame édité en direct (edited_dcp_df) et non la session obsolète
                     df_ajuste = pd.DataFrame(edited_dcp_df)
                     st.session_state[dcp_table_key] = df_ajuste
                     
@@ -1792,7 +1791,7 @@ else:
                             "Statut de validation": statut_recupere
                         })
                         
-                    # --- FIX PARTIE 2 : SAUVEGARDE ET SYNC GLOBALE DU MSA ---
+                    # --- FIX PARTIE 2 SÉCURISÉ : FORÇAGE DE L'ENREGISTREMENT MASTER DU MSA ---
                     df_msa_nouveau = pd.DataFrame(msa_rows)
                     st.session_state[local_msa_key] = df_msa_nouveau
                     st.session_state[msa_classif_key] = df_msa_nouveau
@@ -1820,26 +1819,30 @@ else:
             if not df_msa_in_state.empty:
                 st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
-                # FIX ANTI-LENTEUR CPU : Utilisation d'un conteneur isolé et d'une clé fixe stable
-                edited_msa_df = st.data_editor(
-                    df_msa_in_state,
-                    num_rows="fixed",
-                    use_container_width=True,
-                    key=f"msa_editor_static_{component_idx}", # Clé fixe essentielle pour bloquer le lag
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                        "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation", 
-                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                            width="medium"
-                        )
-                    }
-                )
+                # FIX ANTI-LENTEUR CPU : Utilisation d'un st.form pour bloquer les reruns compulsifs à chaque caractère tapé
+                with st.form(key=f"msa_execution_form_{component_idx}", clear_on_submit=False):
+                    edited_msa_df = st.data_editor(
+                        df_msa_in_state,
+                        num_rows="fixed",
+                        use_container_width=True,
+                        key=f"msa_editor_static_{component_idx}",
+                        column_config={
+                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                            "Statut de validation": st.column_config.SelectboxColumn(
+                                "Statut de validation", 
+                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                                width="medium"
+                            )
+                        }
+                    )
                     
-                if st.button("💾 Enregistrer les statuts de validation MSA", key=f"save_msa_status_btn_{component_idx}", use_container_width=True):
+                    # Le bouton du formulaire valide et enregistre d'un coup propre
+                    submit_msa = st.form_submit_button("💾 Enregistrer les statuts de validation MSA", use_container_width=True)
+                    
+                if submit_msa:
                     df_captured = pd.DataFrame(edited_msa_df)
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
