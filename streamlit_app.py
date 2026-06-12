@@ -1815,7 +1815,7 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — AFFICHAGE FORCÉ
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — UNIFICATION FINALE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1825,44 +1825,42 @@ else:
             if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
 
-            # 2. CONTENEUR DÉDIÉ AU BLOC MSA (Force l'affichage)
-            container_msa = st.empty()
-
+            # 2. AFFICHAGE DU TABLEAU MSA
             if not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
-                with container_msa.container():
-                    st.success("✅ Système de mesure disponible.")
-                    
-                    # Éditeur passif
-                    edited_msa_df = st.data_editor(
-                        st.session_state[local_msa_key],
-                        num_rows="fixed",
-                        use_container_width=True,
-                        key=f"msa_editor_final_{component_idx}",
-                        column_config={
-                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                            "Statut de validation": st.column_config.SelectboxColumn(
-                                "Statut de validation",
-                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                                width="medium"
-                            )
-                        }
-                    )
+                st.success("✅ Système de mesure disponible.")
+                
+                edited_msa_df = st.data_editor(
+                    st.session_state[local_msa_key],
+                    num_rows="fixed",
+                    use_container_width=True,
+                    key=f"msa_editor_final_{component_idx}",
+                    column_config={
+                        "Statut de validation": st.column_config.SelectboxColumn(
+                            "Statut de validation",
+                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                            width="medium"
+                        )
+                    }
+                )
 
-                    # Mise à jour des données
-                    st.session_state[local_msa_key] = edited_msa_df
-                    project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+                # Mise à jour
+                st.session_state[local_msa_key] = edited_msa_df
+                project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
 
-                    # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Directement dans le même conteneur)
-                    st.markdown("#### 📋 Exécution du protocole terrain")
-                    
-                    # [VOTRE CODE PROTOCOLE TERRAIN ICI]
-                    
+                # 3. AFFICHAGE FORCÉ DU PROTOCOLE TERRAIN
+                # On définit explicitement que si le tableau MSA existe, le protocole DOIT s'afficher
+                st.markdown("#### 📋 Exécution du protocole terrain")
+                
+                # --- COLLEZ ICI LE CODE DE VOS TABLEAUX DE TEST (PROTOCOLE TERRAIN) ---
+                # Exemple :
+                # st.write("Tableau de saisie terrain :")
+                # st.data_editor(votre_autre_tableau_terrain)
+                # ---------------------------------------------------------------------
+
             else:
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
 
+        # APPEL DU FRAGMENT (Assurez-vous que c'est bien ici)
         render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
