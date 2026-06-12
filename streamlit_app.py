@@ -1815,44 +1815,44 @@ else:
                     st.rerun()
 
           # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — BLOC D'AFFICHAGE FORCÉ
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — AFFICHAGE FORCÉ ET TOTAL
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # 1. RÉCUPÉRATION SÉCURISÉE (On force la lecture du projet si vide)
-            if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
-                saved_msa = project_dict.get("msa_table_saved", [])
-                st.session_state[local_msa_key] = pd.DataFrame(saved_msa) if saved_msa else pd.DataFrame()
+            # 1. RÉCUPÉRATION DES DONNÉES (Force la lecture du JSON importé)
+            saved_msa = project_dict.get("msa_table_saved", [])
+            if saved_msa:
+                st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
 
-            # 2. AFFICHAGE DU BLOC MSA (Tableau + Protocole)
-            # Cette seule condition gère TOUT le MSA. Si elle est vraie, tout apparaît.
-            if not st.session_state[local_msa_key].empty:
+            # 2. AFFICHAGE DU TABLEAU MSA (Toujours visible si des données existent)
+            if not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
                 st.success("✅ Système de mesure disponible.")
                 
-                # Éditeur MSA (Le point d'entrée unique des données)
+                # Éditeur MSA
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed", use_container_width=True,
                     key=f"msa_editor_final_{component_idx}"
                 )
                 
-                # Mise à jour immédiate
+                # Mise à jour
                 st.session_state[local_msa_key] = edited_msa_df
                 project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
 
-                # 3. EXÉCUTION DU PROTOCOLE TERRAIN
+                # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Affichage direct et forcé)
                 st.markdown("#### 📋 Exécution du protocole terrain")
                 
-                # --- ACTION OBLIGATOIRE ---
-                # Affichez vos tableaux SANS condition 'if' supplémentaire ici.
-                # Utilisez DIRECTEMENT st.session_state[local_msa_key] 
-                # ou des variables que vous avez chargées depuis project_dict juste avant.
+                # --- ACTION CRITIQUE : AFFICHER LES TABLEAUX SANS AUCUN 'IF' ---
+                # Ne mettez AUCUN 'if' ici. Appelez directement vos fonctions ou vos composants.
                 
-                # EXEMPLE : Si vous avez une fonction, appelez-la sans condition :
-                # afficher_tableau_repetabilite(project_dict)
-                # afficher_tableau_reproductibilite(project_dict)
+                # Exemple si vous avez des tableaux dans des variables :
+                # st.dataframe(votre_tableau_repetabilite)
+                # st.dataframe(votre_tableau_reproductibilite)
                 
+                # Si ces tableaux sont dans des fonctions, appelez-les simplement :
+                # afficher_mes_tableaux_de_tests(project_dict)
+
             else:
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
 
