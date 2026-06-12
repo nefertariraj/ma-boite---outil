@@ -1820,45 +1820,39 @@ else:
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # Affichage si le DCP est verrouillé OU si on a déjà des données (reprise travail)
-            if not st.session_state.get(lock_key, False) and not (project_dict.get("msa_table_saved")):
+            # Affichage si le DCP est validé OU si des données MSA existent déjà (reprise)
+            est_valide = st.session_state.get(lock_key, False)
+            a_des_donnees = not pd.DataFrame(project_dict.get("msa_table_saved", [])).empty
+
+            if not est_valide and not a_des_donnees:
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
             else:
-                # 1. CHARGEMENT INITIAL (S'exécute une seule fois lors de l'affichage)
-                saved_msa = project_dict.get("msa_table_saved", [])
-                if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
-                    st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
+                # Initialisation lors de l'import JSON si nécessaire
+                if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
+                    st.session_state[local_msa_key] = pd.DataFrame(project_dict.get("msa_table_saved", []))
 
-                # 2. AFFICHAGE DU BLOC (Tableau + Protocole Terrain)
-                if not st.session_state[local_msa_key].empty:
-                    st.success("✅ Système de mesure disponible.")
+                # Éditeur MSA (Aucune interaction continue)
+                edited_msa_df = st.data_editor(
+                    st.session_state[local_msa_key],
+                    num_rows="fixed",
+                    use_container_width=True,
+                    key=f"msa_editor_final_{component_idx}"
+                )
+
+                # EXÉCUTION DU PROTOCOLE TERRAIN (Indivisible : s'affiche ici)
+                st.markdown("#### 📋 Exécution du protocole terrain")
+                render_data_collection_and_msa(p, safe_idx)
+
+                # BOUTON UNIQUE DE SAUVEGARDE
+                if st.button("💾 Enregistrer tout le bloc MSA (Tableau + Protocole)", key=f"btn_save_msa_{component_idx}", type="primary", use_container_width=True):
+                    df_to_save = pd.DataFrame(edited_msa_df)
+                    st.session_state[local_msa_key] = df_to_save
+                    project_dict["msa_table_saved"] = df_to_save.to_dict('records')
                     
-                    # Éditeur MSA (Aucune sauvegarde automatique ici)
-                    edited_msa_df = st.data_editor(
-                        st.session_state[local_msa_key],
-                        num_rows="fixed", use_container_width=True,
-                        key=f"msa_editor_final_{component_idx}"
-                    )
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        st.session_state.projects[p_idx]["msa_table_saved"] = df_to_save.to_dict('records')
                     
-                    # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Indivisible)
-                    st.markdown("#### 📋 Exécution du protocole terrain")
-                    # [VOTRE CODE PROTOCOLE TERRAIN ICI]
-                    
-                    # 4. BOUTON UNIQUE DE SAUVEGARDE
-                    if st.button("💾 Enregistrer tout le bloc MSA (Tableau + Protocole)", key=f"btn_save_msa_{component_idx}", type="primary", use_container_width=True):
-                        # Sauvegarde des données de l'éditeur
-                        df_to_save = pd.DataFrame(edited_msa_df)
-                        st.session_state[local_msa_key] = df_to_save
-                        project_dict["msa_table_saved"] = df_to_save.to_dict('records')
-                        
-                        if 'projects' in st.session_state and 'p_idx' in locals():
-                            st.session_state.projects[p_idx]["msa_table_saved"] = df_to_save.to_dict('records')
-                            
-                        st.toast("✅ Données sauvegardées dans le fichier !", icon="💾")
-                        # Pas de st.rerun() si vous voulez éviter de recharger l'interface, 
-                        # ou gardez-le pour confirmer la prise en compte.
-                else:
-                    st.warning("⚠️ Les données MSA sont prêtes à être générées.")
+                    st.toast("✅ Données sauvegardées avec succès !", icon="💾")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
