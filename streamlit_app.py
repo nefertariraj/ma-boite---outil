@@ -1851,23 +1851,11 @@ else:
                     }
                 )
                 
-                # Sauvegarde manuelle volontaire pour figer l'état de l'analyse
-                if st.button("💾 Enregistrer définitivement les statuts de validation MSA", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
-                    df_captured = pd.DataFrame(edited_msa_df)
-                    
-                    # Propagation dans toutes les instances de sessions
-                    st.session_state[buffer_msa_key] = df_captured
-                    st.session_state[local_msa_key] = df_captured
-                    st.session_state[msa_classif_key] = df_captured
-                    
-                    project_dict["msa_table_saved"] = df_captured.to_dict('records')
-                    if 'projects' in st.session_state and 'p_idx' in locals():
-                        st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                        
-                    st.toast("✅ Données protocoles et validations enregistrées dans le fichier de sauvegarde !", icon="📊")
-                    st.rerun()
+                # Le bouton intermédiaire a été supprimé.
+                # Les données de 'edited_msa_df' sont maintenant directement disponibles 
+                # en continu pour alimenter la suite de ton script ("Exécution du protocole terrain").
 
-        render_data_collection_and_msa(p, safe_idx) 
+        render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
