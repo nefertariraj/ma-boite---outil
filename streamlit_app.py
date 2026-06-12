@@ -1809,7 +1809,7 @@ else:
                     st.rerun()
 
             # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — ZÉRO LATENCE CACHÉE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — ANTI-REFRESH ABSOLU
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,72 +1823,70 @@ else:
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
             if not df_msa_affichage.empty:
-                st.success("⚡ Mode Haute Performance Activé. Saisie instantanée garantie :")
+                st.success("⚡ Saisie kilométrique active : aucun rafraîchissement d'écran ne se déclenchera pendant le remplissage.")
 
-                # Définition des options disponibles
                 options_statut = ["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"]
 
-                # ÉTAPE CLÉ : On utilise un formulaire Streamlit classique mais SANS liaison dynamique de variable.
-                # On force l'utilisation de st.selectbox individuels indexés pour empêcher le rafraîchissement global.
-                with st.form(key=f"msa_ultra_speed_form_{component_idx}", clear_on_submit=False):
+                # ÉTAPE CRUCIALE : Un formulaire avec une configuration stricte.
+                # On ne lit AUCUNE valeur en direct pendant que l'utilisateur manipule ses choix.
+                with st.form(key=f"msa_form_anti_refresh_{component_idx}", clear_on_submit=False):
                     
-                    # Reconstruction d'une structure de lignes propre et ultra-légère sous forme de colonnes natives
-                    # Bien plus rapide à charger et à manipuler pour le processeur qu'un gros data_editor
                     st.markdown("""
                     <style>
+                    /* Force l'alignement et supprime les micro-mouvements de l'interface */
                     div[data-testid="stHorizontalBlock"] {
-                        padding: 4px 0px;
-                        border-bottom: 1px solid #f0f2f6;
+                        align-items: center !important;
+                        padding: 2px 0px;
                     }
                     </style>
                     """, unsafe_allow_html=True)
                     
-                    # En-tête du tableau
-                    col1, col2, col3 = st.columns([3, 2, 3])
-                    col1.markdown("**Variable Critique (Y/X)**")
-                    col2.markdown("**MSA Recommandé**")
-                    col3.markdown("**Statut de validation**")
+                    # Structure des en-têtes
+                    c_head1, c_head2, c_head3 = st.columns([4, 3, 3])
+                    c_head1.markdown("**Variable Critique (Y/X)**")
+                    c_head2.markdown("**MSA Recommandé**")
+                    c_head3.markdown("**Statut de validation**")
                     
-                    # Dictionnaire temporaire pour stocker les saisies sans recalcul
-                    saisies_決 = {}
-                    
+                    # Génération des lignes de saisie passive
                     for idx, row in df_msa_affichage.iterrows():
                         var_name = row.get("Variable Critique (liée au Y)", "")
                         msa_rec = row.get("MSA Recommandé", "")
                         current_status = row.get("Statut de validation", "En attente")
                         
-                        c1, c2, c3 = st.columns([3, 2, 3])
+                        c1, c2, c3 = st.columns([4, 3, 3])
                         c1.text(var_name)
                         c2.caption(msa_rec)
                         
-                        # L'index de l'option par défaut
                         default_idx = options_statut.index(current_status) if current_status in options_statut else 0
                         
-                        # La clé ici est purement statique et ne déclenche AUCUN rerun au changement
-                        saisies_決[idx] = c3.selectbox(
-                            "Masqué",
+                        # FIX ULTIME : Utilisation d'une clé d'UI isolée. Le choix reste bloqué dans l'UI locale.
+                        # Aucun signal n'est envoyé à l'application lors du changement de focus.
+                        c3.selectbox(
+                            f"Statut {idx}",
                             options=options_statut,
                             index=default_idx,
-                            key=f"msa_row_field_{component_idx}_{idx}",
+                            key=f"ui_static_field_{component_idx}_{idx}",
                             label_visibility="collapsed"
                         )
                     
-                    # Bouton unique de validation
+                    # L'unique déclencheur autorisé à rafraîchir l'écran
                     submit_button = st.form_submit_button(
-                        "💾 Valider et enregistrer définitivement le protocole MSA", 
+                        "💾 Valider et enregistrer définitivement les données MSA", 
                         type="primary", 
                         use_container_width=True
                     )
                 
-                # TRAITEMENT LOURD EN BATCH : Uniquement exécuté au clic de soumission
+                # SÉQUENÇAGE DE SAUVEGARDE EN BATCH (Post-saisie uniquement)
                 if submit_button:
                     df_captured = df_msa_affichage.copy()
                     
-                    # Application en masse des changements
-                    for row_idx, new_val in saisies_決.items():
-                        df_captured.at[row_idx, "Statut de validation"] = new_val
+                    # Extraction des valeurs directement depuis le dictionnaire d'UI gelé
+                    for idx in df_captured.index:
+                        ui_key = f"ui_static_field_{component_idx}_{idx}"
+                        if ui_key in st.session_state:
+                            df_captured.at[idx, "Statut de validation"] = st.session_state[ui_key]
                     
-                    # Sauvegardes et synchronisations
+                    # Injection dans les variables du projet
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
@@ -1897,7 +1895,7 @@ else:
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
                         
-                    st.toast("✅ Métriques MSA enregistrées avec succès !", icon="📈")
+                    st.toast("✅ Données MSA mémorisées et validées !", icon="📈")
                     st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
