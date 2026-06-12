@@ -1809,7 +1809,7 @@ else:
                     st.rerun()
 
             # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — INPUT HAUTE PERFORMANCE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — ZÉRO LATENCE CACHÉE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,111 +1823,82 @@ else:
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
             if not df_msa_affichage.empty:
-                st.success("⚡ Mode Tableur Ultra-Fluide Activé. Saisie kilométrique instantanée (zéro latence réseau) :")
+                st.success("⚡ Mode Haute Performance Activé. Saisie instantanée garantie :")
 
-                # --- 1. INTERCEPTION DES DONNÉES ENTRANTES VIA QUERY PARAMS ---
-                # Si le bouton HTML a été cliqué, les données transitent par l'URL de manière invisible
-                if "msa_payload" in st.query_params:
-                    try:
-                        import json
-                        raw_payload = st.query_params["msa_payload"]
-                        changes = json.loads(raw_payload)
-                        
-                        df_captured = df_msa_affichage.copy()
-                        for row_idx_str, new_status in changes.items():
-                            df_captured.at[int(row_idx_str), "Statut de validation"] = new_status
-                        
-                        # Sauvegarde et synchronisation immédiate
-                        st.session_state[buffer_msa_key] = df_captured
-                        st.session_state[local_msa_key] = df_captured
-                        st.session_state[msa_classif_key] = df_captured
-                        
-                        project_dict["msa_table_saved"] = df_captured.to_dict('records')
-                        if 'projects' in st.session_state and 'p_idx' in locals():
-                            st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                        
-                        # Nettoyage propre du paramètre pour éviter les boucles infinies au prochain rerun
-                        del st.query_params["msa_payload"]
-                        st.toast("✅ Modifications appliquées instantanément !", icon="📊")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erreur lors de la synchronisation : {str(e)}")
-
-                # --- 2. GENERATION DU TABLEAU HTML AUTONOME ---
+                # Définition des options disponibles
                 options_statut = ["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"]
-                html_rows = ""
-                
-                for idx, row in df_msa_affichage.iterrows():
-                    var_name = row.get("Variable Critique (liée au Y)", "")
-                    role = row.get("Rôle", "")
-                    t_data = row.get("Type de Donnée", "")
-                    msa_rec = row.get("MSA Recommandé", "")
-                    current_status = row.get("Statut de validation", "En attente")
-                    
-                    options_html = "".join([
-                        f'<option value="{opt}" {"selected" if opt == current_status else ""}>{opt}</option>'
-                        for opt in options_statut
-                    ])
-                    
-                    html_rows += f"""
-                    <tr>
-                        <td style="padding:8px; border:1px solid #ddd; background:#f9f9f9; font-weight:500;">{var_name}</td>
-                        <td style="padding:8px; border:1px solid #ddd; text-align:center;">{role}</td>
-                        <td style="padding:8px; border:1px solid #ddd;">{t_data}</td>
-                        <td style="padding:8px; border:1px solid #ddd;">{msa_rec}</td>
-                        <td style="padding:8px; border:1px solid #ddd;">
-                            <select class="msa-status-select" data-row="{idx}" style="width:100%; padding:6px; border-radius:4px; border:1px solid #ccc; font-family:sans-serif;">
-                                {options_html}
-                            </select>
-                        </td>
-                    </tr>
-                    """
 
-                html_component = f"""
-                <div style="font-family:sans-serif; color:#333; padding:2px;">
-                    <table style="width:100%; border-collapse:collapse; margin-bottom:15px; font-size:14px;">
-                        <thead>
-                            <tr style="background-color:#f1f3f5; border-bottom:2px solid #dee2e6;">
-                                <th style="padding:10px; border:1px solid #ddd; text-align:left;">Variable Critique</th>
-                                <th style="padding:10px; border:1px solid #ddd; width:80px;">Rôle</th>
-                                <th style="padding:10px; border:1px solid #ddd; width:100px;">Type</th>
-                                <th style="padding:10px; border:1px solid #ddd;">MSA Recommandé</th>
-                                <th style="padding:10px; border:1px solid #ddd; width:250px;">Statut de validation</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {html_rows}
-                        </tbody>
-                    </table>
-                    <button id="submit-html-msa" style="width:100%; background-color:#ff4b4b; color:white; border:none; padding:12px; font-size:15px; font-weight:bold; border-radius:8px; cursor:pointer; transition: background 0.2s;">
-                        💾 Sauvegarder et Verrouiller les modifications MSA
-                    </button>
-                </div>
-
-                <script>
-                    document.getElementById('submit-html-msa').addEventListener('click', function() {{
-                        const selects = document.querySelectorAll('.msa-status-select');
-                        const data_changes = {{}};
-                        selects.forEach(select => {{
-                            const rowIdx = select.getAttribute('data-row');
-                            data_changes[rowIdx] = select.value;
-                        }});
+                # ÉTAPE CLÉ : On utilise un formulaire Streamlit classique mais SANS liaison dynamique de variable.
+                # On force l'utilisation de st.selectbox individuels indexés pour empêcher le rafraîchissement global.
+                with st.form(key=f"msa_ultra_speed_form_{component_idx}", clear_on_submit=False):
+                    
+                    # Reconstruction d'une structure de lignes propre et ultra-légère sous forme de colonnes natives
+                    # Bien plus rapide à charger et à manipuler pour le processeur qu'un gros data_editor
+                    st.markdown("""
+                    <style>
+                    div[data-testid="stHorizontalBlock"] {
+                        padding: 4px 0px;
+                        border-bottom: 1px solid #f0f2f6;
+                    }
+                    </style>
+                    """, unsafe_allow_html=True)
+                    
+                    # En-tête du tableau
+                    col1, col2, col3 = st.columns([3, 2, 3])
+                    col1.markdown("**Variable Critique (Y/X)**")
+                    col2.markdown("**MSA Recommandé**")
+                    col3.markdown("**Statut de validation**")
+                    
+                    # Dictionnaire temporaire pour stocker les saisies sans recalcul
+                    saisies_決 = {}
+                    
+                    for idx, row in df_msa_affichage.iterrows():
+                        var_name = row.get("Variable Critique (liée au Y)", "")
+                        msa_rec = row.get("MSA Recommandé", "")
+                        current_status = row.get("Statut de validation", "En attente")
                         
-                        // Envoi sécurisé via l'URL parente (Query Param)
-                        const payload = encodeURIComponent(JSON.stringify(data_changes));
-                        const parentUrl = new URL(window.parent.location.href);
-                        parentUrl.searchParams.set('msa_payload', JSON.stringify(data_changes));
-                        window.parent.location.href = parentUrl.href;
-                    }});
-                </script>
-                """
-
-                # --- 3. AFFICHAGE DU COMPOSANT SANS RISQUE DE BLOCAGE ---
-                import streamlit.components.v1 as components
-                calculated_height = max(200, 120 + (len(df_msa_affichage) * 45))
+                        c1, c2, c3 = st.columns([3, 2, 3])
+                        c1.text(var_name)
+                        c2.caption(msa_rec)
+                        
+                        # L'index de l'option par défaut
+                        default_idx = options_statut.index(current_status) if current_status in options_statut else 0
+                        
+                        # La clé ici est purement statique et ne déclenche AUCUN rerun au changement
+                        saisies_決[idx] = c3.selectbox(
+                            "Masqué",
+                            options=options_statut,
+                            index=default_idx,
+                            key=f"msa_row_field_{component_idx}_{idx}",
+                            label_visibility="collapsed"
+                        )
+                    
+                    # Bouton unique de validation
+                    submit_button = st.form_submit_button(
+                        "💾 Valider et enregistrer définitivement le protocole MSA", 
+                        type="primary", 
+                        use_container_width=True
+                    )
                 
-                # Rendu autonome isolé
-                components.html(html_component, height=calculated_height, scrolling=False)
+                # TRAITEMENT LOURD EN BATCH : Uniquement exécuté au clic de soumission
+                if submit_button:
+                    df_captured = df_msa_affichage.copy()
+                    
+                    # Application en masse des changements
+                    for row_idx, new_val in saisies_決.items():
+                        df_captured.at[row_idx, "Statut de validation"] = new_val
+                    
+                    # Sauvegardes et synchronisations
+                    st.session_state[buffer_msa_key] = df_captured
+                    st.session_state[local_msa_key] = df_captured
+                    st.session_state[msa_classif_key] = df_captured
+                    
+                    project_dict["msa_table_saved"] = df_captured.to_dict('records')
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
+                        
+                    st.toast("✅ Métriques MSA enregistrées avec succès !", icon="📈")
+                    st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
                 
