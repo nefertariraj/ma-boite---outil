@@ -1815,16 +1815,12 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — FORCE ACCÈS & RENDER
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — CLÉ FIXE ANTI-CRASH
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # Sécurité d'injection : si project_dict est corrompu ou vide, on va chercher dans la session globale
-            if not project_dict and 'projects' in st.session_state and 'p_idx' in locals():
-                project_dict = st.session_state.projects[p_idx]
-
-            # Récupération ou reconstruction immédiate du DataFrame MSA
+            # Étape 1 : On force la récupération depuis le dictionnaire si la session est vide
             if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
                 saved_msa = project_dict.get("msa_table_saved", []) if project_dict else []
                 if saved_msa:
@@ -1844,16 +1840,18 @@ else:
                         })
                     st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
 
-            # AFFICHAGE VISUEL INCONDITIONNEL
+            # Étape 2 : Vérification de l'existence des données
             if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
                 st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité :")
                 
-                # COPIE CONFORME DU COMPORTEMENT DU DATA COLLECTION PLAN (Édition passive ultra-fluide)
+                # FIX TECHNIQUE : Utilisation d'une clé strictement stable pour empêcher Streamlit de faire disparaître le tableau
+                stable_editor_key = f"stable_msa_editor_idx_{component_idx}"
+                
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed",
                     use_container_width=True,
-                    key=f"msa_editor_pure_mirror_{component_idx}", 
+                    key=stable_editor_key, 
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                         "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1867,27 +1865,24 @@ else:
                     }
                 )
                 
-                # Unique bouton de sauvegarde et de verrouillage (identique à la Partie 2)
-                if st.button("💾 Valider et verrouiller définitivement les données", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
+                # Étape 3 : Bouton de sauvegarde (Même logique passive que le Data Collection Plan)
+                if st.button("💾 Valider et verrouiller définitivement les données", key=f"btn_final_msa_save_{component_idx}", use_container_width=True, type="primary"):
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Persistance locale
+                    # Sauvegarde Session State
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
-                    if buffer_msa_key in st.session_state:
-                        st.session_state[buffer_msa_key] = df_captured.copy()
                     
-                    # Persistance dans la base de données du projet
+                    # Sauvegarde dictionnaire projet
                     if project_dict:
                         project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
                         
-                    st.toast("✅ Données protocoles et validations enregistrées avec succès !", icon="📊")
+                    st.toast("✅ Données protocoles et validations enregistrées !", icon="📊")
                     st.rerun()
             else:
-                # Message de secours si l'amont (DCP) n'a pas encore poussé les données
-                st.info("💡 **Note** : Si le tableau n'apparaît pas, veuillez valider ou ré-enregistrer le Data Collection Plan ci-dessus pour initialiser les variables.")
+                st.info("💡 **Note** : En attente de la génération ou de la validation du Data Collection Plan ci-dessus.")  
                 
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
