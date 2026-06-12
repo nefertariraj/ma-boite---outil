@@ -1815,58 +1815,62 @@ else:
                     st.rerun()
 
           # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — BLOC INDIVISIBLE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
+            # Vérification de l'état du DCP (Verrou général)
             if not st.session_state.get(lock_key, False):
-                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module complet MSA (Tableau + Protocole) apparaîtra après validation du DCP.")
+            else:
+                # 1. RÉCUPÉRATION AUTO : Si données en mémoire ou importées, on les charge
+                if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
+                    st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
                 
-            # Synchronisation du tampon d'affichage MSA
-            if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
-                st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
+                df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
 
-            df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
-                
-            if not df_msa_affichage.empty:
-                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
+                # 2. AFFICHAGE DU BLOC MSA COMPLET (Tableau + Protocole Terrain)
+                if not df_msa_affichage.empty:
+                    st.success("✅ Système de mesure prêt.")
                     
-                # FIX ULTIME ANTI-LAG : Utilisation du tampon déconnecté des cycles de rendu globaux
-                edited_msa_df = st.data_editor(
-                    df_msa_affichage,
-                    num_rows="fixed",
-                    use_container_width=True,
-                    key=f"msa_editor_isolated_fluid_{component_idx}", 
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                        "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation", 
-                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                            width="medium"
-                        )
-                    }
-                )
-                
-                # UNIQUE BOUTON DE VERROUILLAGE FINAL (Copie conforme du fonctionnement du DCP)
-                if st.button("💾 Valider et verrouiller définitivement les données", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
-                    df_captured = pd.DataFrame(edited_msa_df)
+                    # Éditeur MSA (sans bouton de validation, sauvegarde auto en tâche de fond)
+                    edited_msa_df = st.data_editor(
+                        df_msa_affichage,
+                        num_rows="fixed",
+                        use_container_width=True,
+                        key=f"msa_editor_{component_idx}",
+                        column_config={
+                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                            "Statut de validation": st.column_config.SelectboxColumn(
+                                "Statut de validation", 
+                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                                width="medium"
+                            )
+                        }
+                    )
                     
-                    # Propagation dans toutes les instances de sessions lors du verrouillage
-                    st.session_state[buffer_msa_key] = df_captured
-                    st.session_state[local_msa_key] = df_captured
-                    st.session_state[msa_classif_key] = df_captured
+                    # 3. SAUVEGARDE AUTOMATIQUE ET SILENCIEUSE
+                    # À chaque modification du tableau, on met à jour la mémoire persistante
+                    df_final = pd.DataFrame(edited_msa_df)
+                    st.session_state[buffer_msa_key] = df_final
+                    st.session_state[local_msa_key] = df_final
                     
-                    project_dict["msa_table_saved"] = df_captured.to_dict('records')
+                    # Mise à jour directe du projet pour l'export JSON
+                    project_dict["msa_table_saved"] = df_final.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
-                        st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                        
-                    st.toast("✅ Données protocoles et validations enregistrées dans le fichier de sauvegarde !", icon="📊")
-                    st.rerun()
+                        st.session_state.projects[p_idx]["msa_table_saved"] = df_final.to_dict('records')
 
+                    # 4. EXÉCUTION DU PROTOCOLE TERRAIN (Indivisible)
+                    # Ce bloc s'affiche OBLIGATOIREMENT en même temps que le tableau MSA
+                    st.markdown("#### 📋 Exécution du protocole terrain")
+                    
+                    # [INSÉREZ ICI VOTRE CODE D'EXÉCUTION DU PROTOCOLE TERRAIN]
+                    # TOUT ce qui est ici apparaîtra dès que le MSA est affiché
+                    
         render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
