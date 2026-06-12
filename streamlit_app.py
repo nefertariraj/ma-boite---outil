@@ -1815,7 +1815,7 @@ else:
                     st.rerun()
 
           # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — CORRECTIF D'AFFICHAGE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — BLOC D'AFFICHAGE FORCÉ
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1825,32 +1825,37 @@ else:
                 saved_msa = project_dict.get("msa_table_saved", [])
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa) if saved_msa else pd.DataFrame()
 
-            # 2. AFFICHAGE DU BLOC (Tableau + Protocole Terrain)
+            # 2. AFFICHAGE DU BLOC MSA (Tableau + Protocole)
+            # Cette seule condition gère TOUT le MSA. Si elle est vraie, tout apparaît.
             if not st.session_state[local_msa_key].empty:
                 st.success("✅ Système de mesure disponible.")
                 
-                # Éditeur MSA (Passif : il se contente d'afficher et de mettre à jour la session)
+                # Éditeur MSA (Le point d'entrée unique des données)
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed", use_container_width=True,
                     key=f"msa_editor_final_{component_idx}"
                 )
                 
-                # Mise à jour immédiate de la mémoire stable
+                # Mise à jour immédiate
                 st.session_state[local_msa_key] = edited_msa_df
                 project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
 
-                # 3. AFFICHAGE DU PROTOCOLE TERRAIN (Directement en dessous)
-                # Il ne dépend plus d'une condition externe, il est dans le même bloc
+                # 3. EXÉCUTION DU PROTOCOLE TERRAIN
                 st.markdown("#### 📋 Exécution du protocole terrain")
                 
-                # [PLACEZ ICI TOUT VOTRE CODE DE PROTOCOLE TERRAIN]
-                # (Graphiques, tests de répétabilité, etc.)
+                # --- ACTION OBLIGATOIRE ---
+                # Affichez vos tableaux SANS condition 'if' supplémentaire ici.
+                # Utilisez DIRECTEMENT st.session_state[local_msa_key] 
+                # ou des variables que vous avez chargées depuis project_dict juste avant.
+                
+                # EXEMPLE : Si vous avez une fonction, appelez-la sans condition :
+                # afficher_tableau_repetabilite(project_dict)
+                # afficher_tableau_reproductibilite(project_dict)
                 
             else:
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
 
-        # Appel du fragment (invariable)
         render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
