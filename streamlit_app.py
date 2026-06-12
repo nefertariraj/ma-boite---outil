@@ -1814,8 +1814,8 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
 
-            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+           # --------------------------------------------------
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — ÉDITION FLUIDE EN DIRECT
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,7 +1823,7 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # Synchronisation du tampon d'affichage MSA
+            # Synchronisation immédiate du tampon d'affichage MSA
             if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
                 st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
 
@@ -1831,8 +1831,8 @@ else:
                 
             if not df_msa_affichage.empty:
                 st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
-                    
-                # FIX ULTIME ANTI-LAG : Utilisation du tampon déconnecté des cycles de rendu globaux
+                
+                # Éditeur direct sans formulaire : les données sont lues en continu sans bloquer l'affichage
                 edited_msa_df = st.data_editor(
                     df_msa_affichage,
                     num_rows="fixed",
@@ -1851,11 +1851,11 @@ else:
                     }
                 )
                 
-                # Sauvegarde manuelle volontaire pour figer l'état de l'analyse
-                if st.button("💾 Enregistrer définitivement les statuts de validation MSA", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
+                # Unique bouton global de verrouillage (identique à la logique du DCP)
+                if st.button("💾 Valider et verrouiller définitivement les données", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Propagation dans toutes les instances de sessions
+                    # Propagation et sauvegarde dans toutes les instances de sessions
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
@@ -1866,8 +1866,6 @@ else:
                         
                     st.toast("✅ Données protocoles et validations enregistrées dans le fichier de sauvegarde !", icon="📊")
                     st.rerun()
-
-        render_data_collection_and_msa(p, safe_idx)
                 
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
