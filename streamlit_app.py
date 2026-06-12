@@ -1590,22 +1590,16 @@ else:
         # Extraction propre de l'index du projet pour éviter les collisions de clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-        # --- INITIALISATION GLOBALE STATIQUE & SÉCURISÉE ---
+        # --- INITIALISATION STATIQUE ---
         msa_classif_key = f"msa_classification_table_{safe_idx}"
 
         if msa_classif_key not in st.session_state:
             st.session_state[msa_classif_key] = pd.DataFrame()
 
-        # FIX PERFORMANCE 1 : On lit la session state localement, mais on ne force pas l'écriture 
-        # dans globals() à chaque cycle d'interaction de l'utilisateur.
-        df_classification_current = st.session_state[msa_classif_key]
-        if 'df_classification_current' not in globals():
-            globals()['df_classification_current'] = st.session_state[msa_classif_key]
-
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
             nom_colonne_variable = "Variable Critique (liée au Y)"
 
-        # --- ISOLATION DU PLAN DE COLLECTE ET MSA DANS UN FRAGMENT ANTI-FLICKER ---
+        # --- ISOLATION DANS LE FRAGMENT ---
         @st.fragment
         def render_data_collection_and_msa(project_dict, component_idx):
             matrix_key = f"mbb_prioritization_matrix_{component_idx}"
@@ -1615,7 +1609,7 @@ else:
             buffer_msa_key = f"msa_buffer_{component_idx}"
 
             # =====================================================================
-            # 🛡️ SÉCURITÉ IMPORT JSON : RESTAURATION ET SÉQUENÇAGE STRICT
+            # 🛡️ RESTAURATION DES DONNÉES (JSON / SESSION STATE)
             # =====================================================================
             if matrix_key not in st.session_state or st.session_state[matrix_key].empty:
                 saved_prio = project_dict.get("prio_matrix_saved", [])
@@ -1802,9 +1796,6 @@ else:
                     st.session_state[msa_classif_key] = df_msa_nouveau
                     st.session_state[buffer_msa_key] = df_msa_nouveau.copy()
                     
-                    # FIX PERFORMANCE 2 : On isole l'écriture globale uniquement lors des phases d'enregistrement dures
-                    globals()['df_classification_current'] = df_msa_nouveau
-                    
                     project_dict["msa_table_saved"] = df_msa_nouveau.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_msa_nouveau.to_dict('records')
@@ -1815,7 +1806,7 @@ else:
                     st.rerun()
 
             # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — GRILLE ISOLÉE PASSIVE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1833,6 +1824,8 @@ else:
                 
                 with st.form(key=f"msa_form_blocker_{component_idx}", clear_on_submit=False):
                     
+                    # RETRAIT TOTAL DES VARIABLES GLOBALES OU DE SYNC EN TEMPS RÉEL : 
+                    # L'éditeur est purement alimenté par le DataFrame d'affichage statique local.
                     edited_msa_df = st.data_editor(
                         df_msa_affichage,
                         num_rows="fixed",
@@ -1857,24 +1850,19 @@ else:
                         use_container_width=True
                     )
                 
+                # UNIQUE ENREGISTREMENT AUTORISÉ (Batch post-clic uniquement)
                 if submit_button:
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # 1. Mise à jour des sessions states de calculs
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
                     
-                    # FIX PERFORMANCE 3 : On n'injecte dans le dictionnaire global qu'au clic final, 
-                    # ce qui empêche le rafraîchissement d'écran intempestif pendant que tu saisis tes cases.
-                    globals()['df_classification_current'] = df_captured
-                    
-                    # 2. Sauvegarde définitive dans le dictionnaire du projet pour l'export JSON
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
                     
-                    st.toast("✅ Données MSA enregistrées et indicateurs mis à jour avec succès !", icon="📊")
+                    st.toast("✅ Données MSA enregistrées avec succès !", icon="📊")
                     st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
