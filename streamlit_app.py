@@ -1815,26 +1815,44 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — COPIE STRICTE DU FONCTIONNEMENT DU DCP
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — PERSISTANCE ET AFFICHAGE DIRECT
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
+            # Sécurité de lecture 1 : On s'assure que le statut du jalon est bien synchronisé
+            if project_dict.get("dcp_validated_lock", False):
+                st.session_state[lock_key] = True
+
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # Restauration directe depuis le JSON si la session s'est vidée accidentellement
+            # Sécurité de lecture 2 : Force la restauration depuis le dictionnaire du projet si la session s'est vidée
             if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
                 saved_msa = project_dict.get("msa_table_saved", [])
                 if saved_msa:
                     st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
+                elif dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
+                    # Si le DCP existe mais que le MSA n'a pas encore été initialisé dans la session
+                    msa_rows = []
+                    for _, row in st.session_state[dcp_table_key].iterrows():
+                        var_nom = str(row.get("Variable à mesurer", "Non définie")).strip()
+                        v_type_brut = str(row.get("Type de donnée", "Continue (Temps)"))
+                        v_lien = str(row.get("Lien avec le Y", ""))
+                        msa_rows.append({
+                            "Variable Critique (liée au Y)": var_nom,
+                            "Rôle": "Y" if "Variable de sortie principale (Y)" in v_lien else "X",
+                            "Type de Donnée": "Continue" if "continue" in v_type_brut.lower() else "Attributaire",
+                            "MSA Recommandé": "Gage R&R" if "continue" in v_type_brut.lower() else "Attribute Agreement Analysis (Kappa)",
+                            "Statut de validation": "En attente"
+                        })
+                    st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
 
-            # Affichage immédiat et persistant si le tableau contient des données
+            # Affichage persistant : Si les données existent (en session ou dans le dictionnaire), on affiche directement
             if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
-                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
+                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité :")
                 
-                # COPIE CONFORME DE LA LOGIQUE DU DCP :
-                # On lie l'éditeur directement à la clé de session pour bloquer le lag et figer l'affichage du DCP
+                # COPIE CONFORME DU FONCTIONNEMENT DU DCP (Pas de rechargement bloquant au clic)
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed",
@@ -1853,16 +1871,17 @@ else:
                     }
                 )
                 
-                # Bouton de validation final (Exactement identique au bouton de sauvegarde du DCP)
+                # Bouton de validation final (Sauvegarde globale et définitive)
                 if st.button("💾 Valider et verrouiller définitivement les données", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Persistance et synchronisation globale
+                    # Persistance immédiate en Session State
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
                     if buffer_msa_key in st.session_state:
                         st.session_state[buffer_msa_key] = df_captured.copy()
                     
+                    # Persistance définitive dans le dictionnaire de sauvegarde du projet
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
