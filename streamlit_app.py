@@ -1815,52 +1815,51 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — VERSION UNIFIÉE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — AFFICHAGE FORCÉ
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # 1. RESTAURATION DES DONNÉES (JSON ou Session)
+            # 1. RÉCUPÉRATION DES DONNÉES (JSON ou Session)
             saved_msa = project_dict.get("msa_table_saved", [])
             if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
                 st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
 
-            # 2. AFFICHAGE DU BLOC COMPLET (Tableau + Protocole)
+            # 2. CONTENEUR DÉDIÉ AU BLOC MSA (Force l'affichage)
+            container_msa = st.empty()
+
             if not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
-                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain :")
-                
-                # Éditeur passif
-                edited_msa_df = st.data_editor(
-                    st.session_state[local_msa_key],
-                    num_rows="fixed",
-                    use_container_width=True,
-                    key=f"msa_editor_isolated_fluid_{component_idx}",
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                        "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation",
-                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                            width="medium"
-                        )
-                    }
-                )
+                with container_msa.container():
+                    st.success("✅ Système de mesure disponible.")
+                    
+                    # Éditeur passif
+                    edited_msa_df = st.data_editor(
+                        st.session_state[local_msa_key],
+                        num_rows="fixed",
+                        use_container_width=True,
+                        key=f"msa_editor_final_{component_idx}",
+                        column_config={
+                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                            "Statut de validation": st.column_config.SelectboxColumn(
+                                "Statut de validation",
+                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                                width="medium"
+                            )
+                        }
+                    )
 
-                # 3. MISE À JOUR STABLE (Pour la sauvegarde et le reste du script)
-                st.session_state[local_msa_key] = edited_msa_df
-                st.session_state["msa_final_data"] = edited_msa_df
-                
-                project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
-                if 'projects' in st.session_state and 'p_idx' in locals():
-                    st.session_state.projects[p_idx]["msa_table_saved"] = edited_msa_df.to_dict('records')
+                    # Mise à jour des données
+                    st.session_state[local_msa_key] = edited_msa_df
+                    project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
 
-                # 4. EXÉCUTION DU PROTOCOLE TERRAIN (Affichage immédiat)
-                st.markdown("#### 📋 Exécution du protocole terrain")
-                
-                # [VOTRE CODE PROTOCOLE TERRAIN ICI]
-                
+                    # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Directement dans le même conteneur)
+                    st.markdown("#### 📋 Exécution du protocole terrain")
+                    
+                    # [VOTRE CODE PROTOCOLE TERRAIN ICI]
+                    
             else:
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
 
