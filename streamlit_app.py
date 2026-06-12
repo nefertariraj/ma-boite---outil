@@ -1815,25 +1815,18 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — PERSISTANCE ET AFFICHAGE DIRECT
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — REMÈDE DISPARITION & FLUIDITÉ
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # Sécurité de lecture 1 : On s'assure que le statut du jalon est bien synchronisé
-            if project_dict.get("dcp_validated_lock", False):
-                st.session_state[lock_key] = True
-
-            if not st.session_state.get(lock_key, False):
-                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
-                
-            # Sécurité de lecture 2 : Force la restauration depuis le dictionnaire du projet si la session s'est vidée
+            # 1. RECUPERATION FORCEE DES DONNEES (Sécurité anti-disparition)
             if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
                 saved_msa = project_dict.get("msa_table_saved", [])
                 if saved_msa:
                     st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
                 elif dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
-                    # Si le DCP existe mais que le MSA n'a pas encore été initialisé dans la session
+                    # Génération automatique initiale si le DCP est prêt
                     msa_rows = []
                     for _, row in st.session_state[dcp_table_key].iterrows():
                         var_nom = str(row.get("Variable à mesurer", "Non définie")).strip()
@@ -1848,11 +1841,17 @@ else:
                         })
                     st.session_state[local_msa_key] = pd.DataFrame(msa_rows)
 
-            # Affichage persistant : Si les données existent (en session ou dans le dictionnaire), on affiche directement
-            if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
+            # 2. GESTION DU MESSAGE DU JALON (N'interrompt plus le code)
+            has_msa_data = local_msa_key in st.session_state and not st.session_state[local_msa_key].empty
+            
+            if not st.session_state.get(lock_key, False) and not project_dict.get("dcp_validated_lock", False) and not has_msa_data:
+                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+                
+            # 3. AFFICHAGE DIRECT ET PERSISTANT (Insubordonné aux verrous de session)
+            if has_msa_data:
                 st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité :")
                 
-                # COPIE CONFORME DU FONCTIONNEMENT DU DCP (Pas de rechargement bloquant au clic)
+                # COPIE STRICTE DU FONCTIONNEMENT DU DCP
                 edited_msa_df = st.data_editor(
                     st.session_state[local_msa_key],
                     num_rows="fixed",
@@ -1871,17 +1870,17 @@ else:
                     }
                 )
                 
-                # Bouton de validation final (Sauvegarde globale et définitive)
+                # Bouton unique de validation définitive (Même logique que la partie 2)
                 if st.button("💾 Valider et verrouiller définitivement les données", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Persistance immédiate en Session State
+                    # Synchronisation des sessions
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
                     if buffer_msa_key in st.session_state:
                         st.session_state[buffer_msa_key] = df_captured.copy()
                     
-                    # Persistance définitive dans le dictionnaire de sauvegarde du projet
+                    # Sauvegarde persistante dans le dictionnaire du projet
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
