@@ -1815,7 +1815,7 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — ÉDITION FLUIDE EN DIRECT
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,21 +1823,23 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # Synchronisation immédiate du tampon d'affichage MSA
-            if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
-                st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
+            # Initialisation et synchronisation transparente (sans couper le flux)
+            if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
+                saved_msa = project_dict.get("msa_table_saved", [])
+                if saved_msa:
+                    st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
 
-            df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
+            # Si le tableau MSA est prêt dans le session_state, on l'affiche directement
+            if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
+                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité :")
                 
-            if not df_msa_affichage.empty:
-                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
-                
-                # Éditeur direct sans formulaire : les données sont lues en continu sans bloquer l'affichage
+                # EXACTEMENT LE MÊME FONCTIONNEMENT QUE LE DCP :
+                # On passe directement la clé de session au data_editor pour bloquer le lag d'affichage
                 edited_msa_df = st.data_editor(
-                    df_msa_affichage,
+                    st.session_state[local_msa_key],
                     num_rows="fixed",
                     use_container_width=True,
-                    key=f"msa_editor_isolated_fluid_{component_idx}", 
+                    key=f"msa_editor_pure_mirror_{component_idx}", 
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                         "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1851,20 +1853,21 @@ else:
                     }
                 )
                 
-                # Unique bouton global de verrouillage (identique à la logique du DCP)
+                # Bouton de validation final (identique au DCP)
                 if st.button("💾 Valider et verrouiller définitivement les données", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Propagation et sauvegarde dans toutes les instances de sessions
-                    st.session_state[buffer_msa_key] = df_captured
+                    # Sauvegarde et persistance
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
+                    if buffer_msa_key in st.session_state:
+                        st.session_state[buffer_msa_key] = df_captured.copy()
                     
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
                         
-                    st.toast("✅ Données protocoles et validations enregistrées dans le fichier de sauvegarde !", icon="📊")
+                    st.toast("✅ Données protocoles et validations enregistrées avec succès !", icon="📊")
                     st.rerun()
                 
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
