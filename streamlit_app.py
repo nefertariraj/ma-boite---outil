@@ -1815,80 +1815,54 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — UNIFICATION TOTALE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — VERSION UNIFIÉE
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            if not st.session_state.get(lock_key, False):
-                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA complet (Tableau et Protocole) se générera après clic sur le bouton de sauvegarde ci-dessus.")
-                
-            # 1. RESTAURATION DIRECTE DEPUIS L'IMPORTATION JSON (Exécutée une seule fois au chargement)
+            # 1. RESTAURATION DES DONNÉES (JSON ou Session)
             saved_msa = project_dict.get("msa_table_saved", [])
-            if saved_msa:
-                if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
-                    st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
-                if buffer_msa_key not in st.session_state or st.session_state[buffer_msa_key].empty:
-                    st.session_state[buffer_msa_key] = pd.DataFrame(saved_msa)
-                if msa_classif_key not in st.session_state or st.session_state[msa_classif_key].empty:
-                    st.session_state[msa_classif_key] = pd.DataFrame(saved_msa)
+            if saved_msa and (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty):
+                st.session_state[local_msa_key] = pd.DataFrame(saved_msa)
 
-            # Synchronisation initiale du tampon de données
-            if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty and not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
-                st.session_state[buffer_msa_key] = st.session_state[local_msa_key].copy()
-
-            df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
+            # 2. AFFICHAGE DU BLOC COMPLET (Tableau + Protocole)
+            if not st.session_state.get(local_msa_key, pd.DataFrame()).empty:
+                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain :")
                 
-            # 2. AFFICHAGE SIMULTANÉ ET INCONDITIONNEL DE TOUT LE BLOC MSA
-            if not df_msa_affichage.empty:
-                st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
-                    
-                # Éditeur de données 100% passif (aucun lag, aucune écriture continue qui fait ramer)
+                # Éditeur passif
                 edited_msa_df = st.data_editor(
-                    df_msa_affichage,
+                    st.session_state[local_msa_key],
                     num_rows="fixed",
                     use_container_width=True,
-                    key=f"msa_editor_isolated_fluid_{component_idx}", 
+                    key=f"msa_editor_isolated_fluid_{component_idx}",
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                         "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
                         "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
                         "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
                         "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation", 
+                            "Statut de validation",
                             options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
                             width="medium"
                         )
                     }
                 )
-                
-                # 3. TRANSFERT EN MÉMOIRE POUR LE RESTE DU SCRIPT
-                df_intermediaire = pd.DataFrame(edited_msa_df) if edited_msa_df is not None else df_msa_affichage
-                st.session_state[local_msa_key] = df_intermediaire
-                st.session_state[msa_classif_key] = df_intermediaire
-                
-                # Alignement de la variable attendue par votre script pour le protocole terrain
-                edited_msa_df = df_intermediaire
 
-                # 4. GESTION DE LA SAUVEGARDE LORS DU CLIC SUR LE BOUTON GÉNÉRAL DE L'APPLICATION
-                # Ce bloc s'assure que lorsque vous cliquez sur votre bouton global de sauvegarde,
-                # les données de l'éditeur sont figées dans project_dict pour l'export JSON.
-                project_dict["msa_table_saved"] = df_intermediaire.to_dict('records')
+                # 3. MISE À JOUR STABLE (Pour la sauvegarde et le reste du script)
+                st.session_state[local_msa_key] = edited_msa_df
+                st.session_state["msa_final_data"] = edited_msa_df
+                
+                project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
                 if 'projects' in st.session_state and 'p_idx' in locals():
-                    st.session_state.projects[p_idx]["msa_table_saved"] = df_intermediaire.to_dict('records')
+                    st.session_state.projects[p_idx]["msa_table_saved"] = edited_msa_df.to_dict('records')
 
-                # =====================================================================
-                # 🛠️ TOUT VOTRE CODE DE L'EXÉCUTION DU PROTOCOLE TERRAIN EST ICI
-                # =====================================================================
-                # En supprimant le 'if edited_msa_df is not None:' qui entourait cette zone, 
-                # le protocole terrain s'affiche OBLIGATOIREMENT en même temps que le tableau MSA.
-                
+                # 4. EXÉCUTION DU PROTOCOLE TERRAIN (Affichage immédiat)
                 st.markdown("#### 📋 Exécution du protocole terrain")
                 
-                # Laissez votre code d'origine inchangé ici (tableaux terrain, saisies, etc.)
-                # Il utilisera 'edited_msa_df' qui est maintenant garanti stable et persistant.
+                # [VOTRE CODE PROTOCOLE TERRAIN ICI]
                 
-                # =====================================================================
+            else:
+                st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
 
         render_data_collection_and_msa(p, safe_idx)
         
