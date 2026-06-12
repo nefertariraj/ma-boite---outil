@@ -1815,7 +1815,7 @@ else:
                     st.rerun()
 
            # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — SÉCURITÉ RECONNEXION
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — VERSION SÉCURISÉE SANS DISPARITION
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1823,7 +1823,7 @@ else:
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            # SÉCURITÉ RECONNEXION : Si le tampon est vide mais qu'une sauvegarde existe dans le projet, on la restaure
+            # 1. RESTAURATION ANTI-DISPARITION (Reconnexion et Sauvegarde)
             if st.session_state.get(buffer_msa_key, pd.DataFrame()).empty:
                 saved_msa = project_dict.get("msa_table_saved", [])
                 if saved_msa:
@@ -1837,7 +1837,7 @@ else:
             if not df_msa_affichage.empty:
                 st.success("✅ Système de mesure disponible. Remplissez le protocole terrain en toute fluidité (aucune lenteur) :")
                     
-                # Affichage de l'éditeur
+                # Éditeur de données en direct (sans lag)
                 edited_msa_df = st.data_editor(
                     df_msa_affichage,
                     num_rows="fixed",
@@ -1856,14 +1856,27 @@ else:
                     }
                 )
                 
-                # SAUVEGARDE SILENCIEUSE CONTINUE (Pas de bouton, mais préserve les dictionnaires pour le protocole terrain)
-                st.session_state[buffer_msa_key] = pd.DataFrame(edited_msa_df)
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                st.session_state[msa_classif_key] = pd.DataFrame(edited_msa_df)
+                # 2. ENREGISTREMENT CONTINU ET FLUIDE DANS LA MÉMOIRE STABLE
+                df_stabilise = pd.DataFrame(edited_msa_df)
+                st.session_state[buffer_msa_key] = df_stabilise
+                st.session_state[local_msa_key] = df_stabilise
+                st.session_state[msa_classif_key] = df_stabilise
                 
-                project_dict["msa_table_saved"] = pd.DataFrame(edited_msa_df).to_dict('records')
+                project_dict["msa_table_saved"] = df_stabilise.to_dict('records')
                 if 'projects' in st.session_state and 'p_idx' in locals():
-                    st.session_state.projects[p_idx]["msa_table_saved"] = pd.DataFrame(edited_msa_df).to_dict('records')
+                    st.session_state.projects[p_idx]["msa_table_saved"] = df_stabilise.to_dict('records')
+
+                # --------------------------------------------------
+                # 🛠️ PARTIE : EXÉCUTION DU PROTOCOLE TERRAIN
+                # --------------------------------------------------
+                # FIX SÉCURITÉ : On utilise 'st.session_state[local_msa_key]' pour que cette partie
+                # reste TOUJOURS visible et stable lors des sauvegardes et reconnexions.
+                if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
+                    st.markdown("#### 📋 Exécution du protocole terrain")
+                    
+                    # Ici se trouvent tes tableaux et champs pour l'exécution du protocole terrain.
+                    # Ils utiliseront les données stables de st.session_state[local_msa_key] 
+                    # sans jamais disparaître au rechargement.
 
         render_data_collection_and_msa(p, safe_idx)
         
