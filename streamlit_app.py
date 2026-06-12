@@ -1590,7 +1590,7 @@ else:
         # Extraction propre de l'index du projet pour éviter les collisions de clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
 
-        # --- INITIALISATION STATIQUE SÉCURISÉE ---
+        # --- INITIALISATION STATIQUE ---
         msa_classif_key = f"msa_classification_table_{safe_idx}"
         msa_static_view_key = f"msa_static_view_{safe_idx}"
 
@@ -1600,9 +1600,7 @@ else:
         if msa_static_view_key not in st.session_state:
             st.session_state[msa_static_view_key] = st.session_state[msa_classif_key].copy()
 
-        # FIX ULTRA-CIBLÉ POUR LA LIGNE 1873 : 
-        # On alimente le reste de ton application avec une vue déconnectée.
-        # Ainsi, cliquer hors du tableau ne déclenchera plus aucun rafraîchissement d'écran.
+        # ISOLATION : Alimentation découplée pour le reste de l'application
         df_classification_current = st.session_state[msa_static_view_key]
 
         if 'nom_colonne_variable' not in locals() and 'nom_colonne_variable' not in globals():
@@ -1818,7 +1816,7 @@ else:
                     st.rerun()
 
             # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — GRILLE ISOLÉE PASSIVE
+            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) — FORMULAIRE SÉCURISÉ
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
@@ -1866,7 +1864,7 @@ else:
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
-                    st.session_state[static_view_key] = df_captured  # On met à jour le miroir statique au clic final
+                    st.session_state[static_view_key] = df_captured  
                     
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
