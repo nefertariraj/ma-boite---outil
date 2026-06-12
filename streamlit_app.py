@@ -1830,44 +1830,57 @@ else:
             df_msa_affichage = st.session_state.get(buffer_msa_key, pd.DataFrame())
                 
             if not df_msa_affichage.empty:
-                st.success("✅ Système de mesure disponible. Saisissez vos données terrain ci-dessous :")
+                st.success("✅ Système de mesure disponible. Remplissez vos tests de répétabilité et reproductibilité ci-dessous :")
+                
+                # --- LE FORMULAIRE DE BLOCAGE GLOBAL ---
+                # On enveloppe l'éditeur dans un formulaire UNIQUE. 
+                # Streamlit gèle TOUS les recalculs et rerenders tant qu'on ne clique pas sur le bouton de soumission.
+                with st.form(key=f"msa_form_blocker_{component_idx}", clear_on_submit=False):
                     
-                # FIX SÉCURITÉ FOCUS : Utilisation d'une clé d'édition isolée de session_state pour bloquer le lag
-                ui_editor_key = f"msa_raw_field_editor_{component_idx}"
+                    # L'éditeur utilise le DataFrame tampon. L'utilisateur peut taper 10, 20, 50 valeurs à la suite,
+                    # utiliser les flèches du clavier et faire 'Entrée' sans AUCUN lag, car l'état reste purement côté navigateur (JS).
+                    edited_msa_df = st.data_editor(
+                        df_msa_affichage,
+                        num_rows="fixed",
+                        use_container_width=True,
+                        key=f"msa_editor_pure_buffer_{component_idx}", # Clé statique pour le cache de l'UI
+                        column_config={
+                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                            "Statut de validation": st.column_config.SelectboxColumn(
+                                "Statut de validation", 
+                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                                width="medium"
+                            )
+                        }
+                    )
+                    
+                    # Unique déclencheur des traitements lourds, recalculs et sauvegardes
+                    submit_button = st.form_submit_button(
+                        "💾 Valider et verrouiller définitivement les données", 
+                        type="primary", 
+                        use_container_width=True
+                    )
                 
-                edited_msa_df = st.data_editor(
-                    df_msa_affichage,
-                    num_rows="fixed",
-                    use_container_width=True,
-                    key=ui_editor_key, 
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                        "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation", 
-                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                            width="medium"
-                        )
-                    }
-                )
-                
-                # Le traitement et la réexécution lourde ne se font QUE lors du clic sur ce bouton
-                if st.button("💾 Enregistrer définitivement les données et validations MSA", key=f"save_msa_final_btn_{component_idx}", use_container_width=True, type="primary"):
-                    # Récupération sécurisée du contenu du composant sans déclenchement intermédiaire
+                # --- EXÉCUTION DIFFÉRÉE DES TRAITEMENTS ---
+                # Aucun calcul, aucun enregistrement JSON, aucune mise à jour de statut ne s'exécute avant ce 'if'
+                if submit_button:
                     df_captured = pd.DataFrame(edited_msa_df)
                     
-                    # Enregistrement local et global
+                    # 1. Mise à jour des sessions states de calculs
                     st.session_state[buffer_msa_key] = df_captured
                     st.session_state[local_msa_key] = df_captured
                     st.session_state[msa_classif_key] = df_captured
                     
+                    # 2. Sauvegarde définitive dans le dictionnaire du projet pour l'export JSON
                     project_dict["msa_table_saved"] = df_captured.to_dict('records')
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_captured.to_dict('records')
-                        
-                    st.toast("✅ Données protocoles et répétabilité enregistrées !", icon="📊")
+                    
+                    # 3. Notification et rafraîchissement unique de l'interface
+                    st.toast("✅ Données MSA enregistrées et indicateurs mis à jour avec succès !", icon="📊")
                     st.rerun()
 
         render_data_collection_and_msa(p, safe_idx)
