@@ -1822,7 +1822,7 @@ else:
 
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
-            
+                
             df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
             if not df_msa_in_state.empty:
@@ -1845,33 +1845,11 @@ else:
                     }
                 )
                     
-                # Sauvegarde auto du MSA (selon votre code actuel)
+                # --- SAUVEGARDE EN DIRECT (LE BOUTON A ÉTÉ SUPPRIMÉ ICI) ---
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
                 project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
-                # --------------------------------------------------
-                # 5. EXECUTION DU PROTOCOLE TERRAIN
-                # --------------------------------------------------
-                st.divider()
-                st.subheader("5. Execution du Protocole Terrain")
-                
-                proto_key = f"protocol_data_{component_idx}"
-                # Initialisation si vide
-                if proto_key not in st.session_state:
-                    st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
-                
-                # Édition sans sauvegarde automatique
-                edited_proto_df = st.data_editor(
-                    st.session_state[proto_key],
-                    num_rows="dynamic",
-                    use_container_width=True
-                )
-                
-                # BOUTON DE SAUVEGARDE MANUELLE POUR LE PROTOCOLE
-                if st.button("💾 Enregistrer le Protocole Terrain", key=f"save_proto_{component_idx}"):
-                    st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
-                    project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
-                    st.success("✅ Protocole terrain enregistré avec succès !")
+        render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
