@@ -1825,7 +1825,8 @@ else:
         local_msa_key = f"msa_classification_table_{safe_idx}"
         lock_key = f"dcp_validated_lock_{safe_idx}"
 
-        # 2. Vérification du verrouillage
+        # 2. Vérification sécurisée du verrouillage
+        # On utilise .get(key, False) pour éviter toute erreur si la clé n'existe pas
         if not st.session_state.get(lock_key, False):
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
         
@@ -1854,8 +1855,9 @@ else:
                 )
             
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                # ICI : Utilisation de 'p' (la variable globale de votre projet)
-                p["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                # Utilisation de 'p' pour la persistance globale
+                if 'p' in locals():
+                    p["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
             else:
                 st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
         
