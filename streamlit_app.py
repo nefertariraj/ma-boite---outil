@@ -1821,10 +1821,9 @@ else:
             local_msa_key = f"msa_classification_table_{component_idx}"
             lock_key = f"dcp_validated_lock_{component_idx}"
 
-            # 2. RESTAURATION AUTOMATIQUE (C'est ici qu'on récupère le JSON)
+            # 2. RESTAURATION AUTOMATIQUE
             if dcp_table_key not in st.session_state and "dcp_table_saved" in project_dict:
                 st.session_state[dcp_table_key] = pd.DataFrame(project_dict["dcp_table_saved"])
-        
             if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
                 st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
 
