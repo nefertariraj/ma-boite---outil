@@ -1820,33 +1820,43 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
+        # 1. Redéfinition locale des clés pour garantir l'accès dans ce scope
+        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
+        local_msa_key = f"msa_classification_table_{safe_idx}"
+        lock_key = f"dcp_validated_lock_{safe_idx}"
+
+        # 2. Vérification du verrouillage
         if not st.session_state.get(lock_key, False):
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
-    
-        df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
-    
-        if not df_msa_in_state.empty:
-            st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
         
-            edited_msa_df = st.data_editor(
-                df_msa_in_state,
-                num_rows="fixed",
-                use_container_width=True,
-                column_config={
-                    "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                    "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                    "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                    "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                    "Statut de validation": st.column_config.SelectboxColumn(
-                        "Statut de validation", 
-                        options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                        width="medium"
-                    )
-                }
-            )
+        else:
+            # 3. Récupération et affichage du MSA
+            df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
         
-            st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+            if not df_msa_in_state.empty:
+                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+            
+                edited_msa_df = st.data_editor(
+                    df_msa_in_state,
+                    num_rows="fixed",
+                    use_container_width=True,
+                    column_config={
+                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                        "Statut de validation": st.column_config.SelectboxColumn(
+                            "Statut de validation", 
+                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                            width="medium"
+                        )
+                    }
+                )
+            
+                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+            else:
+                st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
