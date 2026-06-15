@@ -1849,7 +1849,7 @@ else:
             st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
             project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
-        render_data_collection_and_msa(p, safe_idx)
+            render_data_collection_and_msa(p, safe_idx)
         
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
