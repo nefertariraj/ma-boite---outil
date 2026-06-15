@@ -1814,7 +1814,7 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
 
-             # --------------------------------------------------
+            # --------------------------------------------------
             # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
             # --------------------------------------------------
             st.divider()
@@ -1832,6 +1832,7 @@ else:
                     df_msa_in_state,
                     num_rows="fixed",
                     use_container_width=True,
+                    key=f"msa_editor_{safe_idx}",
                     column_config={
                         "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                         "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1845,11 +1846,26 @@ else:
                     }
                 )
                     
-                # --- SAUVEGARDE EN DIRECT (LE BOUTON A ÉTÉ SUPPRIMÉ ICI) ---
+                # SAUVEGARDE ÉTAT MSA
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
                 project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
-        render_data_collection_and_msa(p, safe_idx)
+                # --- EXÉCUTION DU PROTOCOLE TERRAIN (Affichage des tableaux de tests) ---
+                st.markdown("##### 👟 Exécution du Protocole Terrain")
+                
+                # 1. Sélection de la variable (pour filtrer quel tableau afficher)
+                # ... votre code de sélection de variable ici ...
+                
+                # 2. AFFICHAGE DES TABLEAUX DE TESTS (Répétabilité / Reproductibilité)
+                # IL FAUT QUE CE CODE SOIT ICI, À L'INTÉRIEUR DU BLOC IF
+                if "votre_condition_de_selection": 
+                    st.write("###### Données de Répétabilité (Test-Retest)")
+                    # Exemple : st.data_editor(votre_df_repetition)
+                    
+                    st.write("###### Données de Reproductibilité (Opérateurs)")
+                    # Exemple : st.data_editor(votre_df_reproductibilite)
+                else:
+                    st.warning("Sélectionnez une variable pour afficher les tableaux de test.")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
