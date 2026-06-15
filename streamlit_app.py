@@ -1813,6 +1813,11 @@ else:
                     project_dict["dcp_validated_lock"] = True
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
+    
+    def render_data_collection_and_msa(p, safe_idx):
+        # DÉFINITION DES CLÉS MANQUANTES (Ajustez les noms si nécessaire)
+        lock_key = f"dcp_locked_{safe_idx}"
+        local_msa_key = f"local_msa_data_{safe_idx}"
             
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
