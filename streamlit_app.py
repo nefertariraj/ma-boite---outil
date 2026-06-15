@@ -1813,12 +1813,6 @@ else:
                     project_dict["dcp_validated_lock"] = True
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
-
-                    # 2. RESTAURATION AUTOMATIQUE
-            if dcp_table_key not in st.session_state and "dcp_table_saved" in project_dict:
-                st.session_state[dcp_table_key] = pd.DataFrame(project_dict["dcp_table_saved"])
-            if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
-                st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
             
             # --------------------------------------------------
             # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
