@@ -1814,64 +1814,42 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
 
-            Je comprends parfaitement. Le problème est que, lorsque vous avez ajouté le code du MSA, cela a probablement provoqué une erreur silencieuse (une exception non gérée) dans le script.
-
-Quand une erreur survient dans une fonction Streamlit, tout ce qui suit dans le bloc est ignoré, ce qui fait disparaître les tableaux (le DCP) qui se trouvent après ou dans le même flux.
-
-Pour réparer cela tout en conservant votre code original, nous allons appliquer trois règles de sécurité strictes :
-
-Isolation complète : On encadre le bloc MSA dans un bloc try/except pour que, s'il y a une erreur dans le MSA, le reste de la page (le DCP) continue de s'afficher.
-
-Restauration de la structure : On ne touche plus à votre logique de DCP, on "greffe" simplement le MSA à côté.
-
-Appel direct : On s'assure que le Protocole Terrain est bien là où il doit être.
-
-Voici le code corrigé. Remplacez uniquement la partie MSA par ce bloc sécurisé :
-
-Python
             # --------------------------------------------------
             # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # Bloc de sécurité : Si le MSA plante, le DCP au-dessus reste visible
-            try:
-                if not st.session_state.get(lock_key, False):
-                    st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+            if not st.session_state.get(lock_key, False):
+                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-                df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
+            df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
-                if not df_msa_in_state.empty:
-                    st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+            if not df_msa_in_state.empty:
+                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
-                    edited_msa_df = st.data_editor(
-                        df_msa_in_state,
-                        num_rows="fixed",
-                        use_container_width=True,
-                        key=f"msa_editor_{safe_idx}",
-                        column_config={
-                            "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                            "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                            "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                            "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                            "Statut de validation": st.column_config.SelectboxColumn(
-                                "Statut de validation", 
-                                options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                                width="medium"
-                            )
-                        }
-                    )
+                edited_msa_df = st.data_editor(
+                    df_msa_in_state,
+                    num_rows="fixed",
+                    use_container_width=True,
+                    key=f"msa_editor_{safe_idx}",
+                    column_config={
+                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                        "Statut de validation": st.column_config.SelectboxColumn(
+                            "Statut de validation", 
+                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                            width="medium"
+                        )
+                    }
+                )
                     
-                    # Sauvegarde MSA
-                    st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                    project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
-                    # Affichage du Protocole Terrain (Maintenant inséré ici)
-                    st.markdown("##### 👟 Exécution du Protocole Terrain")
-                    # [VOTRE CODE PROTOCOLE ICI]
-            except Exception as e:
-                st.error(f"Erreur dans le module MSA : {e}")
+            st.markdown("##### 👟 Exécution du Protocole Terrain")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
