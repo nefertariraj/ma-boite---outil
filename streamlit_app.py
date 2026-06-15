@@ -1846,26 +1846,14 @@ else:
                     }
                 )
                     
-                # SAUVEGARDE ÉTAT MSA
+                # SAUVEGARDE EN DIRECT (Maintenue)
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
                 project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
-                # --- EXÉCUTION DU PROTOCOLE TERRAIN (Affichage des tableaux de tests) ---
-                st.markdown("##### 👟 Exécution du Protocole Terrain")
-                
-                # 1. Sélection de la variable (pour filtrer quel tableau afficher)
-                # ... votre code de sélection de variable ici ...
-                
-                # 2. AFFICHAGE DES TABLEAUX DE TESTS (Répétabilité / Reproductibilité)
-                # IL FAUT QUE CE CODE SOIT ICI, À L'INTÉRIEUR DU BLOC IF
-                if "votre_condition_de_selection": 
-                    st.write("###### Données de Répétabilité (Test-Retest)")
-                    # Exemple : st.data_editor(votre_df_repetition)
-                    
-                    st.write("###### Données de Reproductibilité (Opérateurs)")
-                    # Exemple : st.data_editor(votre_df_reproductibilite)
-                else:
-                    st.warning("Sélectionnez une variable pour afficher les tableaux de test.")
+            # --- MODIFICATION ICI : On place le protocole ici, hors du bloc IF MSA ---
+            # Il sera maintenant toujours présent dès que le reste est chargé
+            st.markdown("##### 👟 Exécution du Protocole Terrain")
+            # [VOTRE CODE DE PROTOCOLE TERRAIN ICI]
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
