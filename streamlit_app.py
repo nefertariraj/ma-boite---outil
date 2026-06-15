@@ -1815,21 +1815,23 @@ else:
                     st.rerun()
 
          # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA) & PROTOCOLE TERRAIN
+            # 4. Validate Measurement System (MSA)
             # --------------------------------------------------
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # Vérification de présence de données (via Session ou JSON importé)
-            df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
-            a_des_donnees = not df_msa_in_state.empty
+            # 1. RÉCUPÉRATION DES DONNÉES (Pour la reprise après import JSON)
+            # On vérifie si les données existent dans le projet sans les écraser
+            if (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty) and project_dict.get("msa_table_saved"):
+                st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
 
-            if not a_des_donnees:
-                st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
-            else:
-                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+            # 2. AFFICHAGE DU BLOC (Indivisible : Tableau + Protocole)
+            df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
+            
+            if not df_msa_in_state.empty:
+                st.success("✅ Système de mesure disponible.")
                 
-                # Éditeur MSA (Aucune sauvegarde automatique ici)
+                # Éditeur MSA (Aucune sauvegarde automatique)
                 edited_msa_df = st.data_editor(
                     df_msa_in_state,
                     num_rows="fixed",
@@ -1841,23 +1843,23 @@ else:
                         "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
                         "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
                         "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation", 
+                            "Statut de validation",
                             options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
                             width="medium"
                         )
                     }
                 )
 
-                # --- PROTOCOLE TERRAIN INTÉGRÉ (Indivisible) ---
+                # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Directement ici, lié au MSA)
                 st.markdown("##### 👟 Exécution du Protocole Terrain")
+                # On réinjecte le code de votre protocole ici pour qu'il soit solidaire du MSA
+                # (Assurez-vous que les variables comme 'safe_idx' sont bien accessibles)
                 
-                # J'appelle ici la logique interne de votre protocole
-                # (Assurez-vous que le code qui suit dans votre script utilise bien 
-                # edited_msa_df si besoin pour la liste des variables)
-                
-                # BOUTON UNIQUE DE SAUVEGARDE POUR TOUT LE BLOC
-                if st.button("💾 Enregistrer le bloc MSA et les données terrain", key=f"btn_save_all_{safe_idx}", type="primary", use_container_width=True):
-                    # Mise à jour des états
+                # --- [INSÉREZ ICI VOTRE CODE DE PROTOCOLE TERRAIN ACTUEL] ---
+
+                # 4. BOUTON UNIQUE DE SAUVEGARDE
+                if st.button("💾 Enregistrer tout le bloc MSA (Tableau + Protocole)", key=f"btn_save_msa_{safe_idx}", type="primary", use_container_width=True):
+                    # Sauvegarde manuelle uniquement sur clic
                     df_to_save = pd.DataFrame(edited_msa_df)
                     st.session_state[local_msa_key] = df_to_save
                     project_dict["msa_table_saved"] = df_to_save.to_dict('records')
@@ -1865,7 +1867,10 @@ else:
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_to_save.to_dict('records')
                     
-                    st.toast("✅ Ensemble du bloc sauvegardé avec succès !", icon="💾")
+                    st.toast("✅ Données sauvegardées avec succès !", icon="💾")
+                    
+            else:
+                st.info("🔒 Le module MSA s'affichera une fois les données du DCP disponibles.")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
