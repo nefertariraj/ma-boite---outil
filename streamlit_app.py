@@ -1816,10 +1816,6 @@ else:
 
         @st.fragment
         def render_data_collection_and_msa(project_dict, component_idx):
-            # 1. INITIALISATION DES CLÉS
-            dcp_table_key = f"master_dcp_table_{component_idx}"
-            local_msa_key = f"msa_classification_table_{component_idx}"
-            lock_key = f"dcp_validated_lock_{component_idx}"
 
             # 2. RESTAURATION AUTOMATIQUE
             if dcp_table_key not in st.session_state and "dcp_table_saved" in project_dict:
