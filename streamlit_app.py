@@ -1820,14 +1820,14 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
-        # 1. Redéfinition locale des clés pour garantir l'accès dans ce scope
+        # 1. Redéfinition locale des clés
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
         local_msa_key = f"msa_classification_table_{safe_idx}"
         lock_key = f"dcp_validated_lock_{safe_idx}"
 
         # 2. Vérification du verrouillage
         if not st.session_state.get(lock_key, False):
-            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
         
         else:
             # 3. Récupération et affichage du MSA
@@ -1854,7 +1854,8 @@ else:
                 )
             
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                # ICI : Utilisation de 'p' (la variable globale de votre projet)
+                p["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
             else:
                 st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
         
