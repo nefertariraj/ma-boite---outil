@@ -1820,11 +1820,13 @@ else:
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
+            # Affichage de l'info si non verrouillé
             if not st.session_state.get(lock_key, False):
                 st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
             df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
+            # Affichage du tableau MSA
             if not df_msa_in_state.empty:
                 st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
@@ -1846,10 +1848,14 @@ else:
                     }
                 )
                     
+                # Sauvegarde en direct
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
                 project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
+            # --- CORRECTION ICI : Sortie du bloc IF pour le Protocole ---
+            # Le protocole s'affiche toujours, mais il utilisera les données MSA si elles sont là
             st.markdown("##### 👟 Exécution du Protocole Terrain")
+            # [VOTRE CODE PROTOCOLE TERRAIN ICI]
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
