@@ -1820,27 +1820,24 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
-        # --- RESTAURATION AUTOMATIQUE DES DONNÉES TERRAIN AU CHARGEMENT ---
-        # Cette partie vérifie si des données existent dans project_dict (le JSON) 
-        # mais sont absentes du session_state actuel.
-        df_msa_check = st.session_state.get(local_msa_key, pd.DataFrame())
-        if df_msa_check.empty and "msa_table_saved" in project_dict:
+        # --- RESTAURATION SÉCURISÉE ---
+        if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
             st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
-            st.rerun() # Force la mise à jour immédiate après restauration
+            st.rerun()
 
         if not st.session_state.get(lock_key, False):
-            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+            st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
             
         df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
             
         if not df_msa_in_state.empty:
             st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
-                
+            
             edited_msa_df = st.data_editor(
                 df_msa_in_state,
                 num_rows="fixed",
                 use_container_width=True,
-                key=f"msa_editor_{safe_idx}",
+                key=f"msa_editor_{component_idx}", # Utilise component_idx au lieu de safe_idx pour la cohérence
                 column_config={
                     "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
                     "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
@@ -1853,8 +1850,7 @@ else:
                     )
                 }
             )
-                
-            # Sauvegarde en direct
+            
             st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
             project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
         
