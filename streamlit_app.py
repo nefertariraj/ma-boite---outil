@@ -1826,7 +1826,6 @@ else:
         lock_key = f"dcp_validated_lock_{safe_idx}"
 
         # 2. Vérification sécurisée du verrouillage
-        # On utilise .get(key, False) pour éviter toute erreur si la clé n'existe pas
         if not st.session_state.get(lock_key, False):
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
         
@@ -1855,9 +1854,19 @@ else:
                 )
             
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                # Utilisation de 'p' pour la persistance globale
                 if 'p' in locals():
                     p["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+
+                # --------------------------------------------------
+                # 5. EXECUTION DU PROTOCOLE TERRAIN
+                # --------------------------------------------------
+                st.divider()
+                st.subheader("5. Execution du Protocole Terrain")
+                st.info("🚀 **Protocole activé :** Le système de mesure est prêt. Vous pouvez maintenant procéder à la collecte des données.")
+                
+                # Vous pouvez ajouter ici votre code de saisie terrain
+                # st.write("Interface de saisie des données...")
+
             else:
                 st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
         
