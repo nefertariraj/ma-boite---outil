@@ -1814,10 +1814,14 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
 
-        # --- RESTAURATION AUTOMATIQUE AU CHARGEMENT ---
+            # --- RESTAURATION AUTOMATIQUE ---
+            # Pour le MSA
             if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
                 st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
-                st.rerun()
+            
+            # Pour le DCP
+            if dcp_table_key not in st.session_state and "dcp_table_saved" in project_dict:
+                st.session_state[dcp_table_key] = pd.DataFrame(project_dict["dcp_table_saved"])
 
             # --------------------------------------------------
             # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
