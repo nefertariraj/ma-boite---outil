@@ -2107,84 +2107,84 @@ else:
                     df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
                     st.table(df_history)
 
-            # =====================================================================
-            # 💾 BOUTON DE VALIDATION DÉFINITIVE
-            # =====================================================================
-            if st.button(
-                f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
-                key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
-                type="primary", 
-                use_container_width=True
-            ):
-                # 1️⃣ Sécurité : On s'assure que le projet existe dans la session globale
-                if 'projects' in st.session_state and 'p_idx' in locals():
-                    idx = p_idx
+                # =====================================================================
+                # 💾 BOUTON DE VALIDATION DÉFINITIVE
+                # =====================================================================
+                if st.button(
+                    f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
+                    key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
+                    type="primary", 
+                    use_container_width=True
+                ):
+                    # 1️⃣ Sécurité : On s'assure que le projet existe dans la session globale
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        idx = p_idx
                         
-                    # 2️⃣ Récupération directe des composants de la page
-                    final_rep = edited_rep
-                    final_reprod = edited_reprod
+                        # 2️⃣ Récupération directe des composants de la page
+                        final_rep = edited_rep
+                        final_reprod = edited_reprod
 
-                    # 3️⃣ ON ÉCRIT DIRECTEMENT DANS LE PROJET GLOBAL (Pas dans 'p')
-                    if final_rep is not None and hasattr(final_rep, 'to_dict'):
-                        st.session_state.projects[idx][p_rep_save_key] = final_rep.to_dict(orient='records')
-                        st.session_state[dynamic_rep_key] = final_rep
+                        # 3️⃣ ON ÉCRIT DIRECTEMENT DANS LE PROJET GLOBAL (Pas dans 'p')
+                        if final_rep is not None and hasattr(final_rep, 'to_dict'):
+                            st.session_state.projects[idx][p_rep_save_key] = final_rep.to_dict(orient='records')
+                            st.session_state[dynamic_rep_key] = final_rep
                             
-                    if final_reprod is not None and hasattr(final_reprod, 'to_dict'):
-                        st.session_state.projects[idx][p_reprod_save_key] = final_reprod.to_dict(orient='records')
-                        st.session_state[dynamic_reprod_key] = final_reprod
+                        if final_reprod is not None and hasattr(final_reprod, 'to_dict'):
+                            st.session_state.projects[idx][p_reprod_save_key] = final_reprod.to_dict(orient='records')
+                            st.session_state[dynamic_reprod_key] = final_reprod
                         
-                    # Sauvegarde des statuts MSA directement dans le projet global
-                    st.session_state.projects[idx][f"validated_status_{var_clean_id}_{safe_idx}"] = True
-                    st.session_state.projects[idx][p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                        # Sauvegarde des statuts MSA directement dans le projet global
+                        st.session_state.projects[idx][f"validated_status_{var_clean_id}_{safe_idx}"] = True
+                        st.session_state.projects[idx][p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
 
-                    # 4️⃣ Mise à jour et sauvegarde forcée du statut "test effectué"
-                    classif_df = st.session_state.get(msa_classif_key, pd.DataFrame())
-                    if not classif_df.empty:
-                        for idx_row, row in classif_df.iterrows():
-                            if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
-                                classif_df.at[idx_row, "statut validation"] = "test effectué"
-                        st.session_state[msa_classif_key] = classif_df
-                        st.session_state.projects[idx]["msa_classification_table"] = classif_df.to_dict(orient='records')
+                        # 4️⃣ Mise à jour et sauvegarde forcée du statut "test effectué"
+                        classif_df = st.session_state.get(msa_classif_key, pd.DataFrame())
+                        if not classif_df.empty:
+                            for idx_row, row in classif_df.iterrows():
+                                if str(row[nom_colonne_variable]).strip() == str(selected_var_to_test).strip():
+                                    classif_df.at[idx_row, "statut validation"] = "test effectué"
+                            st.session_state[msa_classif_key] = classif_df
+                            st.session_state.projects[idx]["msa_classification_table"] = classif_df.to_dict(orient='records')
 
-                    # 5️⃣ On synchronise la variable locale 'p' juste pour éviter les bugs d'affichage immédiat
-                    p.update(st.session_state.projects[idx])
+                        # 5️⃣ On synchronise la variable locale 'p' juste pour éviter les bugs d'affichage immédiat
+                        p.update(st.session_state.projects[idx])
 
-                # Verrouillage de l'affichage de l'interface
-                st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
-                st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
+                    # Verrouillage de l'affichage de l'interface
+                    st.session_state[f"status_lock_{var_clean_id}_{safe_idx}"] = True
+                    st.session_state["msa_validated_vars"][f"{selected_var_to_test}_{safe_idx}"] = True
                     
-                st.balloons()
-                st.success(f"✅ Sauvegarde globale forcée avec succès pour **{selected_var_to_test}** !")
-                st.rerun()
+                    st.balloons()
+                    st.success(f"✅ Sauvegarde globale forcée avec succès pour **{selected_var_to_test}** !")
+                    st.rerun()
 
-            # --- 5 & 6. DIAGNOSTIC ET PLAN D'ACTION ---
-            st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
+                # --- 5 & 6. DIAGNOSTIC ET PLAN D'ACTION ---
+                st.markdown("##### 📊 Plan d'Action Correctif (Si système non fiable au dernier essai)")
             
-            last_score_str = "100%"
-            if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
-                last_score_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Indice de Fidélité"]
+                last_score_str = "100%"
+                if 'bias_hist_key' in locals() and bias_hist_key in st.session_state["msa_bias_history"] and st.session_state["msa_bias_history"][bias_hist_key]:
+                    last_score_str = st.session_state["msa_bias_history"][bias_hist_key][-1]["Indice de Fidélité"]
 
-            if last_score_str in ["50%", "35%", "10%"]:
-                p["msa_corrective_action"] = st.selectbox(
-                    "Plan d'action prioritaire déployé lors du recalibrage :",
-                    options=[
-                        "Automatisation de la capture (Remplacement du facteur humain par une règle SI)",
-                        "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
-                        "Mise en place d'une checksheet avec contrôles de saisie rigides"
-                    ],
-                    key=f"msa_action_choice_{safe_idx}"
-                )
+                if last_score_str in ["50%", "35%", "10%"]:
+                    p["msa_corrective_action"] = st.selectbox(
+                        "Plan d'action prioritaire déployé lors du recalibrage :",
+                        options=[
+                            "Automatisation de la capture (Remplacement du facteur humain par une règle SI)",
+                            "Sessions de recalibrage et formation sur définitions opérationnelles exactes",
+                            "Mise en place d'une checksheet avec contrôles de saisie rigides"
+                        ],
+                        key=f"msa_action_choice_{safe_idx}"
+                    )
 
-            # --- 7. VALIDATION FINALE (SIGN-OFF) ---
-            st.markdown("##### 📋 Validation Finale")
-            if last_score_str == "10%":
-                st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable' (10%). Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
-            else:
-                saved_status = p.get("msa_is_validated_status", False)
-                is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
-                p["msa_is_validated_status"] = is_validated
+                # --- 7. VALIDATION FINALE (SIGN-OFF) ---
+                st.markdown("##### 📋 Validation Finale")
+                if last_score_str == "10%":
+                    st.error("🛑 Signature bloquée : Votre dernière analyse indique un système 'Non Fiable' (10%). Veuillez modifier vos données de test et cliquer à nouveau sur 'Lancer l'analyse des risques de biais' pour mettre à jour.")
+                else:
+                    saved_status = p.get("msa_is_validated_status", False)
+                    is_validated = st.checkbox("Je certifie que le système de mesure est désormais stable, précis et reproductible.", value=saved_status, key=f"msa_sign_off_{safe_idx}")
+                    p["msa_is_validated_status"] = is_validated
                 
-                if is_validated:
+                    if is_validated:
                     st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
         # =====================================================================
