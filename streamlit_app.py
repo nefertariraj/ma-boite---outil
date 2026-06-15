@@ -1814,10 +1814,18 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
     
-    def render_data_collection_and_msa(p, safe_idx):
-        # DÉFINITION DES CLÉS MANQUANTES (Ajustez les noms si nécessaire)
-        lock_key = f"dcp_locked_{safe_idx}"
-        local_msa_key = f"local_msa_data_{safe_idx}"
+    @st.fragment
+    def render_data_collection_and_msa(project_dict, component_idx):
+        # 1. DÉFINITION UNIFIÉE DES CLÉS
+        matrix_key = f"mbb_prioritization_matrix_{component_idx}"
+        dcp_table_key = f"master_dcp_table_{component_idx}"
+        lock_key = f"dcp_validated_lock_{component_idx}" # Clé uniforme
+        local_msa_key = f"msa_classification_table_{component_idx}" # Clé uniforme
+        buffer_msa_key = f"msa_buffer_{component_idx}"
+
+        # --- VOTRE LOGIQUE DE DCP ET PRIORISATION EXISTANTE ---
+        # (Insérez ici tout votre code de traitement : priorisation, calculs, etc.)
+        # Assurez-vous que chaque sauvegarde dans st.session_state utilise bien ces clés
             
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
