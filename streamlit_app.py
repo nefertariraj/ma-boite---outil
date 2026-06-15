@@ -1577,7 +1577,7 @@ else:
             c2.metric("🟢 TOTAL VALEUR AJOUTÉE (VA)", f"{totals['va']:.1f} min")
             c3.metric("📈 EFFICIENCE DU CYCLE (PCE)", f"{totals['pce']:.1f}%")
 
-       # =====================================================================
+        # =====================================================================
         # 3. Lean Six Sigma Data Collection Plan (Y = f(X)) & 4. MSA
         # =====================================================================
         st.subheader("3. Master Black Belt Data Collection Plan")
@@ -1815,39 +1815,39 @@ else:
                     st.rerun()
             
         # --------------------------------------------------
-            # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
-            # --------------------------------------------------
-            st.divider()
-            st.subheader("4. Validate Measurement System (MSA)")
+        # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
+        # --------------------------------------------------
+        st.divider()
+        st.subheader("4. Validate Measurement System (MSA)")
 
-            if not st.session_state.get(lock_key, False):
-                st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
+        if not st.session_state.get(lock_key, False):
+            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde ci-dessus.")
                 
-            df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
+        df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
                 
-            if not df_msa_in_state.empty:
-                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+        if not df_msa_in_state.empty:
+            st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
                     
-                edited_msa_df = st.data_editor(
-                    df_msa_in_state,
-                    num_rows="fixed",
-                    use_container_width=True,
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                        "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation", 
-                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                            width="medium"
-                        )
-                    }
-                )
+            edited_msa_df = st.data_editor(
+                df_msa_in_state,
+                num_rows="fixed",
+                use_container_width=True,
+                column_config={
+                    "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                    "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                    "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                    "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                    "Statut de validation": st.column_config.SelectboxColumn(
+                        "Statut de validation", 
+                        options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                        width="medium"
+                    )
+                }
+            )
                     
-                # --- SAUVEGARDE EN DIRECT (LE BOUTON A ÉTÉ SUPPRIMÉ ICI) ---
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+            # --- SAUVEGARDE EN DIRECT (LE BOUTON A ÉTÉ SUPPRIMÉ ICI) ---
+            st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
         render_data_collection_and_msa(p, safe_idx)
         
