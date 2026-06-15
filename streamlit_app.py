@@ -1858,12 +1858,12 @@ else:
                     p["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
                 # --------------------------------------------------
-                # 5. EXECUTION DU PROTOCOLE TERRAIN (Inséré ici)
+                # 5. EXECUTION DU PROTOCOLE TERRAIN
                 # --------------------------------------------------
                 st.divider()
                 st.subheader("5. Execution du Protocole Terrain")
-                st.info("🚀 **Protocole activé :** Le système de mesure est validé/configuré. Vous pouvez procéder à la collecte.")
-                
+                st.info("🚀 **Protocole activé :** Le système de mesure est prêt. Vous pouvez maintenant procéder à la collecte des données.")
+
             else:
                 st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
         
