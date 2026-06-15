@@ -1814,14 +1814,36 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
 
-            # --- RESTAURATION AUTOMATIQUE ---
-            # Pour le MSA
-            if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
-                st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
-            
-            # Pour le DCP
-            if dcp_table_key not in st.session_state and "dcp_table_saved" in project_dict:
-                st.session_state[dcp_table_key] = pd.DataFrame(project_dict["dcp_table_saved"])
+            @st.fragment
+            def render_data_collection_and_msa(project_dict, component_idx):
+                # 1. Initialisation des clés
+                matrix_key = f"mbb_prioritization_matrix_{component_idx}"
+                dcp_table_key = f"master_dcp_table_{component_idx}"
+                lock_key = f"dcp_validated_lock_{component_idx}"
+                local_msa_key = f"msa_classification_table_{component_idx}"
+
+                # 2. RESTAURATION FORCÉE (Le "Moteur" qui empêche la disparition)
+                # On restaure les données AVANT que Streamlit n'essaie de les afficher
+                if dcp_table_key not in st.session_state and "dcp_table_saved" in project_dict:
+                    st.session_state[dcp_table_key] = pd.DataFrame(project_dict["dcp_table_saved"])
+    
+                if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
+                    st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
+
+                # 3. AFFICHAGE (Le flux ne doit pas être bloqué)
+                st.subheader("Data Collection Plan")
+    
+                # On récupère les données (elles sont forcément là grâce à la restauration)
+                df_dcp = st.session_state.get(dcp_table_key)
+    
+                if df_dcp is not None:
+                    # AFFICHEZ VOTRE TABLEAU ICI
+                    edited_dcp = st.data_editor(df_dcp, key=f"dcp_editor_{component_idx}")
+                    # Sauvegarde automatique en temps réel
+                    st.session_state[dcp_table_key] = edited_dcp
+                    project_dict["dcp_table_saved"] = edited_dcp.to_dict('records')
+                else:
+                    st.warning("Données du DCP non trouvées.")
 
             # --------------------------------------------------
             # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
