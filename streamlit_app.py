@@ -1814,6 +1814,28 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
 
+        @st.fragment
+        def render_data_collection_and_msa(project_dict, component_idx):
+            # 1. INITIALISATION DES CLÉS
+            dcp_table_key = f"master_dcp_table_{component_idx}"
+            local_msa_key = f"msa_classification_table_{component_idx}"
+            lock_key = f"dcp_validated_lock_{component_idx}"
+
+            # 2. RESTAURATION AUTOMATIQUE (C'est ici qu'on récupère le JSON)
+            if dcp_table_key not in st.session_state and "dcp_table_saved" in project_dict:
+                st.session_state[dcp_table_key] = pd.DataFrame(project_dict["dcp_table_saved"])
+        
+            if local_msa_key not in st.session_state and "msa_table_saved" in project_dict:
+                st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
+
+            # 3. AFFICHAGE DCP
+            st.subheader("Data Collection Plan")
+            df_dcp = st.session_state.get(dcp_table_key)
+            if df_dcp is not None:
+                edited_dcp = st.data_editor(df_dcp, key=f"dcp_editor_{component_idx}", use_container_width=True)
+                st.session_state[dcp_table_key] = edited_dcp
+                project_dict["dcp_table_saved"] = edited_dcp.to_dict('records')
+            
             # --------------------------------------------------
             # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
             # --------------------------------------------------
