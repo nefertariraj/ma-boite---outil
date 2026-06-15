@@ -1820,18 +1820,17 @@ else:
             st.divider()
             st.subheader("4. Validate Measurement System (MSA)")
 
-            # 1. RÉCUPÉRATION DES DONNÉES (Pour la reprise après import JSON)
-            # On vérifie si les données existent dans le projet sans les écraser
+            # 1. RÉCUPÉRATION DES DONNÉES
             if (local_msa_key not in st.session_state or st.session_state[local_msa_key].empty) and project_dict.get("msa_table_saved"):
                 st.session_state[local_msa_key] = pd.DataFrame(project_dict["msa_table_saved"])
 
-            # 2. AFFICHAGE DU BLOC (Indivisible : Tableau + Protocole)
             df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
             
+            # 2. BLOC CONDITIONNEL UNIQUE (MSA + PROTOCOLE)
             if not df_msa_in_state.empty:
                 st.success("✅ Système de mesure disponible.")
                 
-                # Éditeur MSA (Aucune sauvegarde automatique)
+                # Éditeur MSA
                 edited_msa_df = st.data_editor(
                     df_msa_in_state,
                     num_rows="fixed",
@@ -1850,25 +1849,28 @@ else:
                     }
                 )
 
-                # 3. EXÉCUTION DU PROTOCOLE TERRAIN (Directement ici, lié au MSA)
+                # 3. PROTOCOLE TERRAIN (Directement ici, SANS le 'st.rerun' parasite)
                 st.markdown("##### 👟 Exécution du Protocole Terrain")
-                # On réinjecte le code de votre protocole ici pour qu'il soit solidaire du MSA
-                # (Assurez-vous que les variables comme 'safe_idx' sont bien accessibles)
                 
-                # --- [INSÉREZ ICI VOTRE CODE DE PROTOCOLE TERRAIN ACTUEL] ---
-
+                # --- TOUT VOTRE CODE DE PROTOCOLE TERRAIN DÉPLACÉ ICI ---
+                if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
+                    list_variables_critiques = df_classification_current[nom_colonne_variable].dropna().tolist()
+                else:
+                    list_variables_critiques = []
+                
+                # (Assurez-vous que tout le code de gestion des variables et des data_editors 
+                # de répétabilité/reproductibilité se trouve bien dans ce bloc if)
+                # ...
+                
                 # 4. BOUTON UNIQUE DE SAUVEGARDE
-                if st.button("💾 Enregistrer tout le bloc MSA (Tableau + Protocole)", key=f"btn_save_msa_{safe_idx}", type="primary", use_container_width=True):
-                    # Sauvegarde manuelle uniquement sur clic
+                if st.button("💾 Enregistrer tout le bloc MSA et Protocole", key=f"btn_save_msa_{safe_idx}", type="primary", use_container_width=True):
                     df_to_save = pd.DataFrame(edited_msa_df)
                     st.session_state[local_msa_key] = df_to_save
                     project_dict["msa_table_saved"] = df_to_save.to_dict('records')
-                    
                     if 'projects' in st.session_state and 'p_idx' in locals():
                         st.session_state.projects[p_idx]["msa_table_saved"] = df_to_save.to_dict('records')
-                    
-                    st.toast("✅ Données sauvegardées avec succès !", icon="💾")
-                    
+                    st.toast("✅ Données sauvegardées !", icon="💾")
+            
             else:
                 st.info("🔒 Le module MSA s'affichera une fois les données du DCP disponibles.")
         
