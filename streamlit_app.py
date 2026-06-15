@@ -1851,261 +1851,261 @@ else:
 
     render_data_collection_and_msa(p, safe_idx)
         
-        # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
-        st.markdown("##### 👟 Exécution du Protocole Terrain")
+            # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
+            st.markdown("##### 👟 Exécution du Protocole Terrain")
             
-        if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
-            list_variables_critiques = df_classification_current[nom_colonne_variable].dropna().tolist()
-        else:
-            list_variables_critiques = []
+            if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
+                list_variables_critiques = df_classification_current[nom_colonne_variable].dropna().tolist()
+            else:
+                list_variables_critiques = []
             
-        if list_variables_critiques:
-            if "msa_validated_vars" not in st.session_state:
-                st.session_state["msa_validated_vars"] = {}
-            if "msa_bias_history" not in st.session_state:
-                st.session_state["msa_bias_history"] = {}
+            if list_variables_critiques:
+                if "msa_validated_vars" not in st.session_state:
+                    st.session_state["msa_validated_vars"] = {}
+                if "msa_bias_history" not in st.session_state:
+                    st.session_state["msa_bias_history"] = {}
 
-            # Génération des options du sélecteur avec un indicateur de statut clair
-            options_sélecteur = []
-            mapping_variables = {}
-            for var in list_variables_critiques:
-                if str(var).strip() == "":
-                    continue
-                v_c = "".join(e for e in str(var) if e.isalnum())
-                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or p.get(f"validated_status_{v_c}_{safe_idx}", False):
-                    label = f"✅ {var}"
-                else:
-                    label = f"⏳ {var}"
-                options_sélecteur.append(label)
-                mapping_variables[label] = var
+                # Génération des options du sélecteur avec un indicateur de statut clair
+                options_sélecteur = []
+                mapping_variables = {}
+                for var in list_variables_critiques:
+                    if str(var).strip() == "":
+                        continue
+                    v_c = "".join(e for e in str(var) if e.isalnum())
+                    if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or p.get(f"validated_status_{v_c}_{safe_idx}", False):
+                        label = f"✅ {var}"
+                    else:
+                        label = f"⏳ {var}"
+                    options_sélecteur.append(label)
+                    mapping_variables[label] = var
 
-            selected_option = st.selectbox(
-                "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
-                options=options_sélecteur,
-                key=f"msa_selected_var_{safe_idx}"
-            )
+                selected_option = st.selectbox(
+                    "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
+                    options=options_sélecteur,
+                    key=f"msa_selected_var_{safe_idx}"
+                )
                 
-            # Récupération sécurisée du nom propre de la variable sans couper arbitrairement l'émoji
-            selected_var_to_test = mapping_variables.get(selected_option, "")
+                # Récupération sécurisée du nom propre de la variable sans couper arbitrairement l'émoji
+                selected_var_to_test = mapping_variables.get(selected_option, "")
 
-            # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
-            st.markdown("##### 📈 Historique des protocoles validés")
+                # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
+                st.markdown("##### 📈 Historique des protocoles validés")
                 
-            variables_valides = []
-            for var in list_variables_critiques:
-                v_c = "".join(e for e in str(var) if e.isalnum())
-                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or p.get(f"validated_status_{v_c}_{safe_idx}", False):
-                    variables_valides.append(var)
+                variables_valides = []
+                for var in list_variables_critiques:
+                    v_c = "".join(e for e in str(var) if e.isalnum())
+                    if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or p.get(f"validated_status_{v_c}_{safe_idx}", False):
+                        variables_valides.append(var)
                 
-            if variables_valides:
-                with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=True):
-                    for v_nom in variables_valides:
-                        v_clean = "".join(e for e in str(v_nom) if e.isalnum())
-                        p_rep_key = f"save_rep_{v_clean}_{safe_idx}"
-                        p_reprod_key = f"save_reprod_{v_clean}_{safe_idx}"
+                if variables_valides:
+                    with st.expander("🔍 Voir toutes les données terrain validées (Historique)", expanded=True):
+                        for v_nom in variables_valides:
+                            v_clean = "".join(e for e in str(v_nom) if e.isalnum())
+                            p_rep_key = f"save_rep_{v_clean}_{safe_idx}"
+                            p_reprod_key = f"save_reprod_{v_clean}_{safe_idx}"
                             
-                        st.markdown(f"**🟢 Variable : {v_nom}**")
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if p_rep_key in p:
-                                st.caption("Données de Reproductibilité enregistrées (différentes personnes obtiennent-elles des résultats similaires?: même produit, plusieurs opérateurs) :")
-                                st.dataframe(pd.DataFrame(p[p_rep_key]), use_container_width=True)
-                        with c2:
-                            if p_reprod_key in p:
-                                st.caption("Données de Répétabilité enregistrées (La même personne mesure-t-elle toujours pareil?: 1 opérateur, même situation, plusieurs mesures) :")
-                                st.dataframe(pd.DataFrame(p[p_reprod_key]), use_container_width=True)
-                        st.markdown("---")
-            else:
-                st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici automatiquement après avoir cliqué sur 'Valider et verrouiller'.")
+                            st.markdown(f"**🟢 Variable : {v_nom}**")
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if p_rep_key in p:
+                                    st.caption("Données de Reproductibilité enregistrées (différentes personnes obtiennent-elles des résultats similaires?: même produit, plusieurs opérateurs) :")
+                                    st.dataframe(pd.DataFrame(p[p_rep_key]), use_container_width=True)
+                            with c2:
+                                if p_reprod_key in p:
+                                    st.caption("Données de Répétabilité enregistrées (La même personne mesure-t-elle toujours pareil?: 1 opérateur, même situation, plusieurs mesures) :")
+                                    st.dataframe(pd.DataFrame(p[p_reprod_key]), use_container_width=True)
+                            st.markdown("---")
+                else:
+                    st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici automatiquement après avoir cliqué sur 'Valider et verrouiller'.")
                 
-            # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
-            var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
+                # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
+                var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
                 
-            dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
-            dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
-            bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
+                dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
+                dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
+                bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
                 
-            p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
-            p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
-            p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
+                p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
+                p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
+                p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
                 
-            # Restauration automatique depuis la persistance 'p'
-            if p_rep_save_key in p and dynamic_rep_key not in st.session_state:
-                st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
-            if p_reprod_save_key in p and dynamic_reprod_key not in st.session_state:
-                st.session_state[dynamic_reprod_key] = pd.DataFrame(p[p_reprod_save_key])
-            if p_bias_hist_save_key in p and bias_hist_key not in st.session_state["msa_bias_history"]:
-                st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]
+                # Restauration automatique depuis la persistance 'p'
+                if p_rep_save_key in p and dynamic_rep_key not in st.session_state:
+                    st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
+                if p_reprod_save_key in p and dynamic_reprod_key not in st.session_state:
+                    st.session_state[dynamic_reprod_key] = pd.DataFrame(p[p_reprod_save_key])
+                if p_bias_hist_save_key in p and bias_hist_key not in st.session_state["msa_bias_history"]:
+                    st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]
                 
-            if bias_hist_key not in st.session_state["msa_bias_history"]:
-                st.session_state["msa_bias_history"][bias_hist_key] = []
+                if bias_hist_key not in st.session_state["msa_bias_history"]:
+                    st.session_state["msa_bias_history"][bias_hist_key] = []
                 
-            liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
+                liste_unites = ["minutes", "heure", "jour", "g", "kg", "unité", "m", "l", "%", "Ar"]
                 
-            if dynamic_rep_key not in st.session_state:
-                st.session_state[dynamic_rep_key] = pd.DataFrame([
-                    {"Opérateur": "Opérateur 1", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"},
-                    {"Opérateur": "Opérateur 2", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"}
-                ])
+                if dynamic_rep_key not in st.session_state:
+                    st.session_state[dynamic_rep_key] = pd.DataFrame([
+                        {"Opérateur": "Opérateur 1", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"},
+                        {"Opérateur": "Opérateur 2", "Situation A": 0.0, "Unité A": "unité", "Situation B": 0.0, "Unité B": "unité"}
+                    ])
                     
-            if dynamic_reprod_key not in st.session_state:
-                st.session_state[dynamic_reprod_key] = pd.DataFrame([
-                    {"Essai / Pièce": "Pièce 1", "Résultat": 0.0, "Unité": "unité"},
-                    {"Essai / Pièce": "Pièce 2", "Résultat": 0.0, "Unité": "unité"}
-                ])
+                if dynamic_reprod_key not in st.session_state:
+                    st.session_state[dynamic_reprod_key] = pd.DataFrame([
+                        {"Essai / Pièce": "Pièce 1", "Résultat": 0.0, "Unité": "unité"},
+                        {"Essai / Pièce": "Pièce 2", "Résultat": 0.0, "Unité": "unité"}
+                    ])
                     
-            id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
-            if st.session_state.get(id_validation_blindee_active, False) or p.get(f"validated_status_{var_clean_id}_{safe_idx}", False):
-                st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
-            else:
-                st.warning(f"📋 **Statut : Saisie en cours** | Remplissez les mesures pour : **{selected_var_to_test}**")
+                id_validation_blindee_active = f"status_lock_{var_clean_id}_{safe_idx}"
+                if st.session_state.get(id_validation_blindee_active, False) or p.get(f"validated_status_{var_clean_id}_{safe_idx}", False):
+                    st.success(f"🎯 **Statut : Validé** | Vous visualisez les données sécurisées pour : **{selected_var_to_test}**")
+                else:
+                    st.warning(f"📋 **Statut : Saisie en cours** | Remplissez les mesures pour : **{selected_var_to_test}**")
                 
-            col_t1, col_t2 = st.columns(2)
+                col_t1, col_t2 = st.columns(2)
                 
-            with col_t1:
-                st.markdown("**🔬 Test de Reproductibilité (Inter-Opérateurs)**")
-                edited_rep = st.data_editor(
-                    st.session_state[dynamic_rep_key],
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    key=f"editor_rep_{var_clean_id}_{safe_idx}",
-                    column_config={
-                        "Unité A": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True),
-                        "Unité B": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
-                    }
+                with col_t1:
+                    st.markdown("**🔬 Test de Reproductibilité (Inter-Opérateurs)**")
+                    edited_rep = st.data_editor(
+                        st.session_state[dynamic_rep_key],
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"editor_rep_{var_clean_id}_{safe_idx}",
+                        column_config={
+                            "Unité A": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True),
+                            "Unité B": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
+                        }
+                    )
+
+                with col_t2:
+                    st.markdown("**👥 Test de Répétabilité (Intra-Opérateur)**")
+                    edited_reprod = st.data_editor(
+                        st.session_state[dynamic_reprod_key],
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"editor_reprod_{var_clean_id}_{safe_idx}",
+                        column_config={
+                            "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
+                        }
+                    )
+                    
+                # 🛡️ SÉCURITÉ SANS TOUCHER AUX BOUTONS : Si l'utilisateur clique sur un bouton plus bas,
+                # les variables edited_rep et edited_reprod se vident. On les force ici à récupérer les données en mémoire.
+                if edited_rep is None or (isinstance(edited_rep, dict) and not edited_rep.get("edited_rows") and not edited_rep.get("added_rows") and not edited_rep.get("deleted_rows")):
+                    if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state:
+                        edited_rep = st.session_state[f"editor_rep_{var_clean_id}_{safe_idx}"]
+
+                if edited_reprod is None or (isinstance(edited_reprod, dict) and not edited_reprod.get("edited_rows") and not edited_reprod.get("added_rows") and not edited_reprod.get("deleted_rows")):
+                    if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
+                        edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
+                
+                st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
+                valeur_reference = st.number_input(
+                    f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
+                    value=0.0,
+                    step=0.1,
+                    key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
                 )
 
-            with col_t2:
-                st.markdown("**👥 Test de Répétabilité (Intra-Opérateur)**")
-                edited_reprod = st.data_editor(
-                    st.session_state[dynamic_reprod_key],
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    key=f"editor_reprod_{var_clean_id}_{safe_idx}",
-                    column_config={
-                        "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
-                    }
-                )
+                # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                     
-            # 🛡️ SÉCURITÉ SANS TOUCHER AUX BOUTONS : Si l'utilisateur clique sur un bouton plus bas,
-            # les variables edited_rep et edited_reprod se vident. On les force ici à récupérer les données en mémoire.
-            if edited_rep is None or (isinstance(edited_rep, dict) and not edited_rep.get("edited_rows") and not edited_rep.get("added_rows") and not edited_rep.get("deleted_rows")):
-                if f"editor_rep_{var_clean_id}_{safe_idx}" in st.session_state:
-                    edited_rep = st.session_state[f"editor_rep_{var_clean_id}_{safe_idx}"]
-
-            if edited_reprod is None or (isinstance(edited_reprod, dict) and not edited_reprod.get("edited_rows") and not edited_reprod.get("added_rows") and not edited_reprod.get("deleted_rows")):
-                if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
-                    edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
-                
-            st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
-            valeur_reference = st.number_input(
-                f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
-                value=0.0,
-                step=0.1,
-                key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
-            )
-
-            # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
-                    
-                # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (NONE-CHECK)
-                # Si la variable locale est perdue au clic, on tente de la récupérer via les clés d'état actives
-                if 'edited_rep' not in locals() or edited_rep is None:
-                    edited_rep = st.session_state.get(dynamic_rep_key) or st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
+                    # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (NONE-CHECK)
+                    # Si la variable locale est perdue au clic, on tente de la récupérer via les clés d'état actives
+                    if 'edited_rep' not in locals() or edited_rep is None:
+                        edited_rep = st.session_state.get(dynamic_rep_key) or st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
                         
-                if 'edited_reprod' not in locals() or edited_reprod is None:
-                    edited_reprod = st.session_state.get(dynamic_reprod_key) or st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
+                    if 'edited_reprod' not in locals() or edited_reprod is None:
+                        edited_reprod = st.session_state.get(dynamic_reprod_key) or st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
 
-                # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P' (Uniquement si les données existent)
-                if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    st.session_state[dynamic_rep_key] = edited_rep
+                    # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P' (Uniquement si les données existent)
+                    if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
+                        p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                        st.session_state[dynamic_rep_key] = edited_rep
                     
-                if edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
-                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    if edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
+                        p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+                        st.session_state[dynamic_reprod_key] = edited_reprod
 
-                # 3. VOTRE LOGIQUE D'ANALYSE DES BIAIS (100% INTACTE ET PROTÉGÉE)
-                anomalies_mineures = []
-                anomalies_majeures = []
+                    # 3. VOTRE LOGIQUE D'ANALYSE DES BIAIS (100% INTACTE ET PROTÉGÉE)
+                    anomalies_mineures = []
+                    anomalies_majeures = []
                     
-                if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
-                    try:
-                        val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
-                        val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
+                    if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
+                        try:
+                            val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
+                            val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
                             
-                        if val_col1.dropna().empty or val_col2.dropna().empty:
-                            anomalies_majeures.append("Données de Répétabilité Invalides ou Vides")
-                        else:
-                            diffs = (val_col1 - val_col2).abs()
-                            mean_val = val_col1.mean()
-                            if not diffs.dropna().empty and mean_val > 0:
-                                if diffs.max() > mean_val * 0.30:
-                                    anomalies_majeures.append("Incohérence Critique de Répétabilité (EV)")
-                                elif diffs.max() > mean_val * 0.10:
-                                    anomalies_mineures.append("Dispersion de Répétabilité légère")
+                            if val_col1.dropna().empty or val_col2.dropna().empty:
+                                anomalies_majeures.append("Données de Répétabilité Invalides ou Vides")
+                            else:
+                                diffs = (val_col1 - val_col2).abs()
+                                mean_val = val_col1.mean()
+                                if not diffs.dropna().empty and mean_val > 0:
+                                    if diffs.max() > mean_val * 0.30:
+                                        anomalies_majeures.append("Incohérence Critique de Répétabilité (EV)")
+                                    elif diffs.max() > mean_val * 0.10:
+                                        anomalies_mineures.append("Dispersion de Répétabilité légère")
                                 
-                            all_vals = pd.concat([val_col1, val_col2]).dropna()
-                            if not all_vals.empty and all(v % 5 == 0 for v in all_vals if v > 0):
-                                anomalies_mineures.append("Biais d'Arrondis Systématiques (Résolution insuffisante)")
-                    except Exception as e:
-                        anomalies_majeures.append(f"Erreur évaluation Répétabilité: {str(e)}")
+                                all_vals = pd.concat([val_col1, val_col2]).dropna()
+                                if not all_vals.empty and all(v % 5 == 0 for v in all_vals if v > 0):
+                                    anomalies_mineures.append("Biais d'Arrondis Systématiques (Résolution insuffisante)")
+                        except Exception as e:
+                            anomalies_majeures.append(f"Erreur évaluation Répétabilité: {str(e)}")
 
-                if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
-                    try:
-                        vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
+                    if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
+                        try:
+                            vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
                             
-                        if vals_reprod.empty:
-                            anomalies_majeures.append("Données de Reproductibilité Manquantes ou Invalides")
-                        else:
-                            if len(vals_reprod) >= 2:
-                                std_dev = vals_reprod.std()
-                                if pd.notna(std_dev) and vals_reprod.mean() > 0:
-                                    if std_dev > (vals_reprod.mean() * 0.20):
-                                        anomalies_majeures.append("Instabilité Critique de Reproductibilité (AV)")
-                            if 'valeur_reference' in locals() and valeur_reference != 0.0:
-                                biais_justesse = abs(vals_reprod.mean() - valeur_reference)
-                                if biais_justesse > abs(valeur_reference * 0.08):
-                                    anomalies_majeures.append("Biais de Justesse Linéaire (Décalage / Master)")
-                    except Exception as e:
-                        anomalies_majeures.append(f"Erreur évaluation Reproductibilité: {str(e)}")
+                            if vals_reprod.empty:
+                                anomalies_majeures.append("Données de Reproductibilité Manquantes ou Invalides")
+                            else:
+                                if len(vals_reprod) >= 2:
+                                    std_dev = vals_reprod.std()
+                                    if pd.notna(std_dev) and vals_reprod.mean() > 0:
+                                        if std_dev > (vals_reprod.mean() * 0.20):
+                                            anomalies_majeures.append("Instabilité Critique de Reproductibilité (AV)")
+                                if 'valeur_reference' in locals() and valeur_reference != 0.0:
+                                    biais_justesse = abs(vals_reprod.mean() - valeur_reference)
+                                    if biais_justesse > abs(valeur_reference * 0.08):
+                                        anomalies_majeures.append("Biais de Justesse Linéaire (Décalage / Master)")
+                        except Exception as e:
+                            anomalies_majeures.append(f"Erreur évaluation Reproductibilité: {str(e)}")
                     
-                if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
-                    anomalies_majeures.append("Variabilité Incalculable : Aucune donnée disponible")
+                    if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
+                        anomalies_majeures.append("Variabilité Incalculable : Aucune donnée disponible")
                     
-                if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
-                    score, status = "100%", "🟢 Système Fiable"
-                elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
-                    score, status = "75%", "🟡 Alerte : Biais Mineur (Sous contrôle)"
-                elif len(anomalies_majeures) == 1 and len(anomalies_mineures) == 0:
-                    score, status = "50%", "🟠 Alerte : Dérive Majeure"
-                elif len(anomalies_majeures) == 1 and len(anomalies_mineures) > 0:
-                    score, status = "35%", "🟠 Alerte : Instabilité Système Cumulée"
-                else:
-                    score, status = "10%", "🔴 Système Non Fiable (Processus Hors Contrôle)"
+                    if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
+                        score, status = "100%", "🟢 Système Fiable"
+                    elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
+                        score, status = "75%", "🟡 Alerte : Biais Mineur (Sous contrôle)"
+                    elif len(anomalies_majeures) == 1 and len(anomalies_mineures) == 0:
+                        score, status = "50%", "🟠 Alerte : Dérive Majeure"
+                    elif len(anomalies_majeures) == 1 and len(anomalies_mineures) > 0:
+                        score, status = "35%", "🟠 Alerte : Instabilité Système Cumulée"
+                    else:
+                        score, status = "10%", "🔴 Système Non Fiable (Processus Hors Contrôle)"
                     
-                toutes_anomalies = anomalies_majeures + anomalies_mineures
-                liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
+                    toutes_anomalies = anomalies_majeures + anomalies_mineures
+                    liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
                     
-                gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
+                    gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
                     
-                run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
-                st.session_state["msa_bias_history"][bias_hist_key].append({
-                    "Essai": f"Analyse #{run_number}",
-                    "Date/Heure": gmt3_time,
-                    "Indice de Fidélité": score,
-                    "Statut Global": status,
-                    "Anomalies Détectées": liste_anomalies_str
-                })
+                    run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
+                    st.session_state["msa_bias_history"][bias_hist_key].append({
+                        "Essai": f"Analyse #{run_number}",
+                        "Date/Heure": gmt3_time,
+                        "Indice de Fidélité": score,
+                        "Statut Global": status,
+                        "Anomalies Détectées": liste_anomalies_str
+                    })
                     
-                p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
-                st.rerun()
+                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                    st.rerun()
 
-            if st.session_state["msa_bias_history"][bias_hist_key]:
-                st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
-                df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
-                st.table(df_history)
+                if st.session_state["msa_bias_history"][bias_hist_key]:
+                    st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
+                    df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
+                    st.table(df_history)
 
             # =====================================================================
             # 💾 BOUTON DE VALIDATION DÉFINITIVE
