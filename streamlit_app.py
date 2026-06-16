@@ -1813,22 +1813,6 @@ else:
                     project_dict["dcp_validated_lock"] = True
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
-                       
-        # --- 1. DÉFINITION DES CLÉS (Au niveau du flux principal) ---
-        idx_str = str(safe_idx)
-        dcp_table_key = f"master_dcp_table_{idx_str}"
-        local_msa_key = f"msa_classification_table_{idx_str}"
-        lock_key = f"dcp_validated_lock_{idx_str}"
-        proto_key = f"protocol_data_{idx_str}"
-
-        # --- 2. AFFICHAGE DU DCP (Maintenant que les clés sont définies, ça ne plantera plus) ---
-        st.subheader("3. Master Black Belt Data Collection Plan")
-        st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
-
-        if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
-            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
-        else:
-            st.warning("Le Data Collection Plan n'a pas encore été généré.")
     
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
