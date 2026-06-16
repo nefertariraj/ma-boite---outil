@@ -1814,31 +1814,31 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
                        
-    # --- FLUX PRINCIPAL ---
-    # On stocke l'objet complexe dans le session_state pour ne pas le passer en argument
-    st.session_state["current_project"] = p 
-    safe_idx_str = str(safe_idx)
+        # --- FLUX PRINCIPAL ---
+        # On stocke l'objet complexe dans le session_state pour ne pas le passer en argument
+        st.session_state["current_project"] = p 
+        safe_idx_str = str(safe_idx)
 
-    st.subheader("3. Master Black Belt Data Collection Plan")
+        st.subheader("3. Master Black Belt Data Collection Plan")
 
-    # Appel du fragment avec uniquement une chaîne de caractères
-    render_data_collection_and_msa(safe_idx_str)
+        # Appel du fragment avec uniquement une chaîne de caractères
+        render_data_collection_and_msa(safe_idx_str)
 
-    # --- DÉFINITION DU FRAGMENT ---
-    @st.fragment
-    def render_data_collection_and_msa(idx_str):
-        # Récupération de l'objet depuis le session_state à l'intérieur du fragment
-        project_dict = st.session_state["current_project"]
+        # --- DÉFINITION DU FRAGMENT ---
+        @st.fragment
+        def render_data_collection_and_msa(idx_str):
+            # Récupération de l'objet depuis le session_state à l'intérieur du fragment
+            project_dict = st.session_state["current_project"]
     
-        # Définition des clés locales
-        dcp_table_key = f"master_dcp_table_{idx_str}"
-        local_msa_key = f"msa_classification_table_{idx_str}"
-        lock_key = f"dcp_validated_lock_{idx_str}"
-        proto_key = f"protocol_data_{idx_str}"
+            # Définition des clés locales
+            dcp_table_key = f"master_dcp_table_{idx_str}"
+            local_msa_key = f"msa_classification_table_{idx_str}"
+            lock_key = f"dcp_validated_lock_{idx_str}"
+            proto_key = f"protocol_data_{idx_str}"
 
-        # 1. Affichage DCP
-        if dcp_table_key in st.session_state:
-            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
+            # 1. Affichage DCP
+            if dcp_table_key in st.session_state:
+                st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
     
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
