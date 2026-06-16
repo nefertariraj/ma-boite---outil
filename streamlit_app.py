@@ -1814,19 +1814,18 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
                        
-        # 1. DÉFINITION DES CLÉS (Indispensable pour que dcp_table_key soit reconnu)
-        idx_str = str(safe_idx)
-        dcp_table_key = f"master_dcp_table_{idx_str}"
-        local_msa_key = f"msa_classification_table_{idx_str}"
-        lock_key = f"dcp_validated_lock_{idx_str}"
-        proto_key = f"protocol_data_{idx_str}"
+        # --- DEBUG : AFFICHER TOUTES LES CLÉS DISPONIBLES ---
+        st.write("--- DEBUG : CLÉS DANS LA SESSION ---")
+        st.write(list(st.session_state.keys())) # Ceci affichera toutes les clés existantes
+        st.write(f"Clé recherchée : {dcp_table_key}")
+        # --------------------------------------------------
 
         # 2. AFFICHAGE DU DCP
         st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
         if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
             st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
         else:
-            st.warning("Le Data Collection Plan n'a pas encore été généré.")
+            st.warning(f"Le DCP est introuvable sous la clé : {dcp_table_key}")
     
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
