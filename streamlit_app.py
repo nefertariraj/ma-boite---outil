@@ -1860,14 +1860,6 @@ else:
                 # Note: assurez-vous que edited_proto_df est défini ici si vous l'utilisez
                 p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
-
-            # --- AFFICHAGE CONDITIONNEL : "Exécution du protocole terrain" ---
-            # Cette partie s'affichera automatiquement dès que le MSA est validé/enregistré
-            st.markdown("### 🛠️ Exécution du Protocole Terrain")
-            if p.get("protocol_saved"):
-                st.write("Le protocole a été enregistré et est prêt pour la collecte terrain.")
-            else:
-                st.warning("Veuillez enregistrer le MSA pour accéder aux détails du protocole.")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
