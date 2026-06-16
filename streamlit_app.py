@@ -1814,50 +1814,53 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
             
-    @st.fragment
-    def render_data_collection_and_msa(project_dict, component_idx):
-        # --- 1. CLÉS ---
-        safe_idx = str(component_idx)
-        local_msa_key = f"msa_classification_table_{safe_idx}"
-        proto_key = f"protocol_data_{safe_idx}"
-        dcp_table_key = f"master_dcp_table_{safe_idx}"
+        # --- FLUX PRINCIPAL (Garanti d'être affiché) ---
+        st.subheader("3. Master Black Belt Data Collection Plan")
 
-        # --- PARTIE 3 : DATA COLLECTION PLAN ---
+        # Affichez le DCP ici, hors du fragment
+        dcp_table_key = f"master_dcp_table_{safe_idx}"
         if dcp_table_key in st.session_state:
-            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
+        st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
+
+        # Appelez la fonction de rendu (MSA + Protocole)
+        render_data_collection_and_msa(project_dict, component_idx)
             
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
         # --------------------------------------------------
-        st.divider()
-        st.subheader("4. Validate Measurement System (MSA) & Protocole Terrain")
+        def render_data_collection_and_msa(project_dict, component_idx):
+            # Enlevez @st.fragment pour tester si c'est lui qui bloque
+            # Si ça fonctionne sans, vous pourrez le remettre plus tard
     
-        # 4.1. Édition MSA
-        st.markdown("**4.1. Système de Mesure**")
-        df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
-        if df_msa.empty:
-            df_msa = pd.DataFrame(columns=["Variable Critique", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut"])
+            safe_idx = str(component_idx)
+            local_msa_key = f"msa_classification_table_{safe_idx}"
+            proto_key = f"protocol_data_{safe_idx}"
 
-        edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
+            st.divider()
+            st.subheader("4. Validate Measurement System (MSA) & Protocole Terrain")
     
-        # 4.2. Édition Protocole (Imbriqué sous le MSA)
-        st.markdown("**4.2. Protocole Terrain associé**")
-        if proto_key not in st.session_state:
-            st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
-    
-        edited_proto_df = st.data_editor(
-            st.session_state[proto_key],
-            num_rows="dynamic",
-            use_container_width=True
-        )
+            # 4.1 MSA
+            st.markdown("**4.1. Système de Mesure**")
+            df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
+            if df_msa.empty:
+                df_msa = pd.DataFrame(columns=["Variable Critique", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut"])
 
-        # --- BOUTON DE SAUVEGARDE UNIQUE ---
-        if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
-            st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-            st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
-            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
-            project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
-            st.success("✅ Données enregistrées manuellement !")
+            edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
+    
+            # 4.2 Protocole
+            st.markdown("**4.2. Protocole Terrain associé**")
+            if proto_key not in st.session_state:
+                st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
+    
+            edited_proto_df = st.data_editor(st.session_state[proto_key], num_rows="dynamic", use_container_width=True)
+
+            # Sauvegarde
+            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
+                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+                st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
+                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
+                st.success("✅ Données enregistrées manuellement !")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
