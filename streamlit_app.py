@@ -1866,9 +1866,32 @@ else:
                     }
                 )
             
+                # Sauvegarde MSA
                 st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                # ICI : Utilisation de 'p' (la variable globale de votre projet)
-                p["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+
+                # --------------------------------------------------
+                # 5. EXECUTION DU PROTOCOLE TERRAIN
+                # --------------------------------------------------
+                st.divider()
+                st.subheader("5. Execution du Protocole Terrain")
+                
+                proto_key = f"protocol_data_{safe_idx}"
+                if proto_key not in st.session_state:
+                    st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
+                
+                edited_proto_df = st.data_editor(
+                    st.session_state[proto_key], 
+                    num_rows="dynamic", 
+                    use_container_width=True
+                )
+                
+                # Sauvegarde Protocole
+                if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
+                    st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
+                    project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
+                    st.success("✅ Données MSA et Protocole enregistrées !")
+
             else:
                 st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
         
