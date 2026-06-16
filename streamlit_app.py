@@ -1814,9 +1814,14 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
                        
-        # --------------------------------------------------
-        # AFFICHAGE DU DCP (Ajouté ici pour qu'il apparaisse)
-        # --------------------------------------------------
+        # 1. DÉFINITION DES CLÉS (Indispensable pour que dcp_table_key soit reconnu)
+        idx_str = str(safe_idx)
+        dcp_table_key = f"master_dcp_table_{idx_str}"
+        local_msa_key = f"msa_classification_table_{idx_str}"
+        lock_key = f"dcp_validated_lock_{idx_str}"
+        proto_key = f"protocol_data_{idx_str}"
+
+        # 2. AFFICHAGE DU DCP
         st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
         if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
             st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
