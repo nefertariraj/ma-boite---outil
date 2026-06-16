@@ -1814,29 +1814,21 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
                        
-        # --- FLUX PRINCIPAL ---
-        # On s'assure d'utiliser l'index correct (0 dans votre debug)
-        idx_str = str(safe_idx) 
+        # --- 1. DÉFINITION DES CLÉS (Au niveau du flux principal) ---
+        idx_str = str(safe_idx)
         dcp_table_key = f"master_dcp_table_{idx_str}"
+        local_msa_key = f"msa_classification_table_{idx_str}"
+        lock_key = f"dcp_validated_lock_{idx_str}"
+        proto_key = f"protocol_data_{idx_str}"
 
-        # DEBUG : Vérification explicite
-        st.write(f"DEBUG: Je cherche la clé '{dcp_table_key}'")
-
-        # --- AFFICHAGE DU DCP ---
+        # --- 2. AFFICHAGE DU DCP (Maintenant que les clés sont définies, ça ne plantera plus) ---
+        st.subheader("3. Master Black Belt Data Collection Plan")
         st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
 
-        # On vérifie si la clé existe, SINON on cherche la clé 'master_dcp_table_0' par défaut
-        if dcp_table_key in st.session_state:
-            target_key = dcp_table_key
-        elif "master_dcp_table_0" in st.session_state:
-            target_key = "master_dcp_table_0"
+        if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
+            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
         else:
-            target_key = None
-
-        if target_key and not st.session_state[target_key].empty:
-            st.dataframe(st.session_state[target_key], use_container_width=True)
-        else:
-            st.warning(f"Le Data Collection Plan n'est pas trouvé (Clé cherchée : {dcp_table_key})")
+            st.warning("Le Data Collection Plan n'a pas encore été généré.")
     
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
