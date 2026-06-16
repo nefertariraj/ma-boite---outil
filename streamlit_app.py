@@ -1845,55 +1845,55 @@ else:
         else:
             # 2. Récupération et affichage du MSA
             df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
-        
-            if not df_msa_in_state.empty:
-                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
-            
-                edited_msa_df = st.data_editor(
-                    df_msa_in_state,
-                    num_rows="fixed",
-                    use_container_width=True,
-                    column_config={
-                        "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
-                        "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
-                        "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
-                        "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
-                        "Statut de validation": st.column_config.SelectboxColumn(
-                            "Statut de validation", 
-                            options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
-                            width="medium"
-                        )
-                    }
-                )
-            
-                # Sauvegarde MSA
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
-                # --------------------------------------------------
-                # 5. EXECUTION DU PROTOCOLE TERRAIN
-                # --------------------------------------------------
-                st.divider()
-                st.subheader("5. Execution du Protocole Terrain")
-                
-                proto_key = f"protocol_data_{safe_idx}"
-                if proto_key not in st.session_state:
-                    st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
-                
-                edited_proto_df = st.data_editor(
-                    st.session_state[proto_key], 
-                    num_rows="dynamic", 
-                    use_container_width=True
-                )
-                
-                # Sauvegarde Protocole
-                if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
-                    st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
-                    project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
-                    st.success("✅ Données MSA et Protocole enregistrées !")
+            # Si le DataFrame est vide, on initialise un squelette pour forcer l'affichage
+            if df_msa_in_state.empty:
+                df_msa_in_state = pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
+            
+            st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+            
+            edited_msa_df = st.data_editor(
+                df_msa_in_state,
+                num_rows="fixed",
+                use_container_width=True,
+                column_config={
+                    "Variable Critique (liée au Y)": st.column_config.TextColumn("Variable Critique", disabled=True),
+                    "Rôle": st.column_config.TextColumn("Rôle", disabled=True),
+                    "Type de Donnée": st.column_config.TextColumn("Type", disabled=True),
+                    "MSA Recommandé": st.column_config.TextColumn("MSA Recommandé", disabled=True),
+                    "Statut de validation": st.column_config.SelectboxColumn(
+                        "Statut de validation", 
+                        options=["En attente", "Validé (R&R / Kappa > 90%)", "Conditionnel", "Rejeté", "Test effectué"],
+                        width="medium"
+                    )
+                }
+            )
+            
+            # Sauvegarde MSA
+            st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
 
-            else:
-                st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
+            # --------------------------------------------------
+            # 5. EXECUTION DU PROTOCOLE TERRAIN
+            # --------------------------------------------------
+            st.divider()
+            st.subheader("5. Execution du Protocole Terrain")
+            
+            proto_key = f"protocol_data_{safe_idx}"
+            if proto_key not in st.session_state:
+                st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
+            
+            edited_proto_df = st.data_editor(
+                st.session_state[proto_key], 
+                num_rows="dynamic", 
+                use_container_width=True
+            )
+            
+            # Sauvegarde Protocole
+            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
+                st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
+                project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
+                st.success("✅ Données MSA et Protocole enregistrées !")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
