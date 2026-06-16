@@ -1835,47 +1835,48 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
-        if not st.session_state.get(lock_key, False):
-            st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
-    
+        # On récupère les données, ou un DataFrame vide par défaut
         df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
+
+        # --- CHANGEMENT ICI : On affiche même si le dataframe est vide pour permettre la saisie ---
+        st.info("✅ Configuration du Système de Mesure :")
     
-        if not df_msa_in_state.empty:
-            st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation :")
-        
-            # --- ÉDITION SANS SAUVEGARDE AUTOMATIQUE ---
-            edited_msa_df = st.data_editor(
-                df_msa_in_state,
-                num_rows="fixed",
-                use_container_width=True
-            )
+        # Si c'est vide, on affiche un message ou une possibilité d'initialiser
+        if df_msa_in_state.empty:
+            st.warning("Aucune donnée MSA chargée depuis le DCP. Vérifiez votre matrice.")
+    
+        # On affiche l'éditeur dans tous les cas
+        edited_msa_df = st.data_editor(
+            df_msa_in_state,
+            num_rows="fixed",
+            use_container_width=True
+        )
 
-            # --------------------------------------------------
-            # 5. EXECUTION DU PROTOCOLE TERRAIN
-            # --------------------------------------------------
-            st.divider()
-            st.subheader("5. Execution du Protocole Terrain")
-        
-            if proto_key not in st.session_state:
+        # --------------------------------------------------
+        # 5. EXECUTION DU PROTOCOLE TERRAIN
+        # --------------------------------------------------
+        st.divider()
+        st.subheader("5. Execution du Protocole Terrain")
+    
+        # Même chose ici : on affiche toujours l'éditeur
+        if proto_key not in st.session_state:
                 st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
-        
-            edited_proto_df = st.data_editor(
-                st.session_state[proto_key],
-                num_rows="dynamic",
-                use_container_width=True
-            )
+    
+        edited_proto_df = st.data_editor(
+            st.session_state[proto_key],
+            num_rows="dynamic",
+            use_container_width=True
+        )
 
-            # --- BOUTON UNIQUE DE SAUVEGARDE ---
-            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
-            
-                st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
-                project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
-            
-                st.success("✅ Données enregistrées manuellement !")
-        else:
-            st.warning("⚠️ Aucune donnée MSA à afficher.")
+        # --- BOUTON UNIQUE DE SAUVEGARDE ---
+        if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
+            st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+        
+            st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
+            project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
+        
+            st.success("✅ Données enregistrées manuellement !")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
