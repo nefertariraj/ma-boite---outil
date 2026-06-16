@@ -1814,21 +1814,25 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
                        
-        # --- FLUX PRINCIPAL ---
+       # --- HORS DU FRAGMENT (Affiche uniquement le titre 3) ---
         st.subheader("3. Master Black Belt Data Collection Plan")
 
-        # 1. Définition des clés locales
-        idx_str = str(safe_idx)
-        dcp_table_key = f"master_dcp_table_{idx_str}"
-        local_msa_key = f"msa_classification_table_{idx_str}"
-        lock_key = f"dcp_validated_lock_{idx_str}"
-        proto_key = f"protocol_data_{idx_str}"
+        # --- APPEL DU FRAGMENT ---
+        render_data_collection_and_msa(p, safe_idx)
 
-        # 2. AFFICHAGE DU DCP (Maintenant TOUJOURS affiché)
-        if dcp_table_key in st.session_state:
-            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
-        else:
-            st.warning("Le Data Collection Plan n'a pas encore été généré.")
+        # --- DÉFINITION DU FRAGMENT (Inclut tout : DCP + MSA + Protocole) ---
+        @st.fragment
+        def render_data_collection_and_msa(project_dict, component_idx):
+            # 1. DÉFINITION DES CLÉS ICI (pour qu'elles soient connues dans tout le fragment)
+            safe_idx = str(component_idx)
+            dcp_table_key = f"master_dcp_table_{safe_idx}"
+            local_msa_key = f"msa_classification_table_{safe_idx}"
+            proto_key = f"protocol_data_{safe_idx}"
+            lock_key = f"dcp_validated_lock_{safe_idx}"
+
+            # 2. AFFICHAGE DU DCP (Section 2)
+            if dcp_table_key in st.session_state:
+                st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
     
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
