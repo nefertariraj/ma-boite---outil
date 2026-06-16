@@ -1849,21 +1849,6 @@ else:
             st.session_state[local_msa_key] = edited_msa_df
             p["msa_table_saved"] = edited_msa_df.to_dict('records')
     
-            # --------------------------------------------------
-            # 5. Execution du Protocole Terrain
-            # --------------------------------------------------
-            st.divider()
-            st.subheader("5. Execution du Protocole Terrain")
-    
-            if proto_key not in st.session_state:
-                st.session_state[proto_key] = pd.DataFrame(p.get("protocol_saved", []))
-    
-            edited_proto_df = st.data_editor(
-                st.session_state[proto_key], 
-                num_rows="dynamic", 
-                use_container_width=True
-            )
-    
             if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_{idx_str}", type="primary"):
                 st.session_state[proto_key] = edited_proto_df
                 p["protocol_saved"] = edited_proto_df.to_dict('records')
