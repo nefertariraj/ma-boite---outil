@@ -1813,7 +1813,25 @@ else:
                     project_dict["dcp_validated_lock"] = True
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
-    
+
+        # --- 1. DÉFINITION GLOBALE DES CLÉS (Indispensable avant usage) ---
+        # Ces variables doivent être définies ici pour être accessibles au reste du script
+        idx_str = str(safe_idx)
+        dcp_table_key = f"master_dcp_table_{idx_str}"
+        local_msa_key = f"msa_classification_table_{idx_str}"
+        lock_key = f"dcp_validated_lock_{idx_str}"
+        proto_key = f"protocol_data_{idx_str}"
+
+        # --- 2. APPEL DU FRAGMENT (Génération des données) ---
+        render_data_collection_and_msa(p, safe_idx)
+
+        # --- 3. AFFICHAGE DU DCP (Flux principal - maintenant sécurisé) ---
+        st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
+        if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
+            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
+        else:
+            st.warning("Le Data Collection Plan n'a pas encore été généré.")
+        
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
         # --------------------------------------------------
