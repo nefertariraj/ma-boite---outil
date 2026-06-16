@@ -1814,13 +1814,13 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
             
-        # --- FLUX PRINCIPAL (Garanti d'être affiché) ---
+        # --- FLUX PRINCIPAL ---
         st.subheader("3. Master Black Belt Data Collection Plan")
 
         # Affichez le DCP ici, hors du fragment
         dcp_table_key = f"master_dcp_table_{safe_idx}"
         if dcp_table_key in st.session_state:
-        st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
+            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
 
         # Appelez la fonction de rendu (MSA + Protocole)
         render_data_collection_and_msa(project_dict, component_idx)
@@ -1829,9 +1829,6 @@ else:
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
         # --------------------------------------------------
         def render_data_collection_and_msa(project_dict, component_idx):
-            # Enlevez @st.fragment pour tester si c'est lui qui bloque
-            # Si ça fonctionne sans, vous pourrez le remettre plus tard
-    
             safe_idx = str(component_idx)
             local_msa_key = f"msa_classification_table_{safe_idx}"
             proto_key = f"protocol_data_{safe_idx}"
