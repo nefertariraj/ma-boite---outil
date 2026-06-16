@@ -1881,7 +1881,6 @@ else:
                 p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
 
-        # --- BLOC DE PROTECTION ---
         if p.get("protocol_saved"):       
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
@@ -1955,10 +1954,6 @@ else:
                 dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
                 dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
                 bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
-            
-        # --- FIN DU BLOC ---
-        else:
-            st.info("Le protocole sera disponible après l'enregistrement du MSA.")  
              
                 p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
                 p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
@@ -2020,8 +2015,8 @@ else:
                         column_config={
                             "Unité": st.column_config.SelectboxColumn("Unité de mesure", options=liste_unites, required=True)
                         }
-                    )
-                    
+                    ) 
+                
                 # 🛡️ SÉCURITÉ SANS TOUCHER AUX BOUTONS : Si l'utilisateur clique sur un bouton plus bas,
                 # les variables edited_rep et edited_reprod se vident. On les force ici à récupérer les données en mémoire.
                 if edited_rep is None or (isinstance(edited_rep, dict) and not edited_rep.get("edited_rows") and not edited_rep.get("added_rows") and not edited_rep.get("deleted_rows")):
@@ -2039,7 +2034,7 @@ else:
                     step=0.1,
                     key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
                 )
-
+                
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
