@@ -1881,6 +1881,7 @@ else:
                 p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
 
+        # --- BLOC DE PROTECTION ---
         if p.get("protocol_saved"):       
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
@@ -1947,16 +1948,18 @@ else:
                             st.markdown("---")
                 else:
                     st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici automatiquement après avoir cliqué sur 'Valider et verrouiller'.")
-        else:
-            st.info("Le protocole sera disponible après l'enregistrement du MSA.")
-                
+            
                 # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
                 var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
                 
                 dynamic_rep_key = f"rep_data_{var_clean_id}_{safe_idx}"
                 dynamic_reprod_key = f"reprod_data_{var_clean_id}_{safe_idx}"
                 bias_hist_key = f"hist_{var_clean_id}_{safe_idx}"
-                
+            
+        # --- FIN DU BLOC ---
+        else:
+            st.info("Le protocole sera disponible après l'enregistrement du MSA.")  
+             
                 p_rep_save_key = f"save_rep_{var_clean_id}_{safe_idx}"
                 p_reprod_save_key = f"save_reprod_{var_clean_id}_{safe_idx}"
                 p_bias_hist_save_key = f"save_bias_hist_{var_clean_id}_{safe_idx}"
