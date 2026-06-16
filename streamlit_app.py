@@ -1844,7 +1844,36 @@ else:
                         )
                     }
                 )
-        render_data_collection_and_msa(p, safe_idx)
+                
+                # Sauvegarde automatique de l'état MSA (logique existante)
+                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+
+                # --------------------------------------------------
+                # 5. EXECUTION DU PROTOCOLE TERRAIN
+                # --------------------------------------------------
+                st.divider()
+                st.subheader("5. Execution du Protocole Terrain")
+                
+                # Initialisation de la structure pour le protocole
+                proto_key = f"protocol_data_{component_idx}"
+                if proto_key not in st.session_state:
+                    st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
+                
+                # Éditeur pour la saisie terrain
+                edited_proto_df = st.data_editor(
+                    st.session_state[proto_key],
+                    num_rows="dynamic",
+                    use_container_width=True
+                )
+                
+                # Bouton de sauvegarde manuelle
+                if st.button("💾 Enregistrer le Protocole Terrain", key=f"save_proto_{component_idx}"):
+                    st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
+                    project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
+                    st.success("✅ Protocole terrain enregistré !")
+
+        # Fin de la fonction render_data_collection_and_msa
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
