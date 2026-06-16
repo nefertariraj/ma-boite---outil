@@ -1882,7 +1882,6 @@ else:
                 st.success("✅ Données enregistrées dans le projet !")
 
         if p.get("protocol_saved"):       
-            # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
             if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
