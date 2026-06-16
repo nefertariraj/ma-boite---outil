@@ -1816,16 +1816,18 @@ else:
             
     @st.fragment
     def render_data_collection_and_msa(project_dict, component_idx):
-        # --- 1. DÉFINITION DES CLÉS DANS LE FRAGMENT ---
+        # 1. DIAGNOSTIC : On vérifie si la fonction est bien appelée
+        st.write(f"DEBUG: Fragment appelé pour index {component_idx}")
+    
+        # 2. DÉFINITION DES CLÉS
         safe_idx = str(component_idx)
         matrix_key = f"mbb_prioritization_matrix_{safe_idx}"
         dcp_table_key = f"master_dcp_table_{safe_idx}"
         lock_key = f"dcp_validated_lock_{safe_idx}"
-        local_msa_key = f"msa_classification_table_{safe_idx}"
-        proto_key = f"protocol_data_{safe_idx}"
-
-        # ... (Gardez ici tout votre code de la Section 1 Priorisation et Section 2 DCP) ...
-
+    
+        # 3. DIAGNOSTIC : On vérifie l'état des données
+        st.write(f"DEBUG: DCP Key exists? {dcp_table_key in st.session_state}")
+        
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
         # --------------------------------------------------
