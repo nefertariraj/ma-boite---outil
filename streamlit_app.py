@@ -1860,7 +1860,18 @@ else:
             df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
             if df_msa.empty:
                 df_msa = pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
-    
+
+            for i, row in df_msa.iterrows():
+                var_name = row["Variable Critique (liée au Y)"]
+                v_c = "".join(e for e in str(var_name) if e.isalnum())
+                # On vérifie si des données de test (rép ou reprod) existent dans 'p' pour cette variable
+                if (f"save_rep_{v_c}_{safe_idx}" in p) or (f"save_reprod_{v_c}_{safe_idx}" in p):
+                    df_msa.at[i, "Statut de validation"] = "test effectué"
+            
+            # On met à jour la session avec le statut corrigé
+            st.session_state[local_msa_key] = df_msa 
+            # --------------------------------------------------
+            
             edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
     
             # Bouton de sauvegarde
@@ -1870,8 +1881,7 @@ else:
                 p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
 
-        if p.get("protocol_saved"):
-                    
+        if p.get("protocol_saved"):       
             # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
@@ -1938,6 +1948,8 @@ else:
                             st.markdown("---")
                 else:
                     st.info("ℹ️ Aucune variable n'a encore été validée. Les résumés s'afficheront ici automatiquement après avoir cliqué sur 'Valider et verrouiller'.")
+        else:
+            st.info("Le protocole sera disponible après l'enregistrement du MSA.")
                 
                 # ISOLATION CELLULAIRE TERRAIN (Par variable sélectionnée)
                 var_clean_id = "".join(e for e in selected_var_to_test if e.isalnum())
