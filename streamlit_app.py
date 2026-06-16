@@ -1838,6 +1838,10 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
+        # --- CORRECTION DE SYNCHRONISATION PRIORITAIRE (L'ancre au démarrage) ---
+        if p.get("msa_table_saved"):
+             st.session_state[lock_key] = True
+        
         # --- LOGIQUE DE RESTAURATION AMÉLIORÉE ---
         if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
             saved_msa = p.get("msa_table_saved", [])
