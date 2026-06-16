@@ -1816,78 +1816,39 @@ else:
             
     @st.fragment
     def render_data_collection_and_msa(project_dict, component_idx):
-    # --- 1. CLÉS ---
-    safe_idx = str(component_idx)
-    local_msa_key = f"msa_classification_table_{safe_idx}"
-    proto_key = f"protocol_data_{safe_idx}"
+        # --- 1. CLÉS ---
+        safe_idx = str(component_idx)
+        local_msa_key = f"msa_classification_table_{safe_idx}"
+        proto_key = f"protocol_data_{safe_idx}"
+        dcp_table_key = f"master_dcp_table_{safe_idx}"
 
-    # ... (VOTRE CODE DCP EXISTANT) ...
+        # --- 2. AFFICHAGE DU DCP (Section 3) ---
+        if dcp_table_key in st.session_state:
+            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
 
-    # --- 2. MSA FORCÉ ---
-    st.divider()
-    st.subheader("4. Validate Measurement System (MSA)")
-    try:
-        df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
-        # On s'assure d'avoir un DF valide, même vide
-        if df_msa_in_state is None or df_msa_in_state.empty:
-            st.info("Aucune donnée MSA trouvée (vide).")
-            df_msa_in_state = pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
-        
-        edited_msa_df = st.data_editor(df_msa_in_state, num_rows="fixed", use_container_width=True)
-    except Exception as e:
-        st.error(f"Erreur MSA : {e}")
+        # --- 3. MSA FORCÉ (Section 4) ---
+        st.divider()
+        st.subheader("4. Validate Measurement System (MSA)")
+    
+        df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
+    
+        if df_msa.empty:
+            df_msa = pd.DataFrame(columns=["Variable Critique", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut"])
 
-    # --- 3. PROTOCOLE FORCÉ ---
-    st.divider()
-    st.subheader("5. Execution du Protocole Terrain")
-    try:
-        if proto_key not in st.session_state:
-            st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
-        
-        edited_proto_df = st.data_editor(st.session_state[proto_key], num_rows="dynamic", use_container_width=True)
-    except Exception as e:
-        st.error(f"Erreur Protocole : {e}")
-
-    # --- 4. BOUTON SAUVEGARDE ---
-    if st.button("💾 Enregistrer tout", key=f"btn_save_all_{safe_idx}", type="primary"):
-        st.session_state[local_msa_key] = edited_msa_df
-        st.session_state[proto_key] = edited_proto_df
-        project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
-        project_dict["protocol_saved"] = edited_proto_df.to_dict('records')
-        st.success("✅ Données enregistrées !")
+        edited_msa_df = st.data_editor(
+            df_msa,
+            num_rows="fixed",
+            use_container_width=True
+        )
             
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
         # --------------------------------------------------
         st.divider()
-        st.subheader("4. Validate Measurement System (MSA)")
-
-        # On récupère les données, ou un DataFrame vide par défaut
-        df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
-
-        # --- CHANGEMENT ICI : On affiche même si le dataframe est vide pour permettre la saisie ---
-        st.info("✅ Configuration du Système de Mesure :")
-    
-        # Si c'est vide, on affiche un message ou une possibilité d'initialiser
-        if df_msa_in_state.empty:
-            st.warning("Aucune donnée MSA chargée depuis le DCP. Vérifiez votre matrice.")
-    
-        # On affiche l'éditeur dans tous les cas
-        edited_msa_df = st.data_editor(
-            df_msa_in_state,
-            num_rows="fixed",
-            use_container_width=True
-        )
-
-        # --------------------------------------------------
-        # 5. EXECUTION DU PROTOCOLE TERRAIN
-        # --------------------------------------------------
-        st.divider()
         st.subheader("5. Execution du Protocole Terrain")
     
-        # Même chose ici : on affiche toujours l'éditeur
         if proto_key not in st.session_state:
-                st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
+            st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
     
         edited_proto_df = st.data_editor(
             st.session_state[proto_key],
@@ -1895,12 +1856,14 @@ else:
             use_container_width=True
         )
 
-        # --- BOUTON UNIQUE DE SAUVEGARDE ---
+        # --- 5. BOUTON UNIQUE DE SAUVEGARDE ---
         if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
+            # Mise à jour des sessions
             st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
-        
             st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
+        
+            # Mise à jour du dictionnaire projet
+            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
             project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
         
             st.success("✅ Données enregistrées manuellement !")
