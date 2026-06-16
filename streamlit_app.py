@@ -1838,11 +1838,16 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
-        # --- LOGIQUE DE RESTAURATION : On cherche dans la session ou dans le dictionnaire sauvegardé ---
+        # --- LOGIQUE DE RESTAURATION AMÉLIORÉE ---
         if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
             saved_msa = p.get("msa_table_saved", [])
             st.session_state[local_msa_key] = pd.DataFrame(saved_msa) if saved_msa else pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
         
+        # --- FORCER LA SYNCHRONISATION DU PROTOCOLE AU CHARGEMENT ---
+        # Cette ligne garantit que même si on vient de se connecter, le lien avec 'p' est rafraîchi
+        if p.get("protocol_saved") and st.session_state[local_msa_key].empty:
+             st.session_state[local_msa_key] = pd.DataFrame(p["protocol_saved"])
+            
         # Vérification du verrouillage
         if not st.session_state.get(lock_key, False):
             st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
