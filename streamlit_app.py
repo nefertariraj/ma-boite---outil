@@ -1816,19 +1816,14 @@ else:
                        
     # --- FLUX PRINCIPAL ---
     st.subheader("3. Master Black Belt Data Collection Plan")
-    # Appel unique du fragment
-    render_data_collection_and_msa(p, safe_idx)
 
-    # --- DÉFINITION DU FRAGMENT (Nettoyé) ---
+    # Appel du fragment
+    render_data_collection_and_msa(p, safe_idx_str, dcp_table_key, local_msa_key, lock_key, proto_key)
+
+    # --- DÉFINITION DU FRAGMENT ---
     @st.fragment
-    def render_data_collection_and_msa(project_dict, component_idx):
-        # 1. Définition UNIQUE des clés
-        safe_idx = str(component_idx)
-        dcp_table_key = f"master_dcp_table_{safe_idx}"
-        local_msa_key = f"msa_classification_table_{safe_idx}"
-        lock_key = f"dcp_validated_lock_{safe_idx}"
-
-        # 2. Affichage DCP
+    def render_data_collection_and_msa(project_dict, component_idx, dcp_table_key, local_msa_key, lock_key, proto_key):
+        # 1. Affichage DCP
         if dcp_table_key in st.session_state:
             st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
         
@@ -1838,28 +1833,43 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
-        # 1. Vérification du verrouillage
-        # DEBUG IMMÉDIAT
-        st.write(f"DEBUG: Valeur de lock_key ({lock_key}) est {st.session_state.get(lock_key)}")
+        # Vérification du verrouillage
+        st.write(f"DEBUG: Valeur de lock_key est {st.session_state.get(lock_key, False)}")
+    
         if not st.session_state.get(lock_key, False):
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
-        
         else:
-            # 1. MSA
-            st.write("--- TEST : DÉBUT MSA ---")
+            # Affichage MSA
             df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
-            st.write(f"MSA Data shape: {df_msa.shape}")
-            st.dataframe(df_msa) # Utilisation d'un dataframe simple, pas un editor
-            
-            # 2. SEPARATEUR
-            st.write("--- TEST : ENTRE MSA ET PROTOCOLE ---")
-            
-            # 3. PROTOCOLE
-            st.write("--- TEST : DÉBUT PROTOCOLE ---")
-            proto_key = f"protocol_data_{safe_idx}"
-            df_proto = st.session_state.get(proto_key, pd.DataFrame())
-            st.dataframe(df_proto)
-            st.write("--- TEST : FIN PROTOCOLE ---")
+            if df_msa.empty:
+                df_msa = pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
+        
+            edited_msa_df = st.data_editor(
+                df_msa,
+                num_rows="fixed",
+                use_container_width=True
+            )
+        
+            st.session_state[local_msa_key] = edited_msa_df
+            project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+        
+            # 3. Section 5 (Protocole)
+            st.divider()
+            st.subheader("5. Execution du Protocole Terrain")
+        
+            if proto_key not in st.session_state:
+                st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
+        
+            edited_proto_df = st.data_editor(
+                st.session_state[proto_key], 
+                num_rows="dynamic", 
+                use_container_width=True
+            )
+        
+            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_final_{component_idx}", type="primary"):
+                st.session_state[proto_key] = edited_proto_df
+                project_dict["protocol_saved"] = edited_proto_df.to_dict('records')
+                st.success("✅ Données enregistrées !")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
