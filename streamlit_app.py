@@ -2027,120 +2027,120 @@ else:
                     key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
                 )
 
-            # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
+                # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
                     
-                # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (NONE-CHECK)
-                # Si la variable locale est perdue au clic, on tente de la récupérer via les clés d'état actives
-                if 'edited_rep' not in locals() or edited_rep is None:
-                    edited_rep = st.session_state.get(dynamic_rep_key) or st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
+                    # 1. RÉCUPÉRATION ET BLINDAGE ANTI-CRASH (NONE-CHECK)
+                    # Si la variable locale est perdue au clic, on tente de la récupérer via les clés d'état actives
+                    if 'edited_rep' not in locals() or edited_rep is None:
+                        edited_rep = st.session_state.get(dynamic_rep_key) or st.session_state.get(f"editor_rep_{var_clean_id}_{safe_idx}")
                         
-                if 'edited_reprod' not in locals() or edited_reprod is None:
-                    edited_reprod = st.session_state.get(dynamic_reprod_key) or st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
+                    if 'edited_reprod' not in locals() or edited_reprod is None:
+                        edited_reprod = st.session_state.get(dynamic_reprod_key) or st.session_state.get(f"editor_reprod_{var_clean_id}_{safe_idx}")
 
-                # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P' (Uniquement si les données existent)
-                if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
-                    p[p_rep_save_key] = edited_rep.to_dict(orient='records')
-                    st.session_state[dynamic_rep_key] = edited_rep
+                    # 2. SAUVEGARDE SÉCURISÉE DANS LE DICTIONNAIRE 'P' (Uniquement si les données existent)
+                    if edited_rep is not None and hasattr(edited_rep, 'to_dict'):
+                        p[p_rep_save_key] = edited_rep.to_dict(orient='records')
+                        st.session_state[dynamic_rep_key] = edited_rep
                     
-                if edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
-                    p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
-                    st.session_state[dynamic_reprod_key] = edited_reprod
+                    if edited_reprod is not None and hasattr(edited_reprod, 'to_dict'):
+                        p[p_reprod_save_key] = edited_reprod.to_dict(orient='records')
+                        st.session_state[dynamic_reprod_key] = edited_reprod
 
-                # 3. VOTRE LOGIQUE D'ANALYSE DES BIAIS (100% INTACTE ET PROTÉGÉE)
-                anomalies_mineures = []
-                anomalies_majeures = []
+                    # 3. VOTRE LOGIQUE D'ANALYSE DES BIAIS (100% INTACTE ET PROTÉGÉE)
+                    anomalies_mineures = []
+                    anomalies_majeures = []
                     
-                if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
-                    try:
-                        val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
-                        val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
+                    if edited_rep is not None and not edited_rep.empty and 'Situation A' in edited_rep.columns and 'Situation B' in edited_rep.columns:
+                        try:
+                            val_col1 = pd.to_numeric(edited_rep['Situation A'], errors='coerce')
+                            val_col2 = pd.to_numeric(edited_rep['Situation B'], errors='coerce')
                             
-                        if val_col1.dropna().empty or val_col2.dropna().empty:
-                            anomalies_majeures.append("Données de Répétabilité Invalides ou Vides")
-                        else:
-                            diffs = (val_col1 - val_col2).abs()
-                            mean_val = val_col1.mean()
-                            if not diffs.dropna().empty and mean_val > 0:
-                                if diffs.max() > mean_val * 0.30:
-                                    anomalies_majeures.append("Incohérence Critique de Répétabilité (EV)")
-                                elif diffs.max() > mean_val * 0.10:
-                                    anomalies_mineures.append("Dispersion de Répétabilité légère")
+                            if val_col1.dropna().empty or val_col2.dropna().empty:
+                                anomalies_majeures.append("Données de Répétabilité Invalides ou Vides")
+                            else:
+                                diffs = (val_col1 - val_col2).abs()
+                                mean_val = val_col1.mean()
+                                if not diffs.dropna().empty and mean_val > 0:
+                                    if diffs.max() > mean_val * 0.30:
+                                        anomalies_majeures.append("Incohérence Critique de Répétabilité (EV)")
+                                    elif diffs.max() > mean_val * 0.10:
+                                        anomalies_mineures.append("Dispersion de Répétabilité légère")
                                 
-                            all_vals = pd.concat([val_col1, val_col2]).dropna()
-                            if not all_vals.empty and all(v % 5 == 0 for v in all_vals if v > 0):
-                                anomalies_mineures.append("Biais d'Arrondis Systématiques (Résolution insuffisante)")
-                    except Exception as e:
-                        anomalies_majeures.append(f"Erreur évaluation Répétabilité: {str(e)}")
+                                all_vals = pd.concat([val_col1, val_col2]).dropna()
+                                if not all_vals.empty and all(v % 5 == 0 for v in all_vals if v > 0):
+                                    anomalies_mineures.append("Biais d'Arrondis Systématiques (Résolution insuffisante)")
+                        except Exception as e:
+                            anomalies_majeures.append(f"Erreur évaluation Répétabilité: {str(e)}")
 
-                if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
-                    try:
-                        vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
+                    if edited_reprod is not None and not edited_reprod.empty and "Résultat" in edited_reprod.columns:
+                        try:
+                            vals_reprod = pd.to_numeric(edited_reprod["Résultat"], errors='coerce').dropna()
                             
-                        if vals_reprod.empty:
-                            anomalies_majeures.append("Données de Reproductibilité Manquantes ou Invalides")
-                        else:
-                            if len(vals_reprod) >= 2:
-                                std_dev = vals_reprod.std()
-                                if pd.notna(std_dev) and vals_reprod.mean() > 0:
-                                    if std_dev > (vals_reprod.mean() * 0.20):
-                                        anomalies_majeures.append("Instabilité Critique de Reproductibilité (AV)")
-                            if 'valeur_reference' in locals() and valeur_reference != 0.0:
-                                biais_justesse = abs(vals_reprod.mean() - valeur_reference)
-                                if biais_justesse > abs(valeur_reference * 0.08):
-                                    anomalies_majeures.append("Biais de Justesse Linéaire (Décalage / Master)")
-                    except Exception as e:
-                        anomalies_majeures.append(f"Erreur évaluation Reproductibilité: {str(e)}")
+                            if vals_reprod.empty:
+                                anomalies_majeures.append("Données de Reproductibilité Manquantes ou Invalides")
+                            else:
+                                if len(vals_reprod) >= 2:
+                                    std_dev = vals_reprod.std()
+                                    if pd.notna(std_dev) and vals_reprod.mean() > 0:
+                                        if std_dev > (vals_reprod.mean() * 0.20):
+                                            anomalies_majeures.append("Instabilité Critique de Reproductibilité (AV)")
+                                if 'valeur_reference' in locals() and valeur_reference != 0.0:
+                                    biais_justesse = abs(vals_reprod.mean() - valeur_reference)
+                                    if biais_justesse > abs(valeur_reference * 0.08):
+                                        anomalies_majeures.append("Biais de Justesse Linéaire (Décalage / Master)")
+                        except Exception as e:
+                            anomalies_majeures.append(f"Erreur évaluation Reproductibilité: {str(e)}")
                     
-                if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
-                    anomalies_majeures.append("Variabilité Incalculable : Aucune donnée disponible")
+                    if (edited_rep is None or edited_rep.empty) and (edited_reprod is None or edited_reprod.empty):
+                        anomalies_majeures.append("Variabilité Incalculable : Aucune donnée disponible")
                     
-                if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
-                    score, status = "100%", "🟢 Système Fiable"
-                elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
-                    score, status = "75%", "🟡 Alerte : Biais Mineur (Sous contrôle)"
-                elif len(anomalies_majeures) == 1 and len(anomalies_mineures) == 0:
-                    score, status = "50%", "🟠 Alerte : Dérive Majeure"
-                elif len(anomalies_majeures) == 1 and len(anomalies_mineures) > 0:
-                    score, status = "35%", "🟠 Alerte : Instabilité Système Cumulée"
-                else:
-                    score, status = "10%", "🔴 Système Non Fiable (Processus Hors Contrôle)"
+                    if len(anomalies_majeures) == 0 and len(anomalies_mineures) == 0:
+                        score, status = "100%", "🟢 Système Fiable"
+                    elif len(anomalies_majeures) == 0 and len(anomalies_mineures) > 0:
+                        score, status = "75%", "🟡 Alerte : Biais Mineur (Sous contrôle)"
+                    elif len(anomalies_majeures) == 1 and len(anomalies_mineures) == 0:
+                        score, status = "50%", "🟠 Alerte : Dérive Majeure"
+                    elif len(anomalies_majeures) == 1 and len(anomalies_mineures) > 0:
+                        score, status = "35%", "🟠 Alerte : Instabilité Système Cumulée"
+                    else:
+                        score, status = "10%", "🔴 Système Non Fiable (Processus Hors Contrôle)"
                     
-                toutes_anomalies = anomalies_majeures + anomalies_mineures
-                liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
+                    toutes_anomalies = anomalies_majeures + anomalies_mineures
+                    liste_anomalies_str = ", ".join(toutes_anomalies) if toutes_anomalies else "Aucune (Système sain)"
                     
-                gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
+                    gmt3_time = pd.Timestamp.now(tz='UTC').tz_convert('Indian/Antananarivo').strftime('%d/%m/%Y %H:%M:%S')
                     
-                run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
-                st.session_state["msa_bias_history"][bias_hist_key].append({
-                    "Essai": f"Analyse #{run_number}",
-                    "Date/Heure": gmt3_time,
-                    "Indice de Fidélité": score,
-                    "Statut Global": status,
-                    "Anomalies Détectées": liste_anomalies_str
-                })
+                    run_number = len(st.session_state["msa_bias_history"][bias_hist_key]) + 1
+                    st.session_state["msa_bias_history"][bias_hist_key].append({
+                        "Essai": f"Analyse #{run_number}",
+                        "Date/Heure": gmt3_time,
+                        "Indice de Fidélité": score,
+                        "Statut Global": status,
+                        "Anomalies Détectées": liste_anomalies_str
+                    })
                     
-                p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
-                st.rerun()
+                    p[p_bias_hist_save_key] = st.session_state["msa_bias_history"][bias_hist_key]
+                    st.rerun()
 
-            if st.session_state["msa_bias_history"][bias_hist_key]:
-                st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
-                df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
-                st.table(df_history)
+                if st.session_state["msa_bias_history"][bias_hist_key]:
+                    st.markdown("##### ⏳ Évolution de l'Analyse des Biais (Suivi cumulé des recalibrages)")
+                    df_history = pd.DataFrame(st.session_state["msa_bias_history"][bias_hist_key])
+                    st.table(df_history)
 
-            # =====================================================================
-            # 💾 BOUTON DE VALIDATION DÉFINITIVE
-            # =====================================================================
-            if st.button(
-                f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
-                key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
-                type="primary", 
-                use_container_width=True
-            ):
-                # 1️⃣ Sécurité : On s'assure que le projet existe dans la session globale
-                if 'projects' in st.session_state and 'p_idx' in locals():
-                    idx = p_idx
+                # =====================================================================
+                # 💾 BOUTON DE VALIDATION DÉFINITIVE
+                # =====================================================================
+                if st.button(
+                    f"💾 Valider et verrouiller définitivement les données pour : {selected_var_to_test}", 
+                    key=f"btn_validate_msa_{var_clean_id}_{safe_idx}", 
+                    type="primary", 
+                    use_container_width=True
+                ):
+                    # 1️⃣ Sécurité : On s'assure que le projet existe dans la session globale
+                    if 'projects' in st.session_state and 'p_idx' in locals():
+                        idx = p_idx
                         
                     # 2️⃣ Récupération directe des composants de la page
                     final_rep = edited_rep
