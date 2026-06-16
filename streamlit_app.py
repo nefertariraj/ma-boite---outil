@@ -1843,42 +1843,21 @@ else:
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
         
         else:
-            # 2. RÉCUPÉRATION DU MSA
+            # 1. MSA
+            st.write("--- TEST : DÉBUT MSA ---")
             df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
-            if df_msa.empty:
-                df_msa = pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
+            st.write(f"MSA Data shape: {df_msa.shape}")
+            st.dataframe(df_msa) # Utilisation d'un dataframe simple, pas un editor
             
-            st.success("✅ Système de mesure :")
+            # 2. SEPARATEUR
+            st.write("--- TEST : ENTRE MSA ET PROTOCOLE ---")
             
-            # Utilisation d'un conteneur pour isoler le rendu
-            with st.container():
-                edited_msa_df = st.data_editor(
-                    df_msa,
-                    num_rows="fixed",
-                    use_container_width=True
-                )
-                # Sauvegarde immédiate
-                st.session_state[local_msa_key] = edited_msa_df
-                project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
-
-            # 3. SÉPARATION CLAIRE POUR LE PROTOCOLE
-            st.markdown("---") # Utilisation de markdown au lieu de divider pour éviter les conflits
-            st.subheader("5. Execution du Protocole Terrain")
-            
+            # 3. PROTOCOLE
+            st.write("--- TEST : DÉBUT PROTOCOLE ---")
             proto_key = f"protocol_data_{safe_idx}"
-            if proto_key not in st.session_state:
-                st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
-            
-            edited_proto_df = st.data_editor(
-                st.session_state[proto_key], 
-                num_rows="dynamic", 
-                use_container_width=True
-            )
-            
-            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_final_{safe_idx}", type="primary"):
-                st.session_state[proto_key] = edited_proto_df
-                project_dict["protocol_saved"] = edited_proto_df.to_dict('records')
-                st.success("✅ Données enregistrées !")
+            df_proto = st.session_state.get(proto_key, pd.DataFrame())
+            st.dataframe(df_proto)
+            st.write("--- TEST : FIN PROTOCOLE ---")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
