@@ -1814,23 +1814,21 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
                        
-    # --- HORS DU FRAGMENT (Affiche uniquement le titre 3) ---
+    # --- FLUX PRINCIPAL ---
     st.subheader("3. Master Black Belt Data Collection Plan")
-
-    # --- APPEL DU FRAGMENT ---
+    # Appel unique du fragment
     render_data_collection_and_msa(p, safe_idx)
 
-    # --- DÉFINITION DU FRAGMENT (Inclut tout : DCP + MSA + Protocole) ---
+    # --- DÉFINITION DU FRAGMENT (Nettoyé) ---
     @st.fragment
     def render_data_collection_and_msa(project_dict, component_idx):
-        # 1. DÉFINITION DES CLÉS ICI (pour qu'elles soient connues dans tout le fragment)
+        # 1. Définition UNIQUE des clés
         safe_idx = str(component_idx)
         dcp_table_key = f"master_dcp_table_{safe_idx}"
         local_msa_key = f"msa_classification_table_{safe_idx}"
-        proto_key = f"protocol_data_{safe_idx}"
         lock_key = f"dcp_validated_lock_{safe_idx}"
 
-        # 2. AFFICHAGE DU DCP (Section 2)
+        # 2. Affichage DCP
         if dcp_table_key in st.session_state:
             st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
         
@@ -1840,21 +1838,15 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
-        # 1. Redéfinition locale des clés
-        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
-        local_msa_key = f"msa_classification_table_{safe_idx}"
-        lock_key = f"dcp_validated_lock_{safe_idx}"
-
-        # 2. Vérification du verrouillage
+        # 3. Vérification du verrouillage (Utilise les clés définies plus haut)
         if not st.session_state.get(lock_key, False):
-            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
-        
+            st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
         else:
-            # 3. Récupération et affichage du MSA
+            # 4. Récupération et affichage du MSA
             df_msa_in_state = st.session_state.get(local_msa_key, pd.DataFrame())
         
             if not df_msa_in_state.empty:
-                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation MSA :")
+                st.success("✅ Système de mesure extrait du DCP. Spécifiez vos statuts de validation :")
             
                 edited_msa_df = st.data_editor(
                     df_msa_in_state,
@@ -1872,12 +1864,11 @@ else:
                         )
                     }
                 )
-            
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                # ICI : Utilisation de 'p' (la variable globale de votre projet)
-                p["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+                # Sauvegarde dans le state et dans le dictionnaire du projet
+                st.session_state[local_msa_key] = edited_msa_df
+                project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
             else:
-                st.warning("⚠️ Aucune donnée MSA trouvée. Veuillez vérifier la génération du DCP.")
+                st.warning("⚠️ Aucune donnée MSA trouvée.")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
