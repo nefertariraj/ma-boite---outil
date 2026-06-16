@@ -1815,27 +1815,26 @@ else:
                     st.rerun()
                        
     # --- FLUX PRINCIPAL ---
-    safe_idx_str = str(safe_idx)
-    # On définit tout dans le session_state pour qu'il soit accessible partout
+    # On stocke l'objet complexe dans le session_state pour ne pas le passer en argument
     st.session_state["current_project"] = p 
-    st.session_state["current_idx"] = safe_idx_str
+    safe_idx_str = str(safe_idx)
 
     st.subheader("3. Master Black Belt Data Collection Plan")
 
-    # Appel du fragment SANS passer l'objet projet (juste les clés)
+    # Appel du fragment avec uniquement une chaîne de caractères
     render_data_collection_and_msa(safe_idx_str)
 
     # --- DÉFINITION DU FRAGMENT ---
     @st.fragment
-    def render_data_collection_and_msa(component_idx):
-        # Récupération des objets depuis le session_state au lieu des arguments
+    def render_data_collection_and_msa(idx_str):
+        # Récupération de l'objet depuis le session_state à l'intérieur du fragment
         project_dict = st.session_state["current_project"]
     
         # Définition des clés locales
-        dcp_table_key = f"master_dcp_table_{component_idx}"
-        local_msa_key = f"msa_classification_table_{component_idx}"
-        lock_key = f"dcp_validated_lock_{component_idx}"
-        proto_key = f"protocol_data_{component_idx}"
+        dcp_table_key = f"master_dcp_table_{idx_str}"
+        local_msa_key = f"msa_classification_table_{idx_str}"
+        lock_key = f"dcp_validated_lock_{idx_str}"
+        proto_key = f"protocol_data_{idx_str}"
 
         # 1. Affichage DCP
         if dcp_table_key in st.session_state:
@@ -1848,28 +1847,35 @@ else:
         st.subheader("4. Validate Measurement System (MSA)")
 
         if not st.session_state.get(lock_key, False):
-            st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
+            st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
         else:
             # Affichage MSA
             df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
             if df_msa.empty:
-                df_msa = pd.DataFrame(columns=["Variable Critique", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
+                df_msa = pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
         
             edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
         
-            # Sauvegarde
+            # Sauvegarde MSA
             st.session_state[local_msa_key] = edited_msa_df
             project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
         
-            # 3. Section 5 (Protocole)
+            # --------------------------------------------------
+            # 5. Execution du Protocole Terrain
+            # --------------------------------------------------
             st.divider()
             st.subheader("5. Execution du Protocole Terrain")
+        
             if proto_key not in st.session_state:
                 st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
         
-            edited_proto_df = st.data_editor(st.session_state[proto_key], num_rows="dynamic", use_container_width=True)
+            edited_proto_df = st.data_editor(
+                st.session_state[proto_key], 
+                num_rows="dynamic", 
+                use_container_width=True
+            )
         
-            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_{component_idx}", type="primary"):
+            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_{idx_str}", type="primary"):
                 st.session_state[proto_key] = edited_proto_df
                 project_dict["protocol_saved"] = edited_proto_df.to_dict('records')
                 st.success("✅ Données enregistrées !")
