@@ -1813,51 +1813,53 @@ else:
                     project_dict["dcp_validated_lock"] = True
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
-            
-        # --- FLUX PRINCIPAL ---
-        st.subheader("3. Master Black Belt Data Collection Plan")
-
-        # Affichez le DCP ici, hors du fragment
-        dcp_table_key = f"master_dcp_table_{safe_idx}"
-        if dcp_table_key in st.session_state:
-            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
-
-        # Appelez la fonction de rendu (MSA + Protocole)
-        render_data_collection_and_msa(project_dict, component_idx)
-            
+                       
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
         # --------------------------------------------------
         def render_data_collection_and_msa(project_dict, component_idx):
-            safe_idx = str(component_idx)
-            local_msa_key = f"msa_classification_table_{safe_idx}"
-            proto_key = f"protocol_data_{safe_idx}"
+        safe_idx = str(component_idx)
+        local_msa_key = f"msa_classification_table_{safe_idx}"
+        proto_key = f"protocol_data_{safe_idx}"
 
-            st.divider()
-            st.subheader("4. Validate Measurement System (MSA) & Protocole Terrain")
+        st.divider()
+        st.subheader("4. Validate Measurement System (MSA) & Protocole Terrain")
     
-            # 4.1 MSA
-            st.markdown("**4.1. Système de Mesure**")
-            df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
-            if df_msa.empty:
-                df_msa = pd.DataFrame(columns=["Variable Critique", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut"])
+        # 4.1 MSA
+        st.markdown("**4.1. Système de Mesure**")
+        df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
+        if df_msa.empty:
+            df_msa = pd.DataFrame(columns=["Variable Critique", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut"])
 
-            edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
+        edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
     
-            # 4.2 Protocole
-            st.markdown("**4.2. Protocole Terrain associé**")
-            if proto_key not in st.session_state:
-                st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
+        # 4.2 Protocole
+        st.markdown("**4.2. Protocole Terrain associé**")
+        if proto_key not in st.session_state:
+            st.session_state[proto_key] = pd.DataFrame(project_dict.get("protocol_saved", []))
     
-            edited_proto_df = st.data_editor(st.session_state[proto_key], num_rows="dynamic", use_container_width=True)
+        edited_proto_df = st.data_editor(st.session_state[proto_key], num_rows="dynamic", use_container_width=True)
 
-            # Sauvegarde
-            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
-                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
-                project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
-                st.success("✅ Données enregistrées manuellement !")
+        # Sauvegarde
+        if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
+            st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
+            st.session_state[proto_key] = pd.DataFrame(edited_proto_df)
+            project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
+            project_dict["protocol_saved"] = st.session_state[proto_key].to_dict('records')
+            st.success("✅ Données enregistrées manuellement !")
+
+    # =====================================================================
+    # 3. FLUX PRINCIPAL (Chapitre 3)
+    # =====================================================================
+    st.subheader("3. Master Black Belt Data Collection Plan")
+
+    # Affichez le DCP ici
+    dcp_table_key = f"master_dcp_table_{safe_idx}"
+    if dcp_table_key in st.session_state:
+        st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
+
+    # Appel de la fonction définie au chapitre 4
+    render_data_collection_and_msa(project_dict, component_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
