@@ -1814,7 +1814,7 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
             
-        # --------------------------------------------------
+            # --------------------------------------------------
             # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
             # --------------------------------------------------
             st.divider()
@@ -1844,11 +1844,6 @@ else:
                         )
                     }
                 )
-                    
-                # --- SAUVEGARDE EN DIRECT (LE BOUTON A ÉTÉ SUPPRIMÉ ICI) ---
-                st.session_state[local_msa_key] = pd.DataFrame(edited_msa_df)
-                project_dict["msa_table_saved"] = st.session_state[local_msa_key].to_dict('records')
-
         render_data_collection_and_msa(p, safe_idx)
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
