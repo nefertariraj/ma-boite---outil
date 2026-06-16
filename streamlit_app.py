@@ -1843,32 +1843,34 @@ else:
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
         
         else:
-            # 2. RÉCUPÉRATION ET AFFICHAGE MSA (BLOC 1)
+            # 2. Récupération et affichage MSA avec sécurité
+            st.write("--- DÉBUT MSA ---") # Marqueur visuel
+            
             df_msa = st.session_state.get(local_msa_key, pd.DataFrame())
             
-            # Initialisation forcée si vide
             if df_msa.empty:
+                st.warning("Le DataFrame MSA est vide. Création d'une structure par défaut.")
                 df_msa = pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
             
-            st.success("✅ Système de mesure :")
-            edited_msa_df = st.data_editor(
-                df_msa,
-                num_rows="fixed",
-                use_container_width=True,
-                column_config={
-                    "Statut de validation": st.column_config.SelectboxColumn(
-                        "Statut", 
-                        options=["En attente", "Validé", "Conditionnel", "Rejeté", "Test effectué"],
-                        width="medium"
-                    )
-                }
-            )
+            # Affichage de sécurité
+            st.write("DataFrame récupéré :", df_msa.shape) 
             
-            # Persistance immédiate
-            st.session_state[local_msa_key] = edited_msa_df
-            project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+            try:
+                edited_msa_df = st.data_editor(
+                    df_msa,
+                    num_rows="fixed",
+                    use_container_width=True
+                )
+                st.session_state[local_msa_key] = edited_msa_df
+                project_dict["msa_table_saved"] = edited_msa_df.to_dict('records')
+            except Exception as e:
+                st.error(f"Erreur dans l'éditeur MSA : {e}")
 
-            # 3. RÉCUPÉRATION ET AFFICHAGE PROTOCOLE (BLOC 2 - SÉPARÉ)
+            st.write("--- FIN MSA (Le code continue ici) ---") # Marqueur visuel
+
+            # --------------------------------------------------
+            # 5. EXECUTION DU PROTOCOLE TERRAIN
+            # --------------------------------------------------
             st.divider()
             st.subheader("5. Execution du Protocole Terrain")
             
@@ -1882,8 +1884,7 @@ else:
                 use_container_width=True
             )
             
-            # 4. BOUTON SAUVEGARDE (Commun)
-            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_final_{safe_idx}", type="primary"):
+            if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_all_{safe_idx}", type="primary"):
                 st.session_state[proto_key] = edited_proto_df
                 project_dict["protocol_saved"] = edited_proto_df.to_dict('records')
                 st.success("✅ Données enregistrées !")
