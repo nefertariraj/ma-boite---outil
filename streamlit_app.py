@@ -1824,9 +1824,11 @@ else:
         lock_key = f"dcp_validated_lock_{idx_str}"
         proto_key = f"protocol_data_{idx_str}"
 
-        # 2. Affichage DCP (Hors fragment)
+        # 2. AFFICHAGE DU DCP (Maintenant TOUJOURS affiché)
         if dcp_table_key in st.session_state:
             st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
+        else:
+            st.warning("Le Data Collection Plan n'a pas encore été généré.")
     
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
