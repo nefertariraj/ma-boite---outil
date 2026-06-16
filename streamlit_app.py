@@ -1814,19 +1814,20 @@ else:
                     st.toast("💾 Plan de collecte ajusté et synchronisé avec le MSA !", icon="🛡️")
                     st.rerun()
             
+    # --- HORS DU FRAGMENT (Affiche toujours) ---
+    st.subheader("3. Master Black Belt Data Collection Plan")
+
+    # --- APPEL DU FRAGMENT (Isolé uniquement pour le MSA et Protocole) ---
+    render_data_collection_and_msa(p, safe_idx)
+
+    # --- DÉFINITION DU FRAGMENT (Logique uniquement) ---
     @st.fragment
     def render_data_collection_and_msa(project_dict, component_idx):
-        # 1. DIAGNOSTIC : On vérifie si la fonction est bien appelée
-        st.write(f"DEBUG: Fragment appelé pour index {component_idx}")
-    
-        # 2. DÉFINITION DES CLÉS
-        safe_idx = str(component_idx)
-        matrix_key = f"mbb_prioritization_matrix_{safe_idx}"
-        dcp_table_key = f"master_dcp_table_{safe_idx}"
-        lock_key = f"dcp_validated_lock_{safe_idx}"
-    
-        # 3. DIAGNOSTIC : On vérifie l'état des données
-        st.write(f"DEBUG: DCP Key exists? {dcp_table_key in st.session_state}")
+        # A. Priorisation (Section 1)
+        # B. DCP (Section 2 - Affichage forcé sans condition bloquante)
+        dcp_table_key = f"master_dcp_table_{component_idx}"
+        if dcp_table_key in st.session_state:
+            st.dataframe(st.session_state[dcp_table_key])
         
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
