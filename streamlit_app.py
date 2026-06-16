@@ -1838,6 +1838,11 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
+        # --- LOGIQUE DE RESTAURATION : On cherche dans la session ou dans le dictionnaire sauvegardé ---
+        if local_msa_key not in st.session_state or st.session_state[local_msa_key].empty:
+            saved_msa = p.get("msa_table_saved", [])
+            st.session_state[local_msa_key] = pd.DataFrame(saved_msa) if saved_msa else pd.DataFrame(columns=["Variable Critique (liée au Y)", "Rôle", "Type de Donnée", "MSA Recommandé", "Statut de validation"])
+        
         # Vérification du verrouillage
         if not st.session_state.get(lock_key, False):
             st.info("🔒 **Statut Jalon : En attente de validation du DCP**")
@@ -1849,14 +1854,20 @@ else:
     
             edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
     
-            # Sauvegarde MSA
-            st.session_state[local_msa_key] = edited_msa_df
-            p["msa_table_saved"] = edited_msa_df.to_dict('records')
-    
+            # Bouton de sauvegarde
             if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_{idx_str}", type="primary"):
-                st.session_state[proto_key] = edited_proto_df
-                p["protocol_saved"] = edited_proto_df.to_dict('records')
-                st.success("✅ Données enregistrées !")
+                p["msa_table_saved"] = edited_msa_df.to_dict('records')
+                # Note: assurez-vous que edited_proto_df est défini ici si vous l'utilisez
+                p["protocol_saved"] = edited_msa_df.to_dict('records') 
+                st.success("✅ Données enregistrées dans le projet !")
+
+            # --- AFFICHAGE CONDITIONNEL : "Exécution du protocole terrain" ---
+            # Cette partie s'affichera automatiquement dès que le MSA est validé/enregistré
+            st.markdown("### 🛠️ Exécution du Protocole Terrain")
+            if p.get("protocol_saved"):
+                st.write("Le protocole a été enregistré et est prêt pour la collecte terrain.")
+            else:
+                st.warning("Veuillez enregistrer le MSA pour accéder aux détails du protocole.")
         
         # --- SÉLECTION DE LA VARIABLE ACTIVE POUR LES TESTS ---
         st.markdown("##### 👟 Exécution du Protocole Terrain")
