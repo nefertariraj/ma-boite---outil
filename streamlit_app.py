@@ -1839,6 +1839,8 @@ else:
         st.subheader("4. Validate Measurement System (MSA)")
 
         # 1. Vérification du verrouillage
+        # DEBUG IMMÉDIAT
+        st.write(f"DEBUG: Valeur de lock_key ({lock_key}) est {st.session_state.get(lock_key)}")
         if not st.session_state.get(lock_key, False):
             st.info("🔒 **Statut Jalon : En attente de validation du DCP** — Le module MSA se générera après clic sur le bouton de sauvegarde du DCP.")
         
