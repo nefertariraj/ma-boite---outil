@@ -2616,51 +2616,58 @@ else:
         st.divider()
         st.subheader("6. Measure process capability")
 
-        # Initialisation dynamique des dimensions pour le calcul Six Sigma
-        unites_calcul = len(df_active.dropna(subset=["ID observation"])) if not df_active.empty else 0
-        opportunites_par_unite = max(1, len([v for v in liste_variables_dynamiques if v in df_active.columns]))
+        # --- SÉCURISATION : Préparation des variables avant les widgets ---
+        # On s'assure que les valeurs sont toujours des entiers valides
+        raw_units = len(df_active.dropna(subset=["ID observation"])) if not df_active.empty else 0
+        raw_opp = len([v for v in liste_variables_dynamiques if v in df_active.columns])
+        
+        # On définit des valeurs sûres (valeur > 0 obligatoire pour les diviseurs)
+        val_defects = int(total_defauts_terrain) if isinstance(total_defauts_terrain, (int, float)) else 0
+        val_units = max(1, int(raw_units))
+        val_opp = max(1, int(raw_opp))
 
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("**Paramètres de Capabilité (Générés depuis le terrain)**")
-            defects = st.number_input("Nombre total de défauts constatés", min_value=0, value=int(total_defauts_terrain), key="final_cap_defects")
-            units = st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=max(1, int(unites_calcul)), key="final_cap_units")
-            opp = st.number_input("Nombre d'opportunités de défaut par unité", min_value=1, value=int(opportunites_par_unite), key="final_cap_opp")
+            st.markdown("**Paramètres de Capabilité**")
+            defects = st.number_input("Nombre total de défauts constatés", min_value=0, value=val_defects, key="final_cap_defects")
+            units = st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key="final_cap_units")
+            opp = st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key="final_cap_opp")
         
-        # Formule mathématique du Six Sigma : DPMO = (Défauts / (Unités * Opportunités)) * 1 000 000
+        # --- CALCUL SÉCURISÉ ---
+        # Calcul du DPMO avec protection contre la division par zéro
         dpmo_calculé = (defects / (units * opp)) * 1_000_000
-
-        # Algorithme de calcul de la table de conversion de la loi normale inverse (+1.5σ de shift)
+        
         import math
+        sigma_level = 0.0
         try:
             if dpmo_calculé <= 0:
                 sigma_level = 6.0
             else:
                 taux_defaut = dpmo_calculé / 1_000_000
-                p_val = taux_defaut if taux_defaut < 0.5 else 1 - taux_defaut
+                # On borne la valeur pour le calcul du log
+                p_val = max(1e-7, min(0.5, taux_defaut if taux_defaut < 0.5 else 1 - taux_defaut))
                 
                 t = math.sqrt(-2.0 * math.log(p_val))
-                z = t - ((2.515517 + 0.802853 * t + 0.010328 * t * t) / (1.0 + 1.432788 * t + 0.189269 * t * t + 0.001308 * t * t * t))
+                z = t - ((2.515517 + 0.802853 * t + 0.010328 * t * t) / 
+                         (1.0 + 1.432788 * t + 0.189269 * t * t + 0.001308 * t * t * t))
                 sigma_brut = z if taux_defaut < 0.5 else -z
-                
                 sigma_level = round(sigma_brut + 1.5, 2)
                 sigma_level = max(0.0, min(6.0, sigma_level))
         except Exception:
-            sigma_level = "Non évaluable"
+            sigma_level = 0.0
 
         with c2:
             st.markdown("<br><br>", unsafe_allow_html=True)
-            st.metric("DPMO (Defects Per Million Opportunities)", f"{dpmo_calculé:,.0f}")
+            st.metric("DPMO", f"{float(dpmo_calculé):,.0f}")
             
-            if isinstance(sigma_level, float):
-                if sigma_level >= 4.0:
-                    st.metric("Niveau Sigma du Processus", f"🟢 {sigma_level} σ")
-                elif sigma_level >= 2.5:
-                    st.metric("Niveau Sigma du Processus", f"🟠 {sigma_level} σ")
-                else:
-                    st.metric("Niveau Sigma du Processus", f"🔴 {sigma_level} σ")
+            # Affichage visuel du niveau Sigma
+            if sigma_level >= 4.0:
+                st.metric("Niveau Sigma du Processus", f"🟢 {sigma_level} σ")
+            elif sigma_level >= 2.5:
+                st.metric("Niveau Sigma du Processus", f"🟠 {sigma_level} σ")
             else:
-                st.metric("Niveau Sigma du Processus", sigma_level)
+                st.metric("Niveau Sigma du Processus", f"🔴 {sigma_level} σ")
+                
         # =====================================================================
         # 📊 PARTIE 7 : SITUATION T0 (CARTE DE CONTRÔLE AVANT AMÉLIORATION)
         # =====================================================================
