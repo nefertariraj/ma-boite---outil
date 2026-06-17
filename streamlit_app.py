@@ -2572,43 +2572,50 @@ else:
         st.markdown("---")
         st.markdown("### 🎯 Écran 6 : Baseline du Processus")
 
-        # 🎯 SÉCURITÉ ABSOLUE : Liaison directe pour alimenter df_active sans toucher aux écrans précédents
         df_active = st.session_state.dc_master_data
 
-        # Variables globales pour passer le relai à l'étape de calcul de capabilité
+        # Initialisation propre pour éviter les erreurs de type plus loin dans le code
         total_defauts_terrain = 0
 
         if not df_active.empty:
             st.markdown("#### Situation de référence (KPI Générés depuis la base Terrain)")
             baseline_metrics = []
-            unites_inspectees_count = len(df_active.dropna(subset=["ID observation"]))
-            
+    
             for variable in liste_variables_dynamiques:
                 if variable in df_active.columns:
-                    num_series = pd.to_numeric(df_active[variable], errors="coerce").dropna()
+                    # Nettoyage systématique de la colonne avant calcul
+                    col_data = pd.to_numeric(df_active[variable], errors="coerce")
+                    num_series = col_data.dropna()
+            
+                    # Calcul des moyennes pour les variables numériques
                     if not num_series.empty and not any(k in variable.lower() for k in ["statut", "verdict", "validation"]):
                         baseline_metrics.append({
                             "KPI Courant": f"Moyenne globale [{variable}]", 
                             "Niveau de performance actuel": f"{num_series.mean():.1f} min" if "temps" in variable.lower() else f"{num_series.mean():.2f}"
                         })
+                    # Comptage des défauts pour les variables qualitatives
                     elif not df_active[variable].dropna().empty:
-                        # Comptage exact des défauts qualitatifs
                         non_ok_count = df_active[variable].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1", "NON-CONFORME"]).sum()
-                        total_defauts_terrain += non_ok_count
-                        
-                        pct_nok = (non_ok_count / len(df_active[variable].dropna())) * 100 if len(df_active[variable].dropna()) > 0 else 0
+                
+                        # SÉCURITÉ : On s'assure que total_defauts_terrain reste un entier valide
+                        total_defauts_terrain += int(non_ok_count)
+                
+                        valid_rows = len(df_active[variable].dropna())
+                        pct_nok = (non_ok_count / valid_rows) * 100 if valid_rows > 0 else 0
+                
                         baseline_metrics.append({
                             "KPI Courant": f"Taux de défauts [{variable}]", 
-                            "Niveau de performance actuel": f"{pct_nok:.1f} % ({non_ok_count} défauts)"
+                            "Niveau de performance actuel": f"{pct_nok:.1f} % ({int(non_ok_count)} défauts)"
                         })
 
             if baseline_metrics:
                 st.table(pd.DataFrame(baseline_metrics))
             else:
                 st.table(pd.DataFrame([{"KPI Courant": "Taux de retouches global", "Niveau de performance actuel": "11.0 % (Par défaut)"}]))
+    
             st.caption("⚙️ Les calculs de cette table de référence se mettent à jour dynamiquement.")
         else:
-            st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline de votre processus.")
+            st.info("Alimentez la base de données à l'Écran 2 pour projeter automatiquement la Baseline.")
 
         # =====================================================================
         # 📊 ÉTAPE 6 : MEASURE PROCESS CAPABILITY (DPMO & SIGMA)
