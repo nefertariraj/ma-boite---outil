@@ -1881,6 +1881,15 @@ else:
                 p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
 
+        # --- LOGIQUE D'AFFICHAGE PERSISTANTE ---
+        # On affiche le protocole si les données sont dans 'p' OU 
+        # si le tableau MSA indique qu'un test a déjà été effectué (évite le masquage)
+        
+        df_msa_check = st.session_state.get(local_msa_key, pd.DataFrame())
+        has_test_done = False
+        if not df_msa_check.empty and "Statut de validation" in df_msa_check.columns:
+            has_test_done = "test effectué" in df_msa_check["Statut de validation"].values
+        
         if p.get("protocol_saved"):       
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
