@@ -2554,9 +2554,21 @@ else:
                         ]
                     }
                     st.table(pd.DataFrame(stats_data))
-                    st.bar_chart(pd.DataFrame(numeric_series).reset_index(drop=True))
-                else:
-                    attr_counts = series_data.value_counts()
+                   # --- CORRECTION SÉCURISÉE ---
+                    # On transforme en DataFrame et on nettoie pour éviter l'erreur de typage
+                    chart_data = pd.DataFrame(numeric_series).reset_index(drop=True)
+                
+                    # On ne garde que les colonnes numériques et on remplace les valeurs invalides
+                    chart_data = chart_data.select_dtypes(include=['number']).fillna(0)
+                
+                    if not chart_data.empty:
+                        st.bar_chart(chart_data)
+                    else:
+                        st.info("Graphique non disponible : données insuffisantes.")
+                    # ----------------------------
+                
+                    else:
+                        attr_counts = series_data.value_counts()
                     attr_pct = series_data.value_counts(normalize=True) * 100
                     attr_df = pd.DataFrame({
                         "Fréquence (N)": attr_counts,
