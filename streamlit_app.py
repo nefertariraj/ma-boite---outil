@@ -1881,21 +1881,22 @@ else:
                 p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
 
-        # --- LOGIQUE D'AFFICHAGE ULTRA-ROBUSTE ---
-
-        # On récupère le statut depuis la session (la mémoire active)
-        df_msa_actif = st.session_state.get(local_msa_key, pd.DataFrame())
-
-        # On définit une condition large : 
-        # 1. Soit le protocole est déjà enregistré dans 'p'
-        # 2. Soit on a déjà un statut "test effectué" dans le tableau MSA actif
-        # 3. Soit on a déjà des clés de sauvegarde dans 'p'
-        condition_affichage = (
-            p.get("protocol_saved") is not None or 
-            ("Statut de validation" in df_msa_actif.columns and "test effectué" in df_msa_actif["Statut de validation"].values)
-        )
+        # --- LOGIQUE D'AFFICHAGE ROBUSTE ET PERSISTANTE ---
         
-        if condition_affichage:     
+        # 1. On récupère le dataframe de la session ou du projet
+        df_msa_actif = st.session_state.get(local_msa_key, pd.DataFrame())
+        
+        # 2. Vérification si le statut 'test effectué' existe déjà en mémoire ou dans le projet
+        has_test_done_in_session = False
+        if not df_msa_actif.empty and "Statut de validation" in df_msa_actif.columns:
+            has_test_done_in_session = "test effectué" in df_msa_actif["Statut de validation"].values
+            
+        has_test_done_in_project = p.get("msa_table_saved") is not None and any(
+            row.get("Statut de validation") == "test effectué" for row in p["msa_table_saved"]
+        )
+
+        # 3. La condition finale est élargie
+        if p.get("protocol_saved") or has_test_done_in_session or has_test_done_in_project:    
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
             if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
