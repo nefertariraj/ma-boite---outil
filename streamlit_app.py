@@ -2616,12 +2616,12 @@ else:
         st.divider()
         st.subheader("6. Measure process capability")
 
-        # --- SÉCURISATION : Préparation des variables avant les widgets ---
-        # On s'assure que les valeurs sont toujours des entiers valides
+        # --- SÉCURISATION : Préparation des variables ---
+        # Calcul des unités et opportunités de manière robuste
         raw_units = len(df_active.dropna(subset=["ID observation"])) if not df_active.empty else 0
         raw_opp = len([v for v in liste_variables_dynamiques if v in df_active.columns])
         
-        # On définit des valeurs sûres (valeur > 0 obligatoire pour les diviseurs)
+        # On définit des valeurs sûres (valeur > 0 pour les diviseurs)
         val_defects = int(total_defauts_terrain) if isinstance(total_defauts_terrain, (int, float)) else 0
         val_units = max(1, int(raw_units))
         val_opp = max(1, int(raw_opp))
@@ -2629,12 +2629,13 @@ else:
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Paramètres de Capabilité**")
+            # Widgets sécurisés
             defects = st.number_input("Nombre total de défauts constatés", min_value=0, value=val_defects, key="final_cap_defects")
             units = st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key="final_cap_units")
             opp = st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key="final_cap_opp")
         
         # --- CALCUL SÉCURISÉ ---
-        # Calcul du DPMO avec protection contre la division par zéro
+        # On évite la division par zéro avec les valeurs bornées ci-dessus
         dpmo_calculé = (defects / (units * opp)) * 1_000_000
         
         import math
@@ -2644,7 +2645,7 @@ else:
                 sigma_level = 6.0
             else:
                 taux_defaut = dpmo_calculé / 1_000_000
-                # On borne la valeur pour le calcul du log
+                # On borne la probabilité pour éviter math.log(0)
                 p_val = max(1e-7, min(0.5, taux_defaut if taux_defaut < 0.5 else 1 - taux_defaut))
                 
                 t = math.sqrt(-2.0 * math.log(p_val))
@@ -2658,6 +2659,7 @@ else:
 
         with c2:
             st.markdown("<br><br>", unsafe_allow_html=True)
+            # On force le float pour l'affichage du metric
             st.metric("DPMO", f"{float(dpmo_calculé):,.0f}")
             
             # Affichage visuel du niveau Sigma
