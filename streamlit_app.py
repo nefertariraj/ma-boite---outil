@@ -2521,12 +2521,11 @@ else:
         st.bar_chart(progress_df.set_index("Statut"))
 
         # =====================================================================
-        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (CORRIGÉ & ULTRA-RAPIDE)
+        # 📊 ÉCRAN 5 : STATISTIQUES DESCRIPTIVES (CORRIGÉ & SÉCURISÉ)
         # =====================================================================
         st.markdown("---")
         st.markdown("### 📊 Écran 5 : Statistiques Descriptives")
 
-        # Remplacement de df_active par la source directe et rapide
         df_stats = st.session_state.dc_master_data
 
         if not df_stats.empty:
@@ -2542,6 +2541,7 @@ else:
 
                 numeric_series = pd.to_numeric(series_data, errors="coerce").dropna()
                 
+                # --- BLOC NUMÉRIQUE ---
                 if not numeric_series.empty and not any(k in variable.lower() for k in ["statut", "verdict", "code"]):
                     stats_data = {
                         "Métrique LSS": ["Moyenne", "Médiane", "Minimum", "Maximum", "Écart-type (σ)"],
@@ -2554,21 +2554,18 @@ else:
                         ]
                     }
                     st.table(pd.DataFrame(stats_data))
-                   # --- CORRECTION SÉCURISÉE ---
-                    # On transforme en DataFrame et on nettoie pour éviter l'erreur de typage
+                    
+                    # Graphique sécurisé
                     chart_data = pd.DataFrame(numeric_series).reset_index(drop=True)
-                
-                    # On ne garde que les colonnes numériques et on remplace les valeurs invalides
                     chart_data = chart_data.select_dtypes(include=['number']).fillna(0)
-                
                     if not chart_data.empty:
                         st.bar_chart(chart_data)
                     else:
-                        st.info("Graphique non disponible : données insuffisantes.")
-                    # ----------------------------
-                
-                    else:
-                        attr_counts = series_data.value_counts()
+                        st.info("Graphique non disponible.")
+
+                # --- BLOC QUALITATIF (Le "else" a été réaligné ici) ---
+                else:
+                    attr_counts = series_data.value_counts()
                     attr_pct = series_data.value_counts(normalize=True) * 100
                     attr_df = pd.DataFrame({
                         "Fréquence (N)": attr_counts,
