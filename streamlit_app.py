@@ -1824,13 +1824,6 @@ else:
 
         # --- 2. APPEL DU FRAGMENT (Génération des données) ---
         render_data_collection_and_msa(p, safe_idx)
-
-        # --- 3. AFFICHAGE DU DCP (Flux principal - maintenant sécurisé) ---
-        st.markdown("### 📋 2. Matrice Officielle du Plan de Collecte (Phase Measure)")
-        if dcp_table_key in st.session_state and not st.session_state[dcp_table_key].empty:
-            st.dataframe(st.session_state[dcp_table_key], use_container_width=True)
-        else:
-            st.warning("Le Data Collection Plan n'a pas encore été généré.")
         
         # --------------------------------------------------
         # 4. VALIDATE MEASUREMENT SYSTEM (MSA)
