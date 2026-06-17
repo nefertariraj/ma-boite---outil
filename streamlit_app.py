@@ -2555,13 +2555,22 @@ else:
                     }
                     st.table(pd.DataFrame(stats_data))
                     
-                    # Graphique sécurisé
                     chart_data = pd.DataFrame(numeric_series).reset_index(drop=True)
-                    chart_data = chart_data.select_dtypes(include=['number']).fillna(0)
+                    
+                    # 1. Nettoyage : On ne garde que les nombres
+                    chart_data = chart_data.select_dtypes(include=['number'])
+                    
+                    # 2. Sécurisation : On force un nom de colonne simple pour éviter le bug Altair
+                    chart_data.columns = ['Valeur']
+                    
+                    # 3. Remplacement des valeurs invalides par 0
+                    chart_data = chart_data.fillna(0).replace([float('inf'), -float('inf')], 0)
+                    
+                    # 4. Affichage conditionnel pour éviter le crash
                     if not chart_data.empty:
                         st.bar_chart(chart_data)
                     else:
-                        st.info("Graphique non disponible.")
+                        st.info("Données insuffisantes pour le graphique.")
 
                 # --- BLOC QUALITATIF (Le "else" a été réaligné ici) ---
                 else:
