@@ -2850,67 +2850,76 @@ else:
     with tabs[2]: 
         st.header("Phase Analyse")
     
-        # Vérification : on cherche spécifiquement dc_master_data
         if "dc_master_data" in st.session_state and not st.session_state.dc_master_data.empty:
             df = st.session_state.dc_master_data
-        
-            st.success(f"✅ Données de collecte détectées ({len(df)} lignes).")
-        
-            # --- 1. TEST DES X ---
-            st.subheader("1. Test des X : Identification des variables critiques")
-        
-            # On exclut "ID observation" et "Date de modification" des choix de colonnes
+            st.success(f"✅ Données détectées ({len(df)} lignes).")
+
+            # Sélection des colonnes
             colonnes_a_exclure = ["ID observation", "Date de modification"]
             colonnes_disponibles = [c for c in df.columns if c not in colonnes_a_exclure]
-        
+
             y_col = st.selectbox("Sélectionnez la variable Y (CTQ) :", colonnes_disponibles)
             x_cols = st.multiselect("Sélectionnez les variables X à tester :", [c for c in colonnes_disponibles if c != y_col])
-        
-            # Bouton pour lancer l'analyse
+
             if st.button("🚀 Lancer l'analyse statistique"):
                 results = []
+            
+                # Conversion sécurisée de Y
+                y_data = pd.to_numeric(df[y_col], errors='coerce')
+                is_y_num = y_data.notna().sum() > (len(df) * 0.5)
+
                 for x in x_cols:
-                    # ... (votre logique de détection type) ...
+                    # Conversion sécurisée de X
+                    x_data = pd.to_numeric(df[x], errors='coerce')
+                    is_x_num = x_data.notna().sum() > (len(df) * 0.5)
                 
-                    # --- CALCULS AVEC INTERPRÉTATION ---
                     impact = "Aucun"
                     degre = "N/A"
+                    p_value = 1.0
                 
-                    # Pearson (Corrélation)
-                    if is_x_num and is_y_num:
-                        corr, p_value = stats.pearsonr(df[x].dropna(), df[y_col].dropna())
-                        if p_value < 0.05:
-                            impact = "Oui, influence statistiquement démontrée"
-                            # Interprétation du degré (R²)
-                            r_sq = corr**2
-                            if abs(corr) > 0.7: degre = "Fort"
-                            elif abs(corr) > 0.3: degre = "Modéré"
-                            else: degre = "Faible"
-                        else:
-                            impact = "Non, influence non démontrée"
-                            degre = "Nul"
+                    try:
+                        # 1. Corrélation Pearson (Numérique vs Numérique)
+                        if is_x_num and is_y_num:
+                            corr, p_value = stats.pearsonr(x_data.dropna(), y_data.dropna())
+                            if p_value < 0.05:
+                                impact = "Oui, influence démontrée"
+                                degre = "Fort" if abs(corr) > 0.7 else ("Modéré" if abs(corr) > 0.3 else "Faible")
+                            else:
+                                impact = "Non, influence non démontrée"
+                                degre = "Nul"
 
-                    # ANOVA (Catégoriel -> Numérique)
-                    elif not is_x_num and is_y_num:
-                        groups = [group[y_col].dropna().values for name, group in df.groupby(x)]
-                        _, p_value = stats.f_oneway(*groups)
-                        if p_value < 0.05:
-                            impact = "Oui, les moyennes diffèrent selon le X"
-                            degre = "Modéré à Fort" # Par convention ANOVA
+                        # 2. ANOVA (Catégoriel vs Numérique)
+                        elif not is_x_num and is_y_num:
+                            groups = [group[y_col].dropna().values for _, group in df.groupby(x)]
+                            if len(groups) > 1:
+                                _, p_value = stats.f_oneway(*groups)
+                                if p_value < 0.05:
+                                    impact = "Oui, les moyennes diffèrent"
+                                    degre = "Modéré à Fort"
+                                else:
+                                    impact = "Non, pas de différence"
+                                    degre = "Nul"
+                    
                         else:
-                            impact = "Non, pas de différence significative"
-                            degre = "Nul"
+                            impact = "Test non disponible (données textuelles)"
+
+                    except Exception as e:
+                        impact = f"Erreur de calcul : {e}"
 
                     results.append({
                         "Variable X": x,
                         "Le X agit-il sur Y ?": impact,
                         "Degré d'influence": degre,
-                        "P-value": round(p_value, 4)
+                        "P-value": round(float(p_value), 4)
                     })
-            
-                # Affichage
-                res_df = pd.DataFrame(results)
-                st.table(res_df)
+
+                # Affichage des résultats
+                if results:
+                    st.table(pd.DataFrame(results))
+                else:
+                    st.warning("Aucun résultat généré.")
+        else:
+            st.warning("⚠️ Aucune donnée collectée. Veuillez remplir les données dans la phase 'Data Collection'.")
 
         # Squelette pour les étapes suivantes
         st.markdown("---")
