@@ -2868,30 +2868,49 @@ else:
         
             # Bouton pour lancer l'analyse
             if st.button("🚀 Lancer l'analyse statistique"):
-                st.write("Démarrage de l'analyse...") # Message de suivi
+                results = []
+                for x in x_cols:
+                    # ... (votre logique de détection type) ...
+                
+                    # --- CALCULS AVEC INTERPRÉTATION ---
+                    impact = "Aucun"
+                    degre = "N/A"
+                
+                    # Pearson (Corrélation)
+                    if is_x_num and is_y_num:
+                        corr, p_value = stats.pearsonr(df[x].dropna(), df[y_col].dropna())
+                        if p_value < 0.05:
+                            impact = "Oui, influence statistiquement démontrée"
+                            # Interprétation du degré (R²)
+                            r_sq = corr**2
+                            if abs(corr) > 0.7: degre = "Fort"
+                            elif abs(corr) > 0.3: degre = "Modéré"
+                            else: degre = "Faible"
+                        else:
+                            impact = "Non, influence non démontrée"
+                            degre = "Nul"
+
+                    # ANOVA (Catégoriel -> Numérique)
+                    elif not is_x_num and is_y_num:
+                        groups = [group[y_col].dropna().values for name, group in df.groupby(x)]
+                        _, p_value = stats.f_oneway(*groups)
+                        if p_value < 0.05:
+                            impact = "Oui, les moyennes diffèrent selon le X"
+                            degre = "Modéré à Fort" # Par convention ANOVA
+                        else:
+                            impact = "Non, pas de différence significative"
+                            degre = "Nul"
+
+                    results.append({
+                        "Variable X": x,
+                        "Le X agit-il sur Y ?": impact,
+                        "Degré d'influence": degre,
+                        "P-value": round(p_value, 4)
+                    })
             
-                # 1. Nettoyage radical : on ne garde que le Y et les X choisis
-                df_subset = df[[y_col] + x_cols].copy()
-            
-                # 2. Conversion forcée en numérique pour tous
-                for col in df_subset.columns:
-                    df_subset[col] = pd.to_numeric(df_subset[col], errors='coerce')
-            
-                # Vérification après conversion
-                if df_subset.isna().sum().sum() > 0:
-                    st.warning("⚠️ Attention : certaines données non numériques ont été converties en 'NaN'.")
-            
-                st.write("Données prêtes, lancement des tests...")
-            
-                # 3. Test simplifié pour vérifier si le bloc 'stats' répond
-                try:
-                    # Test simple de corrélation
-                    corr_matrix = df_subset.corr()
-                    st.write("Matrice de corrélation calculée :")
-                    st.dataframe(corr_matrix)
-                    st.success("✅ Calcul terminé avec succès !")
-                except Exception as e:
-                    st.error(f"❌ Erreur lors du calcul : {e}")
+                # Affichage
+                res_df = pd.DataFrame(results)
+                st.table(res_df)
 
         # Squelette pour les étapes suivantes
         st.markdown("---")
