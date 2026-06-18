@@ -2846,10 +2846,35 @@ else:
                     }
                     st.table(pd.DataFrame(stats_t0))
 
+        # --- JALON DE VALIDATION DE LA PHASE MESURE ---
+        with st.container(border=True):
+            st.markdown("### 🏁 Jalon : Validation de la Phase Mesure")
+            st.info("Cliquez sur ce bouton pour valider vos mesures, figer le jeu de données et déverrouiller la phase Analyse.")
+    
+            if st.button("✅ Valider la Phase Mesure & Débloquer l'Analyse", type="primary", use_container_width=True):
+                # On consolide toutes les données dans un seul dataframe "master"
+                # On suppose que vos données de travail sont dans voc_raw_data ou vsm_detailed_map
+                if "voc_raw_data" in st.session_state:
+                    st.session_state.df_master = st.session_state.voc_raw_data.copy()
+                    st.session_state.phase_mesure_validee = True
+                    st.success("Phase Mesure validée ! Les données sont prêtes pour l'analyse.")
+                    st.rerun()
+                else:
+                    st.error("Aucune donnée trouvée pour validation.")
+    
     # --- PHASE ANALYSE ---
     with tabs[2]: # En supposant que l'analyse est dans le 3ème onglet
         st.header("Phase Analyse (DMAIC)")
     
+        # Vérification du jalon
+    if st.session_state.get("phase_mesure_validee", False):
+        st.success("🔓 Phase Analyse déverrouillée.")
+        # ... votre code d'analyse ici ...
+    else:
+        st.warning("🔒 Accès restreint : Veuillez valider la Phase Mesure dans l'onglet précédent pour continuer.")
+        st.markdown("---")
+        st.write("Pour débloquer cette section, assurez-vous que votre plan de collecte est complet et cliquez sur 'Valider la Phase Mesure' dans l'onglet Mesure.")
+        
         # Initialisation de la structure persistante si nécessaire
         if "analyse_data" not in st.session_state:
             st.session_state.analyse_data = {}
