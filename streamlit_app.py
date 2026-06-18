@@ -2949,9 +2949,18 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # CORRECTION : Utilisation de st.session_state.results
-        x_critiques = [r["Variable X"] for r in st.session_state.results if "Oui" in r["Le X agit-il sur Y ?"]]
+        # On filtre pour inclure tout ce qui n'est pas "Nul" ou "Aucun"
+        # Ainsi, les influences "Faibles", "Modérées" et "Fortes" seront capturées
+        x_critiques = [
+            r["Variable X"] for r in st.session_state.results 
+            if r["Degré d'influence"] not in ["Nul", "N/A", "Aucun"]
+        ]
 
+        if not x_critiques:
+            st.info("Aucun X ayant une influence significative n'a été détecté.")
+        else:
+            # Affichage des variables détectées pour confirmation
+            st.write(f"Variables à analyser : {', '.join(x_critiques)}")
         if not x_critiques:
             st.info("Aucun X critique identifié. Veuillez d'abord valider vos X dans la Phase Analyse.")
         else:
