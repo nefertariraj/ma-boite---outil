@@ -2949,35 +2949,35 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # 1. On récupère les résultats de la Phase 1
-        results_data = st.session_state.get("results", [])
+        # 1. On s'assure de récupérer le Y défini en phase 1
+        # Si vous ne l'avez pas stocké dans session_state, on le récupère du selectbox
+        # (Assurez-vous d'avoir fait : st.session_state.y_col = y_col dans votre phase 1)
+        y_selectionne = st.session_state.get("y_col", "") 
         
-        # 2. On récupère la liste complète des colonnes X depuis le dataframe
-        # (C'est cette liste qui garantit que vous avez toujours des choix)
-        if "dc_master_data" in st.session_state:
-            df = st.session_state.dc_master_data
-            # On exclut Y et les colonnes techniques
-            colonnes_a_exclure = ["ID observation", "Date de modification"]
-            tous_les_x = [c for c in df.columns if c not in colonnes_a_exclure and c != st.session_state.get("y_col", "")]
-        else:
-            tous_les_x = []
+        # 2. Récupération des données et des colonnes
+        results_data = st.session_state.get("results", [])
+        df = st.session_state.get("dc_master_data", pd.DataFrame())
 
-        # 3. Filtrage automatique (les variables avec influence)
+        # 3. Construction de la liste des X (Exclut Y et les colonnes techniques)
+        colonnes_a_exclure = ["ID observation", "Date de modification", y_selectionne]
+        tous_les_x = [c for c in df.columns if c not in colonnes_a_exclure]
+
+        # 4. Filtrage automatique (les variables avec influence)
         autos_critiques = [
             r["Variable X"] for r in results_data 
             if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]
         ]
 
-        # 4. Sélection interactive (Auto + Manuel)
-        st.subheader("Sélection des variables à analyser")
+        # 5. Sélection interactive (Auto + Manuel)
+        st.subheader("Sélection des variables X à analyser")
         x_critiques = st.multiselect(
-            "Variables X à approfondir (vous pouvez ajouter ou supprimer des éléments ici) :",
+            "Variables X à approfondir (vous pouvez ajouter ou supprimer des éléments) :",
             options=tous_les_x,
-            default=autos_critiques
+            default=[x for x in autos_critiques if x in tous_les_x]
         )
 
         if not x_critiques:
-            st.info("Sélectionnez au moins une variable pour commencer l'analyse.")
+            st.info("Sélectionnez au moins une variable X pour commencer l'analyse.")
         else:
             for x in x_critiques:
                 st.subheader(f"Analyse pour : {x}")
