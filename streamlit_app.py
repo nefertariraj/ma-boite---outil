@@ -2949,21 +2949,30 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # On filtre pour inclure tout ce qui n'est pas "Nul", "N/A" ou "Aucun"
-        # On s'assure que st.session_state.results est bien une liste
+        # 1. Récupération des données
         results_data = st.session_state.get("results", [])
         
-        x_critiques = [
+        # 2. Filtrage automatique : On prend TOUT sauf "Nul" ou "N/A"
+        # Cela inclut "Faible", "Modéré", "Fort"
+        autos_critiques = [
             r["Variable X"] for r in results_data 
             if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]
         ]
 
+        # 3. Ajout de la possibilité de sélection manuelle
+        st.subheader("Sélection des variables à analyser")
+        tous_les_x = [r["Variable X"] for r in results_data]
+        
+        # Le multiselect permet de garder les automatiques + ajouter les vôtres
+        x_critiques = st.multiselect(
+            "Variables X à approfondir (ajoutez les vôtres si besoin) :",
+            options=tous_les_x,
+            default=autos_critiques
+        )
+
         if not x_critiques:
-            st.info("Aucun X ayant une influence significative n'a été détecté. Validez vos X dans la Phase 1.")
+            st.info("Sélectionnez au moins une variable pour commencer l'analyse.")
         else:
-            # Affichage des variables détectées pour confirmation
-            st.success(f"Variables détectées pour analyse : {', '.join(x_critiques)}")
-            
             for x in x_critiques:
                 st.subheader(f"Analyse pour : {x}")
         
