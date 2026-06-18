@@ -2868,12 +2868,30 @@ else:
         
             # Bouton pour lancer l'analyse
             if st.button("🚀 Lancer l'analyse statistique"):
-                # (Insérez ici le code de calcul robuste que nous avons préparé précédemment)
-                st.write("Analyse en cours...")
+                st.write("Démarrage de l'analyse...") # Message de suivi
             
-        else:
-            st.warning("⚠️ Aucune donnée collectée. Veuillez remplir ou importer des données dans la phase 'Data Collection' (Mesure).")
-            st.info("Le système cherche la variable 'dc_master_data' qui est vide pour le moment.")
+                # 1. Nettoyage radical : on ne garde que le Y et les X choisis
+                df_subset = df[[y_col] + x_cols].copy()
+            
+                # 2. Conversion forcée en numérique pour tous
+                for col in df_subset.columns:
+                    df_subset[col] = pd.to_numeric(df_subset[col], errors='coerce')
+            
+                # Vérification après conversion
+                if df_subset.isna().sum().sum() > 0:
+                    st.warning("⚠️ Attention : certaines données non numériques ont été converties en 'NaN'.")
+            
+                st.write("Données prêtes, lancement des tests...")
+            
+                # 3. Test simplifié pour vérifier si le bloc 'stats' répond
+                try:
+                    # Test simple de corrélation
+                    corr_matrix = df_subset.corr()
+                    st.write("Matrice de corrélation calculée :")
+                    st.dataframe(corr_matrix)
+                    st.success("✅ Calcul terminé avec succès !")
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du calcul : {e}")
 
         # Squelette pour les étapes suivantes
         st.markdown("---")
