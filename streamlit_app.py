@@ -2883,25 +2883,47 @@ else:
             if st.button("🚀 Lancer l'analyse statistique automatique"):
                 results = []
                 for x in x_cols:
-                    # Détection type X et Y
                     is_x_num = pd.api.types.is_numeric_dtype(df[x])
                     is_y_num = pd.api.types.is_numeric_dtype(df[y_col])
                     
                     test_name = "N/A"
                     p_value = 1.0
                     
-                    # Logique de sélection du test
+                    # Logique de test
                     if is_x_num and is_y_num:
                         test_name = "Corrélation de Pearson"
-                        corr, p_value = stats.pearsonr(df[x].dropna(), df[y_col].dropna())
+                        # Gestion des erreurs pour éviter le plantage si les données sont insuffisantes
+                        try:
+                            _, p_value = stats.pearsonr(df[x].dropna(), df[y_col].dropna())
+                        except: p_value = 1.0
                     elif not is_x_num and is_y_num:
                         test_name = "ANOVA (1 facteur)"
-                        groups = [group[y_col].values for name, group in df.groupby(x)]
-                        f_stat, p_value = stats.f_oneway(*groups)
-                    elif not is_x_num and not is_y_num:
-                        test_name = "Chi-Square"
-                        contingency_table = pd.crosstab(df[x], df[y_col])
-                        chi2, p_value, _, _ = stats.chi2_contingency(contingency_table)
+                        try:
+                            groups = [group[y_col].values for name, group in df.groupby(x)]
+                            _, p_value = stats.f_oneway(*groups)
+                        except: p_value = 1.0
+                    
+                    is_sig = p_value < 0.05
+                    results.append({
+                        "Variable X": x,
+                        "Test": test_name,
+                        "P-value": round(p_value, 4),
+                        "Significatif": "✅ Oui" if is_sig else "❌ Non"
+                    })
+                
+                # --- CORRECTION DU KEYERROR ICI ---
+                if results:
+                    res_df = pd.DataFrame(results)
+                    st.table(res_df)
+                    
+                    # On vérifie bien que la colonne existe avant de filtrer
+                    if "Significatif" in res_df.columns:
+                        st.session_state.x_critiques = res_df[res_df["Significatif"] == "✅ Oui"]["Variable X"].tolist()
+                        st.success(f"X critiques identifiés : {', '.join(st.session_state.x_critiques)}")
+                    else:
+                        st.error("Erreur dans la structure des résultats.")
+                else:
+                    st.warning("Aucun résultat généré. Vérifiez la sélection des variables.")
                     
                     # Résultats
                     is_sig = p_value < 0.05
