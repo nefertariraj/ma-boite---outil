@@ -2867,57 +2867,62 @@ else:
         if st.session_state.get("phase_mesure_validee", False):
             st.success("🔓 Phase Analyse déverrouillée.")
 
-        # 1. TEST DES X
+        # --- 1. TEST DES X ---
         st.subheader("1. Test des X : Identification des variables critiques")
-    
-        # Sélection des données (Dataframe issue de la phase mesure)
-        # Pour cet exemple, on suppose qu'un dataset est chargé dans le session_state
+        
         if "df_master" in st.session_state:
             df = st.session_state.df_master
+            
+            # Nettoyage : forcer la conversion numérique pour les colonnes possibles
+            for col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='ignore')
+
             y_col = st.selectbox("Sélectionnez la variable Y (CTQ) :", df.columns)
             x_cols = st.multiselect("Sélectionnez les variables X à tester :", [c for c in df.columns if c != y_col])
-        
+            
             if st.button("🚀 Lancer l'analyse statistique automatique"):
                 results = []
                 for x in x_cols:
-                    # Logique de détection automatique du type de test
-                    # (Simplifié : test automatique basé sur le type de données)
-                    is_x_numeric = pd.api.types.is_numeric_dtype(df[x])
-                    is_y_numeric = pd.api.types.is_numeric_dtype(df[y_col])
-                
-                    test_name = "Non déterminé"
+                    # Détection type X et Y
+                    is_x_num = pd.api.types.is_numeric_dtype(df[x])
+                    is_y_num = pd.api.types.is_numeric_dtype(df[y_col])
+                    
+                    test_name = "N/A"
                     p_value = 1.0
-                
-                    # --- MOTEUR DE TEST ---
-                    if is_x_numeric and is_y_numeric:
+                    
+                    # Logique de sélection du test
+                    if is_x_num and is_y_num:
                         test_name = "Corrélation de Pearson"
                         corr, p_value = stats.pearsonr(df[x].dropna(), df[y_col].dropna())
-                    elif not is_x_numeric and is_y_numeric:
-                        test_name = "Test ANOVA (ou Kruskal-Wallis)"
-                        # Logique simplifiée pour l'exemple
+                    elif not is_x_num and is_y_num:
+                        test_name = "ANOVA (1 facteur)"
                         groups = [group[y_col].values for name, group in df.groupby(x)]
-                        f_val, p_value = stats.f_oneway(*groups)
-                
-                    # Interprétation
-                    is_significant = "Oui" if p_value < 0.05 else "Non"
-                
+                        f_stat, p_value = stats.f_oneway(*groups)
+                    elif not is_x_num and not is_y_num:
+                        test_name = "Chi-Square"
+                        contingency_table = pd.crosstab(df[x], df[y_col])
+                        chi2, p_value, _, _ = stats.chi2_contingency(contingency_table)
+                    
+                    # Résultats
+                    is_sig = p_value < 0.05
                     results.append({
-                        "Variable X": x,
-                        "Test utilisé": test_name,
+                        "X": x,
+                        "Test": test_name,
                         "P-value": round(p_value, 4),
-                        "Significatif": is_significant
+                        "Significatif": "✅ Oui" if is_sig else "❌ Non"
                     })
-            
-                # Affichage des résultats
+                
+                # Affichage sous forme de tableau
                 res_df = pd.DataFrame(results)
                 st.table(res_df)
-            
-                # Sauvegarde des X critiques
-                st.session_state.x_critiques = res_df[res_df["Significatif"] == "Oui"]["Variable X"].tolist()
-                st.success(f"X critiques identifiés : {', '.join(st.session_state.x_critiques)}")
-            
-        else:
-            st.warning("Veuillez importer ou collecter des données dans la phase Mesure pour lancer l'analyse.")
+                
+                # Filtrage des X critiques
+                st.session_state.x_critiques = res_df[res_df["Significatif"] == "✅ Oui"]["X"].tolist()
+                
+                if st.session_state.x_critiques:
+                    st.success(f"X critiques identifiés : {', '.join(st.session_state.x_critiques)}")
+                else:
+                    st.warning("Aucun X n'a montré une influence significative.")
 
         # Squelette pour les étapes suivantes
         st.markdown("---")
