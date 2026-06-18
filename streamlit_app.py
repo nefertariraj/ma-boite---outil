@@ -2955,21 +2955,17 @@ else:
         y_selectionne = st.session_state.get("y_col")
 
         # 2. LISTE EXCLUSIVE : On force l'exclusion du Y
-        # On définit les colonnes de base à ignorer
         colonnes_a_exclure = ["ID observation", "Date de modification"]
-        
-        # On ajoute le Y à la liste des exclus s'il existe
         if y_selectionne:
             colonnes_a_exclure.append(y_selectionne)
             
-        # On génère la liste des choix possibles UNIQUEMENT à partir du DF moins les exclus
         tous_les_x = [c for c in df.columns if c not in colonnes_a_exclure]
 
         # 3. Filtrage automatique (les variables avec influence)
         autos_critiques = [
             r["Variable X"] for r in results_data 
             if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]
-            and r["Variable X"] != y_selectionne # Sécurité supplémentaire
+            and r["Variable X"] != y_selectionne 
         ]
 
         # 4. Sélection interactive
@@ -2979,7 +2975,14 @@ else:
             options=tous_les_x,
             default=[x for x in autos_critiques if x in tous_les_x]
         )
-        
+
+        # 5. BOUCLE D'ANALYSE (C'est ce qui manquait)
+        if not x_critiques:
+            st.info("Sélectionnez au moins une variable X pour commencer l'analyse.")
+        else:
+            for x in x_critiques:
+                st.subheader(f"Analyse pour : {x}")
+                
                 col1, col2 = st.columns([1, 2])
                 with col1:
                     methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
