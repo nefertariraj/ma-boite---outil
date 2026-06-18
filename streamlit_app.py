@@ -2852,6 +2852,13 @@ else:
     with tabs[2]: 
         st.header("Phase Analyse")
 
+        # 1. INITIALISATION : On définit results par défaut
+            if "results" not in st.session_state:
+                st.session_state.results = []
+    
+            if "dc_master_data" in st.session_state and not st.session_state.dc_master_data.empty:
+                df = st.session_state.dc_master_data
+        
         # --- PHASE 1 : TEST ACTION DES X SUR Y ---
         st.subheader("1. Test de l'action des X sur Y")
         
