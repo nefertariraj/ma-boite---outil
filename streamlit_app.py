@@ -2937,7 +2937,9 @@ else:
                         "Degré d'influence": degre,
                         "P-value": round(float(p_value), 4)
                     })
-
+                
+                st.session_state.results = results
+                
                 # Affichage des résultats
                 if results:
                     st.table(pd.DataFrame(results))
