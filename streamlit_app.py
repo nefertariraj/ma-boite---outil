@@ -2949,23 +2949,29 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # 1. Récupération des données
+        # 1. On récupère les résultats de la Phase 1
         results_data = st.session_state.get("results", [])
         
-        # 2. Filtrage automatique : On prend TOUT sauf "Nul" ou "N/A"
-        # Cela inclut "Faible", "Modéré", "Fort"
+        # 2. On récupère la liste complète des colonnes X depuis le dataframe
+        # (C'est cette liste qui garantit que vous avez toujours des choix)
+        if "dc_master_data" in st.session_state:
+            df = st.session_state.dc_master_data
+            # On exclut Y et les colonnes techniques
+            colonnes_a_exclure = ["ID observation", "Date de modification"]
+            tous_les_x = [c for c in df.columns if c not in colonnes_a_exclure and c != st.session_state.get("y_col", "")]
+        else:
+            tous_les_x = []
+
+        # 3. Filtrage automatique (les variables avec influence)
         autos_critiques = [
             r["Variable X"] for r in results_data 
             if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]
         ]
 
-        # 3. Ajout de la possibilité de sélection manuelle
+        # 4. Sélection interactive (Auto + Manuel)
         st.subheader("Sélection des variables à analyser")
-        tous_les_x = [r["Variable X"] for r in results_data]
-        
-        # Le multiselect permet de garder les automatiques + ajouter les vôtres
         x_critiques = st.multiselect(
-            "Variables X à approfondir (ajoutez les vôtres si besoin) :",
+            "Variables X à approfondir (vous pouvez ajouter ou supprimer des éléments ici) :",
             options=tous_les_x,
             default=autos_critiques
         )
