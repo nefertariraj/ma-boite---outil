@@ -2938,10 +2938,47 @@ else:
         else:
             st.warning("⚠️ Aucune donnée collectée. Veuillez remplir les données dans la phase 'Data Collection'.")
 
-        # Squelette pour les étapes suivantes
-        st.markdown("---")
-        st.subheader("2. Identification des causes racines des X critiques")
-        # (À compléter...)
+        # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
+        st.header("Phase 2 : Identification des Causes Racines")
+
+        # On filtre les X qui ont une influence démontrée
+        x_critiques = [r["Variable X"] for r in results if "Oui" in r["Le X agit-il sur Y ?"]]
+
+        if not x_critiques:
+            st.info("Aucun X critique identifié. Veuillez d'abord valider vos X dans la Phase Analyse.")
+        else:
+            for x in x_critiques:
+                st.subheader(f"Analyse pour : {x}")
+        
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
+        
+                # --- LOGIQUE ISHIKAWA ---
+                if methode == "Ishikawa":
+                    st.write("Catégories : Méthode, Main d'œuvre, Machine, Matière, Milieu, Mesure")
+                    # Utilisation de colonnes pour les catégories
+                    cat_cols = st.columns(3)
+                    for i, cat in enumerate(["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]):
+                        with cat_cols[i % 3]:
+                            st.text_input(f"{cat}", key=f"ish_{x}_{cat}")
+        
+                # --- LOGIQUE 5 POURQUOI ---
+                elif methode == "5 Pourquoi":
+                    with st.expander("Détails des 5 Pourquoi"):
+                        p1 = st.text_input("Pourquoi 1 ?", key=f"p1_{x}")
+                        p2 = st.text_input("Pourquoi 2 ?", key=f"p2_{x}")
+                        p3 = st.text_input("Pourquoi 3 ?", key=f"p3_{x}")
+                        p4 = st.text_input("Pourquoi 4 ?", key=f"p4_{x}")
+                        p5 = st.text_input("Pourquoi 5 (Cause Racine) ?", key=f"p5_{x}")
+
+                # --- RÉSULTAT FINAL POUR CHAQUE X ---
+                with st.container():
+                    col_a, col_b = st.columns(2)
+                    cause_finale = col_a.text_input("Cause racine retenue", key=f"cause_{x}")
+                    confiance = col_b.slider("Niveau de confiance", 1, 5, 3, key=f"conf_{x}")
+        
+                st.markdown("---")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
