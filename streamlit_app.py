@@ -2974,11 +2974,23 @@ else:
                         methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
                     
                     if methode == "Ishikawa":
-                        cat_cols = st.columns(3)
-                        categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
-                        for i, cat in enumerate(categories):
-                            with cat_cols[i % 3]:
-                                st.text_input(f"{cat}", key=f"ish_{x}_{cat}")
+                    st.write("### Diagramme d'Ishikawa")
+                    st.info("Saisissez vos idées par catégorie. Utilisez des virgules pour séparer plusieurs éléments.")
+                    
+                    # Structure en 2 colonnes pour simuler les arêtes (3 branches par côté)
+                    cat_gauche, cat_droite = st.columns(2)
+                    
+                    categories_gauche = ["Méthode", "Main d'œuvre", "Machine"]
+                    categories_droite = ["Matière", "Milieu", "Mesure"]
+                    
+                    with cat_gauche:
+                        for cat in categories_gauche:
+                            # Utilisation de text_area pour permettre plusieurs lignes/entrées
+                            st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}", help=f"Entrez les causes pour {cat}")
+                    
+                    with cat_droite:
+                        for cat in categories_droite:
+                            st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}", help=f"Entrez les causes pour {cat}")
                     
                     elif methode == "5 Pourquoi":
                         with st.expander("Détails des 5 Pourquoi"):
