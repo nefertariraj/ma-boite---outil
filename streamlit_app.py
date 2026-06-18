@@ -2949,8 +2949,8 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # On filtre les X qui ont une influence démontrée
-        x_critiques = [r["Variable X"] for r in results if "Oui" in r["Le X agit-il sur Y ?"]]
+        # CORRECTION : Utilisation de st.session_state.results
+        x_critiques = [r["Variable X"] for r in st.session_state.results if "Oui" in r["Le X agit-il sur Y ?"]]
 
         if not x_critiques:
             st.info("Aucun X critique identifié. Veuillez d'abord valider vos X dans la Phase Analyse.")
@@ -2965,7 +2965,6 @@ else:
                 # --- LOGIQUE ISHIKAWA ---
                 if methode == "Ishikawa":
                     st.write("Catégories : Méthode, Main d'œuvre, Machine, Matière, Milieu, Mesure")
-                    # Utilisation de colonnes pour les catégories
                     cat_cols = st.columns(3)
                     for i, cat in enumerate(["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]):
                         with cat_cols[i % 3]:
