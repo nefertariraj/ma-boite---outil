@@ -2850,32 +2850,30 @@ else:
     with tabs[2]: 
         st.header("Phase Analyse")
     
-        # Vérification automatique de la présence des données
-        if "voc_raw_data" in st.session_state and not st.session_state.voc_raw_data.empty:
-            df = st.session_state.voc_raw_data
-            st.success("✅ Données détectées. Vous pouvez lancer l'analyse.")
+        # Vérification : on cherche spécifiquement dc_master_data
+        if "dc_master_data" in st.session_state and not st.session_state.dc_master_data.empty:
+            df = st.session_state.dc_master_data
+        
+            st.success(f"✅ Données de collecte détectées ({len(df)} lignes).")
         
             # --- 1. TEST DES X ---
             st.subheader("1. Test des X : Identification des variables critiques")
         
-            # Sélection des colonnes
-            y_col = st.selectbox("Sélectionnez la variable Y (CTQ) :", df.columns)
-            x_cols = st.multiselect("Sélectionnez les variables X à tester :", [c for c in df.columns if c != y_col])
+            # On exclut "ID observation" et "Date de modification" des choix de colonnes
+            colonnes_a_exclure = ["ID observation", "Date de modification"]
+            colonnes_disponibles = [c for c in df.columns if c not in colonnes_a_exclure]
         
-            # Bouton unique pour lancer le traitement
+            y_col = st.selectbox("Sélectionnez la variable Y (CTQ) :", colonnes_disponibles)
+            x_cols = st.multiselect("Sélectionnez les variables X à tester :", [c for c in colonnes_disponibles if c != y_col])
+        
+            # Bouton pour lancer l'analyse
             if st.button("🚀 Lancer l'analyse statistique"):
-                results = []
-                # ... [Insérez ici la logique de calcul robuste que nous avons définie précédemment] ...
+                # (Insérez ici le code de calcul robuste que nous avons préparé précédemment)
+                st.write("Analyse en cours...")
             
-                # Affichage final
-                if results:
-                    res_df = pd.DataFrame(results)
-                    st.table(res_df)
-                    # ... suite du traitement ...
-                
         else:
-            st.warning("⚠️ Aucune donnée trouvée. Veuillez importer votre fichier dans la phase 'Mesure' avant de continuer.")
-            st.info("La phase Analyse nécessite un jeu de données valide pour effectuer les tests statistiques.")
+            st.warning("⚠️ Aucune donnée collectée. Veuillez remplir ou importer des données dans la phase 'Data Collection' (Mesure).")
+            st.info("Le système cherche la variable 'dc_master_data' qui est vide pour le moment.")
 
         # Squelette pour les étapes suivantes
         st.markdown("---")
