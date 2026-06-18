@@ -2949,21 +2949,21 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # On filtre pour inclure tout ce qui n'est pas "Nul" ou "Aucun"
-        # Ainsi, les influences "Faibles", "Modérées" et "Fortes" seront capturées
+        # On filtre pour inclure tout ce qui n'est pas "Nul", "N/A" ou "Aucun"
+        # On s'assure que st.session_state.results est bien une liste
+        results_data = st.session_state.get("results", [])
+        
         x_critiques = [
-            r["Variable X"] for r in st.session_state.results 
-            if r["Degré d'influence"] not in ["Nul", "N/A", "Aucun"]
+            r["Variable X"] for r in results_data 
+            if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]
         ]
 
         if not x_critiques:
-            st.info("Aucun X ayant une influence significative n'a été détecté.")
+            st.info("Aucun X ayant une influence significative n'a été détecté. Validez vos X dans la Phase 1.")
         else:
             # Affichage des variables détectées pour confirmation
-            st.write(f"Variables à analyser : {', '.join(x_critiques)}")
-        if not x_critiques:
-            st.info("Aucun X critique identifié. Veuillez d'abord valider vos X dans la Phase Analyse.")
-        else:
+            st.success(f"Variables détectées pour analyse : {', '.join(x_critiques)}")
+            
             for x in x_critiques:
                 st.subheader(f"Analyse pour : {x}")
         
@@ -2975,7 +2975,8 @@ else:
                 if methode == "Ishikawa":
                     st.write("Catégories : Méthode, Main d'œuvre, Machine, Matière, Milieu, Mesure")
                     cat_cols = st.columns(3)
-                    for i, cat in enumerate(["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]):
+                    categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
+                    for i, cat in enumerate(categories):
                         with cat_cols[i % 3]:
                             st.text_input(f"{cat}", key=f"ish_{x}_{cat}")
         
