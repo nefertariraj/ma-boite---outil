@@ -2962,52 +2962,39 @@ else:
             default=influents
         )
 
-        # Utilisation d'un FORMULAIRE pour éviter les rechargements à chaque saisie
         if x_critiques:
             with st.form(key="form_causes_racines"):
                 for x in x_critiques:
                     st.subheader(f"Analyse pour : {x}")
-                    
-                    col1, col2 = st.columns([1, 2])
-                    with col1:
-                        # La valeur est stockée temporairement dans le formulaire
-                        methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
-                    
+            
+                    # Selectbox unique par X grâce à sa clé dynamique
+                    methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
+            
+                    # --- LOGIQUE ISHIKAWA ---
                     if methode == "Ishikawa":
-                        st.write("### Diagramme d'Ishikawa")
-                        st.info("Saisissez vos idées par catégorie. Utilisez des virgules pour séparer plusieurs éléments.")
-                    
-                        # Structure en 2 colonnes pour simuler les arêtes (3 branches par côté)
+                        st.write("### Diagramme d'Ishikawa : Arête de Poisson")
                         cat_gauche, cat_droite = st.columns(2)
-                    
-                        categories_gauche = ["Méthode", "Main d'œuvre", "Machine"]
-                        categories_droite = ["Matière", "Milieu", "Mesure"]
-                    
+                
                         with cat_gauche:
-                            for cat in categories_gauche:
-                                # Utilisation de text_area pour permettre plusieurs lignes/entrées
-                                st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}", help=f"Entrez les causes pour {cat}")
-                    
+                            for cat in ["Méthode", "Main d'œuvre", "Machine"]:
+                                st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
                         with cat_droite:
-                            for cat in categories_droite:
-                                st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}", help=f"Entrez les causes pour {cat}")
-                    
+                            for cat in ["Matière", "Milieu", "Mesure"]:
+                                st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
+            
+                    # --- LOGIQUE 5 POURQUOI ---
                     elif methode == "5 Pourquoi":
-                        with st.expander("Détails des 5 Pourquoi"):
-                            st.text_input("Pourquoi 1 ?", key=f"p1_{x}")
-                            st.text_input("Pourquoi 2 ?", key=f"p2_{x}")
-                            st.text_input("Pourquoi 3 ?", key=f"p3_{x}")
-                            st.text_input("Pourquoi 4 ?", key=f"p4_{x}")
-                            st.text_input("Pourquoi 5 (Cause Racine) ?", key=f"p5_{x}")
+                        with st.expander(f"Détails des 5 Pourquoi pour {x}"):
+                            for i in range(1, 6):
+                                st.text_input(f"Pourquoi {i} ?", key=f"p{i}_{x}")
 
-                    with st.container():
-                        col_a, col_b = st.columns(2)
-                        col_a.text_input("Cause racine retenue", key=f"cause_{x}")
-                        col_b.slider("Niveau de confiance", 1, 5, 3, key=f"conf_{x}")
-                    
+                    # --- RÉSULTAT FINAL ---
+                    col_a, col_b = st.columns(2)
+                    col_a.text_input("Cause racine retenue", key=f"cause_{x}")
+                    col_b.slider("Niveau de confiance", 1, 5, 3, key=f"conf_{x}")
+            
                     st.markdown("---")
 
-                # Le bouton est DANS le formulaire
                 submit_button = st.form_submit_button(label="Valider et Enregistrer l'analyse")
 
             if submit_button:
