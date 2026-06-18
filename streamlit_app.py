@@ -2949,34 +2949,36 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # 1. On récupère les données
-        results_data = st.session_state.get("results", [])
+        # 1. Récupération des paramètres de la Phase 1
         df = st.session_state.get("dc_master_data", pd.DataFrame())
-        y_selectionne = st.session_state.get("y_col")
+        y_col = st.session_state.get("y_col")  # Assurez-vous que cette clé est bien définie en Phase 1
+        results_data = st.session_state.get("results", [])
 
-        # 2. LISTE EXCLUSIVE : On force l'exclusion du Y
+        # 2. Logique identique à la Phase 1 pour isoler les X
         colonnes_a_exclure = ["ID observation", "Date de modification"]
-        if y_selectionne:
-            colonnes_a_exclure.append(y_selectionne)
+        if y_col and y_col in df.columns:
+            colonnes_a_exclure.append(y_col)
             
-        tous_les_x = [c for c in df.columns if c not in colonnes_a_exclure]
+        # On définit les X comme toutes les colonnes qui ne sont PAS le Y et PAS les techniques
+        colonnes_x = [c for c in df.columns if c not in colonnes_a_exclure]
 
-        # 3. Filtrage automatique (les variables avec influence)
+        # 3. Préparation de la sélection (Auto + Manuel)
+        # On filtre uniquement sur les résultats liés à des X
         autos_critiques = [
             r["Variable X"] for r in results_data 
             if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]
-            and r["Variable X"] != y_selectionne 
+            and r["Variable X"] in colonnes_x
         ]
 
-        # 4. Sélection interactive
+        # 4. Interface de sélection (On n'utilise que colonnes_x)
         st.subheader("Sélection des variables X à analyser")
         x_critiques = st.multiselect(
-            "Variables X à approfondir (vous pouvez ajouter ou supprimer des éléments) :",
-            options=tous_les_x,
-            default=[x for x in autos_critiques if x in tous_les_x]
+            "Choisissez les variables X à approfondir :",
+            options=colonnes_x,
+            default=[x for x in autos_critiques if x in colonnes_x]
         )
 
-        # 5. BOUCLE D'ANALYSE (C'est ce qui manquait)
+        # 5. Boucle d'analyse
         if not x_critiques:
             st.info("Sélectionnez au moins une variable X pour commencer l'analyse.")
         else:
