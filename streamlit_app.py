@@ -2947,7 +2947,7 @@ else:
             st.warning("⚠️ Aucune donnée collectée. Veuillez remplir les données dans la phase 'Data Collection'.")
 
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
-        st.header("Phase 2 : Identification des Causes Racines")
+        st.subheader("2. Identification des causes racines")
 
         # 1. Récupération des données de la Phase 1
         results_data = st.session_state.get("results", [])
