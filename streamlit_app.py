@@ -2902,8 +2902,20 @@ else:
                                     impact = "Non, pas de différence"
                                     degre = "Nul"
                     
+                        # 3. Chi-2 (Qualitatif vs Qualitatif) - REMPLACE L'ANCIEN ELSE
                         else:
-                            impact = "Test non disponible (données textuelles)"
+                            contingency = pd.crosstab(df[x], df[y_col])
+                            if contingency.size > 0:
+                                chi2, p_value, _, _ = stats.chi2_contingency(contingency)
+                                if p_value < 0.05:
+                                    impact = "Oui, lien statistique trouvé"
+                                    degre = "Modéré à Fort"
+                                else:
+                                    impact = "Non, variables indépendantes"
+                                    degre = "Nul"
+                            else:
+                                impact = "Données insuffisantes"
+                                degre = "N/A"
 
                     except Exception as e:
                         impact = f"Erreur de calcul : {e}"
