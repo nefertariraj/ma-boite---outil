@@ -2853,7 +2853,8 @@ else:
         st.header("Phase Analyse")
 
         # --- PHASE 1 : TEST ACTION DES X SUR Y ---
-            st.subheader("1. Test de l'action des X sur Y")
+        st.subheader("1. Test de l'action des X sur Y")
+        
         if "dc_master_data" in st.session_state and not st.session_state.dc_master_data.empty:
             df = st.session_state.dc_master_data
             st.success(f"✅ Données détectées ({len(df)} lignes).")
