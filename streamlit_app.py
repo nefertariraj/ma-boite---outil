@@ -2949,17 +2949,23 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.header("Phase 2 : Identification des Causes Racines")
 
-        # 1. On s'assure de récupérer le Y défini en phase 1
-        # Si vous ne l'avez pas stocké dans session_state, on le récupère du selectbox
-        # (Assurez-vous d'avoir fait : st.session_state.y_col = y_col dans votre phase 1)
-        y_selectionne = st.session_state.get("y_col", "") 
+        # 1. On récupère le Y, soit depuis la session, soit on le redéfinit
+        # Assurez-vous d'avoir bien mis st.session_state.y_col = y_col dans votre Phase 1
+        y_selectionne = st.session_state.get("y_col")
         
-        # 2. Récupération des données et des colonnes
+        # 2. Récupération des données
         results_data = st.session_state.get("results", [])
         df = st.session_state.get("dc_master_data", pd.DataFrame())
 
-        # 3. Construction de la liste des X (Exclut Y et les colonnes techniques)
-        colonnes_a_exclure = ["ID observation", "Date de modification", y_selectionne]
+        # 3. Construction de la liste des X (Exclusion forcée)
+        # On définit les colonnes à ignorer par défaut
+        colonnes_a_exclure = ["ID observation", "Date de modification"]
+        
+        # Si y_selectionne est connu, on l'ajoute à la liste des exclus
+        if y_selectionne:
+            colonnes_a_exclure.append(y_selectionne)
+
+        # On filtre les colonnes : on ne garde que celles qui ne sont PAS dans la liste
         tous_les_x = [c for c in df.columns if c not in colonnes_a_exclure]
 
         # 4. Filtrage automatique (les variables avec influence)
