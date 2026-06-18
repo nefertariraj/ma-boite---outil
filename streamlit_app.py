@@ -2846,7 +2846,82 @@ else:
                     }
                     st.table(pd.DataFrame(stats_t0))
 
-    # --- AUTRES PHASES (Structure prête) ---
-    with tabs[2]: st.info("Module ANALYZE : Ishikawa & Tests Statistiques IA en attente de données.")
+    # --- PHASE ANALYSE ---
+    with tabs[2]: # En supposant que l'analyse est dans le 3ème onglet
+    st.header("Phase Analyse (DMAIC)")
+    
+    # Initialisation de la structure persistante si nécessaire
+    if "analyse_data" not in st.session_state:
+        st.session_state.analyse_data = {}
+
+    # 1. TEST DES X
+    st.subheader("1. Test des X : Identification des variables critiques")
+    
+    # Sélection des données (Dataframe issue de la phase mesure)
+    # Pour cet exemple, on suppose qu'un dataset est chargé dans le session_state
+    if "df_master" in st.session_state:
+        df = st.session_state.df_master
+        y_col = st.selectbox("Sélectionnez la variable Y (CTQ) :", df.columns)
+        x_cols = st.multiselect("Sélectionnez les variables X à tester :", [c for c in df.columns if c != y_col])
+        
+        if st.button("🚀 Lancer l'analyse statistique automatique"):
+            results = []
+            for x in x_cols:
+                # Logique de détection automatique du type de test
+                # (Simplifié : test automatique basé sur le type de données)
+                is_x_numeric = pd.api.types.is_numeric_dtype(df[x])
+                is_y_numeric = pd.api.types.is_numeric_dtype(df[y_col])
+                
+                test_name = "Non déterminé"
+                p_value = 1.0
+                
+                # --- MOTEUR DE TEST ---
+                if is_x_numeric and is_y_numeric:
+                    test_name = "Corrélation de Pearson"
+                    corr, p_value = stats.pearsonr(df[x].dropna(), df[y_col].dropna())
+                elif not is_x_numeric and is_y_numeric:
+                    test_name = "Test ANOVA (ou Kruskal-Wallis)"
+                    # Logique simplifiée pour l'exemple
+                    groups = [group[y_col].values for name, group in df.groupby(x)]
+                    f_val, p_value = stats.f_oneway(*groups)
+                
+                # Interprétation
+                is_significant = "Oui" if p_value < 0.05 else "Non"
+                
+                results.append({
+                    "Variable X": x,
+                    "Test utilisé": test_name,
+                    "P-value": round(p_value, 4),
+                    "Significatif": is_significant
+                })
+            
+            # Affichage des résultats
+            res_df = pd.DataFrame(results)
+            st.table(res_df)
+            
+            # Sauvegarde des X critiques
+            st.session_state.x_critiques = res_df[res_df["Significatif"] == "Oui"]["Variable X"].tolist()
+            st.success(f"X critiques identifiés : {', '.join(st.session_state.x_critiques)}")
+            
+    else:
+        st.warning("Veuillez importer ou collecter des données dans la phase Mesure pour lancer l'analyse.")
+
+    # Squelette pour les étapes suivantes
+    st.markdown("---")
+    st.subheader("2. Identification des causes racines des X critiques")
+    # (À compléter...)
+    
+    st.subheader("3. Current State FMEA")
+    # (À compléter...)
+    
+    st.subheader("4. Data collection plan for Gemba walk")
+    # (À compléter...)
+    
+    st.subheader("5. Data collection for Gemba walk")
+    # (À compléter...)
+    
+    st.subheader("6. Validation des causes racines")
+    # (À compléter...)
+
     with tabs[3]: st.info("Module IMPROVE : Matrice de sélection multicritères.")
     with tabs[4]: st.info("Module CONTROL : Graphiques Avant/Après & Gains financiers.")
