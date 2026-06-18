@@ -2951,62 +2951,57 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.subheader("2. Identification des causes racines")
 
-        # 1. Récupération des données de la Phase 1
         results_data = st.session_state.get("results", [])
-        
-        # Liste de TOUS les X ayant été testés en Phase 1
         tous_les_x_testes = [r["Variable X"] for r in results_data]
-        
-        # Liste des X ayant une influence (ceux à cocher automatiquement)
-        influents = [
-            r["Variable X"] for r in results_data 
-            if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]
-        ]
+        influents = [r["Variable X"] for r in results_data if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]]
 
-        # 2. Interface de sélection
         st.subheader("Sélection des variables X à approfondir")
         x_critiques = st.multiselect(
-            "Variables testées en phase 1 (ajoutez ou retirez selon votre besoin) :",
+            "Variables testées en phase 1 :",
             options=tous_les_x_testes,
             default=influents
         )
 
-        # 3. Boucle d'analyse
-        if not x_critiques:
-            st.info("Sélectionnez au moins une variable X pour commencer l'analyse.")
-        else:
-            for x in x_critiques:
-                st.subheader(f"Analyse pour : {x}")
-                
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
-        
-                # --- LOGIQUE ISHIKAWA ---
-                if methode == "Ishikawa":
-                    st.write("Catégories : Méthode, Main d'œuvre, Machine, Matière, Milieu, Mesure")
-                    cat_cols = st.columns(3)
-                    categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
-                    for i, cat in enumerate(categories):
-                        with cat_cols[i % 3]:
-                            st.text_input(f"{cat}", key=f"ish_{x}_{cat}")
-        
-                # --- LOGIQUE 5 POURQUOI ---
-                elif methode == "5 Pourquoi":
-                    with st.expander("Détails des 5 Pourquoi"):
-                        p1 = st.text_input("Pourquoi 1 ?", key=f"p1_{x}")
-                        p2 = st.text_input("Pourquoi 2 ?", key=f"p2_{x}")
-                        p3 = st.text_input("Pourquoi 3 ?", key=f"p3_{x}")
-                        p4 = st.text_input("Pourquoi 4 ?", key=f"p4_{x}")
-                        p5 = st.text_input("Pourquoi 5 (Cause Racine) ?", key=f"p5_{x}")
+        # Utilisation d'un FORMULAIRE pour éviter les rechargements à chaque saisie
+        if x_critiques:
+            with st.form(key="form_causes_racines"):
+                for x in x_critiques:
+                    st.subheader(f"Analyse pour : {x}")
+                    
+                    col1, col2 = st.columns([1, 2])
+                    with col1:
+                        # La valeur est stockée temporairement dans le formulaire
+                        methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
+                    
+                    if methode == "Ishikawa":
+                        cat_cols = st.columns(3)
+                        categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
+                        for i, cat in enumerate(categories):
+                            with cat_cols[i % 3]:
+                                st.text_input(f"{cat}", key=f"ish_{x}_{cat}")
+                    
+                    elif methode == "5 Pourquoi":
+                        with st.expander("Détails des 5 Pourquoi"):
+                            st.text_input("Pourquoi 1 ?", key=f"p1_{x}")
+                            st.text_input("Pourquoi 2 ?", key=f"p2_{x}")
+                            st.text_input("Pourquoi 3 ?", key=f"p3_{x}")
+                            st.text_input("Pourquoi 4 ?", key=f"p4_{x}")
+                            st.text_input("Pourquoi 5 (Cause Racine) ?", key=f"p5_{x}")
 
-                # --- RÉSULTAT FINAL POUR CHAQUE X ---
-                with st.container():
-                    col_a, col_b = st.columns(2)
-                    cause_finale = col_a.text_input("Cause racine retenue", key=f"cause_{x}")
-                    confiance = col_b.slider("Niveau de confiance", 1, 5, 3, key=f"conf_{x}")
-        
-                st.markdown("---")
+                    with st.container():
+                        col_a, col_b = st.columns(2)
+                        col_a.text_input("Cause racine retenue", key=f"cause_{x}")
+                        col_b.slider("Niveau de confiance", 1, 5, 3, key=f"conf_{x}")
+                    
+                    st.markdown("---")
+
+                # Le bouton est DANS le formulaire
+                submit_button = st.form_submit_button(label="Valider et Enregistrer l'analyse")
+
+            if submit_button:
+                st.success("Analyse enregistrée avec succès !")
+        else:
+            st.info("Sélectionnez au moins une variable X pour commencer l'analyse.")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
