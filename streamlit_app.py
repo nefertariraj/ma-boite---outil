@@ -2984,48 +2984,35 @@ else:
             status_emoji = "✅" if x_state.get("enregistre", False) else "⏳"
     
             with st.expander(f"{status_emoji} Analyse pour : {x}"):
-                # Sélection de la méthode
-                methode_choisie = st.selectbox(
-                    f"Méthode pour {x}", 
-                    ["Ishikawa", "5 Pourquoi"], 
-                    index=0 if x_state["methode"] == "Ishikawa" else 1,
-                    key=f"select_methode_{x}"
-                )
-        
-                # Formulaire de saisie avec clés temporaires (commençant par 'tmp_')
-                # Ces clés ne sont pas liées au projet, donc aucune mise à jour parasite
-                current_data = {}
-                if methode_choisie == "Ishikawa":
-                    cols = st.columns(2)
-                    categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
-                    for i, cat in enumerate(categories):
-                        current_data[cat] = cols[i % 2].text_area(
-                            f"🦴 {cat}", 
-                            value=x_state["data"].get(cat, ""), 
-                            key=f"tmp_ish_{x}_{cat}"
-                        )
-                else: # 5 Pourquoi
-                    for i in range(1, 6):
-                        current_data[f"p{i}"] = st.text_input(
-                            f"Pourquoi {i} ?", 
-                            value=x_state["data"].get(f"p{i}", ""), 
-                            key=f"tmp_p{i}_{x}"
-                        )
-        
-                cause_racine_val = st.text_input(
-                    "Cause racine retenue", 
-                    value=x_state.get("cause_racine", ""), 
-                    key=f"tmp_cause_{x}"
-                )
-        
-                # Bouton d'enregistrement (Mise à jour réelle du projet)
-                if st.button(f"Enregistrer l'analyse de {x}", key=f"save_{x}"):
-                    x_state["methode"] = methode_choisie
-                    x_state["data"] = current_data
-                    x_state["cause_racine"] = cause_racine_val
-                    x_state["enregistre"] = True
-                    st.success(f"Analyse de {x} enregistrée dans le projet !")
-                    # Note : Pas de st.rerun() pour garder l'écran fixe
+                # On encapsule tout dans un formulaire pour supprimer le clignotement
+                with st.form(key=f"form_{x}"):
+                    methode_choisie = st.selectbox(
+                        f"Méthode pour {x}", 
+                        ["Ishikawa", "5 Pourquoi"], 
+                        index=0 if x_state["methode"] == "Ishikawa" else 1
+                    )
+            
+                    form_data = {}
+                    if methode_choisie == "Ishikawa":
+                        cols = st.columns(2)
+                        categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
+                        for i, cat in enumerate(categories):
+                            form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
+                    else: # 5 Pourquoi
+                        for i in range(1, 6):
+                            form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
+            
+                    cause_racine_val = st.text_input("Cause racine retenue", value=x_state.get("cause_racine", ""))
+            
+                    # Le bouton du formulaire valide la saisie et sauvegarde
+                    submit = st.form_submit_button(f"Enregistrer l'analyse de {x}")
+            
+                    if submit:
+                        x_state["methode"] = methode_choisie
+                        x_state["data"] = form_data
+                        x_state["cause_racine"] = cause_racine_val
+                        x_state["enregistre"] = True
+                        st.success(f"Analyse de {x} enregistrée dans le projet !")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
