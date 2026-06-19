@@ -3037,7 +3037,7 @@ else:
                             # Nettoyage des causes vides avant sauvegarde
                             x_state["causes_racines_list"] = [c for c in x_state["causes_racines_list"] if c.strip() != ""]
                             x_state["enregistre"] = True
-                            st.success(f"Analyse de {x} enregistrée !"))
+                            st.success(f"Analyse de {x} enregistrée !")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
