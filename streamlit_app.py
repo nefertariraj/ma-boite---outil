@@ -2971,22 +2971,22 @@ else:
         x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", tous_les_x, default=x_influents)
 
         for x in x_critiques:
+            # 1. Initialisation dans le JSON si variable absente
             if x not in dmaic_analyze["x_analyses"]:
-                dmaic_analyze["x_analyses"][x] = {"methode": "Ishikawa", "data": {}, "cause_racine": "", "enregistre": False}
-    
+                dmaic_analyze["x_analyses"][x] = {
+                    "methode": "Ishikawa", 
+                    "data": {}, 
+                    "causes_racines_list": [""], 
+                    "enregistre": False
+                }
+            
             x_state = dmaic_analyze["x_analyses"][x]
-    
-            # 1. Choix de la méthode (Hors formulaire)
-            nouvelle_methode = st.radio(
-                f"Choisir la méthode pour {x} :", 
-                ["Ishikawa", "5 Pourquoi"], 
-                index=0 if x_state["methode"] == "Ishikawa" else 1,
-                key=f"radio_methode_{x}",
-                horizontal=True
-            )
-            if nouvelle_methode != x_state["methode"]:
-                x_state["methode"] = nouvelle_methode
-                st.rerun()
+
+            # 2. SYNCHRONISATION : On s'assure que la session possède bien les données du JSON
+            safe_x_key = x.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_")
+            if f"causes_{safe_x_key}" not in st.session_state:
+                # On charge les causes depuis le JSON vers la session (ou une liste vide si rien n'est encore enregistré)
+                st.session_state[f"causes_{safe_x_key}"] = x_state.get("causes_racines_list", [""])
 
             # 2. GESTION DES CAUSES (SÉPARÉE DU FORMULAIRE)
             st.write(f"**Causes racines identifiées pour {x} :**")
