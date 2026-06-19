@@ -3034,8 +3034,42 @@ else:
                         st.success("Analyse enregistrée !")
                         st.rerun()
     
+        # --- PHASE 3 : FMEA (AMDEC) ---
         st.subheader("3. Current State FMEA")
-        # (À compléter...)
+
+        # Initialisation du dictionnaire FMEA
+        if "fmea_data" not in dmaic_analyze:
+            dmaic_analyze["fmea_data"] = {}
+
+        # Récupération de toutes les causes racines validées des étapes précédentes
+        toutes_les_causes = []
+        for x, state in dmaic_analyze.get("x_analyses", {}).items():
+            for cause in state.get("causes_racines_list", []):
+                if cause.strip():
+                    toutes_les_causes.append({"x": x, "cause": cause})
+
+        if not toutes_les_causes:
+            st.warning("Aucune cause racine identifiée. Veuillez compléter la phase 2.")
+        else:
+            for item in toutes_les_causes:
+                cause_id = f"{item['x']}_{item['cause']}"
+                if cause_id not in dmaic_analyze["fmea_data"]:
+                    dmaic_analyze["fmea_data"][cause_id] = {"S": 1, "O": 1, "D": 1, "effet": "", "mode": ""}
+        
+                data = dmaic_analyze["fmea_data"][cause_id]
+        
+                with st.expander(f"Analyse pour : {item['x']} - {item['cause']}"):
+                    col1, col2 = st.columns(2)
+                    data["mode"] = col1.text_input("Mode de défaillance", value=data["mode"], key=f"m_{cause_id}")
+                    data["effet"] = col2.text_input("Effet de la défaillance", value=data["effet"], key=f"e_{cause_id}")
+            
+                    s, o, d = st.columns(3)
+                    data["S"] = s.slider("Sévérité (S)", 1, 10, data["S"], key=f"s_{cause_id}")
+                    data["O"] = o.slider("Occurrence (O)", 1, 10, data["O"], key=f"o_{cause_id}")
+                    data["D"] = d.slider("Détection (D)", 1, 10, data["D"], key=f"d_{cause_id}")
+            
+                    rpn = data["S"] * data["O"] * data["D"]
+                    st.metric("RPN (Calculé)", rpn)
     
         st.subheader("4. Data collection plan for Gemba walk")
         # (À compléter...)
