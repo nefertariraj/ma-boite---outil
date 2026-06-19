@@ -2876,8 +2876,6 @@ else:
 
             if st.button("🚀 Lancer l'analyse statistique"):
                 results = []
-            
-                # Conversion sécurisée de Y
                 y_data = pd.to_numeric(df[y_col], errors='coerce')
                 is_y_num = y_data.notna().sum() > (len(df) * 0.5)
 
@@ -2938,17 +2936,25 @@ else:
                         "P-value": round(float(p_value), 4)
                     })
                 
-                # Sauvegarde dans la session pour persistance JSON
-                st.session_state.results = results
+                # --- CORRECTION POUR SAUVEGARDE JSON ---
+                # On récupère l'index du projet en cours
+                idx = st.session_state["current_project_idx"]
+                
+                # On injecte les résultats DANS le projet actif
+                # C'est cette ligne qui garantit que le JSON récupérera les données
+                st.session_state.projects[idx]["dmaic"]["analyze"]["results"] = results
+                
                 st.rerun()
 
-            # Affichage des résultats persistants
-            if st.session_state.results:
-                st.table(pd.DataFrame(st.session_state.results))
+            # --- AFFICHAGE ---
+            # On lit les résultats directement dans le projet actif
+            idx = st.session_state["current_project_idx"]
+            stored_results = st.session_state.projects[idx]["dmaic"]["analyze"].get("results", [])
+
+            if stored_results:
+                st.table(pd.DataFrame(stored_results))
             else:
-                st.info("Aucun résultat pour le moment. Lancez l'analyse.")
-        else:
-            st.warning("⚠️ Aucune donnée collectée. Veuillez remplir les données dans la phase 'Data Collection'.")
+                st.info("Aucun résultat pour le moment.")
 
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.subheader("2. Identification des causes racines")
