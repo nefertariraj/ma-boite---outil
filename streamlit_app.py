@@ -2985,63 +2985,51 @@ else:
 
             # 3. AFFICHAGE DANS EXPANDER
             statut = "✅" if x_state.get("enregistre") else "⏳"
-            with st.expander(f"{statut} Analyse : {x} ({x_state['methode']})"):
-                
-                # A. Choix de la méthode
-                nouvelle_methode = st.radio(
-                    "Méthode :", ["Ishikawa", "5 Pourquoi"], 
-                    index=0 if x_state["methode"] == "Ishikawa" else 1,
-                    key=f"radio_{safe_x_key}", horizontal=True
-                )
+            with st.expander(f"{'✅' if x_state.get('enregistre') else '⏳'} Analyse pour : {x}"):
+    
+                # 1. Choix méthode (Hors formulaire pour réagir immédiatement)
+                nouvelle_methode = st.radio("Méthode :", ["Ishikawa", "5 Pourquoi"], 
+                                            index=0 if x_state["methode"] == "Ishikawa" else 1,
+                                            key=f"radio_{safe_x_key}", horizontal=True)
                 if nouvelle_methode != x_state["methode"]:
                     x_state["methode"] = nouvelle_methode
                     st.rerun()
 
-                # B. FORMULAIRE (Affiché en haut ou en bas selon votre préférence)
-                with st.form(key=f"form_{safe_x_key}"):
+                # 2. FORMULAIRE UNIQUE (Contient tout : Champs + Causes)
+                with st.form(key=f"form_total_{safe_x_key}"):
+        
+                    # --- A. Champs Ishikawa ou 5 Pourquoi ---
                     form_data = {}
                     if x_state["methode"] == "Ishikawa":
                         cols = st.columns(2)
                         cats = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
                         for i, cat in enumerate(cats):
                             form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
-                    else: 
+                    else:
                         for i in range(1, 6):
                             form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
-                    
-                    submit = st.form_submit_button("Enregistrer les données de l'analyse")
+
+                    # --- B. Causes racines ---
+                    st.write("**Causes racines :**")
+                    # On affiche les causes en lecture/écriture
+                    # NOTE: Pour gérer l'ajout/suppression dans un form, on utilise une logique de suppression simple
+                    for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
+                        st.session_state[f"causes_{safe_x_key}"][i] = st.text_input(
+                            f"Cause {i+1}", value=st.session_state[f"causes_{safe_x_key}"][i], 
+                            key=f"input_{safe_x_key}_{i}"
+                        )
+
+                    # --- C. Boutons de contrôle (Hors st.form) ---
+                    # Si on a vraiment besoin d'ajouter/supprimer, on le fait HORS du form
+                    # et on demande une validation globale.
+        
+                    submit = st.form_submit_button("💾 Enregistrer TOUT (Analyse + Causes)")
+        
                     if submit:
                         x_state["data"] = form_data
+                        x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
                         x_state["enregistre"] = True
-                        st.success("Données enregistrées !")
-
-                # C. GESTION DES CAUSES (SÉPARÉE)
-                st.write("**Causes racines identifiées :**")
-                
-                # Liste temporaire dans la session
-                for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
-                    c1, c2 = st.columns([4, 1])
-                    st.session_state[f"causes_{safe_x_key}"][i] = c1.text_input(
-                        f"Cause {i+1}", 
-                        value=st.session_state[f"causes_{safe_x_key}"][i], 
-                        key=f"input_{safe_x_key}_{i}", 
-                        label_visibility="collapsed"
-                    )
-                    if c2.button("🗑️", key=f"del_{safe_x_key}_{i}"):
-                        st.session_state[f"causes_{safe_x_key}"].pop(i)
-                        st.rerun()
-
-                if st.button("➕ Ajouter une ligne", key=f"add_{safe_x_key}"):
-                    st.session_state[f"causes_{safe_x_key}"].append("")
-                    st.rerun()
-
-                # BOUTON VALIDER AVEC RERUN
-                if st.button("💾 Enregistrer ces causes", key=f"save_btn_{safe_x_key}"):
-                    # On met à jour directement l'objet référencé dans dmaic_analyze
-                    x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
-                    x_state["enregistre"] = True
-                    st.success(f"Causes de {x} sauvegardées !")
-                    st.rerun() # Force le rafraîchissement pour mettre à jour l'affichage
+                        st.success("Analyse et causes enregistrées !")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
