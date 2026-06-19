@@ -3015,25 +3015,33 @@ else:
                         x_state["enregistre"] = True
                         st.success("Données enregistrées !")
 
-                # C. GESTION DES CAUSES (Sous le formulaire pour bien les voir)
+                # C. GESTION DES CAUSES (SÉPARÉE)
                 st.write("**Causes racines identifiées :**")
+                
+                # Liste temporaire dans la session
                 for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
                     c1, c2 = st.columns([4, 1])
                     st.session_state[f"causes_{safe_x_key}"][i] = c1.text_input(
-                        f"Cause {i+1}", value=st.session_state[f"causes_{safe_x_key}"][i], 
-                        key=f"input_{safe_x_key}_{i}", label_visibility="collapsed")
+                        f"Cause {i+1}", 
+                        value=st.session_state[f"causes_{safe_x_key}"][i], 
+                        key=f"input_{safe_x_key}_{i}", 
+                        label_visibility="collapsed"
+                    )
                     if c2.button("🗑️", key=f"del_{safe_x_key}_{i}"):
                         st.session_state[f"causes_{safe_x_key}"].pop(i)
                         st.rerun()
 
-                if st.button("➕ Ajouter une ligne de cause", key=f"add_{safe_x_key}"):
+                if st.button("➕ Ajouter une ligne", key=f"add_{safe_x_key}"):
                     st.session_state[f"causes_{safe_x_key}"].append("")
                     st.rerun()
-                
-                # Bouton spécifique pour valider les causes séparément
-                if st.button("💾 Valider la liste des causes", key=f"save_causes_{safe_x_key}"):
+
+                # BOUTON VALIDER AVEC RERUN
+                if st.button("💾 Enregistrer ces causes", key=f"save_btn_{safe_x_key}"):
+                    # On met à jour directement l'objet référencé dans dmaic_analyze
                     x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
-                    st.success("Liste des causes validée !")
+                    x_state["enregistre"] = True
+                    st.success(f"Causes de {x} sauvegardées !")
+                    st.rerun() # Force le rafraîchissement pour mettre à jour l'affichage
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
