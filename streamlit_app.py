@@ -3002,38 +3002,42 @@ else:
                         for i in range(1, 6):
                             form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
             
-                    # --- TABLEAU DES CAUSES RACINES (Gestion ligne par ligne) ---
+                    # --- GESTION DES CAUSES RACINES (À l'extérieur du formulaire pour éviter les conflits) ---
                     st.write("**Causes racines identifiées :**")
                     if "causes_racines_list" not in x_state:
                         x_state["causes_racines_list"] = [""]
 
-                    # On crée des lignes pour chaque cause
                     for i, cause in enumerate(x_state["causes_racines_list"]):
                         col_text, col_del = st.columns([4, 1])
-                        
-                        # Champ de saisie
                         x_state["causes_racines_list"][i] = col_text.text_input(
-                            f"Cause {i+1}", 
-                            value=cause, 
-                            key=f"cr_{x}_{i}",
-                            label_visibility="collapsed"
+                            f"Cause {i+1}", value=cause, key=f"cr_{x}_{i}", label_visibility="collapsed"
                         )
-                        
-                        # Bouton de suppression spécifique à cette ligne
                         if col_del.button("🗑️", key=f"del_{x}_{i}"):
                             x_state["causes_racines_list"].pop(i)
                             st.rerun()
 
-                    # Bouton d'ajout
                     if st.button("➕ Ajouter une ligne", key=f"add_{x}"):
                         x_state["causes_racines_list"].append("")
                         st.rerun()
-            
-                    if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
-                        x_state["data"] = form_data
-                        x_state["cause_racine"] = cause_racine_val
-                        x_state["enregistre"] = True
-                        st.success(f"Analyse de {x} enregistrée !")
+
+                    # --- FORMULAIRE ---
+                    with st.form(key=f"form_{x}"):
+                        form_data = {}
+                        if x_state["methode"] == "Ishikawa":
+                            cols = st.columns(2)
+                            cats = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
+                            for i, cat in enumerate(cats):
+                                form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
+                        else: # 5 Pourquoi
+                            for i in range(1, 6):
+                                form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
+                    
+                        if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
+                            x_state["data"] = form_data
+                            # Nettoyage des causes vides avant sauvegarde
+                            x_state["causes_racines_list"] = [c for c in x_state["causes_racines_list"] if c.strip() != ""]
+                            x_state["enregistre"] = True
+                            st.success(f"Analyse de {x} enregistrée !"))
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
