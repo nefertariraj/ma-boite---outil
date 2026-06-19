@@ -3002,32 +3002,38 @@ else:
                         for i in range(1, 6):
                             form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
             
-                    # On nettoie le nom de la variable pour créer une clé unique et sans espace
+                    # 1. NETTOYAGE DE LA CLÉ
                     safe_x_key = x.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_")
-                
-                    # 1. GESTION DES CAUSES (Complètement isolée)
+
+                    # 2. GESTION DES CAUSES (COMPLÈTEMENT HORS DU FORMULAIRE)
                     st.write(f"**Causes racines identifiées pour {x} :**")
+
                     if f"causes_{safe_x_key}" not in st.session_state:
                         st.session_state[f"causes_{safe_x_key}"] = x_state.get("causes_racines_list", [""])
 
-                    # Affichage du tableau de causes
+                    # Affichage des lignes avec leurs boutons de suppression
                     for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
-                        col_text, col_del = st.columns([4, 1])
-                        st.session_state[f"causes_{safe_x_key}"][i] = col_text.text_input(
+                        # Utilisation d'un conteneur simple pour le tableau, PAS un formulaire
+                        row_col1, row_col2 = st.columns([4, 1])
+    
+                        st.session_state[f"causes_{safe_x_key}"][i] = row_col1.text_input(
                             f"Cause {i+1}", 
                             value=st.session_state[f"causes_{safe_x_key}"][i], 
                             key=f"input_{safe_x_key}_{i}",
                             label_visibility="collapsed"
                         )
-                        if col_del.button("🗑️", key=f"del_{safe_x_key}_{i}"):
+    
+                        # Le bouton de suppression est ici, en dehors de tout form
+                        if row_col2.button("🗑️", key=f"del_{safe_x_key}_{i}"):
                             st.session_state[f"causes_{safe_x_key}"].pop(i)
                             st.rerun()
 
+                    # Bouton d'ajout
                     if st.button("➕ Ajouter une ligne", key=f"add_{safe_x_key}"):
                         st.session_state[f"causes_{safe_x_key}"].append("")
                         st.rerun()
 
-                    # 2. FORMULAIRE (Strictement pour la méthode et la sauvegarde)
+                    # 3. LE FORMULAIRE (NE CONTIENT QUE LES DONNÉES ET LE SUBMIT)
                     with st.form(key=f"form_{safe_x_key}"):
                         form_data = {}
                         if x_state["methode"] == "Ishikawa":
@@ -3035,14 +3041,13 @@ else:
                             cats = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
                             for i, cat in enumerate(cats):
                                 form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
-                        else:
+                        else: 
                             for i in range(1, 6):
                                 form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
     
-                        # Bouton de soumission
+                        # SEUL BOUTON AUTORISÉ DANS LE FORM
                         if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
                             x_state["data"] = form_data
-                            # On transfère les causes depuis la session temporaire vers le projet
                             x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
                             x_state["enregistre"] = True
                             st.success(f"Analyse de {x} enregistrée !")
