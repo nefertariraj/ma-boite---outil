@@ -3005,27 +3005,29 @@ else:
                     # On nettoie le nom de la variable pour créer une clé unique et sans espace
                     safe_x_key = x.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_")
                 
-                    # --- 1. GESTION DES CAUSES RACINES (Avant le formulaire) ---
+                    # 1. GESTION DES CAUSES (Complètement isolée)
                     st.write(f"**Causes racines identifiées pour {x} :**")
-                    if "causes_racines_list" not in x_state:
-                        x_state["causes_racines_list"] = [""]
+                    if f"causes_{safe_x_key}" not in st.session_state:
+                        st.session_state[f"causes_{safe_x_key}"] = x_state.get("causes_racines_list", [""])
 
-                    # On affiche les lignes de saisie et leurs boutons de suppression
-                    for i, cause in enumerate(x_state["causes_racines_list"]):
+                    # Affichage du tableau de causes
+                    for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
                         col_text, col_del = st.columns([4, 1])
-                        x_state["causes_racines_list"][i] = col_text.text_input(
-                            f"Cause {i+1}", value=cause, key=f"cr_{safe_x_key}_{i}", label_visibility="collapsed"
+                        st.session_state[f"causes_{safe_x_key}"][i] = col_text.text_input(
+                            f"Cause {i+1}", 
+                            value=st.session_state[f"causes_{safe_x_key}"][i], 
+                            key=f"input_{safe_x_key}_{i}",
+                            label_visibility="collapsed"
                         )
                         if col_del.button("🗑️", key=f"del_{safe_x_key}_{i}"):
-                            x_state["causes_racines_list"].pop(i)
+                            st.session_state[f"causes_{safe_x_key}"].pop(i)
                             st.rerun()
 
-                    # Bouton d'ajout de ligne
                     if st.button("➕ Ajouter une ligne", key=f"add_{safe_x_key}"):
-                        x_state["causes_racines_list"].append("")
+                        st.session_state[f"causes_{safe_x_key}"].append("")
                         st.rerun()
 
-                    # --- 2. FORMULAIRE (Uniquement pour le contenu dynamique et la sauvegarde) ---
+                    # 2. FORMULAIRE (Strictement pour la méthode et la sauvegarde)
                     with st.form(key=f"form_{safe_x_key}"):
                         form_data = {}
                         if x_state["methode"] == "Ishikawa":
@@ -3033,15 +3035,15 @@ else:
                             cats = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
                             for i, cat in enumerate(cats):
                                 form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
-                        else: # 5 Pourquoi
+                        else:
                             for i in range(1, 6):
-                                form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
+            form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
     
-                        # Bouton unique de validation du formulaire
+                        # Bouton de soumission
                         if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
                             x_state["data"] = form_data
-                            # On sauvegarde les causes racines dans le projet au moment du clic
-                            x_state["causes_racines_list"] = [c for c in x_state["causes_racines_list"] if c.strip() != ""]
+                            # On transfère les causes depuis la session temporaire vers le projet
+                            x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
                             x_state["enregistre"] = True
                             st.success(f"Analyse de {x} enregistrée !")
     
