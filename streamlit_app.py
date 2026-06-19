@@ -2971,7 +2971,7 @@ else:
         x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", tous_les_x, default=x_influents)
 
         for x in x_critiques:
-            # 1. Initialisation (avec causes_racines_list)
+            # 1. Initialisation dans le JSON
             if x not in dmaic_analyze["x_analyses"]:
                 dmaic_analyze["x_analyses"][x] = {
                     "methode": "Ishikawa", "data": {}, "causes_racines_list": [""], "enregistre": False
@@ -2979,15 +2979,15 @@ else:
             x_state = dmaic_analyze["x_analyses"][x]
             safe_x_key = x.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_")
 
-            # 2. SYNCHRO
+            # 2. SYNCHRO Session
             if f"causes_{safe_x_key}" not in st.session_state:
                 st.session_state[f"causes_{safe_x_key}"] = x_state.get("causes_racines_list", [""])
 
-            # 3. AFFICHAGE DANS EXPANDER
+            # 3. EXPANDER
             statut = "✅" if x_state.get("enregistre") else "⏳"
-            with st.expander(f"{'✅' if x_state.get('enregistre') else '⏳'} Analyse pour : {x}"):
-    
-                # 1. Choix méthode (Hors formulaire pour réagir immédiatement)
+            with st.expander(f"{statut} Analyse pour : {x}"):
+                
+                # A. Choix méthode (Hors form)
                 nouvelle_methode = st.radio("Méthode :", ["Ishikawa", "5 Pourquoi"], 
                                             index=0 if x_state["methode"] == "Ishikawa" else 1,
                                             key=f"radio_{safe_x_key}", horizontal=True)
@@ -2995,10 +2995,15 @@ else:
                     x_state["methode"] = nouvelle_methode
                     st.rerun()
 
-                # 2. FORMULAIRE UNIQUE (Contient tout : Champs + Causes)
+                # B. AJOUT/SUPPRESSION (Hors form pour ne pas bugger)
+                col_add, col_del = st.columns([1, 5])
+                if col_add.button("➕", key=f"add_{safe_x_key}"):
+                    st.session_state[f"causes_{safe_x_key}"].append("")
+                    st.rerun()
+
+                # C. FORMULAIRE UNIQUE
                 with st.form(key=f"form_total_{safe_x_key}"):
-        
-                    # --- A. Champs Ishikawa ou 5 Pourquoi ---
+                    # --- Analyse ---
                     form_data = {}
                     if x_state["methode"] == "Ishikawa":
                         cols = st.columns(2)
@@ -3009,27 +3014,25 @@ else:
                         for i in range(1, 6):
                             form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
 
-                    # --- B. Causes racines ---
+                    # --- Causes (Boucle DANS le form) ---
                     st.write("**Causes racines :**")
-                    # On affiche les causes en lecture/écriture
-                    # NOTE: Pour gérer l'ajout/suppression dans un form, on utilise une logique de suppression simple
                     for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
-                        st.session_state[f"causes_{safe_x_key}"][i] = st.text_input(
+                        c1, c2 = st.columns([10, 1])
+                        st.session_state[f"causes_{safe_x_key}"][i] = c1.text_input(
                             f"Cause {i+1}", value=st.session_state[f"causes_{safe_x_key}"][i], 
-                            key=f"input_{safe_x_key}_{i}"
+                            key=f"input_{safe_x_key}_{i}", label_visibility="collapsed"
                         )
+                        if c2.form_submit_button("🗑️", key=f"del_{safe_x_key}_{i}"):
+                            st.session_state[f"causes_{safe_x_key}"].pop(i)
+                            st.rerun()
 
-                    # --- C. Boutons de contrôle (Hors st.form) ---
-                    # Si on a vraiment besoin d'ajouter/supprimer, on le fait HORS du form
-                    # et on demande une validation globale.
-        
-                    submit = st.form_submit_button("💾 Enregistrer TOUT (Analyse + Causes)")
-        
-                    if submit:
+                    # Bouton Soumission Finale
+                    if st.form_submit_button("💾 Enregistrer TOUT"):
                         x_state["data"] = form_data
                         x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
                         x_state["enregistre"] = True
-                        st.success("Analyse et causes enregistrées !")
+                        st.success("Analyse enregistrée !")
+                        st.rerun()
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
