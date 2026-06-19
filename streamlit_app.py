@@ -2959,44 +2959,44 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.subheader("2. Identification des causes racines")
 
-        # 1. Accès au projet actif
         idx = st.session_state["current_project_idx"]
         dmaic_analyze = st.session_state.projects[idx]["dmaic"]["analyze"]
 
-        # Initialisation de la structure si elle n'existe pas
         if "x_analyses" not in dmaic_analyze:
             dmaic_analyze["x_analyses"] = {}
 
-        # 2. Gestion de la liste des X
         results_phase1 = dmaic_analyze.get("results", [])
-        x_influents = [r["Variable X"] for r in results_phase1 if "Oui" in r.get("Le X agit-il sur Y ?", "")]
         tous_les_x = [r["Variable X"] for r in results_phase1]
-
+        x_influents = [r["Variable X"] for r in results_phase1 if "Oui" in r.get("Le X agit-il sur Y ?", "")]
         x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", tous_les_x, default=x_influents)
 
-        # 3. Boucle d'analyse
         for x in x_critiques:
-            # État spécifique au X dans le projet
             if x not in dmaic_analyze["x_analyses"]:
                 dmaic_analyze["x_analyses"][x] = {"methode": "Ishikawa", "data": {}, "cause_racine": "", "enregistre": False}
     
             x_state = dmaic_analyze["x_analyses"][x]
-            status_emoji = "✅" if x_state.get("enregistre", False) else "⏳"
     
-            with st.expander(f"{status_emoji} Analyse pour : {x}"):
-                # On encapsule tout dans un formulaire pour supprimer le clignotement
+            with st.expander(f"{'✅' if x_state.get('enregistre') else '⏳'} Analyse pour : {x}"):
+                # On déplace le choix de la méthode HORS du formulaire pour une réaction immédiate
+                nouvelle_methode = st.radio(
+                    f"Choisir la méthode pour {x} :", 
+                    ["Ishikawa", "5 Pourquoi"], 
+                    index=0 if x_state["methode"] == "Ishikawa" else 1,
+                    key=f"radio_methode_{x}",
+                    horizontal=True
+                )
+        
+                # Mise à jour immédiate de la méthode dans l'état (sans valider les causes)
+                if nouvelle_methode != x_state["methode"]:
+                    x_state["methode"] = nouvelle_methode
+                    st.rerun() # Rafraîchit juste pour afficher les bons champs
+        
                 with st.form(key=f"form_{x}"):
-                    methode_choisie = st.selectbox(
-                        f"Méthode pour {x}", 
-                        ["Ishikawa", "5 Pourquoi"], 
-                        index=0 if x_state["methode"] == "Ishikawa" else 1
-                    )
-            
                     form_data = {}
-                    if methode_choisie == "Ishikawa":
+                    if x_state["methode"] == "Ishikawa":
                         cols = st.columns(2)
-                        categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
-                        for i, cat in enumerate(categories):
+                        cats = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
+                        for i, cat in enumerate(cats):
                             form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
                     else: # 5 Pourquoi
                         for i in range(1, 6):
@@ -3004,15 +3004,11 @@ else:
             
                     cause_racine_val = st.text_input("Cause racine retenue", value=x_state.get("cause_racine", ""))
             
-                    # Le bouton du formulaire valide la saisie et sauvegarde
-                    submit = st.form_submit_button(f"Enregistrer l'analyse de {x}")
-            
-                    if submit:
-                        x_state["methode"] = methode_choisie
+                    if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
                         x_state["data"] = form_data
                         x_state["cause_racine"] = cause_racine_val
                         x_state["enregistre"] = True
-                        st.success(f"Analyse de {x} enregistrée dans le projet !")
+                        st.success(f"Analyse de {x} enregistrée !")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
