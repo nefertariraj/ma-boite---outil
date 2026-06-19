@@ -2967,69 +2967,53 @@ else:
         if "x_analyses" not in dmaic_analyze:
             dmaic_analyze["x_analyses"] = {}
 
-        # 2. Gestion de la liste des X (Auto-remplie par Phase 1 + Manuel)
+        # 2. Gestion de la liste des X
         results_phase1 = dmaic_analyze.get("results", [])
         x_influents = [r["Variable X"] for r in results_phase1 if "Oui" in r.get("Le X agit-il sur Y ?", "")]
-
-        # On permet de sélectionner parmi les X testés en phase 1
         tous_les_x = [r["Variable X"] for r in results_phase1]
+
         x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", tous_les_x, default=x_influents)
 
-        # 3. Boucle d'analyse indépendante par X
+        # 3. Boucle d'analyse
         for x in x_critiques:
-            # État spécifique au X dans le projet
+            # État spécifique au X
             if x not in dmaic_analyze["x_analyses"]:
-                dmaic_analyze["x_analyses"][x] = {"methode": "Ishikawa", "data": {}, "enregistre": False}
+                dmaic_analyze["x_analyses"][x] = {"methode": "Ishikawa", "data": {}, "cause_racine": "", "enregistre": False}
     
-            x_data = dmaic_analyze["x_analyses"][x]
-    
-            # Indicateur visuel si déjà enregistré
-            status_emoji = "✅" if x_data.get("enregistre", False) else "⏳"
+            x_state = dmaic_analyze["x_analyses"][x]
+            status_emoji = "✅" if x_state.get("enregistre", False) else "⏳"
     
             with st.expander(f"{status_emoji} Analyse pour : {x}"):
-                methode = st.selectbox(
+                # Sélection de la méthode (on utilise une clé temporaire pour ne pas modifier le projet tout de suite)
+                methode_choisie = st.selectbox(
                     f"Méthode pour {x}", 
                     ["Ishikawa", "5 Pourquoi"], 
-                    index=0 if x_data["methode"] == "Ishikawa" else 1,
-                    key=f"methode_{x}"
+                    index=0 if x_state["methode"] == "Ishikawa" else 1,
+                    key=f"select_methode_{x}"
                 )
         
-                # --- LOGIQUE ISHIKAWA ---
-                if methode == "Ishikawa":
+                # Formulaire de saisie (les valeurs sont chargées depuis le projet)
+                current_data = {}
+                if methode_choisie == "Ishikawa":
                     cols = st.columns(2)
                     categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
                     for i, cat in enumerate(categories):
-                        col = cols[i % 2]
-                        val = col.text_area(
-                            f"🦴 {cat}", 
-                            value=x_data["data"].get(cat, ""), 
-                            key=f"ish_{x}_{cat}"
-                        )
-                        x_data["data"][cat] = val
+                        current_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""), key=f"inp_ish_{x}_{cat}")
         
-                # --- LOGIQUE 5 POURQUOI ---
-                elif methode == "5 Pourquoi":
+                else: # 5 Pourquoi
                     for i in range(1, 6):
-                        val = st.text_input(
-                            f"Pourquoi {i} ?", 
-                            value=x_data["data"].get(f"p{i}", ""), 
-                            key=f"p{i}_{x}"
-                        )
-                        x_data["data"][f"p{i}"] = val
+                        current_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""), key=f"inp_p{i}_{x}")
         
-                # Cause racine finale
-                x_data["cause_racine"] = st.text_input(
-                    "Cause racine retenue", 
-                    value=x_data.get("cause_racine", ""), 
-                    key=f"cause_{x}"
-                )
+                cause_racine_val = st.text_input("Cause racine retenue", value=x_state.get("cause_racine", ""), key=f"inp_cause_{x}")
         
-                # Bouton d'enregistrement propre au X
+                # Le bouton d'enregistrement est le SEUL moment où on met à jour le projet
                 if st.button(f"Enregistrer l'analyse de {x}", key=f"save_{x}"):
-                    x_data["methode"] = methode
-                    x_data["enregistre"] = True
-                    st.success(f"Analyse de {x} enregistrée avec succès !")
-                    st.rerun()
+                    x_state["methode"] = methode_choisie
+                    x_state["data"] = current_data
+                    x_state["cause_racine"] = cause_racine_val
+                    x_state["enregistre"] = True
+                    st.success(f"Analyse de {x} enregistrée dans le projet !")
+                    # Note : Pas de st.rerun() ici, l'écran reste stable.
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
