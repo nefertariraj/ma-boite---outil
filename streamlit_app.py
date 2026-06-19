@@ -2959,47 +2959,77 @@ else:
         # --- PHASE 2 : IDENTIFICATION DES CAUSES RACINES ---
         st.subheader("2. Identification des causes racines")
 
-        results_data = st.session_state.get("results", [])
-        # On récupère les X testés en Phase 1
-        x_disponibles = [r["Variable X"] for r in results_data]
+        # 1. Accès au projet actif
+        idx = st.session_state["current_project_idx"]
+        dmaic_analyze = st.session_state.projects[idx]["dmaic"]["analyze"]
 
-        if not x_disponibles:
-            st.warning("Veuillez d'abord réaliser l'analyse statistique (Phase 1).")
-        else:
-            # 1. Sélection globale des X à analyser
-            x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", x_disponibles)
+        # Initialisation de la structure si elle n'existe pas
+        if "x_analyses" not in dmaic_analyze:
+            dmaic_analyze["x_analyses"] = {}
 
-            # 2. Gestion individuelle par X
-            for x in x_critiques:
-                st.markdown(f"---")
-                st.subheader(f"Analyse pour : {x}")
+        # 2. Gestion de la liste des X (Auto-remplie par Phase 1 + Manuel)
+        results_phase1 = dmaic_analyze.get("results", [])
+        x_influents = [r["Variable X"] for r in results_phase1 if "Oui" in r.get("Le X agit-il sur Y ?", "")]
+
+        # On permet de sélectionner parmi les X testés en phase 1
+        tous_les_x = [r["Variable X"] for r in results_phase1]
+        x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", tous_les_x, default=x_influents)
+
+        # 3. Boucle d'analyse indépendante par X
+        for x in x_critiques:
+            # État spécifique au X dans le projet
+            if x not in dmaic_analyze["x_analyses"]:
+                dmaic_analyze["x_analyses"][x] = {"methode": "Ishikawa", "data": {}, "enregistre": False}
+    
+            x_data = dmaic_analyze["x_analyses"][x]
+    
+            # Indicateur visuel si déjà enregistré
+            status_emoji = "✅" if x_data.get("enregistre", False) else "⏳"
+    
+            with st.expander(f"{status_emoji} Analyse pour : {x}"):
+                methode = st.selectbox(
+                    f"Méthode pour {x}", 
+                    ["Ishikawa", "5 Pourquoi"], 
+                    index=0 if x_data["methode"] == "Ishikawa" else 1,
+                    key=f"methode_{x}"
+                )
         
-                # Initialisation de l'état pour ce X précis s'il n'existe pas
-                if f"ana_{x}" not in st.session_state:
-                    st.session_state[f"ana_{x}"] = {"methode": "Ishikawa", "data": {}}
-
-                # Sélection indépendante
-                methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
+                # --- LOGIQUE ISHIKAWA ---
+                if methode == "Ishikawa":
+                    cols = st.columns(2)
+                    categories = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
+                    for i, cat in enumerate(categories):
+                        col = cols[i % 2]
+                        val = col.text_area(
+                            f"🦴 {cat}", 
+                            value=x_data["data"].get(cat, ""), 
+                            key=f"ish_{x}_{cat}"
+                        )
+                        x_data["data"][cat] = val
         
-                with st.container():
-                    # Bloc d'analyse spécifique
-                    if methode == "Ishikawa":
-                        cat_gauche, cat_droite = st.columns(2)
-                        for cat in ["Méthode", "Main d'œuvre", "Machine"]:
-                            st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
-                        for cat in ["Matière", "Milieu", "Mesure"]:
-                            st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
-            
-                    elif methode == "5 Pourquoi":
-                        for i in range(1, 6):
-                            st.text_input(f"Pourquoi {i} ?", key=f"p{i}_{x}")
-            
-                    # Sauvegarde individuelle
-                    if st.button(f"Enregistrer l'analyse de {x}", key=f"btn_{x}"):
-                        # Ici, vous sauvegardez l'état de ce X précis dans session_state
-                        # qui sera inclus dans votre export JSON
-                        st.session_state[f"ana_{x}"] = {"methode": methode, "status": "Sauvegardé"}
-                        st.success(f"Analyse de {x} enregistrée.")
+                # --- LOGIQUE 5 POURQUOI ---
+                elif methode == "5 Pourquoi":
+                    for i in range(1, 6):
+                        val = st.text_input(
+                            f"Pourquoi {i} ?", 
+                            value=x_data["data"].get(f"p{i}", ""), 
+                            key=f"p{i}_{x}"
+                        )
+                        x_data["data"][f"p{i}"] = val
+        
+                # Cause racine finale
+                x_data["cause_racine"] = st.text_input(
+                    "Cause racine retenue", 
+                    value=x_data.get("cause_racine", ""), 
+                    key=f"cause_{x}"
+                )
+        
+                # Bouton d'enregistrement propre au X
+                if st.button(f"Enregistrer l'analyse de {x}", key=f"save_{x}"):
+                    x_data["methode"] = methode
+                    x_data["enregistre"] = True
+                    st.success(f"Analyse de {x} enregistrée avec succès !")
+                    st.rerun()
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
