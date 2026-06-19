@@ -3005,11 +3005,12 @@ else:
                     # On nettoie le nom de la variable pour créer une clé unique et sans espace
                     safe_x_key = x.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_")
                 
-                    # --- 1. GESTION DES CAUSES (EXTÉRIEUR AU FORMULAIRE) ---
+                    # --- 1. GESTION DES CAUSES RACINES (Avant le formulaire) ---
                     st.write(f"**Causes racines identifiées pour {x} :**")
                     if "causes_racines_list" not in x_state:
                         x_state["causes_racines_list"] = [""]
 
+                    # On affiche les lignes de saisie et leurs boutons de suppression
                     for i, cause in enumerate(x_state["causes_racines_list"]):
                         col_text, col_del = st.columns([4, 1])
                         x_state["causes_racines_list"][i] = col_text.text_input(
@@ -3019,12 +3020,12 @@ else:
                             x_state["causes_racines_list"].pop(i)
                             st.rerun()
 
+                    # Bouton d'ajout de ligne
                     if st.button("➕ Ajouter une ligne", key=f"add_{safe_x_key}"):
                         x_state["causes_racines_list"].append("")
                         st.rerun()
 
-                    # --- 2. FORMULAIRE ---
-                    # Utilisation de la clé nettoyée ici
+                    # --- 2. FORMULAIRE (Uniquement pour le contenu dynamique et la sauvegarde) ---
                     with st.form(key=f"form_{safe_x_key}"):
                         form_data = {}
                         if x_state["methode"] == "Ishikawa":
@@ -3035,10 +3036,11 @@ else:
                         else: # 5 Pourquoi
                             for i in range(1, 6):
                                 form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
-                    
-                        # Le bouton submit est bien DANS le with st.form
+    
+                        # Bouton unique de validation du formulaire
                         if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
                             x_state["data"] = form_data
+                            # On sauvegarde les causes racines dans le projet au moment du clic
                             x_state["causes_racines_list"] = [c for c in x_state["causes_racines_list"] if c.strip() != ""]
                             x_state["enregistre"] = True
                             st.success(f"Analyse de {x} enregistrée !")
