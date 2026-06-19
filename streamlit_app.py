@@ -2983,27 +2983,40 @@ else:
             if f"causes_{safe_x_key}" not in st.session_state:
                 st.session_state[f"causes_{safe_x_key}"] = x_state.get("causes_racines_list", [""])
 
-            # 3. AFFICHAGE ÉPURÉ
-            # L'expander affiche l'état et les causes validées en résumé
-            causes_validees = [c for c in x_state.get("causes_racines_list", []) if c.strip() != ""]
+            # 3. AFFICHAGE DANS EXPANDER
             statut = "✅" if x_state.get("enregistre") else "⏳"
-            
-            # Résumé affiché même quand c'est fermé
-            label = f"{statut} Analyse : {x} | Causes : {len(causes_validees)}"
-            
-            with st.expander(label):
-                # ICI, tout le contenu (formulaire, boutons, etc.)
-                # Il ne sera chargé que quand l'utilisateur cliquera pour ouvrir
+            with st.expander(f"{statut} Analyse : {x} ({x_state['methode']})"):
                 
-                nouvelle_methode = st.radio(f"Méthode pour {x} :", ["Ishikawa", "5 Pourquoi"], 
-                                          index=0 if x_state["methode"] == "Ishikawa" else 1,
-                                          key=f"radio_{safe_x_key}", horizontal=True)
-                
+                # A. Choix de la méthode
+                nouvelle_methode = st.radio(
+                    "Méthode :", ["Ishikawa", "5 Pourquoi"], 
+                    index=0 if x_state["methode"] == "Ishikawa" else 1,
+                    key=f"radio_{safe_x_key}", horizontal=True
+                )
                 if nouvelle_methode != x_state["methode"]:
                     x_state["methode"] = nouvelle_methode
                     st.rerun()
 
-                # GESTION DES CAUSES (HORS FORMULAIRE)
+                # B. FORMULAIRE (Affiché en haut ou en bas selon votre préférence)
+                with st.form(key=f"form_{safe_x_key}"):
+                    form_data = {}
+                    if x_state["methode"] == "Ishikawa":
+                        cols = st.columns(2)
+                        cats = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
+                        for i, cat in enumerate(cats):
+                            form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
+                    else: 
+                        for i in range(1, 6):
+                            form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
+                    
+                    submit = st.form_submit_button("Enregistrer les données de l'analyse")
+                    if submit:
+                        x_state["data"] = form_data
+                        x_state["enregistre"] = True
+                        st.success("Données enregistrées !")
+
+                # C. GESTION DES CAUSES (Sous le formulaire pour bien les voir)
+                st.write("**Causes racines identifiées :**")
                 for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
                     c1, c2 = st.columns([4, 1])
                     st.session_state[f"causes_{safe_x_key}"][i] = c1.text_input(
@@ -3013,18 +3026,14 @@ else:
                         st.session_state[f"causes_{safe_x_key}"].pop(i)
                         st.rerun()
 
-                if st.button("➕ Ajouter", key=f"add_{safe_x_key}"):
+                if st.button("➕ Ajouter une ligne de cause", key=f"add_{safe_x_key}"):
                     st.session_state[f"causes_{safe_x_key}"].append("")
                     st.rerun()
-
-                # FORMULAIRE
-                with st.form(key=f"form_{safe_x_key}"):
-                    # ... (votre code formulaire inchangé) ...
-                    if st.form_submit_button(f"Enregistrer {x}"):
-                        x_state["data"] = form_data
-                        x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
-                        x_state["enregistre"] = True
-                        st.rerun() # Rerun nécessaire pour mettre à jour le label de l'expander
+                
+                # Bouton spécifique pour valider les causes séparément
+                if st.button("💾 Valider la liste des causes", key=f"save_causes_{safe_x_key}"):
+                    x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
+                    st.success("Liste des causes validée !")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
