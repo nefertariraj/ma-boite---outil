@@ -2952,55 +2952,46 @@ else:
         st.subheader("2. Identification des causes racines")
 
         results_data = st.session_state.get("results", [])
-        tous_les_x_testes = [r["Variable X"] for r in results_data]
-        influents = [r["Variable X"] for r in results_data if r.get("Degré d'influence") not in ["Nul", "N/A", "Aucun"]]
+        # On récupère les X testés en Phase 1
+        x_disponibles = [r["Variable X"] for r in results_data]
 
-        st.subheader("Sélection des variables X à approfondir")
-        x_critiques = st.multiselect(
-            "Variables testées en phase 1 :",
-            options=tous_les_x_testes,
-            default=influents
-        )
-
-        if x_critiques:
-            with st.form(key="form_causes_racines"):
-                for x in x_critiques:
-                    st.subheader(f"Analyse pour : {x}")
-            
-                    # Selectbox unique par X grâce à sa clé dynamique
-                    methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
-            
-                    # --- LOGIQUE ISHIKAWA ---
-                    if methode == "Ishikawa":
-                        st.write("### Diagramme d'Ishikawa : Arête de Poisson")
-                        cat_gauche, cat_droite = st.columns(2)
-                
-                        with cat_gauche:
-                            for cat in ["Méthode", "Main d'œuvre", "Machine"]:
-                                st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
-                        with cat_droite:
-                            for cat in ["Matière", "Milieu", "Mesure"]:
-                                st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
-            
-                    # --- LOGIQUE 5 POURQUOI ---
-                    elif methode == "5 Pourquoi":
-                        with st.expander(f"Détails des 5 Pourquoi pour {x}"):
-                            for i in range(1, 6):
-                                st.text_input(f"Pourquoi {i} ?", key=f"p{i}_{x}")
-
-                    # --- RÉSULTAT FINAL ---
-                    col_a, col_b = st.columns(2)
-                    col_a.text_input("Cause racine retenue", key=f"cause_{x}")
-                    col_b.slider("Niveau de confiance", 1, 5, 3, key=f"conf_{x}")
-            
-                    st.markdown("---")
-
-                submit_button = st.form_submit_button(label="Valider et Enregistrer l'analyse")
-
-            if submit_button:
-                st.success("Analyse enregistrée avec succès !")
+        if not x_disponibles:
+            st.warning("Veuillez d'abord réaliser l'analyse statistique (Phase 1).")
         else:
-            st.info("Sélectionnez au moins une variable X pour commencer l'analyse.")
+            # 1. Sélection globale des X à analyser
+            x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", x_disponibles)
+
+            # 2. Gestion individuelle par X
+            for x in x_critiques:
+                st.markdown(f"---")
+                st.subheader(f"Analyse pour : {x}")
+        
+                # Initialisation de l'état pour ce X précis s'il n'existe pas
+                if f"ana_{x}" not in st.session_state:
+                    st.session_state[f"ana_{x}"] = {"methode": "Ishikawa", "data": {}}
+
+                # Sélection indépendante
+                methode = st.selectbox(f"Méthode pour {x}", ["Ishikawa", "5 Pourquoi"], key=f"methode_{x}")
+        
+                with st.container():
+                    # Bloc d'analyse spécifique
+                    if methode == "Ishikawa":
+                        cat_gauche, cat_droite = st.columns(2)
+                        for cat in ["Méthode", "Main d'œuvre", "Machine"]:
+                            st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
+                        for cat in ["Matière", "Milieu", "Mesure"]:
+                            st.text_area(f"🦴 {cat}", key=f"ish_{x}_{cat}")
+            
+                    elif methode == "5 Pourquoi":
+                        for i in range(1, 6):
+                            st.text_input(f"Pourquoi {i} ?", key=f"p{i}_{x}")
+            
+                    # Sauvegarde individuelle
+                    if st.button(f"Enregistrer l'analyse de {x}", key=f"btn_{x}"):
+                        # Ici, vous sauvegardez l'état de ce X précis dans session_state
+                        # qui sera inclus dans votre export JSON
+                        st.session_state[f"ana_{x}"] = {"methode": methode, "status": "Sauvegardé"}
+                        st.success(f"Analyse de {x} enregistrée.")
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
