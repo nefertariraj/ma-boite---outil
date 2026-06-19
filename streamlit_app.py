@@ -3037,7 +3037,7 @@ else:
                                 form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
                         else:
                             for i in range(1, 6):
-            form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
+                                form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
     
                         # Bouton de soumission
                         if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
