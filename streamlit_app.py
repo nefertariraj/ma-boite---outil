@@ -3002,26 +3002,32 @@ else:
                         for i in range(1, 6):
                             form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
             
+                    # --- TABLEAU DES CAUSES RACINES (Gestion ligne par ligne) ---
                     st.write("**Causes racines identifiées :**")
                     if "causes_racines_list" not in x_state:
                         x_state["causes_racines_list"] = [""]
-                    
-                    # Affichage des champs de saisie
-                    for i in range(len(x_state["causes_racines_list"])):
-                        x_state["causes_racines_list"][i] = st.text_input(
+
+                    # On crée des lignes pour chaque cause
+                    for i, cause in enumerate(x_state["causes_racines_list"]):
+                        col_text, col_del = st.columns([4, 1])
+                        
+                        # Champ de saisie
+                        x_state["causes_racines_list"][i] = col_text.text_input(
                             f"Cause {i+1}", 
-                            value=x_state["causes_racines_list"][i], 
-                            key=f"cr_{x}_{i}"
+                            value=cause, 
+                            key=f"cr_{x}_{i}",
+                            label_visibility="collapsed"
                         )
-                    
-                    col1, col2 = st.columns(2)
-                    if col1.form_submit_button("➕ Ajouter une cause"):
+                        
+                        # Bouton de suppression spécifique à cette ligne
+                        if col_del.button("🗑️", key=f"del_{x}_{i}"):
+                            x_state["causes_racines_list"].pop(i)
+                            st.rerun()
+
+                    # Bouton d'ajout
+                    if st.button("➕ Ajouter une ligne", key=f"add_{x}"):
                         x_state["causes_racines_list"].append("")
                         st.rerun()
-                    if col2.form_submit_button("➖ Supprimer la dernière"):
-                        if len(x_state["causes_racines_list"]) > 1:
-                            x_state["causes_racines_list"].pop()
-                            st.rerun()
             
                     if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
                         x_state["data"] = form_data
