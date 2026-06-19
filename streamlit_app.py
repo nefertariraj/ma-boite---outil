@@ -2938,13 +2938,15 @@ else:
                         "P-value": round(float(p_value), 4)
                     })
                 
+                # Sauvegarde dans la session pour persistance JSON
                 st.session_state.results = results
-                
-                # Affichage des résultats
-                if results:
-                    st.table(pd.DataFrame(results))
-                else:
-                    st.warning("Aucun résultat généré.")
+                st.rerun()
+
+            # Affichage des résultats persistants
+            if st.session_state.results:
+                st.table(pd.DataFrame(st.session_state.results))
+            else:
+                st.info("Aucun résultat pour le moment. Lancez l'analyse.")
         else:
             st.warning("⚠️ Aucune donnée collectée. Veuillez remplir les données dans la phase 'Data Collection'.")
 
