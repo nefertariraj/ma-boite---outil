@@ -2971,67 +2971,60 @@ else:
         x_critiques = st.multiselect("Sélectionnez les variables à approfondir :", tous_les_x, default=x_influents)
 
         for x in x_critiques:
-            # 1. Initialisation dans le JSON si variable absente
+            # 1. Initialisation (avec causes_racines_list)
             if x not in dmaic_analyze["x_analyses"]:
                 dmaic_analyze["x_analyses"][x] = {
-                    "methode": "Ishikawa", 
-                    "data": {}, 
-                    "causes_racines_list": [""], 
-                    "enregistre": False
+                    "methode": "Ishikawa", "data": {}, "causes_racines_list": [""], "enregistre": False
                 }
-            
             x_state = dmaic_analyze["x_analyses"][x]
-
-            # 2. SYNCHRONISATION : On s'assure que la session possède bien les données du JSON
             safe_x_key = x.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_")
-            if f"causes_{safe_x_key}" not in st.session_state:
-                # On charge les causes depuis le JSON vers la session (ou une liste vide si rien n'est encore enregistré)
-                st.session_state[f"causes_{safe_x_key}"] = x_state.get("causes_racines_list", [""])
 
-            # 2. GESTION DES CAUSES (SÉPARÉE DU FORMULAIRE)
-            st.write(f"**Causes racines identifiées pour {x} :**")
-            safe_x_key = x.replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_")
-        
+            # 2. SYNCHRO
             if f"causes_{safe_x_key}" not in st.session_state:
                 st.session_state[f"causes_{safe_x_key}"] = x_state.get("causes_racines_list", [""])
 
-            # Affichage des lignes avec boutons de suppression (HORS FORMULAIRE)
-            for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
-                c1, c2 = st.columns([4, 1])
-                st.session_state[f"causes_{safe_x_key}"][i] = c1.text_input(
-                    f"Cause {i+1}", 
-                    value=st.session_state[f"causes_{safe_x_key}"][i], 
-                    key=f"input_{safe_x_key}_{i}",
-                    label_visibility="collapsed"
-                )
-                if c2.button("🗑️", key=f"del_{safe_x_key}_{i}"):
-                    st.session_state[f"causes_{safe_x_key}"].pop(i)
+            # 3. AFFICHAGE ÉPURÉ
+            # L'expander affiche l'état et les causes validées en résumé
+            causes_validees = [c for c in x_state.get("causes_racines_list", []) if c.strip() != ""]
+            statut = "✅" if x_state.get("enregistre") else "⏳"
+            
+            # Résumé affiché même quand c'est fermé
+            label = f"{statut} Analyse : {x} | Causes : {len(causes_validees)}"
+            
+            with st.expander(label):
+                # ICI, tout le contenu (formulaire, boutons, etc.)
+                # Il ne sera chargé que quand l'utilisateur cliquera pour ouvrir
+                
+                nouvelle_methode = st.radio(f"Méthode pour {x} :", ["Ishikawa", "5 Pourquoi"], 
+                                          index=0 if x_state["methode"] == "Ishikawa" else 1,
+                                          key=f"radio_{safe_x_key}", horizontal=True)
+                
+                if nouvelle_methode != x_state["methode"]:
+                    x_state["methode"] = nouvelle_methode
                     st.rerun()
 
-            if st.button("➕ Ajouter une ligne", key=f"add_{safe_x_key}"):
-                st.session_state[f"causes_{safe_x_key}"].append("")
-                st.rerun()
+                # GESTION DES CAUSES (HORS FORMULAIRE)
+                for i in range(len(st.session_state[f"causes_{safe_x_key}"])):
+                    c1, c2 = st.columns([4, 1])
+                    st.session_state[f"causes_{safe_x_key}"][i] = c1.text_input(
+                        f"Cause {i+1}", value=st.session_state[f"causes_{safe_x_key}"][i], 
+                        key=f"input_{safe_x_key}_{i}", label_visibility="collapsed")
+                    if c2.button("🗑️", key=f"del_{safe_x_key}_{i}"):
+                        st.session_state[f"causes_{safe_x_key}"].pop(i)
+                        st.rerun()
 
-            st.markdown("---") # Séparation visuelle
+                if st.button("➕ Ajouter", key=f"add_{safe_x_key}"):
+                    st.session_state[f"causes_{safe_x_key}"].append("")
+                    st.rerun()
 
-            # 3. LE FORMULAIRE (NE CONTIENT QUE LES DONNÉES ET LE BOUTON SUBMIT)
-            with st.form(key=f"form_{safe_x_key}"):
-                form_data = {}
-                if x_state["methode"] == "Ishikawa":
-                    cols = st.columns(2)
-                    cats = ["Méthode", "Main d'œuvre", "Machine", "Matière", "Milieu", "Mesure"]
-                    for i, cat in enumerate(cats):
-                        form_data[cat] = cols[i % 2].text_area(f"🦴 {cat}", value=x_state["data"].get(cat, ""))
-                else: 
-                    for i in range(1, 6):
-                        form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
-            
-                # SEUL BOUTON AUTORISÉ DANS LE FORM
-                if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
-                    x_state["data"] = form_data
-                    x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
-                    x_state["enregistre"] = True
-                    st.success(f"Analyse de {x} enregistrée !")
+                # FORMULAIRE
+                with st.form(key=f"form_{safe_x_key}"):
+                    # ... (votre code formulaire inchangé) ...
+                    if st.form_submit_button(f"Enregistrer {x}"):
+                        x_state["data"] = form_data
+                        x_state["causes_racines_list"] = [c for c in st.session_state[f"causes_{safe_x_key}"] if c.strip() != ""]
+                        x_state["enregistre"] = True
+                        st.rerun() # Rerun nécessaire pour mettre à jour le label de l'expander
     
         st.subheader("3. Current State FMEA")
         # (À compléter...)
