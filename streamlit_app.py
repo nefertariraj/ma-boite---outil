@@ -3002,7 +3002,26 @@ else:
                         for i in range(1, 6):
                             form_data[f"p{i}"] = st.text_input(f"Pourquoi {i} ?", value=x_state["data"].get(f"p{i}", ""))
             
-                    cause_racine_val = st.text_input("Cause racine retenue", value=x_state.get("cause_racine", ""))
+                    st.write("**Causes racines identifiées :**")
+                    if "causes_racines_list" not in x_state:
+                        x_state["causes_racines_list"] = [""]
+                    
+                    # Affichage des champs de saisie
+                    for i in range(len(x_state["causes_racines_list"])):
+                        x_state["causes_racines_list"][i] = st.text_input(
+                            f"Cause {i+1}", 
+                            value=x_state["causes_racines_list"][i], 
+                            key=f"cr_{x}_{i}"
+                        )
+                    
+                    col1, col2 = st.columns(2)
+                    if col1.form_submit_button("➕ Ajouter une cause"):
+                        x_state["causes_racines_list"].append("")
+                        st.rerun()
+                    if col2.form_submit_button("➖ Supprimer la dernière"):
+                        if len(x_state["causes_racines_list"]) > 1:
+                            x_state["causes_racines_list"].pop()
+                            st.rerun()
             
                     if st.form_submit_button(f"Enregistrer l'analyse de {x}"):
                         x_state["data"] = form_data
