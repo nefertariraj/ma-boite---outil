@@ -3080,21 +3080,21 @@ else:
                             st.success("Analyse enregistrée !")
                             st.rerun()
 
-    # Classement automatique
-    st.divider()
-    st.subheader("📊 Classement des risques (RPN)")
+        # Classement automatique
+        st.divider()
+        st.subheader("📊 Classement des risques (RPN)")
     
-    import pandas as pd
-    liste_tri = []
-    for cid, vals in dmaic_analyze["fmea_data"].items():
-        liste_tri.append({
-            "Cause": cid, 
-            "RPN": vals.get("S", 1) * vals.get("O", 1) * vals.get("D", 1)
-        })
+        import pandas as pd
+        liste_tri = []
+        for cid, vals in dmaic_analyze["fmea_data"].items():
+            liste_tri.append({
+                "Cause": cid, 
+                "RPN": vals.get("S", 1) * vals.get("O", 1) * vals.get("D", 1)
+            })
     
-    if liste_tri:
-        df_fmea = pd.DataFrame(liste_tri).sort_values(by="RPN", ascending=False)
-        st.table(df_fmea)
+        if liste_tri:
+            df_fmea = pd.DataFrame(liste_tri).sort_values(by="RPN", ascending=False)
+            st.table(df_fmea)
     
         st.subheader("4. Data collection plan for Gemba walk")
         # (À compléter...)
