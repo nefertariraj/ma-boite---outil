@@ -3040,7 +3040,7 @@ else:
         if "fmea_data" not in dmaic_analyze:
             dmaic_analyze["fmea_data"] = {}
 
-        # Initialisation d'une session temporaire pour les saisies (pour éviter le temps réel)
+        # Initialisation d'une session temporaire pour les saisies
         if "fmea_temp_state" not in st.session_state:
             st.session_state["fmea_temp_state"] = {}
 
@@ -3055,41 +3055,55 @@ else:
         else:
             for item in toutes_les_causes:
                 cause_id = f"{item['x']}_{item['cause']}"
-                
-                # Charger les données depuis le JSON vers la session temporaire si pas déjà fait
+        
+                # Charger les données avec valeurs par défaut
                 if cause_id not in st.session_state["fmea_temp_state"]:
                     st.session_state["fmea_temp_state"][cause_id] = dmaic_analyze["fmea_data"].get(cause_id, {
                         "S": 1, "O": 1, "D": 1, "effet": "", "mode": "", "etape": "", "controles": ""
                     }).copy()
-                
+        
                 temp_data = st.session_state["fmea_temp_state"][cause_id]
 
                 with st.expander(f"Analyse : {item['x']} | Cause : {item['cause']}"):
                     c1, c2 = st.columns(2)
-                    temp_data["etape"] = c1.text_input("Étape du processus", value=temp_data["etape"], key=f"et_{cause_id}")
-                    temp_data["controles"] = c2.text_input("Contrôles existants", value=temp_data["controles"], key=f"ct_{cause_id}")
-                    
+                    temp_data["etape"] = c1.text_input("Étape du processus", value=temp_data.get("etape", ""), key=f"et_{cause_id}")
+                    temp_data["controles"] = c2.text_input("Contrôles existants", value=temp_data.get("controles", ""), key=f"ct_{cause_id}")
+            
                     c3, c4 = st.columns(2)
-                    temp_data["mode"] = c3.text_input("Mode de défaillance", value=temp_data["mode"], key=f"m_{cause_id}")
-                    temp_data["effet"] = c4.text_input("Effet de la défaillance", value=temp_data["effet"], key=f"e_{cause_id}")
-                    
+                    temp_data["mode"] = c3.text_input("Mode de défaillance", value=temp_data.get("mode", ""), key=f"m_{cause_id}")
+                    temp_data["effet"] = c4.text_input("Effet de la défaillance", value=temp_data.get("effet", ""), key=f"e_{cause_id}")
+            
                     s, o, d = st.columns(3)
-                    temp_data["S"] = s.slider("Sévérité (S)", 1, 10, temp_data["S"], key=f"s_{cause_id}")
-                    temp_data["O"] = o.slider("Occurrence (O)", 1, 10, temp_data["O"], key=f"o_{cause_id}")
-                    temp_data["D"] = d.slider("Détection (D)", 1, 10, temp_data["D"], key=f"d_{cause_id}")
-                    
+                    temp_data["S"] = s.slider("Sévérité (S)", 1, 10, temp_data.get("S", 1), key=f"s_{cause_id}")
+                    temp_data["O"] = o.slider("Occurrence (O)", 1, 10, temp_data.get("O", 1), key=f"o_{cause_id}")
+                    temp_data["D"] = d.slider("Détection (D)", 1, 10, temp_data.get("D", 1), key=f"d_{cause_id}")
+            
                     rpn = temp_data["S"] * temp_data["O"] * temp_data["D"]
                     st.metric("RPN (Calculé)", rpn)
 
-                    # Bouton de validation local pour cette analyse
                     if st.button(f"Valider cette analyse FMEA", key=f"btn_val_{cause_id}"):
                         dmaic_analyze["fmea_data"][cause_id] = temp_data.copy()
                         st.success("Analyse enregistrée !")
+                        st.rerun()
 
-            # Classement automatique (basé sur le JSON final)
+            # Classement automatique
             st.divider()
             st.subheader("📊 Classement des risques (RPN)")
-            # ... (votre logique de tri reste inchangée ici)
+    
+            import pandas as pd
+            liste_tri = []
+            for cid, vals in dmaic_analyze["fmea_data"].items():
+                liste_tri.append({
+                    "Cause": cid, 
+                    "RPN": vals.get("S", 1) * vals.get("O", 1) * vals.get("D", 1),
+                    "S": vals.get("S"), "O": vals.get("O"), "D": vals.get("D")
+                })
+    
+            if liste_tri:
+                df_fmea = pd.DataFrame(liste_tri).sort_values(by="RPN", ascending=False)
+                st.table(df_fmea)
+            else:
+                st.info("Validez au moins une analyse pour voir le classement.")
     
         st.subheader("4. Data collection plan for Gemba walk")
         # (À compléter...)
