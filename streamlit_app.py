@@ -3037,11 +3037,13 @@ else:
         # --- PHASE 3 : FMEA (AMDEC) ---
         st.subheader("3. Current State FMEA")
 
-        # Initialisation du dictionnaire FMEA
         if "fmea_data" not in dmaic_analyze:
             dmaic_analyze["fmea_data"] = {}
 
-        # Récupération de toutes les causes racines validées des étapes précédentes
+        # Initialisation d'une session temporaire pour les saisies (pour éviter le temps réel)
+        if "fmea_temp_state" not in st.session_state:
+            st.session_state["fmea_temp_state"] = {}
+
         toutes_les_causes = []
         for x, state in dmaic_analyze.get("x_analyses", {}).items():
             for cause in state.get("causes_racines_list", []):
@@ -3053,23 +3055,41 @@ else:
         else:
             for item in toutes_les_causes:
                 cause_id = f"{item['x']}_{item['cause']}"
-                if cause_id not in dmaic_analyze["fmea_data"]:
-                    dmaic_analyze["fmea_data"][cause_id] = {"S": 1, "O": 1, "D": 1, "effet": "", "mode": ""}
-        
-                data = dmaic_analyze["fmea_data"][cause_id]
-        
-                with st.expander(f"Analyse pour : {item['x']} - {item['cause']}"):
-                    col1, col2 = st.columns(2)
-                    data["mode"] = col1.text_input("Mode de défaillance", value=data["mode"], key=f"m_{cause_id}")
-                    data["effet"] = col2.text_input("Effet de la défaillance", value=data["effet"], key=f"e_{cause_id}")
-            
+                
+                # Charger les données depuis le JSON vers la session temporaire si pas déjà fait
+                if cause_id not in st.session_state["fmea_temp_state"]:
+                    st.session_state["fmea_temp_state"][cause_id] = dmaic_analyze["fmea_data"].get(cause_id, {
+                        "S": 1, "O": 1, "D": 1, "effet": "", "mode": "", "etape": "", "controles": ""
+                    }).copy()
+                
+                temp_data = st.session_state["fmea_temp_state"][cause_id]
+
+                with st.expander(f"Analyse : {item['x']} | Cause : {item['cause']}"):
+                    c1, c2 = st.columns(2)
+                    temp_data["etape"] = c1.text_input("Étape du processus", value=temp_data["etape"], key=f"et_{cause_id}")
+                    temp_data["controles"] = c2.text_input("Contrôles existants", value=temp_data["controles"], key=f"ct_{cause_id}")
+                    
+                    c3, c4 = st.columns(2)
+                    temp_data["mode"] = c3.text_input("Mode de défaillance", value=temp_data["mode"], key=f"m_{cause_id}")
+                    temp_data["effet"] = c4.text_input("Effet de la défaillance", value=temp_data["effet"], key=f"e_{cause_id}")
+                    
                     s, o, d = st.columns(3)
-                    data["S"] = s.slider("Sévérité (S)", 1, 10, data["S"], key=f"s_{cause_id}")
-                    data["O"] = o.slider("Occurrence (O)", 1, 10, data["O"], key=f"o_{cause_id}")
-                    data["D"] = d.slider("Détection (D)", 1, 10, data["D"], key=f"d_{cause_id}")
-            
-                    rpn = data["S"] * data["O"] * data["D"]
+                    temp_data["S"] = s.slider("Sévérité (S)", 1, 10, temp_data["S"], key=f"s_{cause_id}")
+                    temp_data["O"] = o.slider("Occurrence (O)", 1, 10, temp_data["O"], key=f"o_{cause_id}")
+                    temp_data["D"] = d.slider("Détection (D)", 1, 10, temp_data["D"], key=f"d_{cause_id}")
+                    
+                    rpn = temp_data["S"] * temp_data["O"] * temp_data["D"]
                     st.metric("RPN (Calculé)", rpn)
+
+                    # Bouton de validation local pour cette analyse
+                    if st.button(f"Valider cette analyse FMEA", key=f"btn_val_{cause_id}"):
+                        dmaic_analyze["fmea_data"][cause_id] = temp_data.copy()
+                        st.success("Analyse enregistrée !")
+
+            # Classement automatique (basé sur le JSON final)
+            st.divider()
+            st.subheader("📊 Classement des risques (RPN)")
+            # ... (votre logique de tri reste inchangée ici)
     
         st.subheader("4. Data collection plan for Gemba walk")
         # (À compléter...)
