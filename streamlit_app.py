@@ -3096,8 +3096,74 @@ else:
                 df_fmea = pd.DataFrame(liste_tri).sort_values(by="RPN", ascending=False)
                 st.table(df_fmea)
     
-        st.subheader("4. Data collection plan for Gemba walk")
-        # (À compléter...)
+        # --- PHASE 4 : DATA COLLECTION PLAN (GEMBA WALK) ---
+        st.subheader("4. Data Collection Plan (Gemba Walk)")
+
+        if "gemba_plans" not in dmaic_analyze:
+            dmaic_analyze["gemba_plans"] = {}
+
+        # 1. Récupération des causes pour génération
+        toutes_les_causes = []
+        for x, state in dmaic_analyze.get("x_analyses", {}).items():
+            for cause in state.get("causes_racines_list", []):
+                if cause.strip():
+                    toutes_les_causes.append({"x": x, "cause": cause})
+
+        if not toutes_les_causes:
+            st.warning("Veuillez d'abord identifier des causes racines (Phase Analyse).")
+        else:
+            # Bouton pour générer/réinitialiser les fiches
+            if st.button("🚀 Générer/Mettre à jour les fiches Gemba"):
+                for item in toutes_les_causes:
+                    cid = f"{item['x']}_{item['cause']}"
+                    if cid not in dmaic_analyze["gemba_plans"]:
+                        dmaic_analyze["gemba_plans"][cid] = {
+                            "x_critique": item['x'],
+                            "cause_racine": item['cause'],
+                            "objectif": f"Vérifier sur le terrain que cette cause racine est effectivement présente et qu'elle contribue au problème observé.",
+                            "activite": "", "lieu": "", "personnes": "", "elements_obs": "",
+                            "preuves": "", "taille_ech": 10, "date": None, "responsable": "",
+                            "critere": "Validé si observé dans 80% des cas", "statut": "À préparer"
+                        }
+                st.rerun()
+
+            # 2. Affichage et édition des fiches
+            for cid, fiche in dmaic_analyze["gemba_plans"].items():
+                with st.expander(f"Fiche Gemba : {fiche['cause_racine']} ({fiche['statut']})"):
+                    st.write(f"**X associé :** {fiche['x_critique']}")
+                    st.write(f"**Objectif :** {fiche['objectif']}")
+            
+                    c1, c2 = st.columns(2)
+                    fiche["activite"] = c1.text_input("Activité à observer", fiche.get("activite", ""), key=f"act_{cid}")
+                    fiche["lieu"] = c2.text_input("Lieu d'observation", fiche.get("lieu", ""), key=f"lieu_{cid}")
+            
+                    fiche["personnes"] = st.text_input("Personnes/Fonctions à observer", fiche.get("personnes", ""), key=f"pers_{cid}")
+                    fiche["elements_obs"] = st.text_area("Éléments à observer", fiche.get("elements_obs", ""), key=f"elem_{cid}")
+                    fiche["preuves"] = st.text_area("Preuves recherchées", fiche.get("preuves", ""), key=f"prev_{cid}")
+            
+                    c3, c4, c5 = st.columns(3)
+                    fiche["taille_ech"] = c3.number_input("Nb observations", min_value=1, value=fiche.get("taille_ech", 10), key=f"ech_{cid}")
+                    fiche["responsable"] = c4.text_input("Responsable", fiche.get("responsable", ""), key=f"resp_{cid}")
+                    fiche["statut"] = c5.selectbox("Statut", ["À préparer", "Planifié", "En cours", "Terminé"], 
+                                                 index=["À préparer", "Planifié", "En cours", "Terminé"].index(fiche.get("statut", "À préparer")),
+                                                 key=f"stat_{cid}")
+            
+                    fiche["critere"] = st.text_input("Critère de validation", fiche.get("critere", ""), key=f"crit_{cid}")
+
+            if st.button("💾 Enregistrer le plan Gemba"):
+                st.success("Plan Gemba sauvegardé !")
+
+            # 3. Tableau récapitulatif
+            st.divider()
+            st.subheader("📋 Tableau récapitulatif du Plan")
+    
+            import pandas as pd
+            tab_data = [{"X": f['x_critique'], "Cause": f['cause_racine'], "Activité": f['activite'], 
+                         "Resp": f['responsable'], "Nb Obs": f['taille_ech'], "Statut": f['statut']} 
+                        for f in dmaic_analyze["gemba_plans"].values()]
+    
+            if tab_data:
+                st.table(pd.DataFrame(tab_data))
     
         st.subheader("5. Data collection for Gemba walk")
         # (À compléter...)
