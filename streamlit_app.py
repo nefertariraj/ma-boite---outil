@@ -3195,10 +3195,10 @@ else:
                     dmaic_analyze["gemba_observations"][cid]["logs"] = pd.read_excel(up).fillna("").to_dict('records')
                     st.rerun()
 
-                # 3. ÉDITEUR SANS MISE À JOUR TEMPS RÉEL (Contrôlé par bouton)
-                # On ne met PAS de key liée à dmaic_analyze ici pour éviter les mises à jour auto
+                # --- ÉDITEUR SANS MISE À JOUR TEMPS RÉEL (Contrôlé par bouton) ---
                 edited_df = st.data_editor(
                     df_obs.fillna(""),
+                    key=f"editor_{cid}",  # <--- C'est ici que l'on donne une identité unique
                     column_config={
                         "date": st.column_config.TextColumn("Date (YYYY-MM-DD)"),
                         "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
