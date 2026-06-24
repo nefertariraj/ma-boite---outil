@@ -3165,7 +3165,7 @@ else:
             if tab_data:
                 st.table(pd.DataFrame(tab_data))
     
-        # --- PHASE 5 : DATA COLLECTION (OBSERVATIONS TERRAIN) ---
+       # --- PHASE 5 : DATA COLLECTION (OBSERVATIONS TERRAIN) ---
         st.subheader("5. Data Collection (Résultats des Gemba Walks)")
 
         import pandas as pd
@@ -3174,10 +3174,9 @@ else:
         if "gemba_observations" not in dmaic_analyze:
             dmaic_analyze["gemba_observations"] = {}
 
-        # Récupération des plans pour référence
         gemba_plans = dmaic_analyze.get("gemba_plans", {})
 
-        # Préparation d'une liste plate pour l'éditeur (une ligne par observation)
+        # Préparation d'une liste plate
         obs_list = []
         for cid, data in dmaic_analyze["gemba_observations"].items():
             plan = gemba_plans.get(cid, {})
@@ -3189,19 +3188,21 @@ else:
 
         df_obs = pd.DataFrame(obs_list)
 
+        # --- CORRECTION : Nettoyage pour éviter l'erreur Streamlit ---
+        # On remplace les valeurs vides par des chaînes vides pour le tableau
+        df_display = df_obs.fillna("")
+
         # --- IMPORT / EXPORT ---
         c_exp, c_imp = st.columns(2)
-
-        if not df_obs.empty:
+        if not df_display.empty:
             buffer = io.BytesIO()
-            df_obs.to_excel(buffer, index=False)
+            df_display.to_excel(buffer, index=False)
             c_exp.download_button("📥 Exporter les observations (Excel)", data=buffer.getvalue(), 
                                    file_name="gemba_observations.xlsx", mime="application/vnd.ms-excel")
 
         uploaded_file = c_imp.file_uploader("📤 Importer vos observations complétées", type=["xlsx"])
         if uploaded_file:
-            df_imp = pd.read_excel(uploaded_file)
-            # Logique pour réinjecter dans le JSON (reconstruction du dict imbriqué)
+            df_imp = pd.read_excel(uploaded_file).fillna("")
             new_obs = {}
             for _, row in df_imp.iterrows():
                 cid = row['cid']
@@ -3213,47 +3214,52 @@ else:
         # --- ÉDITEUR ---
         st.write("Journal des observations :")
         edited_obs = st.data_editor(
-            df_obs,
+            df_display,
             column_config={
-                "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
-                "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"]),
+                "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"], required=False),
+                "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"], required=False),
                 "date": st.column_config.DateColumn("Date")
             },
+            hide_index=True,
             use_container_width=True
         )
 
         if st.button("💾 Enregistrer toutes les observations"):
-            # Reconvertir le tableau édité en structure JSON
             new_data = {}
+            # On utilise le résultat de l'éditeur (edited_obs)
             for _, row in edited_obs.iterrows():
                 cid = row['cid']
                 if cid not in new_data: new_data[cid] = {"logs": []}
-                new_data[cid]["logs"].append({k:v for k,v in row.to_dict().items() if k not in ['cid', 'cause_racine']})
-    
-            # Recalculer les statuts automatiquement
+                # On reconstruit le dictionnaire de log en ignorant les colonnes ajoutées pour l'affichage
+                log_entry = {k: v for k, v in row.to_dict().items() if k not in ['cid', 'cause_racine']}
+                new_data[cid]["logs"].append(log_entry)
+            
+            # Recalcul des statuts
             for cid in new_data:
                 logs = new_data[cid]["logs"]
                 total = len(logs)
                 fav = len([l for l in logs if l.get("confirme") == "Oui"])
                 pct = (fav / total * 100) if total > 0 else 0
                 new_data[cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
-        
+            
             dmaic_analyze["gemba_observations"] = new_data
             st.success("Observations enregistrées et statuts recalculés !")
             st.rerun()
 
-        # --- PHASE 6: VALIDATION DES CAUSES RACINES
+        # --- PHASE 6: VALIDATION DES CAUSES RACINES ---
         st.divider()
         st.subheader("6. Validation des causes racines")
-    
         summary = []
         for cid, plan in gemba_plans.items():
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {"logs": []})
+            logs = obs.get("logs", [])
+            fav = len([l for l in logs if l.get("confirme") == "Oui"])
+            pct = (fav / len(logs) * 100) if len(logs) > 0 else 0
             summary.append({
                 "X Critique": plan["x_critique"],
                 "Cause Racine": plan["cause_racine"],
-                "Nb Observations": len(obs["logs"]),
-                "% Conf": f"{(len([o for o in obs['logs'] if o['confirme'] == 'Oui']) / len(obs['logs']) * 100) if len(obs['logs']) > 0 else 0:.0f}%",
+                "Nb Observations": len(logs),
+                "% Conf": f"{pct:.0f}%",
                 "Statut": obs.get("status", "En attente")
             })
         st.table(pd.DataFrame(summary))
