@@ -3175,82 +3175,78 @@ else:
             dmaic_analyze["gemba_observations"] = {}
 
         gemba_plans = dmaic_analyze.get("gemba_plans", {})
+        colonnes_defaut = ["date", "confirme", "description", "preuve", "confiance"]
 
-        # Préparation du DataFrame pour l'éditeur
-        obs_list = []
-        for cid, data in dmaic_analyze["gemba_observations"].items():
-            plan = gemba_plans.get(cid, {})
-            for log in data.get("logs", []):
-                obs_row = log.copy()
-                obs_row["cid"] = cid
-                obs_row["cause_racine"] = plan.get("cause_racine", cid)
-                obs_list.append(obs_row)
-
-        colonnes_defaut = ["cid", "cause_racine", "date", "confirme", "description", "preuve", "confiance"]
-        df_obs = pd.DataFrame(obs_list, columns=colonnes_defaut)
-        df_display = df_obs.fillna("")
-
-        # --- IMPORT / EXPORT & TEMPLATE ---
-        c1, c2, c3 = st.columns(3)
-        
-        # 1. Télécharger le template vierge
-        template_df = pd.DataFrame(columns=colonnes_defaut)
-        buf_t = io.BytesIO()
-        template_df.to_excel(buf_t, index=False)
-        c1.download_button("📄 Template Vide (Excel)", data=buf_t.getvalue(), file_name="template_gemba.xlsx")
-
-        # 2. Exporter les données actuelles
-        buf_e = io.BytesIO()
-        df_display.to_excel(buf_e, index=False)
-        c2.download_button("📥 Exporter Observations", data=buf_e.getvalue(), file_name="observations.xlsx")
-
-        # 3. Import
-        uploaded_file = c3.file_uploader("📤 Importer fichier complété", type=["xlsx"])
-        if uploaded_file:
-            df_imp = pd.read_excel(uploaded_file).fillna("")
-            new_obs = {}
-            for _, row in df_imp.iterrows():
-                cid = row['cid']
-                if cid not in new_obs: new_obs[cid] = {"logs": []}
-                new_obs[cid]["logs"].append({k:v for k,v in row.to_dict().items() if k not in ['cid', 'cause_racine']})
-            dmaic_analyze["gemba_observations"] = new_obs
-            st.rerun()
-
-        # --- ÉDITEUR (AJOUT/SUPPRESSION DE LIGNES) ---
-        st.write("Journal des observations (Ajoutez/Supprimez des lignes via le menu du tableau) :")
-        edited_obs = st.data_editor(
-            df_display,
-            column_config={
-                "cid": st.column_config.TextColumn("ID", disabled=True),
-                "cause_racine": st.column_config.TextColumn("Cause", disabled=True),
-                "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
-                "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"]),
-            },
-            num_rows="dynamic", # C'est cette option qui permet d'ajouter/supprimer des lignes
-            hide_index=True,
-            use_container_width=True
-        )
-
-        if st.button("💾 Enregistrer et calculer"):
-            new_data = {}
-            for _, row in edited_obs.iterrows():
-                cid = row.get('cid')
-                if not cid: continue
-                if cid not in new_data: new_data[cid] = {"logs": []}
-                log_entry = {k: v for k, v in row.to_dict().items() if k not in ['cid', 'cause_racine']}
-                new_data[cid]["logs"].append(log_entry)
+        if not gemba_plans:
+            st.warning("Veuillez d'abord préparer le Data Collection Plan (étape 4).")
+        else:
+            for cid, plan in gemba_plans.items():
+                # Titre de la fiche par cause
+                with st.expander(f"Fiche : {plan['cause_racine']} (X: {plan['x_critique']})", expanded=True):
+                    st.info(f"**Objectif :** {plan['objectif']} | **Critère :** {plan['critere']}")
             
-            # Recalcul des statuts
-            for cid in new_data:
-                logs = new_data[cid]["logs"]
-                total = len(logs)
+                    # Charger les données existantes pour ce CID
+                    data_cid = dmaic_analyze["gemba_observations"].get(cid, {"logs": []})
+                    df_obs = pd.DataFrame(data_cid.get("logs", []), columns=colonnes_defaut)
+            
+                    # --- IMPORT / TEMPLATE ---
+                    c1, c2 = st.columns(2)
+                    # 1. Template
+                    template_df = pd.DataFrame(columns=colonnes_defaut)
+                    buf_t = io.BytesIO()
+                    template_df.to_excel(buf_t, index=False)
+                    c1.download_button(f"📄 Template {plan['cause_racine'][:10]}...", data=buf_t.getvalue(), 
+                                       file_name=f"template_{cid}.xlsx", key=f"tpl_{cid}")
+
+                    # 2. Import
+                    up = c2.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}...", type=["xlsx"], key=f"up_{cid}")
+                    if up:
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = pd.read_excel(up).fillna("").to_dict('records')
+                        st.rerun()
+
+                    # --- ÉDITEUR PAR FICHE ---
+                    edited_df = st.data_editor(
+                        df_obs.fillna(""),
+                        column_config={
+                            "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
+                            "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"]),
+                            "date": st.column_config.DateColumn("Date")
+                        },
+                        num_rows="dynamic",
+                        hide_index=True,
+                        use_container_width=True
+                    )
+
+                    if st.button(f"💾 Enregistrer {plan['cause_racine'][:10]}", key=f"btn_{cid}"):
+                        # Sauvegarde des logs
+                        dmaic_analyze["gemba_observations"][cid] = {"logs": edited_df.to_dict('records')}
+                
+                        # Recalcul statut
+                        logs = edited_df.to_dict('records')
+                        total = len(logs)
+                        fav = len([l for l in logs if l.get("confirme") == "Oui"])
+                        pct = (fav / total * 100) if total > 0 else 0
+                        dmaic_analyze["gemba_observations"][cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
+                        st.success("Enregistré !")
+                        st.rerun()
+
+            # --- SYNTHÈSE GLOBALE ---
+            st.divider()
+            st.subheader("6. Validation des causes racines (Synthèse)")
+            summary = []
+            for cid, plan in gemba_plans.items():
+                obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {"logs": []})
+                logs = obs.get("logs", [])
                 fav = len([l for l in logs if l.get("confirme") == "Oui"])
-                pct = (fav / total * 100) if total > 0 else 0
-                new_data[cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
-            
-            dmaic_analyze["gemba_observations"] = new_data
-            st.success("Données synchronisées !")
-            st.rerun()
+                pct = (fav / len(logs) * 100) if len(logs) > 0 else 0
+                summary.append({
+                    "X Critique": plan["x_critique"],
+                    "Cause Racine": plan["cause_racine"],
+                    "Nb": len(logs),
+                    "% Conf": f"{pct:.0f}%",
+                    "Statut": obs.get("status", "En attente")
+                })
+            st.table(pd.DataFrame(summary))
 
         # --- PHASE 6: VALIDATION DES CAUSES RACINES ---
         st.divider()
