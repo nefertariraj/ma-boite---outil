@@ -3195,10 +3195,13 @@ else:
                     dmaic_analyze["gemba_observations"][cid]["logs"] = pd.read_excel(up).fillna("").to_dict('records')
                     st.rerun()
 
-                # --- ÉDITEUR SANS MISE À JOUR TEMPS RÉEL (Contrôlé par bouton) ---
+                # --- ÉDITEUR PAR FICHE (FIXE ET SANS MISES À JOUR INTEMPESTIVES) ---
+        
+                # On utilise une clé unique pour l'éditeur, mais SANS lier directement à dmaic_analyze
+                # pour éviter le rafraîchissement à chaque clic hors cellule.
                 edited_df = st.data_editor(
                     df_obs.fillna(""),
-                    key=f"editor_{cid}",  # <--- C'est ici que l'on donne une identité unique
+                    key=f"editor_{cid}", 
                     column_config={
                         "date": st.column_config.TextColumn("Date (YYYY-MM-DD)"),
                         "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
@@ -3209,18 +3212,19 @@ else:
                     use_container_width=True
                 )
 
-                # 4. BOUTON DE SAUVEGARDE MANUELLE
+                # BOUTON DE SAUVEGARDE MANUELLE
+                # Seul ce bouton déclenche le traitement des données et le st.rerun()
                 if st.button(f"💾 Sauvegarder les données de {plan['cause_racine'][:10]}", key=f"save_{cid}"):
-                    # Conversion des données de l'éditeur vers le stockage
+                    # On prend la version de l'éditeur au moment précis du clic
                     new_logs = edited_df.to_dict('records')
                     dmaic_analyze["gemba_observations"][cid]["logs"] = new_logs
             
-                    # Recalcul automatique des statuts lors du clic sur le bouton
+                    # Recalcul des statuts
                     fav = len([l for l in new_logs if str(l.get("confirme")).lower() == 'oui'])
                     pct = (fav / len(new_logs) * 100) if len(new_logs) > 0 else 0
                     dmaic_analyze["gemba_observations"][cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
             
-                    st.success("Données enregistrées !")
+                    st.success("Données sauvegardées !")
                     st.rerun()
 
         # --- PHASE 6: VALIDATION DES CAUSES RACINES ---
