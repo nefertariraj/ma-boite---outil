@@ -3204,13 +3204,18 @@ else:
                         dmaic_analyze["gemba_observations"][cid]["logs"] = pd.read_excel(up).fillna("").to_dict('records')
                         st.rerun()
 
-                    # --- ÉDITEUR PAR FICHE ---
+                    # --- ÉDITEUR PAR FICHE (CORRIGÉ) ---
+                    # Conversion forcée en chaînes de caractères pour garantir la compatibilité
+                    df_display = df_obs.fillna("").astype(str)
+            
                     edited_df = st.data_editor(
-                        df_obs.fillna(""),
+                        df_display,
                         column_config={
+                            "date": st.column_config.TextColumn("Date (YYYY-MM-DD)"),
                             "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
                             "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"]),
-                            "date": st.column_config.DateColumn("Date")
+                            "description": st.column_config.TextColumn("Description"),
+                            "preuve": st.column_config.TextColumn("Preuve"),
                         },
                         num_rows="dynamic",
                         hide_index=True,
@@ -3218,13 +3223,16 @@ else:
                     )
 
                     if st.button(f"💾 Enregistrer {plan['cause_racine'][:10]}", key=f"btn_{cid}"):
-                        # Sauvegarde des logs
-                        dmaic_analyze["gemba_observations"][cid] = {"logs": edited_df.to_dict('records')}
+                        # On convertit les données de l'éditeur en une liste de dictionnaires
+                        # On nettoie pour enlever les lignes vides si besoin
+                        records = edited_df.to_dict('records')
+                        filtered_records = [r for r in records if any(r.values())]
+                
+                        dmaic_analyze["gemba_observations"][cid] = {"logs": filtered_records}
                 
                         # Recalcul statut
-                        logs = edited_df.to_dict('records')
-                        total = len(logs)
-                        fav = len([l for l in logs if l.get("confirme") == "Oui"])
+                        total = len(filtered_records)
+                        fav = len([l for l in filtered_records if l.get("confirme") == "Oui"])
                         pct = (fav / total * 100) if total > 0 else 0
                         dmaic_analyze["gemba_observations"][cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
                         st.success("Enregistré !")
