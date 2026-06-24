@@ -3165,11 +3165,76 @@ else:
             if tab_data:
                 st.table(pd.DataFrame(tab_data))
     
-        st.subheader("5. Data collection for Gemba walk")
-        # (À compléter...)
+        # --- PHASE 5 : DATA COLLECTION (OBSERVATIONS TERRAIN) ---
+        st.subheader("5. Data Collection (Résultats des Gemba Walks)")
+
+        if "gemba_observations" not in dmaic_analyze:
+            dmaic_analyze["gemba_observations"] = {}
+
+        gemba_plans = dmaic_analyze.get("gemba_plans", {})
+
+        if not gemba_plans:
+            st.warning("Veuillez d'abord préparer le Data Collection Plan (étape 4).")
+        else:
+            for cid, plan in gemba_plans.items():
+                with st.expander(f"Validation : {plan['cause_racine']} (Statut: {dmaic_analyze.get('gemba_observations', {}).get(cid, {}).get('status', 'En attente')})"):
+                    st.info(f"**Objectif :** {plan['objectif']} | **Critère :** {plan['critere']}")
+            
+                    if cid not in dmaic_analyze["gemba_observations"]:
+                        dmaic_analyze["gemba_observations"][cid] = {"logs": [], "status": "En attente"}
+            
+                    obs_data = dmaic_analyze["gemba_observations"][cid]
+            
+                    # --- Journal des observations ---
+                    for i, obs in enumerate(obs_data["logs"]):
+                        with st.container():
+                            st.write(f"**Observation {i+1}** : {obs['date']} - {obs['confirme']}")
+                            st.caption(f"{obs['description']}")
+            
+                    # --- Ajout d'une nouvelle observation ---
+                    with st.form(key=f"new_obs_{cid}"):
+                        c1, c2 = st.columns(2)
+                        date_obs = c1.date_input("Date", key=f"d_{cid}")
+                        confirme = c2.selectbox("Cause observée ?", ["Oui", "Non", "Partiellement"], key=f"c_{cid}")
+                
+                        desc = st.text_area("Description de l'observation", key=f"desc_{cid}")
+                        preuve = st.text_input("Preuve (Lien/Ticket/Nom)", key=f"p_{cid}")
+                        confiance = st.select_slider("Niveau de confiance", ["Faible", "Moyen", "Élevé"], key=f"conf_{cid}")
+                
+                        if st.form_submit_button("Ajouter cette observation"):
+                            obs_data["logs"].append({
+                                "date": str(date_obs), "confirme": confirme, "description": desc,
+                                "preuve": preuve, "confiance": confiance
+                            })
+                            st.rerun()
+
+                    # --- Calculs automatiques ---
+                    total = len(obs_data["logs"])
+                    favorables = len([o for o in obs_data["logs"] if o["confirme"] == "Oui"])
+                    pct = (favorables / total * 100) if total > 0 else 0
+            
+                    # Détermination statut
+                    if total > 0:
+                        obs_data["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
+            
+                    st.metric("Pourcentage de confirmation", f"{pct:.1f}%")
+                    st.write(f"**Statut final :** {obs_data['status']}")
+
+        # --- PHASE 6: VALIDATION DES CAUSES RACINES
+        st.divider()
+        st.subheader("📊 Validation des causes racines")
     
-        st.subheader("6. Validation des causes racines")
-        # (À compléter...)
+        summary = []
+        for cid, plan in gemba_plans.items():
+            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {"logs": []})
+            summary.append({
+                "X Critique": plan["x_critique"],
+                "Cause Racine": plan["cause_racine"],
+                "Nb Observations": len(obs["logs"]),
+                "% Conf": f"{(len([o for o in obs['logs'] if o['confirme'] == 'Oui']) / len(obs['logs']) * 100) if len(obs['logs']) > 0 else 0:.0f}%",
+                "Statut": obs.get("status", "En attente")
+            })
+        st.table(pd.DataFrame(summary))
 
     with tabs[3]: st.info("Module IMPROVE : Matrice de sélection multicritères.")
     with tabs[4]: st.info("Module CONTROL : Graphiques Avant/Après & Gains financiers.")
