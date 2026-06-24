@@ -3222,7 +3222,7 @@ else:
 
         # --- PHASE 6: VALIDATION DES CAUSES RACINES
         st.divider()
-        st.subheader("📊 Validation des causes racines")
+        st.subheader("6. Validation des causes racines")
     
         summary = []
         for cid, plan in gemba_plans.items():
