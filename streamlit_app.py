@@ -3204,12 +3204,13 @@ else:
                         dmaic_analyze["gemba_observations"][cid]["logs"] = pd.read_excel(up).fillna("").to_dict('records')
                         st.rerun()
 
-                    # --- ÉDITEUR PAR FICHE (CORRIGÉ) ---
+                    # --- ÉDITEUR PAR FICHE (CORRIGÉ AVEC CLÉ UNIQUE) ---
                     # Conversion forcée en chaînes de caractères pour garantir la compatibilité
                     df_display = df_obs.fillna("").astype(str)
             
                     edited_df = st.data_editor(
                         df_display,
+                        key=f"editor_{cid}",  # <--- C'EST CETTE CLÉ QUI RÉSOUT L'ERREUR
                         column_config={
                             "date": st.column_config.TextColumn("Date (YYYY-MM-DD)"),
                             "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
@@ -3222,39 +3223,23 @@ else:
                         use_container_width=True
                     )
 
-                    if st.button(f"💾 Enregistrer {plan['cause_racine'][:10]}", key=f"btn_{cid}"):
-                        # On convertit les données de l'éditeur en une liste de dictionnaires
-                        # On nettoie pour enlever les lignes vides si besoin
-                        records = edited_df.to_dict('records')
-                        filtered_records = [r for r in records if any(r.values())]
-                
-                        dmaic_analyze["gemba_observations"][cid] = {"logs": filtered_records}
-                
-                        # Recalcul statut
-                        total = len(filtered_records)
-                        fav = len([l for l in filtered_records if l.get("confirme") == "Oui"])
-                        pct = (fav / total * 100) if total > 0 else 0
-                        dmaic_analyze["gemba_observations"][cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
-                        st.success("Enregistré !")
-                        st.rerun()
-
-            # --- SYNTHÈSE GLOBALE ---
-            st.divider()
-            st.subheader("6. Validation des causes racines (Synthèse)")
-            summary = []
-            for cid, plan in gemba_plans.items():
-                obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {"logs": []})
-                logs = obs.get("logs", [])
-                fav = len([l for l in logs if l.get("confirme") == "Oui"])
-                pct = (fav / len(logs) * 100) if len(logs) > 0 else 0
-                summary.append({
-                    "X Critique": plan["x_critique"],
-                    "Cause Racine": plan["cause_racine"],
-                    "Nb": len(logs),
-                    "% Conf": f"{pct:.0f}%",
-                    "Statut": obs.get("status", "En attente")
-                })
-            st.table(pd.DataFrame(summary))
+                    # --- SYNTHÈSE GLOBALE ---
+                    st.divider()
+                    st.subheader("6. Validation des causes racines (Synthèse)")
+                    summary = []
+                    for cid, plan in gemba_plans.items():
+                        obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {"logs": []})
+                        logs = obs.get("logs", [])
+                        fav = len([l for l in logs if l.get("confirme") == "Oui"])
+                        pct = (fav / len(logs) * 100) if len(logs) > 0 else 0
+                        summary.append({
+                            "X Critique": plan["x_critique"],
+                            "Cause Racine": plan["cause_racine"],
+                            "Nb": len(logs),
+                            "% Conf": f"{pct:.0f}%",
+                            "Statut": obs.get("status", "En attente")
+                        })
+                    st.table(pd.DataFrame(summary))
 
         # --- PHASE 6: VALIDATION DES CAUSES RACINES ---
         st.divider()
