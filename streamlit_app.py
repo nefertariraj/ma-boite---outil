@@ -3176,7 +3176,7 @@ else:
 
         gemba_plans = dmaic_analyze.get("gemba_plans", {})
 
-        # Préparation d'une liste plate
+        # Préparation du DataFrame pour l'éditeur
         obs_list = []
         for cid, data in dmaic_analyze["gemba_observations"].items():
             plan = gemba_plans.get(cid, {})
@@ -3186,23 +3186,38 @@ else:
                 obs_row["cause_racine"] = plan.get("cause_racine", cid)
                 obs_list.append(obs_row)
 
-        # FIX : Créer un DataFrame avec des colonnes prédéfinies même s'il est vide
         colonnes_defaut = ["cid", "cause_racine", "date", "confirme", "description", "preuve", "confiance"]
-        if obs_list:
-            df_obs = pd.DataFrame(obs_list)
-        else:
-            df_obs = pd.DataFrame(columns=colonnes_defaut)
-
-        # Nettoyage pour éviter les erreurs de type
+        df_obs = pd.DataFrame(obs_list, columns=colonnes_defaut)
         df_display = df_obs.fillna("")
 
-        # --- IMPORT / EXPORT ---
-        # ... (votre code d'import/export reste identique) ...
-
-        # --- ÉDITEUR (CORRIGÉ) ---
-        st.write("Journal des observations :")
+        # --- IMPORT / EXPORT & TEMPLATE ---
+        c1, c2, c3 = st.columns(3)
         
-        # On définit explicitement les types pour aider Streamlit
+        # 1. Télécharger le template vierge
+        template_df = pd.DataFrame(columns=colonnes_defaut)
+        buf_t = io.BytesIO()
+        template_df.to_excel(buf_t, index=False)
+        c1.download_button("📄 Template Vide (Excel)", data=buf_t.getvalue(), file_name="template_gemba.xlsx")
+
+        # 2. Exporter les données actuelles
+        buf_e = io.BytesIO()
+        df_display.to_excel(buf_e, index=False)
+        c2.download_button("📥 Exporter Observations", data=buf_e.getvalue(), file_name="observations.xlsx")
+
+        # 3. Import
+        uploaded_file = c3.file_uploader("📤 Importer fichier complété", type=["xlsx"])
+        if uploaded_file:
+            df_imp = pd.read_excel(uploaded_file).fillna("")
+            new_obs = {}
+            for _, row in df_imp.iterrows():
+                cid = row['cid']
+                if cid not in new_obs: new_obs[cid] = {"logs": []}
+                new_obs[cid]["logs"].append({k:v for k,v in row.to_dict().items() if k not in ['cid', 'cause_racine']})
+            dmaic_analyze["gemba_observations"] = new_obs
+            st.rerun()
+
+        # --- ÉDITEUR (AJOUT/SUPPRESSION DE LIGNES) ---
+        st.write("Journal des observations (Ajoutez/Supprimez des lignes via le menu du tableau) :")
         edited_obs = st.data_editor(
             df_display,
             column_config={
@@ -3210,23 +3225,18 @@ else:
                 "cause_racine": st.column_config.TextColumn("Cause", disabled=True),
                 "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
                 "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"]),
-                "date": st.column_config.TextColumn("Date (YYYY-MM-DD)") # Plus stable en texte pour l'éditeur
             },
+            num_rows="dynamic", # C'est cette option qui permet d'ajouter/supprimer des lignes
             hide_index=True,
             use_container_width=True
         )
 
-        # --- BOUTON ENREGISTRER ---
-        if st.button("💾 Enregistrer toutes les observations"):
+        if st.button("💾 Enregistrer et calculer"):
             new_data = {}
-            # On filtre pour ne garder que les lignes valides
             for _, row in edited_obs.iterrows():
                 cid = row.get('cid')
-                if not cid: continue # Ignore les lignes vides
-                
+                if not cid: continue
                 if cid not in new_data: new_data[cid] = {"logs": []}
-                
-                # Reconstruire le log
                 log_entry = {k: v for k, v in row.to_dict().items() if k not in ['cid', 'cause_racine']}
                 new_data[cid]["logs"].append(log_entry)
             
@@ -3239,7 +3249,7 @@ else:
                 new_data[cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
             
             dmaic_analyze["gemba_observations"] = new_data
-            st.success("Observations enregistrées !")
+            st.success("Données synchronisées !")
             st.rerun()
 
         # --- PHASE 6: VALIDATION DES CAUSES RACINES ---
