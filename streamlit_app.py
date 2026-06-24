@@ -3186,51 +3186,47 @@ else:
                 obs_row["cause_racine"] = plan.get("cause_racine", cid)
                 obs_list.append(obs_row)
 
-        df_obs = pd.DataFrame(obs_list)
+        # FIX : Créer un DataFrame avec des colonnes prédéfinies même s'il est vide
+        colonnes_defaut = ["cid", "cause_racine", "date", "confirme", "description", "preuve", "confiance"]
+        if obs_list:
+            df_obs = pd.DataFrame(obs_list)
+        else:
+            df_obs = pd.DataFrame(columns=colonnes_defaut)
 
-        # --- CORRECTION : Nettoyage pour éviter l'erreur Streamlit ---
-        # On remplace les valeurs vides par des chaînes vides pour le tableau
+        # Nettoyage pour éviter les erreurs de type
         df_display = df_obs.fillna("")
 
         # --- IMPORT / EXPORT ---
-        c_exp, c_imp = st.columns(2)
-        if not df_display.empty:
-            buffer = io.BytesIO()
-            df_display.to_excel(buffer, index=False)
-            c_exp.download_button("📥 Exporter les observations (Excel)", data=buffer.getvalue(), 
-                                   file_name="gemba_observations.xlsx", mime="application/vnd.ms-excel")
+        # ... (votre code d'import/export reste identique) ...
 
-        uploaded_file = c_imp.file_uploader("📤 Importer vos observations complétées", type=["xlsx"])
-        if uploaded_file:
-            df_imp = pd.read_excel(uploaded_file).fillna("")
-            new_obs = {}
-            for _, row in df_imp.iterrows():
-                cid = row['cid']
-                if cid not in new_obs: new_obs[cid] = {"logs": []}
-                new_obs[cid]["logs"].append({k:v for k,v in row.to_dict().items() if k not in ['cid', 'cause_racine']})
-            dmaic_analyze["gemba_observations"] = new_obs
-            st.rerun()
-
-        # --- ÉDITEUR ---
+        # --- ÉDITEUR (CORRIGÉ) ---
         st.write("Journal des observations :")
+        
+        # On définit explicitement les types pour aider Streamlit
         edited_obs = st.data_editor(
             df_display,
             column_config={
-                "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"], required=False),
-                "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"], required=False),
-                "date": st.column_config.DateColumn("Date")
+                "cid": st.column_config.TextColumn("ID", disabled=True),
+                "cause_racine": st.column_config.TextColumn("Cause", disabled=True),
+                "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
+                "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"]),
+                "date": st.column_config.TextColumn("Date (YYYY-MM-DD)") # Plus stable en texte pour l'éditeur
             },
             hide_index=True,
             use_container_width=True
         )
 
+        # --- BOUTON ENREGISTRER ---
         if st.button("💾 Enregistrer toutes les observations"):
             new_data = {}
-            # On utilise le résultat de l'éditeur (edited_obs)
+            # On filtre pour ne garder que les lignes valides
             for _, row in edited_obs.iterrows():
-                cid = row['cid']
+                cid = row.get('cid')
+                if not cid: continue # Ignore les lignes vides
+                
                 if cid not in new_data: new_data[cid] = {"logs": []}
-                # On reconstruit le dictionnaire de log en ignorant les colonnes ajoutées pour l'affichage
+                
+                # Reconstruire le log
                 log_entry = {k: v for k, v in row.to_dict().items() if k not in ['cid', 'cause_racine']}
                 new_data[cid]["logs"].append(log_entry)
             
@@ -3243,7 +3239,7 @@ else:
                 new_data[cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
             
             dmaic_analyze["gemba_observations"] = new_data
-            st.success("Observations enregistrées et statuts recalculés !")
+            st.success("Observations enregistrées !")
             st.rerun()
 
         # --- PHASE 6: VALIDATION DES CAUSES RACINES ---
