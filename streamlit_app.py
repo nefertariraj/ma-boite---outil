@@ -3190,31 +3190,30 @@ else:
                                    data=template_df.to_csv(index=False), 
                                    file_name=f"template_{cid}.csv", mime="text/csv")
 
-                # 2. Import Excel/CSV
+                # 2. Import Excel/CSV corrigé
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
                     try:
-                        # Lecture du fichier
-                        df_imp = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up)
-                        df_imp = df_imp.fillna("")
+                        # On charge le fichier en disant que la première ligne NE DOIT PAS être utilisée comme titre
+                        # (header=None) et on définit manuellement nos colonnes
+                        df_imp = pd.read_excel(up, header=None) if up.name.endswith('.xlsx') else pd.read_csv(up, header=None)
                         
-                        # Colonnes attendues
+                        # On définit les colonnes attendues dans l'ordre
                         cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
                         
-                        # On ne garde que les colonnes qui existent dans le fichier importé
-                        # Cela évite le KeyError si une colonne manque
-                        df_final = pd.DataFrame(columns=cols_attendues)
-                        for col in cols_attendues:
-                            if col in df_imp.columns:
-                                df_final[col] = df_imp[col]
-                            else:
-                                df_final[col] = "" # Valeur par défaut si la colonne manque
+                        # On ne garde que les 5 premières colonnes du fichier Excel
+                        df_imp = df_imp.iloc[:, :5]
+                        df_imp.columns = cols_attendues
                         
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.to_dict('records')
+                        # Nettoyage : on enlève la ligne d'en-tête si elle était incluse par erreur
+                        # (Si la première ligne contient "date", on la supprime)
+                        df_imp = df_imp[df_imp['date'] != 'date'] 
+                        
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_imp.fillna("").to_dict('records')
                         st.success("Importation réussie !")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Erreur lors de l'importation : {e}")
+                        st.error(f"Le format du fichier ne correspond pas au template. Vérifiez vos colonnes. Erreur : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
