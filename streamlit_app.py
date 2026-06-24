@@ -3168,57 +3168,79 @@ else:
         # --- PHASE 5 : DATA COLLECTION (OBSERVATIONS TERRAIN) ---
         st.subheader("5. Data Collection (Résultats des Gemba Walks)")
 
+        import pandas as pd
+        import io
+
         if "gemba_observations" not in dmaic_analyze:
             dmaic_analyze["gemba_observations"] = {}
 
+        # Récupération des plans pour référence
         gemba_plans = dmaic_analyze.get("gemba_plans", {})
 
-        if not gemba_plans:
-            st.warning("Veuillez d'abord préparer le Data Collection Plan (étape 4).")
-        else:
-            for cid, plan in gemba_plans.items():
-                with st.expander(f"Validation : {plan['cause_racine']} (Statut: {dmaic_analyze.get('gemba_observations', {}).get(cid, {}).get('status', 'En attente')})"):
-                    st.info(f"**Objectif :** {plan['objectif']} | **Critère :** {plan['critere']}")
-            
-                    if cid not in dmaic_analyze["gemba_observations"]:
-                        dmaic_analyze["gemba_observations"][cid] = {"logs": [], "status": "En attente"}
-            
-                    obs_data = dmaic_analyze["gemba_observations"][cid]
-            
-                    # --- Journal des observations ---
-                    for i, obs in enumerate(obs_data["logs"]):
-                        with st.container():
-                            st.write(f"**Observation {i+1}** : {obs['date']} - {obs['confirme']}")
-                            st.caption(f"{obs['description']}")
-            
-                    # --- Ajout d'une nouvelle observation ---
-                    with st.form(key=f"new_obs_{cid}"):
-                        c1, c2 = st.columns(2)
-                        date_obs = c1.date_input("Date", key=f"d_{cid}")
-                        confirme = c2.selectbox("Cause observée ?", ["Oui", "Non", "Partiellement"], key=f"c_{cid}")
-                
-                        desc = st.text_area("Description de l'observation", key=f"desc_{cid}")
-                        preuve = st.text_input("Preuve (Lien/Ticket/Nom)", key=f"p_{cid}")
-                        confiance = st.select_slider("Niveau de confiance", ["Faible", "Moyen", "Élevé"], key=f"conf_{cid}")
-                
-                        if st.form_submit_button("Ajouter cette observation"):
-                            obs_data["logs"].append({
-                                "date": str(date_obs), "confirme": confirme, "description": desc,
-                                "preuve": preuve, "confiance": confiance
-                            })
-                            st.rerun()
+        # Préparation d'une liste plate pour l'éditeur (une ligne par observation)
+        obs_list = []
+        for cid, data in dmaic_analyze["gemba_observations"].items():
+            plan = gemba_plans.get(cid, {})
+            for log in data.get("logs", []):
+                obs_row = log.copy()
+                obs_row["cid"] = cid
+                obs_row["cause_racine"] = plan.get("cause_racine", cid)
+                obs_list.append(obs_row)
 
-                    # --- Calculs automatiques ---
-                    total = len(obs_data["logs"])
-                    favorables = len([o for o in obs_data["logs"] if o["confirme"] == "Oui"])
-                    pct = (favorables / total * 100) if total > 0 else 0
-            
-                    # Détermination statut
-                    if total > 0:
-                        obs_data["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
-            
-                    st.metric("Pourcentage de confirmation", f"{pct:.1f}%")
-                    st.write(f"**Statut final :** {obs_data['status']}")
+        df_obs = pd.DataFrame(obs_list)
+
+        # --- IMPORT / EXPORT ---
+        c_exp, c_imp = st.columns(2)
+
+        if not df_obs.empty:
+            buffer = io.BytesIO()
+            df_obs.to_excel(buffer, index=False)
+            c_exp.download_button("📥 Exporter les observations (Excel)", data=buffer.getvalue(), 
+                                   file_name="gemba_observations.xlsx", mime="application/vnd.ms-excel")
+
+        uploaded_file = c_imp.file_uploader("📤 Importer vos observations complétées", type=["xlsx"])
+        if uploaded_file:
+            df_imp = pd.read_excel(uploaded_file)
+            # Logique pour réinjecter dans le JSON (reconstruction du dict imbriqué)
+            new_obs = {}
+            for _, row in df_imp.iterrows():
+                cid = row['cid']
+                if cid not in new_obs: new_obs[cid] = {"logs": []}
+                new_obs[cid]["logs"].append({k:v for k,v in row.to_dict().items() if k not in ['cid', 'cause_racine']})
+            dmaic_analyze["gemba_observations"] = new_obs
+            st.rerun()
+
+        # --- ÉDITEUR ---
+        st.write("Journal des observations :")
+        edited_obs = st.data_editor(
+            df_obs,
+            column_config={
+                "confirme": st.column_config.SelectboxColumn("Cause observée ?", options=["Oui", "Non", "Partiellement"]),
+                "confiance": st.column_config.SelectboxColumn("Confiance", options=["Faible", "Moyen", "Élevé"]),
+                "date": st.column_config.DateColumn("Date")
+            },
+            use_container_width=True
+        )
+
+        if st.button("💾 Enregistrer toutes les observations"):
+            # Reconvertir le tableau édité en structure JSON
+            new_data = {}
+            for _, row in edited_obs.iterrows():
+                cid = row['cid']
+                if cid not in new_data: new_data[cid] = {"logs": []}
+                new_data[cid]["logs"].append({k:v for k,v in row.to_dict().items() if k not in ['cid', 'cause_racine']})
+    
+            # Recalculer les statuts automatiquement
+            for cid in new_data:
+                logs = new_data[cid]["logs"]
+                total = len(logs)
+                fav = len([l for l in logs if l.get("confirme") == "Oui"])
+                pct = (fav / total * 100) if total > 0 else 0
+                new_data[cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
+        
+            dmaic_analyze["gemba_observations"] = new_data
+            st.success("Observations enregistrées et statuts recalculés !")
+            st.rerun()
 
         # --- PHASE 6: VALIDATION DES CAUSES RACINES
         st.divider()
