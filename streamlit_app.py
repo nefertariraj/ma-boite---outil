@@ -3184,12 +3184,22 @@ else:
                 data_cid = dmaic_analyze["gemba_observations"].get(cid, {"logs": []})
                 df_obs = pd.DataFrame(data_cid.get("logs", []), columns=["date", "confirme", "description", "preuve", "confiance"])
         
-                # 1. Template
+                # 1. Template EXCEL (Plus robuste)
+                import io
+                
                 template_df = pd.DataFrame(columns=["date", "confirme", "description", "preuve", "confiance"])
-                st.download_button(f"📄 Template {plan['cause_racine'][:10]}", 
-                                   data=template_df.to_csv(index=False), 
-                                   file_name=f"template_{cid}.csv", mime="text/csv")
-
+                
+                # Création d'un buffer mémoire pour le fichier Excel
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                    template_df.to_excel(writer, index=False, sheet_name='Data')
+                
+                st.download_button(
+                    label=f"📄 Télécharger Template Excel {plan['cause_racine'][:10]}",
+                    data=buffer.getvalue(),
+                    file_name=f"template_{cid}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
                 # 2. Import Excel/CSV (Lecture sécurisée et compatible)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
