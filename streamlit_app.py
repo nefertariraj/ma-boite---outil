@@ -3190,22 +3190,22 @@ else:
                                    data=template_df.to_csv(index=False), 
                                    file_name=f"template_{cid}.csv", mime="text/csv")
 
-                # 2. Import Excel/CSV (Lecture "Nettoyage Total")
+                # 2. Import Excel/CSV (Lecture sécurisée et compatible)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
                     try:
-                        # Lecture brute sans aucun header, en forçant le type chaîne de caractères
+                        # Lecture brute, header=None,dtype=str pour tout traiter comme du texte
                         df_imp = pd.read_excel(up, header=None, dtype=str) if up.name.endswith('.xlsx') else pd.read_csv(up, header=None, dtype=str)
                         
-                        # On transforme tout en texte et on enlève les espaces inutiles autour
-                        df_imp = df_imp.applymap(lambda x: str(x).strip() if x is not None else "")
+                        # Remplacer les valeurs nulles par des chaînes vides
+                        df_imp = df_imp.fillna("")
                         
-                        # FILTRE AUTOMATIQUE : On ne garde que les lignes qui n'ont pas le titre parasite
-                        # On supprime toutes les lignes qui contiennent votre texte d'erreur
-                        filtre = ~df_imp.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)
-                        df_clean = df_imp[filtre].reset_index(drop=True)
+                        # Nettoyage : supprimer les lignes contenant le titre parasite
+                        # On convertit tout le dataframe en string pour chercher le texte interdit
+                        mask = df_imp.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)
+                        df_clean = df_imp[~mask].reset_index(drop=True)
                         
-                        # On force le mappage sur 5 colonnes
+                        # Création du dataframe final avec les colonnes attendues
                         cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
                         df_final = pd.DataFrame(index=df_clean.index)
                         
@@ -3220,7 +3220,7 @@ else:
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Impossible de traiter le fichier. Veuillez copier vos données dans un nouveau fichier Excel propre sans titres. Détail : {e}")
+                        st.error(f"Erreur lors de l'import. Veuillez utiliser un fichier sans lignes de titre. Détail : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
