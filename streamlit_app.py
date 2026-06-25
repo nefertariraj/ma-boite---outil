@@ -3203,13 +3203,19 @@ else:
                     submit = st.form_submit_button(f"💾 Sauvegarder les données de {plan['cause_racine'][:10]}")
             
                     if submit:
-                        # Traitement uniquement au clic sur le bouton
+                        # 1. S'assurer que le dictionnaire est bien initialisé pour ce cid
+                        if cid not in dmaic_analyze["gemba_observations"]:
+                            dmaic_analyze["gemba_observations"][cid] = {"logs": [], "status": "Non confirmée"}
+                        
+                        # 2. Sauvegarde des données
                         new_logs = edited_df.to_dict('records')
                         dmaic_analyze["gemba_observations"][cid]["logs"] = new_logs
                 
-                        # Recalcul des statuts
+                        # 3. Recalcul des statuts
                         fav = len([l for l in new_logs if str(l.get("confirme")).lower() == 'oui'])
                         pct = (fav / len(new_logs) * 100) if len(new_logs) > 0 else 0
+                        
+                        # Ici aussi, on s'assure que la clé existe avant d'écrire
                         dmaic_analyze["gemba_observations"][cid]["status"] = "Confirmée" if pct >= 80 else ("Partiellement confirmée" if pct >= 50 else "Non confirmée")
                 
                         st.success("Données sauvegardées !")
