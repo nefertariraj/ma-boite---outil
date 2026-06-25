@@ -3225,72 +3225,71 @@ else:
         st.divider()
         st.subheader("6. Validation des causes racines")
         
+        # 1. TABLEAU RÉCAPITULATIF DE COLLECTE (Data Collection Summary)
+        summary_col = []
+        for cid, plan in gemba_plans.items():
+            logs = dmaic_analyze.get("gemba_observations", {}).get(cid, {}).get("logs", [])
+            fav = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
+            pct = (fav / len(logs) * 100) if len(logs) > 0 else 0
+            summary_col.append({
+                "X Critique": plan["x_critique"],
+                "Cause Racine": plan["cause_racine"],
+                "Nb Obs": len(logs),
+                "% Conf": f"{pct:.0f}%"
+            })
+        st.table(pd.DataFrame(summary_col))
+
         # Initialisation structure de validation
         if "validation_data" not in dmaic_analyze:
             dmaic_analyze["validation_data"] = {}
 
+        # 2. FICHE DE VALIDATION DÉTAILLÉE
         for cid, plan in gemba_plans.items():
-            # 1. Récupération des données croisées
             stats = dmaic_analyze.get("tests_x", {}).get(cid, {})
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
             logs = obs.get("logs", [])
-            
-            # 2. Calculs automatiques Gemba
             fav = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
-            total = len(logs)
-            pct = (fav / total * 100) if total > 0 else 0
             
-            # 3. Initialisation de la fiche pour ce CID
             if cid not in dmaic_analyze["validation_data"]:
                 dmaic_analyze["validation_data"][cid] = {
                     "theorie": "", "conclusion_terrain": "", "statut": "Investigation complémentaire nécessaire", "justification": ""
                 }
             val = dmaic_analyze["validation_data"][cid]
 
-            with st.expander(f"Validation : {plan['x_critique']} -> {plan['cause_racine']}", expanded=False):
+            with st.expander(f"Fiche : {plan['x_critique']} -> {plan['cause_racine']}"):
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.markdown("### 📊 Données Statistiques")
-                    st.write(f"**Méthode :** {stats.get('methode', 'Non défini')}")
-                    st.info(f"P-value: {stats.get('p_value', 'N/A')} | Confiance: {stats.get('confiance', 'N/A')}")
-                    st.write(f"**Conclusion :** {'H0 rejetée (Significatif)' if stats.get('p_value', 1) < 0.05 else 'H0 non rejetée'}")
+                    st.markdown("### 📈 Hypothèses Statistiques")
+                    st.write("**H0 :** La cause racine n'explique pas le comportement observé du X et n'a pas d'effet significatif sur Y.")
+                    st.write("**H1 :** La cause racine explique le comportement observé du X et contribue significativement au comportement de Y.")
+                    
+                    st.markdown("### 💡 Conclusion Statistique")
+                    p_val = float(stats.get('p_value', 1.0))
+                    # On suppose un seuil de significativité classique de 0.05
+                    if p_val < 0.05:
+                        st.success("H0 rejetée. Les données indiquent que le X influence significativement le Y.")
+                    else:
+                        st.warning("H0 non rejetée. L'influence du X sur le Y n'est pas démontrée.")
                     
                 with col2:
-                    st.markdown("### 🔎 Données Gemba Walk")
-                    st.write(f"Confirmations : {fav}/{total} ({pct:.0f}%)")
-                    st.write(f"**Synthèse terrain :** {obs.get('status', 'En attente')}")
+                    st.markdown("### 🔎 Synthèse Terrain (Gemba)")
+                    st.write(f"Confirmations : {fav}/{len(logs)}")
+                    st.write(f"**Synthèse :** {obs.get('status', 'En attente')}")
 
                 # Saisie de la validation
-                st.divider()
                 val["theorie"] = st.text_area("Théorie (Mécanisme d'influence)", value=val["theorie"], key=f"v6_theo_{cid}")
                 val["conclusion_terrain"] = st.text_area("Conclusion pratique (Terrain)", value=val["conclusion_terrain"], key=f"v6_conc_{cid}")
         
-                col_v1, col_v2 = st.columns(2)
-                options_statut = [
-                    "Cause racine validée", 
-                    "Cause racine partiellement validée", 
-                    "Cause racine rejetée", 
-                    "Investigation complémentaire nécessaire"
-                ]
-                
-                # Calcul de l'index par défaut sécurisé
-                current_statut = val.get("statut", "Investigation complémentaire nécessaire")
-                default_index = options_statut.index(current_statut) if current_statut in options_statut else 3
-                
-                with col_v1:
-                    val["statut"] = st.selectbox(
-                        "Statut final", 
-                        options_statut,
-                        index=default_index,
-                        key=f"v6_stat_{cid}"
-                    )
-                with col_v2:
-                    val["justification"] = st.text_input(
-                        "Justification finale (Obligatoire)", 
-                        value=val["justification"], 
-                        key=f"v6_just_{cid}"
-                    )
+                c1, c2 = st.columns(2)
+                with c1:
+                    options = ["Cause racine validée", "Cause racine partiellement validée", "Cause racine rejetée", "Investigation complémentaire nécessaire"]
+                    default = options.index(val.get("statut", options[3])) if val.get("statut") in options else 3
+                    val["statut"] = st.selectbox("Statut final", options, index=default, key=f"v6_stat_{cid}")
+                with c2:
+                    val["justification"] = st.text_input("Justification finale (Obligatoire)", value=val["justification"], key=f"v6_just_{cid}")
+
+        # --- FIN DU BLOC ---
 
         # --- CONCLUSION & CLÔTURE DE PHASE ---
         st.divider()
