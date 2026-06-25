@@ -3201,33 +3201,42 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                # 2. Import Excel (Lecture "Force Brute")
+                # 2. Import Excel (Lecture avec détection automatique de zone)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
                 if up:
                     try:
-                        # 1. Lire sans en-tête, et forcer la lecture de la ligne 1 à la fin (skiprows=1)
-                        # Cela saute automatiquement votre ligne de titres "durée d'attente..."
-                        df_raw = pd.read_excel(up, header=None, skiprows=1, dtype=str)
+                        # On lit le fichier sans aucun header, en ignorant le typage
+                        # On charge toutes les données brutes
+                        df_raw = pd.read_excel(up, header=None, dtype=str)
                         
-                        # 2. On sélectionne uniquement les 5 premières colonnes
-                        # S'il y en a moins, on complète avec des vides
-                        df_data = pd.DataFrame(index=df_raw.index)
-                        cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
+                        # LOGIQUE DE DÉTECTION :
+                        # On cherche la première ligne qui contient au moins 3 colonnes remplies
+                        # (Souvent les lignes de titres parasites ne contiennent qu'une seule cellule fusionnée)
+                        start_row = 0
+                        for i in range(len(df_raw)):
+                            if df_raw.iloc[i].notna().sum() >= 3:
+                                start_row = i
+                                break
                         
-                        for i in range(5):
-                            if i < df_raw.shape[1]:
-                                df_data[cols_attendues[i]] = df_raw.iloc[:, i]
-                            else:
-                                df_data[cols_attendues[i]] = ""
-                                
-                        # 3. Nettoyage final
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_data.fillna("").to_dict('records')
+                        # On extrait les données à partir de cette ligne trouvée
+                        df_data = df_raw.iloc[start_row:].reset_index(drop=True)
+                        
+                        # Si la première ligne trouvée semble être un titre (ex: "date"), on la saute
+                        if "date" in str(df_data.iloc[0, 0]).lower():
+                            df_data = df_data.iloc[1:]
+                            
+                        # Sélection des 5 premières colonnes
+                        df_final = df_data.iloc[:, :5].copy()
+                        df_final.columns = ["date", "confirme", "description", "preuve", "confiance"]
+                        
+                        # Nettoyage
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.fillna("").to_dict('records')
                         
                         st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Erreur fatale : {e}")
+                        st.error(f"Le fichier Excel contient une structure illisible. Assurez-vous d'utiliser le template fourni. Erreur détectée : {e}")
                         
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
