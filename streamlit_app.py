@@ -3190,35 +3190,42 @@ else:
                                    data=template_df.to_csv(index=False), 
                                    file_name=f"template_{cid}.csv", mime="text/csv")
 
-                # 2. Import Excel/CSV (Assistant d'importation intelligent)
+                # 2. Import Excel/CSV (Lecture "Blindée")
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
                     try:
-                        # Lecture flexible : on laisse Pandas détecter l'en-tête
-                        df_imp = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up)
+                        # 1. On lit le fichier sans considérer la première ligne comme des titres
+                        # Cela évite que Pandas ne prenne votre texte "durée d'attente..." pour un nom de colonne
+                        df_raw = pd.read_excel(up, header=None) if up.name.endswith('.xlsx') else pd.read_csv(up, header=None)
                         
-                        # Définition des colonnes attendues
-                        target_cols = ["date", "confirme", "description", "preuve", "confiance"]
-                        df_final = pd.DataFrame(columns=target_cols)
+                        # 2. On cherche où commencent les vraies données
+                        # On cherche une ligne qui contient au moins 2 des mots-clés attendus
+                        start_row = 0
+                        for i, row in df_raw.iterrows():
+                            row_str = str(row.values).lower()
+                            if any(word in row_str for word in ["date", "confirme", "description"]):
+                                start_row = i + 1
+                                break
                         
-                        # L'IA de mappage : on essaie de trouver les colonnes correspondantes 
-                        # même si les titres sont légèrement différents
-                        import difflib
+                        # 3. On extrait les données après la ligne trouvée
+                        df_data = df_raw.iloc[start_row:].reset_index(drop=True)
                         
-                        for target in target_cols:
-                            # Chercher la colonne la plus proche dans le fichier importé
-                            matches = difflib.get_close_matches(target, df_imp.columns, n=1, cutoff=0.3)
-                            if matches:
-                                df_final[target] = df_imp[matches[0]]
+                        # 4. On mappe les 5 premières colonnes par force
+                        cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
+                        df_final = pd.DataFrame(index=df_data.index)
+                        
+                        for idx, col_name in enumerate(cols_attendues):
+                            if idx < len(df_data.columns):
+                                df_final[col_name] = df_data.iloc[:, idx]
                             else:
-                                df_final[target] = "" # Colonne manquante -> vide
+                                df_final[col_name] = ""
                         
                         dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.fillna("").to_dict('records')
-                        st.success("Importation intelligente réussie !")
+                        st.success("Importation robuste réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Impossible d'importer le fichier automatiquement. Erreur : {e}")
+                        st.error(f"Le fichier est illisible. Veuillez vérifier qu'il ne contient pas de cellules fusionnées. Détail : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
