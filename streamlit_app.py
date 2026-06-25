@@ -3183,54 +3183,8 @@ else:
                 # Récupération des données
                 data_cid = dmaic_analyze["gemba_observations"].get(cid, {"logs": []})
                 df_obs = pd.DataFrame(data_cid.get("logs", []), columns=["date", "confirme", "description", "preuve", "confiance"])
-        
-                # 1. Template EXCEL (Plus robuste)
-                import io
-                
-                template_df = pd.DataFrame(columns=["date", "confirme", "description", "preuve", "confiance"])
-                
-                # Création d'un buffer mémoire pour le fichier Excel
-                buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                    template_df.to_excel(writer, index=False, sheet_name='Data')
-                
-                st.download_button(
-                    label=f"📄 Télécharger Template Excel {plan['cause_racine'][:10]}",
-                    data=buffer.getvalue(),
-                    file_name=f"template_{cid}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                
-                # 2. Import Excel (Lecture Simple et Directe)
-                up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
-                if up:
-                    try:
-                        # Lecture basique sans rien interpréter
-                        df = pd.read_excel(up, header=None)
                         
-                        # On transforme les données en liste de dictionnaires
-                        # On prend uniquement les colonnes 0 à 4 (les 5 premières)
-                        data_list = []
-                        for index, row in df.iterrows():
-                            # On ignore les lignes qui ne contiennent que du texte parasite 
-                            # (si elles n'ont qu'une seule valeur)
-                            if row.count() > 1:
-                                data_list.append({
-                                    "date": str(row[0]) if len(row) > 0 else "",
-                                    "confirme": str(row[1]) if len(row) > 1 else "",
-                                    "description": str(row[2]) if len(row) > 2 else "",
-                                    "preuve": str(row[3]) if len(row) > 3 else "",
-                                    "confiance": str(row[4]) if len(row) > 4 else ""
-                                })
-                        
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = data_list
-                        st.success("Importation terminée !")
-                        st.rerun()
-                        
-                    except Exception as e:
-                        st.error(f"Erreur simple : {e}")  
-                        
-                # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
+                # 2. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
                     edited_df = st.data_editor(
                         df_obs.fillna(""),
