@@ -3248,15 +3248,29 @@ else:
             elif taux >= 50: val_terrain = "Partiellement confirmée"
             else: val_terrain = "Non confirmée"
     
-            # 3. Logique de décision croisée
+            # 3. Logique de décision croisée explicite
             p_val = float(stats.get('p_value', 1.0))
-            stat_validee = p_val < 0.05 # True si significatif
+            stat_validee = p_val < 0.05 
     
-            if stat_validee and val_terrain == "Confirmée": decision = "CAUSE RACINE VALIDÉE"
-            elif stat_validee and val_terrain == "Partiellement confirmée": decision = "CAUSE RACINE PARTIELLEMENT VALIDÉE"
-            elif (stat_validee and val_terrain == "Non confirmée") or (not stat_validee and val_terrain == "Confirmée"): decision = "INVESTIGATION COMPLÉMENTAIRE REQUISE"
-            elif not stat_validee and val_terrain == "Non confirmée": decision = "CAUSE RACINE REJETÉE"
-            else: decision = "En cours d'analyse"
+            # Mapping des résultats
+            res_stat = "Confirmé" if stat_validee else "Non confirmé"
+            res_terrain = val_terrain # ("Confirmée", "Partiellement confirmée", "Non confirmée")
+
+            # Logique de décision selon votre nouvelle grille
+            if res_stat == "Confirmé" and res_terrain == "Confirmée":
+                decision = "Cause validée"
+            elif res_stat == "Confirmé" and res_terrain == "Partiellement confirmée":
+                decision = "Cause partiellement validée"
+            elif res_stat == "Confirmé" and res_terrain == "Non confirmée":
+                decision = "Contradiction à investiguer"
+            elif res_stat == "Non confirmé" and res_terrain == "Confirmée":
+                decision = "Contradiction à investiguer"
+            elif res_stat == "Non confirmé" and res_terrain == "Partiellement confirmée":
+                decision = "Cause non démontrée"
+            elif res_stat == "Non confirmé" and res_terrain == "Non confirmée":
+                decision = "Cause rejetée"
+            else:
+                decision = "En cours d'analyse"
 
             # Stockage pour le tableau
             summary_data.append({
@@ -3284,10 +3298,23 @@ else:
         
                 st.info(f"**Décision automatique :** {decision}")
 
-        # 5. TABLEAU RÉCAPITULATIF FINAL
+        # 5. TABLEAU RÉCAPITULATIF FINAL (Mis à jour)
         st.subheader("Tableau récapitulatif final")
+        
+        # Préparation du DataFrame pour l'affichage
         df_final = pd.DataFrame(summary_data)
-        st.table(df_final)
+        
+        # Affichage du tableau avec un formatage lisible
+        st.dataframe(
+            df_final,
+            column_config={
+                "Résultat Statistique": st.column_config.TextColumn("Résultat Statistique"),
+                "Résultat Terrain": st.column_config.TextColumn("Résultat Terrain"),
+                "Décision finale": st.column_config.TextColumn("Décision finale")
+            },
+            use_container_width=True,
+            hide_index=True
+        )
 
         # 6. CRITÈRE DE CLÔTURE
         st.divider()
