@@ -3190,31 +3190,35 @@ else:
                                    data=template_df.to_csv(index=False), 
                                    file_name=f"template_{cid}.csv", mime="text/csv")
 
-                # 2. Import Excel/CSV (Version ultra-robuste)
+                # 2. Import Excel/CSV (Assistant d'importation intelligent)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
                     try:
-                        # 1. Lire le fichier en ignorant la première ligne (les titres) pour éviter les erreurs de noms de colonnes
-                        # skiprows=1 demande de sauter la ligne qui contient les titres
-                        df_imp = pd.read_excel(up, skiprows=1) if up.name.endswith('.xlsx') else pd.read_csv(up, skiprows=1)
+                        # Lecture flexible : on laisse Pandas détecter l'en-tête
+                        df_imp = pd.read_excel(up) if up.name.endswith('.xlsx') else pd.read_csv(up)
                         
-                        # 2. On renomme les colonnes du fichier importé par celles attendues
-                        # On prend les 5 premières colonnes du fichier pour les mapper à nos besoins
-                        cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
+                        # Définition des colonnes attendues
+                        target_cols = ["date", "confirme", "description", "preuve", "confiance"]
+                        df_final = pd.DataFrame(columns=target_cols)
                         
-                        # On s'assure de ne prendre que les 5 premières colonnes du fichier uploadé
-                        df_final = df_imp.iloc[:, :5].copy()
-                        df_final.columns = cols_attendues
+                        # L'IA de mappage : on essaie de trouver les colonnes correspondantes 
+                        # même si les titres sont légèrement différents
+                        import difflib
                         
-                        # 3. Nettoyage final
+                        for target in target_cols:
+                            # Chercher la colonne la plus proche dans le fichier importé
+                            matches = difflib.get_close_matches(target, df_imp.columns, n=1, cutoff=0.3)
+                            if matches:
+                                df_final[target] = df_imp[matches[0]]
+                            else:
+                                df_final[target] = "" # Colonne manquante -> vide
+                        
                         dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.fillna("").to_dict('records')
-                        
-                        st.success("Importation réussie !")
+                        st.success("Importation intelligente réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        # Si le fichier est vraiment bizarre, on essaie sans le skiprows=1
-                        st.error(f"Erreur d'import : assurez-vous que votre fichier suit strictement l'ordre du template. Détail : {e}")
+                        st.error(f"Impossible d'importer le fichier automatiquement. Erreur : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
