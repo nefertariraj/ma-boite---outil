@@ -3201,32 +3201,35 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                # 2. Import Excel (Lecture "Anti-Erreur" : Ignorer tout titre)
-                up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
+                # 2. Importation Ultime (Nettoyage total avant lecture)
+                up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
                     try:
-                        # header=None : Aucun titre n'est reconnu
-                        # dtype=str : Tout est lu comme du texte simple
-                        df_imp = pd.read_excel(up, header=None, dtype=str)
+                        # 1. Lecture forcée en mode texte pur, sans interprétation
+                        if up.name.endswith('.csv'):
+                            df_imp = pd.read_csv(up, header=None, dtype=str, encoding='utf-8', sep=None, engine='python')
+                        else:
+                            df_imp = pd.read_excel(up, header=None, dtype=str)
                         
-                        # On supprime les lignes qui contiennent le mot "durée d'attente" ou autres titres
-                        # Cela nettoie le fichier avant même de commencer
-                        df_imp = df_imp[~df_imp.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)]
+                        # 2. Suppression de TOUTES les lignes contenant le texte qui fait planter
+                        # On transforme tout le tableau en texte et on cherche la chaîne "durée d'attente"
+                        mask = df_imp.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False, na=False).any(), axis=1)
+                        df_clean = df_imp[~mask].copy()
                         
-                        # On ne garde que les 5 premières colonnes
-                        df_data = df_imp.iloc[:, :5].reset_index(drop=True)
+                        # 3. On ne garde que les 5 premières colonnes
+                        if df_clean.shape[1] > 5:
+                            df_clean = df_clean.iloc[:, :5]
                         
-                        # On nomme manuellement les colonnes
-                        df_data.columns = ["date", "confirme", "description", "preuve", "confiance"]
+                        # On force le nommage des colonnes
+                        df_clean.columns = ["date", "confirme", "description", "preuve", "confiance"]
                         
-                        # Remplissage des cases vides
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_data.fillna("").to_dict('records')
-                        
+                        # 4. Envoi vers le dictionnaire
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_clean.fillna("").to_dict('records')
                         st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Le fichier est corrompu ou illisible. Détail : {e}")
+                        st.error("Le format du fichier est incompatible. Veuillez ouvrir votre fichier, faire 'Enregistrer sous' au format CSV (Comma Separated Values) et réessayer.")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
