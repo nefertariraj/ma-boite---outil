@@ -3267,14 +3267,27 @@ else:
                 val["conclusion_terrain"] = st.text_area("Conclusion pratique (Terrain)", value=val["conclusion_terrain"], key=f"conc_{cid}")
         
                 col_v1, col_v2 = st.columns(2)
+                options_statut = [
+                    "Cause racine validée", 
+                    "Cause racine partiellement validée", 
+                    "Cause racine rejetée", 
+                    "Investigation complémentaire nécessaire"
+                ]
+                
+                # Calcul de l'index par défaut sécurisé
+                current_statut = val.get("statut", "Investigation complémentaire nécessaire")
+                default_index = options_statut.index(current_statut) if current_statut in options_statut else 3
+                
                 with col_v1:
-                    val["statut"] = st.selectbox("Statut final", 
-                        ["Cause racine validée", "Cause racine partiellement validée", "Cause racine rejetée", "Investigation complémentaire nécessaire"],
-                        index=["Cause racine validée", "Cause racine partiellement validée", "Cause racine rejetée", "Investigation complémentaire nécessaire"].index(val["statut"]),
-                        key=f"stat_{cid}")
+                    val["statut"] = st.selectbox(
+                        "Statut final", 
+                        options_statut,
+                        index=default_index,
+                        key=f"stat_{cid}"
+                    )
                 with col_v2:
                     val["justification"] = st.text_input("Justification finale (Obligatoire)", value=val["justification"], key=f"just_{cid}")
-
+        
         # --- CONCLUSION & CLÔTURE DE PHASE ---
         st.divider()
         st.subheader("🏁 Clôture de la Phase Analyse")
