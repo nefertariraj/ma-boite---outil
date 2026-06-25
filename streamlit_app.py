@@ -3225,90 +3225,77 @@ else:
         st.divider()
         st.subheader("6. Validation des causes racines")
         
-        # 1. TABLEAU RÉCAPITULATIF DE COLLECTE (Data Collection Summary)
-        summary_col = []
-        for cid, plan in gemba_plans.items():
-            logs = dmaic_analyze.get("gemba_observations", {}).get(cid, {}).get("logs", [])
-            fav = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
-            pct = (fav / len(logs) * 100) if len(logs) > 0 else 0
-            summary_col.append({
-                "X Critique": plan["x_critique"],
-                "Cause Racine": plan["cause_racine"],
-                "Nb Obs": len(logs),
-                "% Conf": f"{pct:.0f}%"
-            })
-        st.table(pd.DataFrame(summary_col))
-
-        # Initialisation structure de validation
+        # Initialisation
         if "validation_data" not in dmaic_analyze:
             dmaic_analyze["validation_data"] = {}
 
-        # 2. FICHE DE VALIDATION DÉTAILLÉE
+        summary_data = []
+
         for cid, plan in gemba_plans.items():
+            # 1. Récupération des données
             stats = dmaic_analyze.get("tests_x", {}).get(cid, {})
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
             logs = obs.get("logs", [])
-            fav = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
-            
-            if cid not in dmaic_analyze["validation_data"]:
-                dmaic_analyze["validation_data"][cid] = {
-                    "theorie": "", "conclusion_terrain": "", "statut": "Investigation complémentaire nécessaire", "justification": ""
-                }
-            val = dmaic_analyze["validation_data"][cid]
+    
+            # 2. Calculs Gemba automatiques
+            conf = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
+            total = len(logs)
+            non_conf = total - conf
+            taux = (conf / total * 100) if total > 0 else 0
+    
+            # Évaluation terrain auto
+            if taux >= 80: val_terrain = "Confirmée"
+            elif taux >= 50: val_terrain = "Partiellement confirmée"
+            else: val_terrain = "Non confirmée"
+    
+            # 3. Logique de décision croisée
+            p_val = float(stats.get('p_value', 1.0))
+            stat_validee = p_val < 0.05 # True si significatif
+    
+            if stat_validee and val_terrain == "Confirmée": decision = "CAUSE RACINE VALIDÉE"
+            elif stat_validee and val_terrain == "Partiellement confirmée": decision = "CAUSE RACINE PARTIELLEMENT VALIDÉE"
+            elif (stat_validee and val_terrain == "Non confirmée") or (not stat_validee and val_terrain == "Confirmée"): decision = "INVESTIGATION COMPLÉMENTAIRE REQUISE"
+            elif not stat_validee and val_terrain == "Non confirmée": decision = "CAUSE RACINE REJETÉE"
+            else: decision = "En cours d'analyse"
 
-            with st.expander(f"Fiche : {plan['x_critique']} -> {plan['cause_racine']}"):
+            # Stockage pour le tableau
+            summary_data.append({
+                "X Critique": plan["x_critique"],
+                "Cause Racine": plan["cause_racine"],
+                "Test": stats.get('methode', 'N/A'),
+                "P-value": f"{p_val:.4f}",
+                "Taux Terrain": f"{taux:.0f}%",
+                "Décision": decision
+            })
+
+            # 4. Affichage détaillé par Expandeur
+            with st.expander(f"{plan['x_critique']} : {plan['cause_racine']} (Décision: {decision})"):
                 col1, col2 = st.columns(2)
-                
                 with col1:
-                    st.markdown("### 📈 Hypothèses Statistiques")
-                    st.write("**H0 :** La cause racine n'explique pas le comportement observé du X et n'a pas d'effet significatif sur Y.")
-                    st.write("**H1 :** La cause racine explique le comportement observé du X et contribue significativement au comportement de Y.")
-                    
-                    st.markdown("### 💡 Conclusion Statistique")
-                    p_val = float(stats.get('p_value', 1.0))
-                    # On suppose un seuil de significativité classique de 0.05
-                    if p_val < 0.05:
-                        st.success("H0 rejetée. Les données indiquent que le X influence significativement le Y.")
-                    else:
-                        st.warning("H0 non rejetée. L'influence du X sur le Y n'est pas démontrée.")
-                    
+                    st.markdown("### 📊 Statistiques")
+                    st.write(f"**Test :** {stats.get('methode')}")
+                    st.write(f"**P-value :** {p_val:.4f}")
+                    st.write(f"**Conclusion :** {'Confirmée' if stat_validee else 'Non confirmée'}")
                 with col2:
-                    st.markdown("### 🔎 Synthèse Terrain (Gemba)")
-                    st.write(f"Confirmations : {fav}/{len(logs)}")
-                    st.write(f"**Synthèse :** {obs.get('status', 'En attente')}")
-
-                # Saisie de la validation
-                val["theorie"] = st.text_area("Théorie (Mécanisme d'influence)", value=val["theorie"], key=f"v6_theo_{cid}")
-                val["conclusion_terrain"] = st.text_area("Conclusion pratique (Terrain)", value=val["conclusion_terrain"], key=f"v6_conc_{cid}")
+                    st.markdown("### 🔎 Terrain")
+                    st.write(f"**Observations :** {total} | **Confirmées :** {conf} | **Contradictions :** {non_conf}")
+                    st.write(f"**Taux :** {taux:.0f}%")
+                    st.write(f"**Validation :** {val_terrain}")
         
-                c1, c2 = st.columns(2)
-                with c1:
-                    options = ["Cause racine validée", "Cause racine partiellement validée", "Cause racine rejetée", "Investigation complémentaire nécessaire"]
-                    default = options.index(val.get("statut", options[3])) if val.get("statut") in options else 3
-                    val["statut"] = st.selectbox("Statut final", options, index=default, key=f"v6_stat_{cid}")
-                with c2:
-                    val["justification"] = st.text_input("Justification finale (Obligatoire)", value=val["justification"], key=f"v6_just_{cid}")
+                st.info(f"**Décision automatique :** {decision}")
 
-        # --- FIN DU BLOC ---
+        # 5. TABLEAU RÉCAPITULATIF FINAL
+        st.subheader("Tableau récapitulatif final")
+        df_final = pd.DataFrame(summary_data)
+        st.table(df_final)
 
-        # --- CONCLUSION & CLÔTURE DE PHASE ---
+        # 6. CRITÈRE DE CLÔTURE
         st.divider()
-        st.subheader("🏁 Clôture de la Phase Analyse")
-        
-        # Indicateurs automatiques
-        tous_statuts = [v["statut"] for v in dmaic_analyze["validation_data"].values()]
-        nb_total = len(gemba_plans)
-        nb_valide = tous_statuts.count("Cause racine validée")
-
-        st.metric("Taux de validation global", f"{(nb_valide/nb_total*100) if nb_total>0 else 0:.0f}%")
-
-        # Vérification des conditions
-        conditions_remplies = all(v["statut"] != "Investigation complémentaire nécessaire" and v["justification"] != "" for v in dmaic_analyze["validation_data"].values())
-
-        if st.button("Valider la fin de la phase Analyse"):
-            if conditions_remplies and nb_total > 0:
-                st.success("Les causes racines validées ont été confirmées. Le projet peut passer en phase Improve.")
-            else:
-                st.error("Conditions non remplies : Vérifiez que tous les statuts sont définis et que chaque cause possède une justification.")
+        tous_decides = all(d not in ["En cours d'analyse"] for d in df_final["Décision"])
+        if tous_decides and len(df_final) > 0:
+            st.success("✅ Tous les critères de clôture sont remplis. Vous pouvez passer en phase Improve.")
+        else:
+            st.warning("⚠️ Phase Analyse incomplète : Certaines causes nécessitent encore une décision.")
+            
     with tabs[3]: st.info("Module IMPROVE : Matrice de sélection multicritères.")
     with tabs[4]: st.info("Module CONTROL : Graphiques Avant/Après & Gains financiers.")
