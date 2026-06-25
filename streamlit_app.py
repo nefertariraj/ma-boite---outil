@@ -3201,42 +3201,46 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                # 2. Import Excel (Lecture avec détection automatique de zone)
+                # 2. Import Excel (Lecture "Force Brute" sans aucune interprétation)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
                 if up:
                     try:
-                        # On lit le fichier sans aucun header, en ignorant le typage
-                        # On charge toutes les données brutes
-                        df_raw = pd.read_excel(up, header=None, dtype=str)
+                        # On charge le fichier en mode brut total (sans aucun header)
+                        # On lit le fichier comme une liste de listes (values)
+                        import openpyxl
+                        wb = openpyxl.load_workbook(up, data_only=True)
+                        sheet = wb.active
                         
-                        # LOGIQUE DE DÉTECTION :
-                        # On cherche la première ligne qui contient au moins 3 colonnes remplies
-                        # (Souvent les lignes de titres parasites ne contiennent qu'une seule cellule fusionnée)
-                        start_row = 0
-                        for i in range(len(df_raw)):
-                            if df_raw.iloc[i].notna().sum() >= 3:
-                                start_row = i
-                                break
-                        
-                        # On extrait les données à partir de cette ligne trouvée
-                        df_data = df_raw.iloc[start_row:].reset_index(drop=True)
-                        
-                        # Si la première ligne trouvée semble être un titre (ex: "date"), on la saute
-                        if "date" in str(df_data.iloc[0, 0]).lower():
-                            df_data = df_data.iloc[1:]
+                        # On récupère toutes les lignes sous forme de liste de valeurs
+                        data = []
+                        for row in sheet.iter_rows(values_only=True):
+                            data.append(list(row))
                             
-                        # Sélection des 5 premières colonnes
-                        df_final = df_data.iloc[:, :5].copy()
+                        # On transforme en DataFrame en partant de la ligne 0
+                        # Mais on ignore la première ligne si elle contient du texte "sale"
+                        df_raw = pd.DataFrame(data)
+                        
+                        # FILTRE ANTI-TITRE : On cherche la ligne qui semble contenir les données
+                        # On garde les lignes où la première colonne n'est pas votre texte d'erreur
+                        df_clean = df_raw[~df_raw[0].astype(str).str.contains("durée d'attente", case=False, na=False)].reset_index(drop=True)
+                        
+                        # On force le nommage des 5 colonnes
+                        df_final = pd.DataFrame()
+                        for i in range(5):
+                            if i < df_clean.shape[1]:
+                                df_final.iloc[:, i] = df_clean.iloc[:, i]
+                            else:
+                                df_final[i] = ""
+                                
                         df_final.columns = ["date", "confirme", "description", "preuve", "confiance"]
                         
-                        # Nettoyage
+                        # Nettoyage et enregistrement
                         dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.fillna("").to_dict('records')
-                        
                         st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Le fichier Excel contient une structure illisible. Assurez-vous d'utiliser le template fourni. Erreur détectée : {e}")
+                        st.error(f"Erreur technique persistante : {e}")  
                         
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
