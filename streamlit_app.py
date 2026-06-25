@@ -3201,46 +3201,43 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                # 2. Import Excel (Lecture "Force Brute" sans aucune interprétation)
+                # 2. Import Excel (Lecture "Anti-Crash")
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
                 if up:
                     try:
-                        # On charge le fichier en mode brut total (sans aucun header)
-                        # On lit le fichier comme une liste de listes (values)
                         import openpyxl
                         wb = openpyxl.load_workbook(up, data_only=True)
                         sheet = wb.active
                         
-                        # On récupère toutes les lignes sous forme de liste de valeurs
+                        # Extraire toutes les données en une liste simple
                         data = []
                         for row in sheet.iter_rows(values_only=True):
-                            data.append(list(row))
-                            
-                        # On transforme en DataFrame en partant de la ligne 0
-                        # Mais on ignore la première ligne si elle contient du texte "sale"
+                            # On ne prend que les lignes qui ne sont pas vides
+                            if any(cell is not None for cell in row):
+                                data.append([str(c) if c is not None else "" for c in row])
+                                
+                        # Création du DataFrame
                         df_raw = pd.DataFrame(data)
                         
-                        # FILTRE ANTI-TITRE : On cherche la ligne qui semble contenir les données
-                        # On garde les lignes où la première colonne n'est pas votre texte d'erreur
-                        df_clean = df_raw[~df_raw[0].astype(str).str.contains("durée d'attente", case=False, na=False)].reset_index(drop=True)
+                        # Filtrage radical : on supprime toute ligne contenant votre texte parasite
+                        mask = df_raw.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)
+                        df_clean = df_raw[~mask].copy()
                         
-                        # On force le nommage des 5 colonnes
-                        df_final = pd.DataFrame()
-                        for i in range(5):
-                            if i < df_clean.shape[1]:
-                                df_final.iloc[:, i] = df_clean.iloc[:, i]
-                            else:
-                                df_final[i] = ""
-                                
-                        df_final.columns = ["date", "confirme", "description", "preuve", "confiance"]
+                        # Création du tableau final de 5 colonnes EXACTES
+                        df_final = pd.DataFrame(columns=["date", "confirme", "description", "preuve", "confiance"])
                         
-                        # Nettoyage et enregistrement
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.fillna("").to_dict('records')
+                        # Remplissage : on prend les 5 premières colonnes du fichier
+                        for i in range(min(5, df_clean.shape[1])):
+                            df_final.iloc[:, i] = df_clean.iloc[:, i].values
+                            
+                        # Si le fichier a moins de 5 colonnes, le reste est vide (déjà géré par le nommage)
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.to_dict('records')
+                        
                         st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Erreur technique persistante : {e}")  
+                        st.error(f"Erreur fatale de lecture : {e}")  
                         
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
