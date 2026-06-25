@@ -3201,43 +3201,34 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                # 2. Import Excel (Lecture "Anti-Crash")
+                # 2. Import Excel (Lecture Simple et Directe)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
                 if up:
                     try:
-                        import openpyxl
-                        wb = openpyxl.load_workbook(up, data_only=True)
-                        sheet = wb.active
+                        # Lecture basique sans rien interpréter
+                        df = pd.read_excel(up, header=None)
                         
-                        # Extraire toutes les données en une liste simple
-                        data = []
-                        for row in sheet.iter_rows(values_only=True):
-                            # On ne prend que les lignes qui ne sont pas vides
-                            if any(cell is not None for cell in row):
-                                data.append([str(c) if c is not None else "" for c in row])
-                                
-                        # Création du DataFrame
-                        df_raw = pd.DataFrame(data)
+                        # On transforme les données en liste de dictionnaires
+                        # On prend uniquement les colonnes 0 à 4 (les 5 premières)
+                        data_list = []
+                        for index, row in df.iterrows():
+                            # On ignore les lignes qui ne contiennent que du texte parasite 
+                            # (si elles n'ont qu'une seule valeur)
+                            if row.count() > 1:
+                                data_list.append({
+                                    "date": str(row[0]) if len(row) > 0 else "",
+                                    "confirme": str(row[1]) if len(row) > 1 else "",
+                                    "description": str(row[2]) if len(row) > 2 else "",
+                                    "preuve": str(row[3]) if len(row) > 3 else "",
+                                    "confiance": str(row[4]) if len(row) > 4 else ""
+                                })
                         
-                        # Filtrage radical : on supprime toute ligne contenant votre texte parasite
-                        mask = df_raw.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)
-                        df_clean = df_raw[~mask].copy()
-                        
-                        # Création du tableau final de 5 colonnes EXACTES
-                        df_final = pd.DataFrame(columns=["date", "confirme", "description", "preuve", "confiance"])
-                        
-                        # Remplissage : on prend les 5 premières colonnes du fichier
-                        for i in range(min(5, df_clean.shape[1])):
-                            df_final.iloc[:, i] = df_clean.iloc[:, i].values
-                            
-                        # Si le fichier a moins de 5 colonnes, le reste est vide (déjà géré par le nommage)
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.to_dict('records')
-                        
-                        st.success("Importation réussie !")
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = data_list
+                        st.success("Importation terminée !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Erreur fatale de lecture : {e}")  
+                        st.error(f"Erreur simple : {e}")  
                         
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
