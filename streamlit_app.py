@@ -3230,13 +3230,17 @@ else:
             dmaic_analyze["validation_data"] = {}
 
         for cid, plan in gemba_plans.items():
-            # ... (votre code de calcul reste identique)
+            # 1. Récupération des données croisées
+            stats = dmaic_analyze.get("tests_x", {}).get(cid, {})
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
             logs = obs.get("logs", [])
+            
+            # 2. Calculs automatiques Gemba
             fav = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
             total = len(logs)
             pct = (fav / total * 100) if total > 0 else 0
             
+            # 3. Initialisation de la fiche pour ce CID
             if cid not in dmaic_analyze["validation_data"]:
                 dmaic_analyze["validation_data"][cid] = {
                     "theorie": "", "conclusion_terrain": "", "statut": "Investigation complémentaire nécessaire", "justification": ""
@@ -3244,10 +3248,21 @@ else:
             val = dmaic_analyze["validation_data"][cid]
 
             with st.expander(f"Validation : {plan['x_critique']} -> {plan['cause_racine']}", expanded=False):
-                # ... (votre code col1, col2 identique)
+                col1, col2 = st.columns(2)
                 
+                with col1:
+                    st.markdown("### 📊 Données Statistiques")
+                    st.write(f"**Méthode :** {stats.get('methode', 'Non défini')}")
+                    st.info(f"P-value: {stats.get('p_value', 'N/A')} | Confiance: {stats.get('confiance', 'N/A')}")
+                    st.write(f"**Conclusion :** {'H0 rejetée (Significatif)' if stats.get('p_value', 1) < 0.05 else 'H0 non rejetée'}")
+                    
+                with col2:
+                    st.markdown("### 🔎 Données Gemba Walk")
+                    st.write(f"Confirmations : {fav}/{total} ({pct:.0f}%)")
+                    st.write(f"**Synthèse terrain :** {obs.get('status', 'En attente')}")
+
+                # Saisie de la validation
                 st.divider()
-                # Ajout de préfixes 'v6_' aux clés pour garantir l'unicité
                 val["theorie"] = st.text_area("Théorie (Mécanisme d'influence)", value=val["theorie"], key=f"v6_theo_{cid}")
                 val["conclusion_terrain"] = st.text_area("Conclusion pratique (Terrain)", value=val["conclusion_terrain"], key=f"v6_conc_{cid}")
         
@@ -3259,6 +3274,7 @@ else:
                     "Investigation complémentaire nécessaire"
                 ]
                 
+                # Calcul de l'index par défaut sécurisé
                 current_statut = val.get("statut", "Investigation complémentaire nécessaire")
                 default_index = options_statut.index(current_statut) if current_statut in options_statut else 3
                 
@@ -3267,13 +3283,33 @@ else:
                         "Statut final", 
                         options_statut,
                         index=default_index,
-                        key=f"v6_stat_{cid}" # Clé unique avec préfixe
+                        key=f"v6_stat_{cid}"
                     )
                 with col_v2:
                     val["justification"] = st.text_input(
                         "Justification finale (Obligatoire)", 
                         value=val["justification"], 
-                        key=f"v6_just_{cid}" # Clé unique avec préfixe
+                        key=f"v6_just_{cid}"
                     )
+
+        # --- CONCLUSION & CLÔTURE DE PHASE ---
+        st.divider()
+        st.subheader("🏁 Clôture de la Phase Analyse")
+        
+        # Indicateurs automatiques
+        tous_statuts = [v["statut"] for v in dmaic_analyze["validation_data"].values()]
+        nb_total = len(gemba_plans)
+        nb_valide = tous_statuts.count("Cause racine validée")
+
+        st.metric("Taux de validation global", f"{(nb_valide/nb_total*100) if nb_total>0 else 0:.0f}%")
+
+        # Vérification des conditions
+        conditions_remplies = all(v["statut"] != "Investigation complémentaire nécessaire" and v["justification"] != "" for v in dmaic_analyze["validation_data"].values())
+
+        if st.button("Valider la fin de la phase Analyse"):
+            if conditions_remplies and nb_total > 0:
+                st.success("Les causes racines validées ont été confirmées. Le projet peut passer en phase Improve.")
+            else:
+                st.error("Conditions non remplies : Vérifiez que tous les statuts sont définis et que chaque cause possède une justification.")
     with tabs[3]: st.info("Module IMPROVE : Matrice de sélection multicritères.")
     with tabs[4]: st.info("Module CONTROL : Graphiques Avant/Après & Gains financiers.")
