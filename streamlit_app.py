@@ -3190,39 +3190,37 @@ else:
                                    data=template_df.to_csv(index=False), 
                                    file_name=f"template_{cid}.csv", mime="text/csv")
 
-                # 2. Import Excel/CSV (Lecture brute sécurisée)
+                # 2. Import Excel/CSV (Lecture "Nettoyage Total")
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
                     try:
-                        # On lit le fichier sans headers du tout
-                        # dtype=str force tout le contenu en texte pour éviter les erreurs de lecture
+                        # Lecture brute sans aucun header, en forçant le type chaîne de caractères
                         df_imp = pd.read_excel(up, header=None, dtype=str) if up.name.endswith('.xlsx') else pd.read_csv(up, header=None, dtype=str)
                         
-                        # On supprime les lignes totalement vides
-                        df_imp = df_imp.dropna(how='all')
+                        # On transforme tout en texte et on enlève les espaces inutiles autour
+                        df_imp = df_imp.applymap(lambda x: str(x).strip() if x is not None else "")
                         
-                        # On crée une nouvelle DataFrame propre avec seulement 5 colonnes
-                        df_final = pd.DataFrame()
-                        cols = ["date", "confirme", "description", "preuve", "confiance"]
+                        # FILTRE AUTOMATIQUE : On ne garde que les lignes qui n'ont pas le titre parasite
+                        # On supprime toutes les lignes qui contiennent votre texte d'erreur
+                        filtre = ~df_imp.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)
+                        df_clean = df_imp[filtre].reset_index(drop=True)
+                        
+                        # On force le mappage sur 5 colonnes
+                        cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
+                        df_final = pd.DataFrame(index=df_clean.index)
                         
                         for i in range(5):
-                            if i < df_imp.shape[1]:
-                                df_final[cols[i]] = df_imp.iloc[:, i]
+                            if i < df_clean.shape[1]:
+                                df_final[cols_attendues[i]] = df_clean.iloc[:, i]
                             else:
-                                df_final[cols[i]] = ""
-                        
-                        # On supprime la première ligne si elle contient le titre parasite
-                        # On cherche le mot-clé problématique pour le sauter
-                        if "durée d'attente" in str(df_final.iloc[0, 0]).lower():
-                            df_final = df_final.iloc[1:]
-                        
-                        # Nettoyage final
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.fillna("").to_dict('records')
-                        st.success("Importation brute réussie !")
+                                df_final[cols_attendues[i]] = ""
+                                
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.to_dict('records')
+                        st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Erreur technique : Le fichier semble contenir des données incohérentes. Détail : {e}")
+                        st.error(f"Impossible de traiter le fichier. Veuillez copier vos données dans un nouveau fichier Excel propre sans titres. Détail : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
