@@ -3190,42 +3190,39 @@ else:
                                    data=template_df.to_csv(index=False), 
                                    file_name=f"template_{cid}.csv", mime="text/csv")
 
-                # 2. Import Excel/CSV (Lecture "Blindée")
+                # 2. Import Excel/CSV (Lecture brute sécurisée)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
                 if up:
                     try:
-                        # 1. On lit le fichier sans considérer la première ligne comme des titres
-                        # Cela évite que Pandas ne prenne votre texte "durée d'attente..." pour un nom de colonne
-                        df_raw = pd.read_excel(up, header=None) if up.name.endswith('.xlsx') else pd.read_csv(up, header=None)
+                        # On lit le fichier sans headers du tout
+                        # dtype=str force tout le contenu en texte pour éviter les erreurs de lecture
+                        df_imp = pd.read_excel(up, header=None, dtype=str) if up.name.endswith('.xlsx') else pd.read_csv(up, header=None, dtype=str)
                         
-                        # 2. On cherche où commencent les vraies données
-                        # On cherche une ligne qui contient au moins 2 des mots-clés attendus
-                        start_row = 0
-                        for i, row in df_raw.iterrows():
-                            row_str = str(row.values).lower()
-                            if any(word in row_str for word in ["date", "confirme", "description"]):
-                                start_row = i + 1
-                                break
+                        # On supprime les lignes totalement vides
+                        df_imp = df_imp.dropna(how='all')
                         
-                        # 3. On extrait les données après la ligne trouvée
-                        df_data = df_raw.iloc[start_row:].reset_index(drop=True)
+                        # On crée une nouvelle DataFrame propre avec seulement 5 colonnes
+                        df_final = pd.DataFrame()
+                        cols = ["date", "confirme", "description", "preuve", "confiance"]
                         
-                        # 4. On mappe les 5 premières colonnes par force
-                        cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
-                        df_final = pd.DataFrame(index=df_data.index)
-                        
-                        for idx, col_name in enumerate(cols_attendues):
-                            if idx < len(df_data.columns):
-                                df_final[col_name] = df_data.iloc[:, idx]
+                        for i in range(5):
+                            if i < df_imp.shape[1]:
+                                df_final[cols[i]] = df_imp.iloc[:, i]
                             else:
-                                df_final[col_name] = ""
+                                df_final[cols[i]] = ""
                         
+                        # On supprime la première ligne si elle contient le titre parasite
+                        # On cherche le mot-clé problématique pour le sauter
+                        if "durée d'attente" in str(df_final.iloc[0, 0]).lower():
+                            df_final = df_final.iloc[1:]
+                        
+                        # Nettoyage final
                         dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.fillna("").to_dict('records')
-                        st.success("Importation robuste réussie !")
+                        st.success("Importation brute réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Le fichier est illisible. Veuillez vérifier qu'il ne contient pas de cellules fusionnées. Détail : {e}")
+                        st.error(f"Erreur technique : Le fichier semble contenir des données incohérentes. Détail : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
