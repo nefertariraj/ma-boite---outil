@@ -3200,37 +3200,30 @@ else:
                     file_name=f"template_{cid}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-                # 2. Import Excel/CSV (Lecture sécurisée et compatible)
-                up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx", "csv"], key=f"up_{cid}")
+                
+                # 2. Import Excel (Lecture forcée : ignore les titres)
+                up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
                 if up:
                     try:
-                        # Lecture brute, header=None,dtype=str pour tout traiter comme du texte
-                        df_imp = pd.read_excel(up, header=None, dtype=str) if up.name.endswith('.xlsx') else pd.read_csv(up, header=None, dtype=str)
+                        # header=None : On dit à Pandas de ne pas chercher de titres en première ligne
+                        # On lit le fichier Excel directement
+                        df_imp = pd.read_excel(up, header=None)
                         
-                        # Remplacer les valeurs nulles par des chaînes vides
-                        df_imp = df_imp.fillna("")
+                        # On saute la première ligne qui contient les titres (qui cause l'erreur)
+                        # On ne garde que les données à partir de la deuxième ligne (index 1)
+                        df_data = df_imp.iloc[1:, :5].reset_index(drop=True)
                         
-                        # Nettoyage : supprimer les lignes contenant le titre parasite
-                        # On convertit tout le dataframe en string pour chercher le texte interdit
-                        mask = df_imp.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)
-                        df_clean = df_imp[~mask].reset_index(drop=True)
+                        # On force nos propres noms de colonnes
+                        df_data.columns = ["date", "confirme", "description", "preuve", "confiance"]
                         
-                        # Création du dataframe final avec les colonnes attendues
-                        cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
-                        df_final = pd.DataFrame(index=df_clean.index)
+                        # Nettoyage final
+                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_data.fillna("").to_dict('records')
                         
-                        for i in range(5):
-                            if i < df_clean.shape[1]:
-                                df_final[cols_attendues[i]] = df_clean.iloc[:, i]
-                            else:
-                                df_final[cols_attendues[i]] = ""
-                                
-                        dmaic_analyze["gemba_observations"][cid]["logs"] = df_final.to_dict('records')
                         st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Erreur lors de l'import. Veuillez utiliser un fichier sans lignes de titre. Détail : {e}")
+                        st.error(f"Erreur lors de l'import. Assurez-vous d'utiliser le template Excel. Détail : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
