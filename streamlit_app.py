@@ -3201,34 +3201,34 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                # 2. Import Excel (Lecture "Aspirateur" : copie directe des données)
+                # 2. Import Excel (Lecture "Force Brute")
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
                 if up:
                     try:
-                        # On charge le fichier en forçant le format texte (dtype=str)
-                        # et on ignore totalement les en-têtes (header=None)
-                        df_raw = pd.read_excel(up, header=None, dtype=str)
+                        # 1. Lire sans en-tête, et forcer la lecture de la ligne 1 à la fin (skiprows=1)
+                        # Cela saute automatiquement votre ligne de titres "durée d'attente..."
+                        df_raw = pd.read_excel(up, header=None, skiprows=1, dtype=str)
                         
-                        # On nettoie : on cherche à supprimer la ligne qui contient "durée d'attente"
-                        # en filtrant sur la valeur de la première cellule
-                        mask = df_raw.astype(str).apply(lambda x: x.str.contains("durée d'attente", case=False, na=False)).any(axis=1)
-                        df_data = df_raw[~mask].copy()
+                        # 2. On sélectionne uniquement les 5 premières colonnes
+                        # S'il y en a moins, on complète avec des vides
+                        df_data = pd.DataFrame(index=df_raw.index)
+                        cols_attendues = ["date", "confirme", "description", "preuve", "confiance"]
                         
-                        # On ne garde que les 5 premières colonnes du fichier
-                        df_data = df_data.iloc[:, :5]
-                        
-                        # On renomme de force les colonnes pour qu'elles correspondent à votre application
-                        df_data.columns = ["date", "confirme", "description", "preuve", "confiance"]
-                        
-                        # On remplit les vides avec du texte vide pour éviter les erreurs
+                        for i in range(5):
+                            if i < df_raw.shape[1]:
+                                df_data[cols_attendues[i]] = df_raw.iloc[:, i]
+                            else:
+                                df_data[cols_attendues[i]] = ""
+                                
+                        # 3. Nettoyage final
                         dmaic_analyze["gemba_observations"][cid]["logs"] = df_data.fillna("").to_dict('records')
                         
                         st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Erreur lors de l'import. Veuillez vérifier que votre fichier ne contient pas de cellules fusionnées. Détail : {e}")
-                
+                        st.error(f"Erreur fatale : {e}")
+                        
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
                     edited_df = st.data_editor(
