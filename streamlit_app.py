@@ -3201,29 +3201,32 @@ else:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 
-                # 2. Import Excel (Lecture forcée : ignore les titres)
+                # 2. Import Excel (Lecture "Anti-Erreur" : Ignorer tout titre)
                 up = st.file_uploader(f"📤 Importer fichier pour {plan['cause_racine'][:10]}", type=["xlsx"], key=f"up_{cid}")
                 if up:
                     try:
-                        # header=None : On dit à Pandas de ne pas chercher de titres en première ligne
-                        # On lit le fichier Excel directement
-                        df_imp = pd.read_excel(up, header=None)
+                        # header=None : Aucun titre n'est reconnu
+                        # dtype=str : Tout est lu comme du texte simple
+                        df_imp = pd.read_excel(up, header=None, dtype=str)
                         
-                        # On saute la première ligne qui contient les titres (qui cause l'erreur)
-                        # On ne garde que les données à partir de la deuxième ligne (index 1)
-                        df_data = df_imp.iloc[1:, :5].reset_index(drop=True)
+                        # On supprime les lignes qui contiennent le mot "durée d'attente" ou autres titres
+                        # Cela nettoie le fichier avant même de commencer
+                        df_imp = df_imp[~df_imp.apply(lambda row: row.astype(str).str.contains("durée d'attente", case=False).any(), axis=1)]
                         
-                        # On force nos propres noms de colonnes
+                        # On ne garde que les 5 premières colonnes
+                        df_data = df_imp.iloc[:, :5].reset_index(drop=True)
+                        
+                        # On nomme manuellement les colonnes
                         df_data.columns = ["date", "confirme", "description", "preuve", "confiance"]
                         
-                        # Nettoyage final
+                        # Remplissage des cases vides
                         dmaic_analyze["gemba_observations"][cid]["logs"] = df_data.fillna("").to_dict('records')
                         
                         st.success("Importation réussie !")
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"Erreur lors de l'import. Assurez-vous d'utiliser le template Excel. Détail : {e}")
+                        st.error(f"Le fichier est corrompu ou illisible. Détail : {e}")
 
                 # 3. ÉDITEUR DANS UN FORMULAIRE (Empêche la mise à jour temps réel)
                 with st.form(key=f"form_{cid}"):
