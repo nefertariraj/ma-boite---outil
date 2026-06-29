@@ -3336,9 +3336,31 @@ else:
     with tabs[3]: 
         st.header("Phase Improve")
 
+        # 0. SÉCURISATION DES DONNÉES (À placer ici pour être sûr de les avoir)
+        if "summary_data_phase6" not in st.session_state and "summary_data" in locals():
+             st.session_state.summary_data_phase6 = summary_data
+        
         # 1 : IMPROVEMENT STRATEGIES ---
         st.subheader("1. Improvement strategies")
+        if "summary_data_phase6" in st.session_state:
+            summary_data = st.session_state.summary_data_phase6
+            causes_validees = [item["Cause Racine"] for item in summary_data if item["Décision"] in ["Cause validée", "Cause partiellement validée"]]
+            
+            if "improve_strategies" not in st.session_state:
+                st.session_state.improve_strategies = pd.DataFrame(columns=["Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"])
 
+            st.session_state.improve_strategies = st.data_editor(
+                st.session_state.improve_strategies,
+                column_config={
+                    "Type de solution": st.column_config.SelectboxColumn(
+                        options=["Préventive", "Corrective", "Détective", "Automatisation", "Standardisation", "Formation", "Organisationnelle"]
+                    ),
+                    "Cause racine": st.column_config.SelectboxColumn(options=causes_validees, required=True)
+                },
+                num_rows="dynamic", use_container_width=True
+            )
+        else:
+            st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
 
         # 2 : CRITERIA - BASED SELECTION MATRIX ---
