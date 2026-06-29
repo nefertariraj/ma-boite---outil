@@ -3232,20 +3232,26 @@ else:
         summary_data = []
 
         for cid, plan in gemba_plans.items():
-            # 1. RÉCUPÉRATION DIRECTE DE LA SOURCE (Session State)
+            # 1. RÉCUPÉRATION SÉCURISÉE (La source de vérité)
             idx = st.session_state.get("current_project_idx", 0)
-            # On accède au projet actif directement
             results_phase1 = st.session_state.projects[idx]["dmaic"]["analyze"].get("results", [])
             
-            x_nom = str(plan["x_critique"]).strip().lower()
+            # Normalisation du nom pour la comparaison
+            x_nom_cible = str(plan["x_critique"]).strip().lower()
             
             # Recherche de la P-value dans les résultats de Phase 1
-            # On utilise une boucle simple pour être sûr de trouver la bonne correspondance
-            p_val = 1.0 # Valeur par défaut
+            # On cherche l'objet qui correspond au nom du X
+            p_val = 1.0 # Valeur par défaut si rien n'est trouvé
             for r in results_phase1:
-                if str(r.get("Variable X", "")).strip().lower() == x_nom:
-                    p_val = float(r.get("P-value", 1.0))
-                    break # On arrête dès qu'on a trouvé la bonne valeur
+                if str(r.get("Variable X", "")).strip().lower() == x_nom_cible:
+                    # On récupère la valeur, en gérant les deux écritures possibles
+                    valeur_brute = r.get("P-value") or r.get("p-value") or 1.0
+                    p_val = float(valeur_brute)
+                    break
+            
+            # 2. RÉCUPÉRATION DES LOGS (Correction du NameError précédent)
+            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
+            logs = obs.get("logs", []) if isinstance(obs, dict) else []
             
             # 2. RÉCUPÉRATION DES LOGS
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
