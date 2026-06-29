@@ -3295,7 +3295,8 @@ else:
                 col1, col2 = st.columns(2)
                 with col1:
                     st.markdown("### 📊 Statistiques")
-                    st.write(f"**Test :** {stats.get('methode')}")
+                    # ON UTILISE stats_temp QUI CONTIENT BIEN LES DONNÉES
+                    st.write(f"**Test :** {stats_temp.get('Le X agit-il sur Y ?', 'N/A')}")
                     st.write(f"**P-value :** {p_val:.4f}")
                     st.write(f"**Conclusion :** {'Confirmée' if stat_validee else 'Non confirmée'}")
                 with col2:
