@@ -3233,12 +3233,22 @@ else:
 
         for cid, plan in gemba_plans.items():
             # 1. RÉCUPÉRATION DU X ASSOCIÉ
-            x_nom = plan["x_critique"]
+            x_nom = str(plan["x_critique"]).strip()
             results_phase1 = dmaic_analyze.get("results", [])
-            stats = next((r for r in results_phase1 if r.get("Variable X") == x_nom), {})
             
-            # Récupération sécurisée du P-value (respectant la casse 'P-value')
-            p_val = float(stats.get('P-value', 1.0))
+            # --- DÉBOGAGE TEMPORAIRE (À supprimer une fois le problème résolu) ---
+            # st.write(f"Recherche de '{x_nom}' dans : {results_phase1}")
+            # ---------------------------------------------------------------------
+
+            # Recherche élargie : on compare les noms en ignorant les majuscules et espaces
+            stats = next((r for r in results_phase1 if str(r.get("Variable X", "")).strip().lower() == x_nom.lower()), {})
+            
+            # Récupération de la P-value : on vérifie les deux clés possibles
+            p_val = float(stats.get('P-value', stats.get('p-value', 1.0)))
+            
+            # Récupération des logs
+            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
+            logs = obs.get("logs", []) if isinstance(obs, dict) else []
             
             # 2. RÉCUPÉRATION SÉCURISÉE DES OBSERVATIONS TERRAIN
             # On récupère le dict 'obs'. Si 'obs' est vide, on crée un dict vide pour éviter l'erreur
