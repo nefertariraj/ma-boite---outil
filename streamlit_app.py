@@ -3336,6 +3336,44 @@ else:
     with tabs[3]: 
         st.header("Phase Improve")
 
+        # 1 : IMPROVEMENT STRATEGIES ---
+        st.subheader("1. Improvement strategies")
+
+        
+
+        # 2 : CRITERIA - BASED SELECTION MATRIX ---
+        st.subheader("2. Criteria-based selection matrix")
+
+        
+
+        # 3 : BENEFIT EFFORT MATRIX ---
+        st.subheader("3. Benefit effort matrix")
+
+        
+
+        # 4 : SOLUTIONS ACTION PLAN ---
+        st.subheader("4. Solutions action plan")
+
+
+        
+        # 5 : PILOT PLAN ---
+        st.subheader("5. Pilot plan")
+    
+
+        
+        # 6 : ACTION PLAN ---
+        st.subheader("6. Action plan")
+
+        
+
+        # 7 : FUTURE STATE PROCESS MAP ---
+        st.subheader("7. Future state process map")
+
+        
+
+        # 8 : FUTURE STATE FMEA ---
+        st.subheader("7. Future state FMEA")
+
     
     
     # --- PHASE CONTROL ---
