@@ -3332,40 +3332,12 @@ else:
         else:
             st.warning("⚠️ Phase Analyse incomplète : Certaines causes nécessitent encore une décision.")
             
-    # --- PHASE INNOVE ---
+    # --- PHASE IMPROVE ---
     with tabs[3]: 
-        st.header("Phase Innove")
-    def render_improve_section(summary_data):
-        # Récupération des causes validées provenant de l'analyse
-        causes_validees = [
-            {"Cause racine": item["Cause Racine"], "X Critique": item["X Critique"]} 
-            for item in summary_data 
-            if item["Décision"] in ["Cause validée", "Cause partiellement validée"]
-        ]
+        st.header("Phase Improve")
 
-        st.subheader("1. Improvement Strategies")
     
-        # Initialisation
-        if "improve_strategies" not in st.session_state:
-            st.session_state.improve_strategies = pd.DataFrame(columns=[
-                "Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"
-            ])
-
-        # Édition
-        edited_df = st.data_editor(
-            st.session_state.improve_strategies,
-            column_config={
-                "Type de solution": st.column_config.SelectboxColumn(
-                    options=["Préventive", "Corrective", "Détective", "Automatisation", "Standardisation", "Formation", "Organisationnelle"]
-                ),
-                "Cause racine": st.column_config.SelectboxColumn(
-                    options=[c["Cause racine"] for c in causes_validees],
-                    required=True
-                )
-            },
-            num_rows="dynamic",
-            use_container_width=True
-        )
-        st.session_state.improve_strategies = edited_df
     
-    with tabs[4]: st.info("Module CONTROL : Graphiques Avant/Après & Gains financiers.")
+    # --- PHASE CONTROL ---
+    with tabs[4]: 
+        st.header("Phase Control")
