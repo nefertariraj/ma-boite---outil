@@ -3235,17 +3235,26 @@ else:
             # 1. RÉCUPÉRATION DU X ASSOCIÉ
             x_nom = plan["x_critique"]
             results_phase1 = dmaic_analyze.get("results", [])
-            
-            # On cherche l'objet qui contient la P-value dans les résultats Phase 1
-            # On extrait le dictionnaire correspondant au X
             stats = next((r for r in results_phase1 if r.get("Variable X") == x_nom), {})
             
-            # PROTECTION : Si stats n'est pas un dictionnaire (ex: chaîne vide), on force un dict
-            if not isinstance(stats, dict):
-                stats = {}
-            
-            # Récupération sécurisée : Notez la majuscule à 'P-value' car c'est ce que vous utilisez en Phase 1
+            # Récupération sécurisée du P-value (respectant la casse 'P-value')
             p_val = float(stats.get('P-value', 1.0))
+            
+            # 2. RÉCUPÉRATION SÉCURISÉE DES OBSERVATIONS TERRAIN
+            # On récupère le dict 'obs'. Si 'obs' est vide, on crée un dict vide pour éviter l'erreur
+            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
+            
+            # SI 'obs' n'est pas un dictionnaire ou est vide, on initialise logs comme une liste vide
+            if isinstance(obs, dict):
+                logs = obs.get("logs", [])
+            else:
+                logs = []
+    
+            # 3. CALCULS SÉCURISÉS
+            conf = len([l for l in logs if str(l.get("confirme", "")).lower() == 'oui'])
+            total = len(logs)
+            non_conf = total - conf
+            taux = (conf / total * 100) if total > 0 else 0
     
             # 2. Calculs Gemba automatiques
             conf = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
