@@ -3232,22 +3232,22 @@ else:
         summary_data = []
 
         for cid, plan in gemba_plans.items():
-            # 1. RÉCUPÉRATION SÉCURISÉE (La source de vérité)
+            # 1. RÉCUPÉRATION EXACTE DEPUIS LA PHASE 1
             idx = st.session_state.get("current_project_idx", 0)
             results_phase1 = st.session_state.projects[idx]["dmaic"]["analyze"].get("results", [])
             
             x_nom_cible = str(plan["x_critique"]).strip().lower()
             
-            # Recherche de la P-value dans les résultats de Phase 1
-            # p_val est calculé ici et stocké dans la variable p_val
-            p_val = 1.0 
-            stats_temp = {} # On crée un conteneur temporaire pour les infos (méthode, etc.)
+            # On cherche UNIQUEMENT l'objet résultat qui correspond au X
+            # On initialise p_val à 1.0 (valeur par défaut si non trouvé)
+            p_val = 1.0
+            info_stat = {}
             
             for r in results_phase1:
+                # Comparaison stricte sur le nom
                 if str(r.get("Variable X", "")).strip().lower() == x_nom_cible:
-                    valeur_brute = r.get("P-value") or r.get("p-value") or 1.0
-                    p_val = float(valeur_brute)
-                    stats_temp = r # On garde l'objet complet pour récupérer la méthode
+                    p_val = float(r.get("P-value", 1.0))
+                    info_stat = r # On récupère tout le dict pour l'affichage
                     break
             
             # 2. RÉCUPÉRATION DES OBSERVATIONS TERRAIN
