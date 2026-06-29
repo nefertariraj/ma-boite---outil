@@ -3235,20 +3235,20 @@ else:
             # 1. RÉCUPÉRATION EXACTE DEPUIS LA PHASE 1
             idx = st.session_state.get("current_project_idx", 0)
             results_phase1 = st.session_state.projects[idx]["dmaic"]["analyze"].get("results", [])
-            
             x_nom_cible = str(plan["x_critique"]).strip().lower()
             
-            # On cherche UNIQUEMENT l'objet résultat qui correspond au X
-            # On initialise p_val à 1.0 (valeur par défaut si non trouvé)
+            # Recherche de la P-value dans la source de vérité
             p_val = 1.0
-            info_stat = {}
+            # On cherche l'objet correspondant au nom du X pour extraire la P-value
+            match = next((r for r in results_phase1 if str(r.get("Variable X", "")).strip().lower() == x_nom_cible), None)
             
-            for r in results_phase1:
-                # Comparaison stricte sur le nom
-                if str(r.get("Variable X", "")).strip().lower() == x_nom_cible:
-                    p_val = float(r.get("P-value", 1.0))
-                    info_stat = r # On récupère tout le dict pour l'affichage
-                    break
+            if match:
+                # On récupère la valeur, en gérant les deux écritures possibles
+                p_val = float(match.get("P-value") or match.get("p-value") or 1.0)
+            # --- FIN DU BLOC DE RÉCUPÉRATION ---
+
+            # Le reste de votre code (logs, calculs, etc.) reste inchangé !
+            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
             
             # 2. RÉCUPÉRATION DES OBSERVATIONS TERRAIN
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
