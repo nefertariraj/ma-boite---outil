@@ -3346,12 +3346,14 @@ else:
             summary_data = st.session_state.summary_data_phase6
             causes_validees = [item["Cause Racine"] for item in summary_data if item["Décision"] in ["Cause validée", "Cause partiellement validée"]]
             
-            # Initialisation pour l'édition (si vide, on crée un DataFrame temporaire)
-            df_temp = st.session_state.get("improve_strategies", pd.DataFrame(columns=["Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"]))
-            
-            # Éditeur : il travaille sur une copie temporaire
-            edited_df = st.data_editor(
-                df_temp,
+            # 1. On initialise la copie de travail si elle n'existe pas
+            if "temp_strategies" not in st.session_state:
+                st.session_state.temp_strategies = st.session_state.get("improve_strategies", pd.DataFrame(columns=["Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"]))
+
+            # 2. L'éditeur travaille sur la copie temporaire (st.session_state.temp_strategies)
+            # On n'écrase PAS la variable finale ici
+            st.session_state.temp_strategies = st.data_editor(
+                st.session_state.temp_strategies,
                 column_config={
                     "Type de solution": st.column_config.SelectboxColumn(
                         options=["Préventive", "Corrective", "Détective", "Automatisation", "Standardisation", "Formation", "Organisationnelle"]
@@ -3359,14 +3361,13 @@ else:
                     "Cause racine": st.column_config.SelectboxColumn(options=causes_validees, required=True)
                 },
                 num_rows="dynamic", use_container_width=True,
-                key="editor_strategies" # Clé unique pour l'éditeur
+                key="editor_strategies"
             )
             
-            # Bouton de validation pour "fixer" les données
-            if st.button("✅ Valider les solutions"):
-                st.session_state.improve_strategies = edited_df
-                st.success("Solutions validées ! Elles sont maintenant disponibles pour la Matrice de sélection.")
-                st.rerun() # Rafraîchit pour prendre en compte les données
+            # 3. Le bouton de validation recopie la copie temporaire vers la donnée officielle
+            if st.button("✅ Valider et enregistrer les solutions"):
+                st.session_state.improve_strategies = st.session_state.temp_strategies.copy()
+                st.success("Solutions enregistrées pour la phase suivante !")
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
