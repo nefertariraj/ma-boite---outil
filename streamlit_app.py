@@ -3337,7 +3337,7 @@ else:
     import pandas as pd
 
     def render_improve_section():
-        st.header("Phase 5 : IMPROVE")
+    st.header("Phase 5 : IMPROVE")
     
         # 1. Récupération des causes validées
         # On suppose que 'summary_data' contient les résultats de la phase 6
