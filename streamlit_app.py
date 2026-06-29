@@ -3232,21 +3232,22 @@ else:
         summary_data = []
 
         for cid, plan in gemba_plans.items():
-            # 1. RÉCUPÉRATION EXACTE DEPUIS LA PHASE 1
+            # 1. Accès à la source de vérité (la même liste que Phase 1)
             idx = st.session_state.get("current_project_idx", 0)
             results_phase1 = st.session_state.projects[idx]["dmaic"]["analyze"].get("results", [])
+            
             x_nom_cible = str(plan["x_critique"]).strip().lower()
             
-            # Initialisation par défaut
+            # 2. Recherche du X correspondant
             p_val = 1.0
             stats_temp = {} 
             
-            # Recherche
-            match = next((r for r in results_phase1 if str(r.get("Variable X", "")).strip().lower() == x_nom_cible), None)
-            
-            if match:
-                stats_temp = match # On remplit stats_temp avec le résultat trouvé
-                p_val = float(match.get("P-value") or match.get("p-value") or 1.0)
+            for r in results_phase1:
+                if str(r.get("Variable X", "")).strip().lower() == x_nom_cible:
+                    # On utilise exactement la clé "P-value" enregistrée en Phase 1
+                    p_val = float(r.get("P-value", 1.0))
+                    stats_temp = r
+                    break
             
             # 2. RÉCUPÉRATION DES OBSERVATIONS TERRAIN
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
