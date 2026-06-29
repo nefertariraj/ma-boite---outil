@@ -3237,18 +3237,16 @@ else:
             results_phase1 = st.session_state.projects[idx]["dmaic"]["analyze"].get("results", [])
             x_nom_cible = str(plan["x_critique"]).strip().lower()
             
-            # Recherche de la P-value dans la source de vérité
+            # Initialisation par défaut
             p_val = 1.0
-            # On cherche l'objet correspondant au nom du X pour extraire la P-value
+            stats_temp = {} 
+            
+            # Recherche
             match = next((r for r in results_phase1 if str(r.get("Variable X", "")).strip().lower() == x_nom_cible), None)
             
             if match:
-                # On récupère la valeur, en gérant les deux écritures possibles
+                stats_temp = match # On remplit stats_temp avec le résultat trouvé
                 p_val = float(match.get("P-value") or match.get("p-value") or 1.0)
-            # --- FIN DU BLOC DE RÉCUPÉRATION ---
-
-            # Le reste de votre code (logs, calculs, etc.) reste inchangé !
-            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
             
             # 2. RÉCUPÉRATION DES OBSERVATIONS TERRAIN
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
