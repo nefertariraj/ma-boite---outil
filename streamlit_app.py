@@ -3346,23 +3346,30 @@ else:
             summary_data = st.session_state.summary_data_phase6
             causes_validees = [item["Cause Racine"] for item in summary_data if item["Décision"] in ["Cause validée", "Cause partiellement validée"]]
             
-            if "improve_strategies" not in st.session_state:
-                st.session_state.improve_strategies = pd.DataFrame(columns=["Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"])
-
-            st.session_state.improve_strategies = st.data_editor(
-                st.session_state.improve_strategies,
+            # Initialisation pour l'édition (si vide, on crée un DataFrame temporaire)
+            df_temp = st.session_state.get("improve_strategies", pd.DataFrame(columns=["Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"]))
+            
+            # Éditeur : il travaille sur une copie temporaire
+            edited_df = st.data_editor(
+                df_temp,
                 column_config={
                     "Type de solution": st.column_config.SelectboxColumn(
                         options=["Préventive", "Corrective", "Détective", "Automatisation", "Standardisation", "Formation", "Organisationnelle"]
                     ),
                     "Cause racine": st.column_config.SelectboxColumn(options=causes_validees, required=True)
                 },
-                num_rows="dynamic", use_container_width=True
+                num_rows="dynamic", use_container_width=True,
+                key="editor_strategies" # Clé unique pour l'éditeur
             )
+            
+            # Bouton de validation pour "fixer" les données
+            if st.button("✅ Valider les solutions"):
+                st.session_state.improve_strategies = edited_df
+                st.success("Solutions validées ! Elles sont maintenant disponibles pour la Matrice de sélection.")
+                st.rerun() # Rafraîchit pour prendre en compte les données
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
-
         # 2 : CRITERIA - BASED SELECTION MATRIX ---
         st.subheader("2. Criteria-based selection matrix")
 
