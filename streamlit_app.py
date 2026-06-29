@@ -3346,28 +3346,32 @@ else:
             summary_data = st.session_state.summary_data_phase6
             causes_validees = [item["Cause Racine"] for item in summary_data if item["Décision"] in ["Cause validée", "Cause partiellement validée"]]
             
-            # 1. On initialise la copie de travail si elle n'existe pas
-            if "temp_strategies" not in st.session_state:
-                st.session_state.temp_strategies = st.session_state.get("improve_strategies", pd.DataFrame(columns=["Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"]))
+            # Initialisation de la donnée officielle si inexistante
+            if "improve_strategies" not in st.session_state:
+                st.session_state.improve_strategies = pd.DataFrame(columns=["Cause racine", "Solution potentielle", "Type de solution", "Forces", "Faiblesses"])
 
-            # 2. L'éditeur travaille sur la copie temporaire (st.session_state.temp_strategies)
-            # On n'écrase PAS la variable finale ici
-            st.session_state.temp_strategies = st.data_editor(
-                st.session_state.temp_strategies,
-                column_config={
-                    "Type de solution": st.column_config.SelectboxColumn(
-                        options=["Préventive", "Corrective", "Détective", "Automatisation", "Standardisation", "Formation", "Organisationnelle"]
-                    ),
-                    "Cause racine": st.column_config.SelectboxColumn(options=causes_validees, required=True)
-                },
-                num_rows="dynamic", use_container_width=True,
-                key="editor_strategies"
-            )
+            # UTILISATION D'UN FORMULAIRE
+            with st.form(key="form_strategies"):
+                # On édite une copie temporaire dans le formulaire
+                temp_df = st.data_editor(
+                    st.session_state.improve_strategies,
+                    column_config={
+                        "Type de solution": st.column_config.SelectboxColumn(
+                            options=["Préventive", "Corrective", "Détective", "Automatisation", "Standardisation", "Formation", "Organisationnelle"]
+                        ),
+                        "Cause racine": st.column_config.SelectboxColumn(options=causes_validees, required=True)
+                    },
+                    num_rows="dynamic", use_container_width=True
+                )
+                
+                # Le bouton est DANS le formulaire
+                submit_button = st.form_submit_button(label="✅ Valider et enregistrer les solutions")
             
-            # 3. Le bouton de validation recopie la copie temporaire vers la donnée officielle
-            if st.button("✅ Valider et enregistrer les solutions"):
-                st.session_state.improve_strategies = st.session_state.temp_strategies.copy()
-                st.success("Solutions enregistrées pour la phase suivante !")
+            # La mise à jour ne se fait QUE si le bouton est cliqué
+            if submit_button:
+                st.session_state.improve_strategies = temp_df
+                st.success("Données enregistrées !")
+                st.rerun() # Rafraîchir pour afficher les données validées
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
