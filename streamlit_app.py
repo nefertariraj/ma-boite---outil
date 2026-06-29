@@ -3236,83 +3236,55 @@ else:
             idx = st.session_state.get("current_project_idx", 0)
             results_phase1 = st.session_state.projects[idx]["dmaic"]["analyze"].get("results", [])
             
-            # Normalisation du nom pour la comparaison
             x_nom_cible = str(plan["x_critique"]).strip().lower()
             
             # Recherche de la P-value dans les résultats de Phase 1
-            # On cherche l'objet qui correspond au nom du X
-            p_val = 1.0 # Valeur par défaut si rien n'est trouvé
+            # p_val est calculé ici et stocké dans la variable p_val
+            p_val = 1.0 
+            stats_temp = {} # On crée un conteneur temporaire pour les infos (méthode, etc.)
+            
             for r in results_phase1:
                 if str(r.get("Variable X", "")).strip().lower() == x_nom_cible:
-                    # On récupère la valeur, en gérant les deux écritures possibles
                     valeur_brute = r.get("P-value") or r.get("p-value") or 1.0
                     p_val = float(valeur_brute)
+                    stats_temp = r # On garde l'objet complet pour récupérer la méthode
                     break
             
-            # 2. RÉCUPÉRATION DES LOGS (Correction du NameError précédent)
+            # 2. RÉCUPÉRATION DES OBSERVATIONS TERRAIN
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
             logs = obs.get("logs", []) if isinstance(obs, dict) else []
-            
-            # 2. RÉCUPÉRATION DES LOGS
-            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
-            logs = obs.get("logs", []) if isinstance(obs, dict) else []
-            
-            # 2. RÉCUPÉRATION SÉCURISÉE DES OBSERVATIONS TERRAIN
-            # On récupère le dict 'obs'. Si 'obs' est vide, on crée un dict vide pour éviter l'erreur
-            obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
-            
-            # SI 'obs' n'est pas un dictionnaire ou est vide, on initialise logs comme une liste vide
-            if isinstance(obs, dict):
-                logs = obs.get("logs", [])
-            else:
-                logs = []
     
             # 3. CALCULS SÉCURISÉS
             conf = len([l for l in logs if str(l.get("confirme", "")).lower() == 'oui'])
             total = len(logs)
             non_conf = total - conf
             taux = (conf / total * 100) if total > 0 else 0
-    
-            # 2. Calculs Gemba automatiques
-            conf = len([l for l in logs if str(l.get("confirme")).lower() == 'oui'])
-            total = len(logs)
-            non_conf = total - conf
-            taux = (conf / total * 100) if total > 0 else 0
-    
+            
             # Évaluation terrain auto
             if taux >= 80: val_terrain = "Confirmée"
             elif taux >= 50: val_terrain = "Partiellement confirmée"
             else: val_terrain = "Non confirmée"
-    
-            # 3. Logique de décision croisée explicite
-            p_val = float(stats.get('p_value', 1.0))
+            
+            # 4. LOGIQUE DE DÉCISION
+            # On utilise p_val (calculé plus haut) et non stats.get
             stat_validee = p_val < 0.05 
-    
-            # Mapping des résultats
+            
             res_stat = "Confirmé" if stat_validee else "Non confirmé"
-            res_terrain = val_terrain # ("Confirmée", "Partiellement confirmée", "Non confirmée")
+            res_terrain = val_terrain
 
-            # Logique de décision selon votre nouvelle grille
-            if res_stat == "Confirmé" and res_terrain == "Confirmée":
-                decision = "Cause validée"
-            elif res_stat == "Confirmé" and res_terrain == "Partiellement confirmée":
-                decision = "Cause partiellement validée"
-            elif res_stat == "Confirmé" and res_terrain == "Non confirmée":
-                decision = "Contradiction à investiguer"
-            elif res_stat == "Non confirmé" and res_terrain == "Confirmée":
-                decision = "Contradiction à investiguer"
-            elif res_stat == "Non confirmé" and res_terrain == "Partiellement confirmée":
-                decision = "Cause non démontrée"
-            elif res_stat == "Non confirmé" and res_terrain == "Non confirmée":
-                decision = "Cause rejetée"
-            else:
-                decision = "En cours d'analyse"
+            if res_stat == "Confirmé" and res_terrain == "Confirmée": decision = "Cause validée"
+            elif res_stat == "Confirmé" and res_terrain == "Partiellement confirmée": decision = "Cause partiellement validée"
+            elif res_stat == "Confirmé" and res_terrain == "Non confirmée": decision = "Contradiction à investiguer"
+            elif res_stat == "Non confirmé" and res_terrain == "Confirmée": decision = "Contradiction à investiguer"
+            elif res_stat == "Non confirmé" and res_terrain == "Partiellement confirmée": decision = "Cause non démontrée"
+            elif res_stat == "Non confirmé" and res_terrain == "Non confirmée": decision = "Cause rejetée"
+            else: decision = "En cours d'analyse"
 
             # Stockage pour le tableau
             summary_data.append({
                 "X Critique": plan["x_critique"],
                 "Cause Racine": plan["cause_racine"],
-                "Test": stats.get('methode', 'N/A'),
+                "Test": stats_temp.get('Le X agit-il sur Y ?', 'N/A'), # Correction ici
                 "P-value": f"{p_val:.4f}",
                 "Taux Terrain": f"{taux:.0f}%",
                 "Décision": decision
