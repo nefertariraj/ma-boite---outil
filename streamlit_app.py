@@ -3332,7 +3332,9 @@ else:
         else:
             st.warning("⚠️ Phase Analyse incomplète : Certaines causes nécessitent encore une décision.")
             
-    with tabs[3]: st.info("Module IMPROVE : Matrice de sélection multicritères.")
+    # --- PHASE INNOVE ---
+    with tabs[3]: 
+        st.header("Phase Innove")
     def render_improve_section(summary_data):
         # Récupération des causes validées provenant de l'analyse
         causes_validees = [
