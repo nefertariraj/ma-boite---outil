@@ -3232,17 +3232,19 @@ else:
         summary_data = []
 
         for cid, plan in gemba_plans.items():
-            # 1. RÉCUPÉRATION SÉCURISÉE DES DONNÉES (Bridge Phase 1 -> Phase 6)
-            x_nom = plan["x_critique"]
+            # 1. RÉCUPÉRATION DU X ASSOCIÉ À LA CAUSE
+            x_nom = plan["x_critique"] 
+            
+            # On cherche dans les résultats globaux de la Phase 1 (qui contient tous les X testés)
             results_phase1 = dmaic_analyze.get("results", [])
             
-            # Recherche du résultat correspondant au X de cette fiche
-            stats = next((r for r in results_phase1 if r["Variable X"] == x_nom), {})
+            # On trouve le résultat correspondant à ce X
+            x_data = next((r for r in results_phase1 if r["Variable X"] == x_nom), {})
             
-            # Récupération de la P-value (référence la clé "P-value" de Phase 1)
-            p_val = float(stats.get('P-value', 1.0))
+            # Récupération du P-value (on utilise la clé exacte de la Phase 1)
+            p_val = float(x_data.get('P-value', 1.0))
             
-            # Récupération des observations terrain
+            # Récupération des observations terrain pour cette cause spécifique
             obs = dmaic_analyze.get("gemba_observations", {}).get(cid, {})
             logs = obs.get("logs", [])
     
