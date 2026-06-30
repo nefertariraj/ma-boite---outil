@@ -3370,20 +3370,21 @@ else:
             
             # Traitement unique de la soumission
             if submit_button:
-                # 1. On met à jour la mémoire (session_state)
+                # 1. Mise à jour de la mémoire temporaire
                 st.session_state.improve_strategies = temp_df.copy()
-                
-                # 2. On synchronise avec le projet global (comme dans Phase Analyse)
+            
+                # 2. Mise à jour de la base de données du projet (pour que le JSON le voit)
                 idx = st.session_state["current_project_idx"]
-                
-                # On s'assure que la structure existe
+            
+                # On s'assure que le chemin existe dans le dictionnaire du projet
                 if "improve" not in st.session_state.projects[idx]["dmaic"]:
                     st.session_state.projects[idx]["dmaic"]["improve"] = {}
                 
-                # On sauvegarde les données au bon endroit
+                # On enregistre les données proprement
                 st.session_state.projects[idx]["dmaic"]["improve"]["strategies"] = temp_df.to_dict(orient="records")
-                
-                st.success("Données enregistrées et synchronisées avec le projet !")
+            
+                # 3. MESSAGE DE SUCCÈS
+                st.success("Données synchronisées avec le projet !")
                 st.rerun()
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
