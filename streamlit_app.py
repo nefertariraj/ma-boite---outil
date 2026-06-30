@@ -3480,13 +3480,6 @@ else:
                     st.info("Une seule solution identifiée : elle est par défaut la recommandée.")
                 else:
                     st.info("Aucune solution notée pour générer une recommandation.")
-
-    # 2. L'appel (cette ligne exécute la fonction ci-dessus)
-    idx = st.session_state.get("current_project_idx")
-    if idx is not None:
-        # Initialisation des structures si nécessaire
-        if "improve" not in st.session_state.projects[idx]["dmaic"]:
-            st.session_state.projects[idx]["dmaic"]["improve"] = {}
         
 
         # 3 : BENEFIT EFFORT MATRIX ---
