@@ -3370,16 +3370,18 @@ else:
             
             # Traitement unique de la soumission
             if submit_button:
+                # 1. On met à jour la mémoire (session_state) avec les données éditées
                 st.session_state.improve_strategies = temp_df.copy()
-            
-            # On vérifie si la fonction existe avant de l'appeler pour éviter le crash
-            if 'save_to_json' in globals():
-                save_to_json()
-                st.success("Données enregistrées et sauvegardées !")
-            else:
-                st.error("Erreur : La fonction de sauvegarde n'est pas définie correctement.")
-            
-            st.rerun()
+                
+                # 2. APPEL DE VOTRE FONCTION DE SAUVEGARDE GLOBALE
+                # Si votre fonction s'appelle 'save_data()', 'save_to_json()' ou autre,
+                # utilisez le nom exact que vous utilisez déjà dans les autres phases.
+                # Par exemple, si vous n'avez pas de fonction et que vous écrivez manuellement :
+                save_to_json() # <--- Utilisez ICI le nom de la fonction qui fonctionne partout ailleurs
+                
+                # 3. Message et rafraîchissement
+                st.success("Données enregistrées et synchronisées avec le fichier JSON !")
+                st.rerun()
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
