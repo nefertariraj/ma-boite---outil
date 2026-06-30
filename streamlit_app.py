@@ -3405,78 +3405,76 @@ else:
         st.subheader("2. Criteria-based selection matrix")
         
         # 1. Initialisation des données dans le projet si elles n'existent pas
-            if "criteria" not in st.session_state.projects[idx]["dmaic"]["improve"]:
-                st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = [
-                    {"Critère": "Impact Y", "Poids": 30},
-                    {"Critère": "Efficacité cause", "Poids": 20},
-                    {"Critère": "Coût", "Poids": 10},
-                    {"Critère": "Délai", "Poids": 10},
-                    {"Critère": "Facilité", "Poids": 10},
-                    {"Critère": "Acceptation", "Poids": 10},
-                    {"Critère": "Pérennité", "Poids": 10}
-                ]
+        # Assurez-vous que ce bloc est bien indenté sous la fonction
+        if "criteria" not in st.session_state.projects[idx]["dmaic"]["improve"]:
+            st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = [
+                {"Critère": "Impact Y", "Poids": 30},
+                {"Critère": "Efficacité cause", "Poids": 20},
+                {"Critère": "Coût", "Poids": 10},
+                {"Critère": "Délai", "Poids": 10},
+                {"Critère": "Facilité", "Poids": 10},
+                {"Critère": "Acceptation", "Poids": 10},
+                {"Critère": "Pérennité", "Poids": 10}
+            ]
 
-            # 2. Gestion des critères (Étape 1)
-            with st.expander("⚙️ Paramétrage des critères et pondérations"):
-                df_crit = pd.DataFrame(st.session_state.projects[idx]["dmaic"]["improve"]["criteria"])
-                edited_crit = st.data_editor(df_crit, num_rows="dynamic", use_container_width=True)
+        # 2. Gestion des critères (Étape 1)
+        with st.expander("⚙️ Paramétrage des critères et pondérations"):
+            df_crit = pd.DataFrame(st.session_state.projects[idx]["dmaic"]["improve"]["criteria"])
+            edited_crit = st.data_editor(df_crit, num_rows="dynamic", use_container_width=True)
         
-                total = edited_crit["Poids"].sum()
-                if total != 100:
-                    st.error(f"⚠️ Somme des poids : {total}% (Doit être égale à 100%)")
-                st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
+            total = edited_crit["Poids"].sum()
+            if total != 100:
+                st.error(f"⚠️ Somme des poids : {total}% (Doit être égale à 100%)")
+            st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
 
-            # 3. Notation des solutions (Étape 2)
-            solutions = st.session_state.projects[idx]["dmaic"]["improve"].get("strategies", [])
-            if not solutions:
-                st.warning("Veuillez d'abord définir des solutions dans la section 'Improvement Strategies'.")
-                return
+        # 3. Notation des solutions (Étape 2)
+        solutions = st.session_state.projects[idx]["dmaic"]["improve"].get("strategies", [])
+        if not solutions:
+            st.warning("Veuillez d'abord définir des solutions dans la section 'Improvement Strategies'.")
+            return
 
-            df_sol = pd.DataFrame(solutions)
+        df_sol = pd.DataFrame(solutions)
     
-            # Préparation des colonnes de critères pour la saisie (si absentes)
-            for c in edited_crit["Critère"]:
-                if c not in df_sol.columns:
-                    df_sol[c] = 3 # Note par défaut
+        # Préparation des colonnes de critères pour la saisie (si absentes)
+        for c in edited_crit["Critère"]:
+            if c not in df_sol.columns:
+                df_sol[c] = 3 # Note par défaut
             
-            st.write("### 📝 Notation des solutions (1 = Faible, 5 = Excellent)")
-            # Sélection des colonnes pour la notation
-            cols_a_noter = list(edited_crit["Critère"])
-            df_notes = st.data_editor(df_sol[["Cause racine", "Solution"] + cols_a_noter], use_container_width=True)
+        st.write("### 📝 Notation des solutions (1 = Faible, 5 = Excellent)")
+        cols_a_noter = list(edited_crit["Critère"])
+        df_notes = st.data_editor(df_sol[["Cause racine", "Solution"] + cols_a_noter], use_container_width=True)
 
-            # 4. Calcul automatique (Étape 3 & 4)
-            if total == 100:
-                # Calcul score pondéré
-                for _, row_crit in edited_crit.iterrows():
-                    crit = row_crit["Critère"]
-                    poids = row_crit["Poids"] / 100
-                    df_notes[f"Score_{crit}"] = df_notes[crit] * poids
+        # 4. Calcul automatique (Étape 3 & 4)
+        if total == 100:
+            # Calcul score pondéré
+            for _, row_crit in edited_crit.iterrows():
+                crit = row_crit["Critère"]
+                poids = row_crit["Poids"] / 100
+                df_notes[f"Score_{crit}"] = df_notes[crit] * poids
         
-                df_notes["Score Total"] = df_notes[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
-                df_notes = df_notes.sort_values(by="Score Total", ascending=False)
+            df_notes["Score Total"] = df_notes[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
+            df_notes = df_notes.sort_values(by="Score Total", ascending=False)
         
-                # 5. Sélection finale (Étape 7)
-                df_notes["Décision"] = "Alternative" # Par défaut
-                df_final = st.data_editor(df_notes, column_config={
-                    "Décision": st.column_config.SelectboxColumn(options=["Retenue", "Retenue pour pilote", "Alternative", "Rejetée"])
-                })
+            # 5. Sélection finale (Étape 7)
+            if "Décision" not in df_notes.columns:
+                df_notes["Décision"] = "Alternative"
+            
+            df_final = st.data_editor(df_notes, column_config={
+                "Décision": st.column_config.SelectboxColumn(options=["Retenue", "Retenue pour pilote", "Alternative", "Rejetée"])
+            })
 
-                # 6. Recommandation (Étape 6)
-                st.write("### 🏆 Recommandation automatique")
-                if len(df_final) >= 2:
-                    s1 = df_final.iloc[0]["Score Total"]
-                    s2 = df_final.iloc[1]["Score Total"]
-                    if s1 >= (s2 * 1.10):
-                        st.success(f"Solution recommandée : **{df_final.iloc[0]['Solution']}**")
-                    else:
-                        st.warning("Solutions équivalentes. Analyse complémentaire recommandée.")
+            # 6. Recommandation (Étape 6)
+            st.write("### 🏆 Recommandation automatique")
+            if len(df_final) >= 2:
+                s1 = df_final.iloc[0]["Score Total"]
+                s2 = df_final.iloc[1]["Score Total"]
+                if s1 >= (s2 * 1.10):
+                    st.success(f"Solution recommandée : **{df_final.iloc[0]['Solution']}**")
+                else:
+                    st.warning("Solutions équivalentes. Analyse complémentaire recommandée.")
         
-                # Sauvegarde automatique dans le projet
-                st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final
-
-        # --- Appel de la fonction ---
-        # idx = st.session_state["current_project_idx"]
-        # afficher_matrice_selection(idx)
+            # Sauvegarde automatique
+            st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final
         
 
         # 3 : BENEFIT EFFORT MATRIX ---
