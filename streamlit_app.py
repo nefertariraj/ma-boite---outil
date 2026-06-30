@@ -53,6 +53,12 @@ def synchroniser_et_capturer_tout(projet_en_cours, index_projet):
             if "table" not in cle_interne and "editor" not in cle_interne:
                 projet_en_cours[nom_propre_du_champ] = st.session_state[cle_interne]
 
+    # AJOUT : Capture de la phase IMPROVE
+    if "improve_strategies" in st.session_state:
+        donnees = st.session_state["improve_strategies"]
+        if isinstance(donnees, pd.DataFrame):
+            projet_en_cours["dmaic"]["improve"]["strategies"] = donnees.to_dict(orient="records")
+
     return projet_en_cours
 
 # ==========================================
@@ -156,6 +162,12 @@ def traiter_importation_json():
                     for phase in ["define", "measure", "analyze", "improve", "innovate", "control"]:
                         if phase in dmaic_originel:
                             dmaic_structure[phase] = dmaic_originel[phase]
+                    
+                    # AJOUT : Restauration des données IMPROVE pour l'affichage
+                    if "strategies" in projet_reconstruit["dmaic"]["improve"]:
+                        st.session_state["improve_strategies"] = pd.DataFrame(
+                            projet_reconstruit["dmaic"]["improve"]["strategies"]
+                        )
                     
                     projet_reconstruit["dmaic"] = dmaic_structure
                     projets_valides.append(projet_reconstruit)
