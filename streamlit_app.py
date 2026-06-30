@@ -3402,84 +3402,63 @@ else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
         # 2 : CRITERIA - BASED SELECTION MATRIX ---
+    if "current_project_idx" in st.session_state and st.session_state.current_project_idx is not None:
+        idx = st.session_state.current_project_idx
         st.subheader("2. Criteria-based selection matrix")
         
         if "improve" not in st.session_state.projects[idx]["dmaic"]:
             st.session_state.projects[idx]["dmaic"]["improve"] = {}
 
+        # 1. Paramétrage des critères
         if "criteria" not in st.session_state.projects[idx]["dmaic"]["improve"]:
             st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = [
-                {"Critère": "Impact Y", "Poids": 30},
-                {"Critère": "Efficacité cause", "Poids": 20},
-                {"Critère": "Coût", "Poids": 10},
-                {"Critère": "Délai", "Poids": 10},
-                {"Critère": "Facilité", "Poids": 10},
-                {"Critère": "Acceptation", "Poids": 10},
+                {"Critère": "Impact Y", "Poids": 30}, {"Critère": "Efficacité cause", "Poids": 20},
+                {"Critère": "Coût", "Poids": 10}, {"Critère": "Délai", "Poids": 10},
+                {"Critère": "Facilité", "Poids": 10}, {"Critère": "Acceptation", "Poids": 10},
                 {"Critère": "Pérennité", "Poids": 10}
-            ]
+        ]    
 
-        with st.expander("⚙️ Paramétrage des critères et pondérations"):
+        with st.expander("⚙️ Paramétrage des critères"):
             df_crit = pd.DataFrame(st.session_state.projects[idx]["dmaic"]["improve"]["criteria"])
-            edited_crit = st.data_editor(df_crit, num_rows="dynamic", use_container_width=True)
-            total = edited_crit["Poids"].sum()
-            if total != 100:
-                st.error(f"⚠️ La somme des poids doit être égale à 100% (Actuel : {total}%)")
-            st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
+            edited_crit = st.data_editor(df_crit, num_rows="dynamic", key="editor_crit")
 
+        # 2. Notation des solutions
         solutions = st.session_state.projects[idx]["dmaic"]["improve"].get("strategies", [])
         if not solutions:
             st.warning("Veuillez d'abord définir des solutions dans la section 'Improvement Strategies'.")
         else:
             df_sol = pd.DataFrame(solutions)
+            cols_a_noter = edited_crit["Critère"].tolist()
         
-            # --- CORRECTION ICI : On s'assure que toutes les colonnes existent ---
-            for critere in edited_crit["Critère"]:
-                if critere not in df_sol.columns:
-                    df_sol[critere] = 3  # On crée la colonne avec une note par défaut de 3
+            for c in cols_a_noter:
+                if c not in df_sol.columns: df_sol[c] = 3
         
-            # On définit les colonnes à afficher
-            colonnes_fixes = [c for c in ["Cause racine", "Solution"] if c in df_sol.columns]
-            cols_a_noter = list(edited_crit["Critère"])
-        
-            st.write("### 📝 Notation des solutions (1 = Faible, 5 = Excellent)")
-        
-            # On affiche le tableau. Si des colonnes manquent, cela ne plantera plus.
-            df_notes = st.data_editor(df_sol[colonnes_fixes + cols_a_noter], use_container_width=True)
+            colonnes_base = [c for c in ["Cause racine", "Solution"] if c in df_sol.columns]
+            st.write("### 📝 Notation des solutions")
+            df_notes = st.data_editor(df_sol[colonnes_base + cols_a_noter], key="editor_notes")
 
-            if total == 100:
-                for _, row_crit in edited_crit.iterrows():
-                    crit = row_crit["Critère"]
-                    poids = row_crit["Poids"] / 100
-                    df_notes[f"Score_{crit}"] = df_notes[crit] * poids
+            # 3. Bouton pour calculer et sauvegarder (évite les mises à jour constantes)
+            if st.button("💾 Enregistrer et Calculer les scores"):
+                # Sauvegarde temporaire des modifs
+                st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
             
-                df_notes["Score Total"] = df_notes[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
-                df_notes = df_notes.sort_values(by="Score Total", ascending=False)
-            
-                if "Décision" not in df_notes.columns:
-                    df_notes["Décision"] = "Alternative"
+                # Calculs
+                if edited_crit["Poids"].sum() == 100:
+                    for _, r in edited_crit.iterrows():
+                        df_notes[f"Score_{r['Critère']}"] = df_notes[r['Critère']] * (r['Poids'] / 100)
                 
-                st.write("### 📊 Classement et Décision")
-                df_final = st.data_editor(df_notes, column_config={
-                    "Décision": st.column_config.SelectboxColumn(options=["Retenue", "Retenue pour pilote", "Alternative", "Rejetée"])
-                })
-
-                st.write("### 🏆 Recommandation automatique")
-                if len(df_final) >= 2:
-                    # On s'assure que 'Score Total' existe bien dans le tableau
-                    if "Score Total" in df_final.columns:
-                        s1 = df_final.iloc[0]["Score Total"]
-                        s2 = df_final.iloc[1]["Score Total"]
-                    
-                        # Logique de recommandation
-                        if s1 >= (s2 * 1.10):
-                            nom_sol = df_final.iloc[0].get("Solution", "la meilleure solution")
-                            st.success(f"Solution recommandée : **{nom_sol}**")
-                        else:
-                            st.warning("Solutions équivalentes. Une analyse complémentaire est recommandée.")
-                elif len(df_final) == 1:
-                    st.info("Une seule solution identifiée : elle est par défaut la recommandée.")
+                    df_notes["Score Total"] = df_notes[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
+                    df_notes = df_notes.sort_values(by="Score Total", ascending=False)
+                
+                    st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_notes
+                    st.success("Matrice mise à jour avec succès !")
                 else:
-                    st.info("Aucune solution notée pour générer une recommandation.")
+                    st.error(f"La somme des poids doit être égale à 100% (actuellement {edited_crit['Poids'].sum()}%)")
+
+        # 4. Affichage du résultat si disponible
+        if "selection_matrix" in st.session_state.projects[idx]["dmaic"]["improve"]:
+            st.write("### 📊 Résultats enregistrés")
+            st.dataframe(st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"])
         
 
         # 3 : BENEFIT EFFORT MATRIX ---
