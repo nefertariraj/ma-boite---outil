@@ -3470,14 +3470,21 @@ else:
 
                 st.write("### 🏆 Recommandation automatique")
                 if len(df_final) >= 2:
-                    s1 = df_final.iloc[0]["Score Total"]
-                    s2 = df_final.iloc[1]["Score Total"]
-                    if s1 >= (s2 * 1.10):
-                        st.success(f"Solution recommandée : **{df_final.iloc[0]['Solution']}**")
-                    else:
-                        st.warning("Solutions équivalentes. Une analyse complémentaire est recommandée.")
-            
-                st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final
+                    # On s'assure que 'Score Total' existe bien dans le tableau
+                    if "Score Total" in df_final.columns:
+                        s1 = df_final.iloc[0]["Score Total"]
+                        s2 = df_final.iloc[1]["Score Total"]
+                    
+                        # Logique de recommandation
+                        if s1 >= (s2 * 1.10):
+                            nom_sol = df_final.iloc[0].get("Solution", "la meilleure solution")
+                            st.success(f"Solution recommandée : **{nom_sol}**")
+                        else:
+                            st.warning("Solutions équivalentes. Une analyse complémentaire est recommandée.")
+                elif len(df_final) == 1:
+                    st.info("Une seule solution identifiée : elle est par défaut la recommandée.")
+                else:
+                    st.info("Aucune solution notée pour générer une recommandation.")
 
     # 2. L'appel (cette ligne exécute la fonction ci-dessus)
     idx = st.session_state.get("current_project_idx")
