@@ -3409,53 +3409,59 @@ else:
         if "improve" not in st.session_state.projects[idx]["dmaic"]:
             st.session_state.projects[idx]["dmaic"]["improve"] = {}
 
-        # 1. Paramétrage des critères
+        # Initialisation
         if "criteria" not in st.session_state.projects[idx]["dmaic"]["improve"]:
             st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = [
                 {"Critère": "Impact Y", "Poids": 30}, {"Critère": "Efficacité cause", "Poids": 20},
                 {"Critère": "Coût", "Poids": 10}, {"Critère": "Délai", "Poids": 10},
                 {"Critère": "Facilité", "Poids": 10}, {"Critère": "Acceptation", "Poids": 10},
                 {"Critère": "Pérennité", "Poids": 10}
-        ]    
+            ]
 
-        with st.expander("⚙️ Paramétrage des critères"):
-            df_crit = pd.DataFrame(st.session_state.projects[idx]["dmaic"]["improve"]["criteria"])
-            edited_crit = st.data_editor(df_crit, num_rows="dynamic", key="editor_crit")
+        # Utilisation d'un formulaire pour regrouper les saisies et bloquer le rafraîchissement
+        with st.form(key="matrice_form"):
+            # 1. Paramétrage critères
+            with st.expander("⚙️ Paramétrage des critères"):
+                df_crit = pd.DataFrame(st.session_state.projects[idx]["dmaic"]["improve"]["criteria"])
+                edited_crit = st.data_editor(df_crit, num_rows="dynamic", key="editor_crit_form")
 
-        # 2. Notation des solutions
-        solutions = st.session_state.projects[idx]["dmaic"]["improve"].get("strategies", [])
-        if not solutions:
-            st.warning("Veuillez d'abord définir des solutions dans la section 'Improvement Strategies'.")
-        else:
-            df_sol = pd.DataFrame(solutions)
-            cols_a_noter = edited_crit["Critère"].tolist()
-        
-            for c in cols_a_noter:
-                if c not in df_sol.columns: df_sol[c] = 3
-        
-            colonnes_base = [c for c in ["Cause racine", "Solution"] if c in df_sol.columns]
-            st.write("### 📝 Notation des solutions")
-            df_notes = st.data_editor(df_sol[colonnes_base + cols_a_noter], key="editor_notes")
-
-            # 3. Bouton pour calculer et sauvegarder (évite les mises à jour constantes)
-            if st.button("💾 Enregistrer et Calculer les scores"):
-                # Sauvegarde temporaire des modifs
-                st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
+            # 2. Notation des solutions
+            solutions = st.session_state.projects[idx]["dmaic"]["improve"].get("strategies", [])
+            if not solutions:
+                st.warning("Veuillez d'abord définir des solutions dans la section 'Improvement Strategies'.")
+                df_notes = pd.DataFrame()
+            else:
+                df_sol = pd.DataFrame(solutions)
+                cols_a_noter = edited_crit["Critère"].tolist()
+                for c in cols_a_noter:
+                    if c not in df_sol.columns: df_sol[c] = 3
             
-                # Calculs
-                if edited_crit["Poids"].sum() == 100:
-                    for _, r in edited_crit.iterrows():
-                        df_notes[f"Score_{r['Critère']}"] = df_notes[r['Critère']] * (r['Poids'] / 100)
-                
-                    df_notes["Score Total"] = df_notes[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
-                    df_notes = df_notes.sort_values(by="Score Total", ascending=False)
-                
-                    st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_notes
-                    st.success("Matrice mise à jour avec succès !")
-                else:
-                    st.error(f"La somme des poids doit être égale à 100% (actuellement {edited_crit['Poids'].sum()}%)")
+                colonnes_base = [c for c in ["Cause racine", "Solution"] if c in df_sol.columns]
+                st.write("### 📝 Notation des solutions")
+                df_notes = st.data_editor(df_sol[colonnes_base + cols_a_noter], key="editor_notes_form")
 
-        # 4. Affichage du résultat si disponible
+            submit_button = st.form_submit_button(label="💾 Enregistrer et Calculer les scores")
+
+        # 3. Traitement uniquement après clic sur le bouton
+        if submit_button:
+            # Vérification poids
+            if edited_crit["Poids"].sum() == 100:
+                # Calculs
+                df_calcul = df_notes.copy()
+                for _, r in edited_crit.iterrows():
+                    df_calcul[f"Score_{r['Critère']}"] = df_calcul[r['Critère']] * (r['Poids'] / 100)
+            
+                df_calcul["Score Total"] = df_calcul[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
+                df_calcul = df_calcul.sort_values(by="Score Total", ascending=False)
+            
+                # Sauvegarde finale
+                st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
+                st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_calcul
+                st.success("Calcul effectué et données enregistrées !")
+            else:
+                st.error(f"La somme des poids doit être égale à 100% (Actuel : {edited_crit['Poids'].sum()}%)")
+
+        # 4. Affichage des résultats en lecture seule
         if "selection_matrix" in st.session_state.projects[idx]["dmaic"]["improve"]:
             st.write("### 📊 Résultats enregistrés")
             st.dataframe(st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"])
