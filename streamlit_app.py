@@ -3370,17 +3370,20 @@ else:
             
             # Traitement unique de la soumission
             if submit_button:
-                # 1. On met à jour la mémoire (session_state) avec les données éditées
+                # 1. On met à jour la mémoire (session_state)
                 st.session_state.improve_strategies = temp_df.copy()
                 
-                # 2. APPEL DE VOTRE FONCTION DE SAUVEGARDE GLOBALE
-                # Si votre fonction s'appelle 'save_data()', 'save_to_json()' ou autre,
-                # utilisez le nom exact que vous utilisez déjà dans les autres phases.
-                # Par exemple, si vous n'avez pas de fonction et que vous écrivez manuellement :
-                save_to_json() # <--- Utilisez ICI le nom de la fonction qui fonctionne partout ailleurs
+                # 2. On synchronise avec le projet global (comme dans Phase Analyse)
+                idx = st.session_state["current_project_idx"]
                 
-                # 3. Message et rafraîchissement
-                st.success("Données enregistrées et synchronisées avec le fichier JSON !")
+                # On s'assure que la structure existe
+                if "improve" not in st.session_state.projects[idx]["dmaic"]:
+                    st.session_state.projects[idx]["dmaic"]["improve"] = {}
+                
+                # On sauvegarde les données au bon endroit
+                st.session_state.projects[idx]["dmaic"]["improve"]["strategies"] = temp_df.to_dict(orient="records")
+                
+                st.success("Données enregistrées et synchronisées avec le projet !")
                 st.rerun()
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
