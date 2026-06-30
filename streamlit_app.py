@@ -3352,7 +3352,7 @@ else:
 
             # UTILISATION D'UN FORMULAIRE
             with st.form(key="form_strategies"):
-                # On édite une copie temporaire dans le formulaire
+                # Édition
                 temp_df = st.data_editor(
                     st.session_state.improve_strategies,
                     column_config={
@@ -3361,17 +3361,18 @@ else:
                         ),
                         "Cause racine": st.column_config.SelectboxColumn(options=causes_validees, required=True)
                     },
-                    num_rows="dynamic", use_container_width=True
+                    num_rows="dynamic", 
+                    use_container_width=True,
+                    key="editor_strategies_data" 
                 )
                 
-                # Le bouton est DANS le formulaire
                 submit_button = st.form_submit_button(label="✅ Valider et enregistrer les solutions")
             
-            # La mise à jour ne se fait QUE si le bouton est cliqué
+            # Traitement unique de la soumission
             if submit_button:
-                st.session_state.improve_strategies = temp_df
-                st.success("Données enregistrées !")
-                st.rerun() # Rafraîchir pour afficher les données validées
+                st.session_state.improve_strategies = temp_df.copy()
+                st.success("Toutes les lignes ont été enregistrées avec succès !")
+                st.rerun() 
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
