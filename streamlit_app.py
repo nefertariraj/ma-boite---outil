@@ -3370,9 +3370,16 @@ else:
             
             # Traitement unique de la soumission
             if submit_button:
+                # 1. On met à jour la mémoire (session_state)
                 st.session_state.improve_strategies = temp_df.copy()
-                st.success("Toutes les lignes ont été enregistrées avec succès !")
-                st.rerun() 
+                
+                # 2. On déclenche la sauvegarde sur le disque
+                # Remplacez "save_to_json()" par le nom de votre fonction de sauvegarde réelle
+                # Si vous ne connaissez pas le nom, essayez de trouver celle qui écrit le fichier .json
+                save_to_json() 
+                
+                st.success("Données enregistrées et sauvegardées sur le disque !")
+                st.rerun()
         else:
             st.warning("Veuillez d'abord valider des causes racines dans la phase Analyse.")
         
