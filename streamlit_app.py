@@ -3436,8 +3436,20 @@ else:
                     df_sol[c] = 3
                 
             st.write("### 📝 Notation des solutions (1 = Faible, 5 = Excellent)")
+        
+            # On vérifie quelles colonnes existent réellement dans vos données
+            # Cela évite le KeyError si une colonne a un nom légèrement différent
+            colonnes_disponibles = list(df_sol.columns)
+        
+            # On cherche les colonnes de base, en évitant de faire planter le code si elles manquent
+            colonnes_base = [c for c in ["Cause racine", "Solution"] if c in colonnes_disponibles]
+        
+            # On ajoute les critères à la liste d'affichage
             cols_a_noter = list(edited_crit["Critère"])
-            df_notes = st.data_editor(df_sol[["Cause racine", "Solution"] + cols_a_noter], use_container_width=True)
+            colonnes_finales = colonnes_base + [c for c in cols_a_noter if c not in colonnes_base]
+        
+            # Création de l'éditeur avec uniquement les colonnes réellement présentes
+            df_notes = st.data_editor(df_sol[colonnes_finales], use_container_width=True)
 
             if total == 100:
                 for _, row_crit in edited_crit.iterrows():
