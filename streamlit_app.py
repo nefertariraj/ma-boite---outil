@@ -3431,25 +3431,20 @@ else:
             st.warning("Veuillez d'abord définir des solutions dans la section 'Improvement Strategies'.")
         else:
             df_sol = pd.DataFrame(solutions)
-            for c in edited_crit["Critère"]:
-                if c not in df_sol.columns:
-                    df_sol[c] = 3
-                
+        
+            # --- CORRECTION ICI : On s'assure que toutes les colonnes existent ---
+            for critere in edited_crit["Critère"]:
+                if critere not in df_sol.columns:
+                    df_sol[critere] = 3  # On crée la colonne avec une note par défaut de 3
+        
+            # On définit les colonnes à afficher
+            colonnes_fixes = [c for c in ["Cause racine", "Solution"] if c in df_sol.columns]
+            cols_a_noter = list(edited_crit["Critère"])
+        
             st.write("### 📝 Notation des solutions (1 = Faible, 5 = Excellent)")
         
-            # On vérifie quelles colonnes existent réellement dans vos données
-            # Cela évite le KeyError si une colonne a un nom légèrement différent
-            colonnes_disponibles = list(df_sol.columns)
-        
-            # On cherche les colonnes de base, en évitant de faire planter le code si elles manquent
-            colonnes_base = [c for c in ["Cause racine", "Solution"] if c in colonnes_disponibles]
-        
-            # On ajoute les critères à la liste d'affichage
-            cols_a_noter = list(edited_crit["Critère"])
-            colonnes_finales = colonnes_base + [c for c in cols_a_noter if c not in colonnes_base]
-        
-            # Création de l'éditeur avec uniquement les colonnes réellement présentes
-            df_notes = st.data_editor(df_sol[colonnes_finales], use_container_width=True)
+            # On affiche le tableau. Si des colonnes manquent, cela ne plantera plus.
+            df_notes = st.data_editor(df_sol[colonnes_fixes + cols_a_noter], use_container_width=True)
 
             if total == 100:
                 for _, row_crit in edited_crit.iterrows():
