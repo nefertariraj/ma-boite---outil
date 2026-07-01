@@ -3605,8 +3605,25 @@ else:
                     # 5. SAUVEGARDE
                     if st.button("💾 Enregistrer la matrice et les priorités"):
                         dmaic_improve["benefit_effort_results"] = df_filtered.to_dict(orient="records")
-                        save_data() # Appel de votre fonction définie plus haut
-                        st.success("Priorités enregistrées !")
+                
+                        # --- SAUVEGARDE SÉCURISÉE ---
+                        import json
+                
+                        # Fonction de nettoyage interne pour éviter l'erreur DataFrame
+                        def prepare_for_json(obj):
+                            if isinstance(obj, dict): return {k: prepare_for_json(v) for k, v in obj.items()}
+                            elif isinstance(obj, list): return [prepare_for_json(item) for item in obj]
+                            elif isinstance(obj, pd.DataFrame): return obj.to_dict(orient="records")
+                            else: return obj
+                
+                        try:
+                            # On nettoie tout le projet avant d'écrire
+                            data_to_save = prepare_for_json(st.session_state.projects)
+                            with open("projects.json", "w") as f:
+                                json.dump(data_to_save, f, indent=4)
+                            st.success("Priorités enregistrées !")
+                        except Exception as e:
+                            st.error(f"Erreur lors de la sauvegarde : {e}")
         
 
         # 4 : SOLUTIONS ACTION PLAN ---
