@@ -3703,7 +3703,7 @@ else:
                         val_deb = c1.date_input(f"Début - {sol}", value=saved["debut"])
                         val_fin = c2.date_input(f"Fin - {sol}", value=saved["fin"])
                         val_charg = c1.number_input(f"Charge (JH) - {sol}", value=saved["charge"])
-                        val_budg = c2.number_input(f"Budget (€) - {sol}", value=saved["budget"])
+                        val_budg = c2.number_input(f"Budget (Ar) - {sol}", value=saved["budget"])
                         val_risq = st.text_area(f"Risques - {sol}", value=saved["risques"])
 
                         # Bouton de soumission spécifique au formulaire
