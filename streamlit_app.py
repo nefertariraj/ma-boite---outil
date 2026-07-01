@@ -3463,8 +3463,10 @@ else:
                     st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final.to_dict(orient="records")
                     
                     # 3. APPEL DE LA FONCTION DE SAUVEGARDE 
-                    # Remplacez save_data() par le nom exact de votre fonction de sauvegarde
-                    save_data() 
+                    # Sauvegarde directe via JSON (si vous n'avez pas de fonction définie)
+                    import json
+                    with open("projects.json", "w") as f:
+                        json.dump(st.session_state.projects, f, indent=4)
                     
                     st.success("Classement calculé et sauvegardé sur le disque !")
 
