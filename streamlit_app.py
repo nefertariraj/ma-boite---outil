@@ -3667,42 +3667,48 @@ else:
             for idx, row in df_filter.iterrows():
                 sol = row["Solution potentielle"]
         
-                # Récupération des données existantes (si elles ont déjà été validées)
+                # Récupération des données existantes (pour pré-remplir)
                 saved = dmaic_improve["action_plan"].get(sol, {
                     "responsable": "", "debut": date.today(), "fin": date.today(),
                     "charge": 0, "budget": 0, "risques": "", "predecesseur": None
                 })
         
                 with st.expander(f"Action : {sol} (Priorité : {row['Priorité']})"):
-                    # Saisie temporaire via des clés uniques (widget ne modifie pas le dict directement)
-                    c1, c2 = st.columns(2)
-                    resp = c1.text_input(f"Responsable(s) - {sol}", value=saved["responsable"], key=f"tmp_resp_{sol}")
-                    predec = c2.selectbox(
-                        f"Action prédécesseur", 
-                        [None] + [s for s in df_filter["Solution potentielle"] if s != sol],
-                        index=0 if saved["predecesseur"] is None else [s for s in df_filter["Solution potentielle"]].index(saved["predecesseur"]) + 1,
-                        key=f"tmp_predec_{sol}"
-                    )
-                    deb = c1.date_input(f"Début - {sol}", value=saved["debut"], key=f"tmp_deb_{sol}")
-                    fin = c2.date_input(f"Fin - {sol}", value=saved["fin"], key=f"tmp_fin_{sol}")
-                    charg = c1.number_input(f"Charge (JH) - {sol}", value=saved["charge"], key=f"tmp_charg_{sol}")
-                    budg = c2.number_input(f"Budget (€) - {sol}", value=saved["budget"], key=f"tmp_budg_{sol}")
-                    risq = st.text_area(f"Risques - {sol}", value=saved["risques"], key=f"tmp_risq_{sol}")
+                    # L'utilisation de st.form bloque le rechargement jusqu'au clic sur le bouton
+                    with st.form(key=f"form_{sol}"):
+                        c1, c2 = st.columns(2)
+                
+                        # Les inputs sont capturés dans des variables temporaires
+                        val_resp = c1.text_input(f"Responsable(s) - {sol}", value=saved["responsable"])
+                
+                        # Récupération de l'index pour le selectbox
+                        all_sols = [s for s in df_filter["Solution potentielle"] if s != sol]
+                        options = [None] + all_sols
+                        idx_predec = options.index(saved["predecesseur"]) if saved["predecesseur"] in options else 0
+                
+                        val_predec = c2.selectbox(f"Action prédécesseur", options, index=idx_predec)
+                        val_deb = c1.date_input(f"Début - {sol}", value=saved["debut"])
+                        val_fin = c2.date_input(f"Fin - {sol}", value=saved["fin"])
+                        val_charg = c1.number_input(f"Charge (JH) - {sol}", value=saved["charge"])
+                        val_budg = c2.number_input(f"Budget (€) - {sol}", value=saved["budget"])
+                        val_risq = st.text_area(f"Risques - {sol}", value=saved["risques"])
 
-                    # Bouton de validation par fiche
-                    if st.button(f"Valider la fiche : {sol}", key=f"btn_save_{sol}"):
-                        # Enregistrement dans le dictionnaire réel uniquement maintenant
-                        dmaic_improve["action_plan"][sol] = {
-                            "responsable": resp,
-                            "predecesseur": predec,
-                            "debut": deb,
-                            "fin": fin,
-                            "charge": charg,
-                            "budget": budg,
-                            "risques": risq
-                        }
-                        save_data() # Sauvegarde globale
-                        st.success(f"Action '{sol}' enregistrée.")
+                        # Bouton de soumission spécifique au formulaire
+                        submitted = st.form_submit_button(f"Enregistrer {sol}")
+                
+                        if submitted:
+                            # Enregistrement dans le dictionnaire
+                            dmaic_improve["action_plan"][sol] = {
+                                "responsable": val_resp,
+                                "predecesseur": val_predec,
+                                "debut": val_deb,
+                                "fin": val_fin,
+                                "charge": val_charg,
+                                "budget": val_budg,
+                                "risques": val_risq
+                            }
+                            save_data() 
+                            st.success(f"Action '{sol}' enregistrée !")
                         
             # 3. GÉNÉRATION DU GANTT (Corrigé pour la saisie libre)
             st.markdown("### 3. Diagramme de Gantt")
