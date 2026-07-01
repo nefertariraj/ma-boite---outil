@@ -3456,10 +3456,17 @@ else:
                     df_final["Score Total"] = df_final[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
                     df_final = df_final.sort_values(by="Score Total", ascending=False)
             
-                    # Enregistrement
+                    # 1. On enregistre les critères
                     st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
-                    st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final
-                    st.success("Classement calculé et enregistré !")
+                    
+                    # 2. On convertit le DataFrame en liste de dictionnaires pour le JSON
+                    st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final.to_dict(orient="records")
+                    
+                    # 3. APPEL DE LA FONCTION DE SAUVEGARDE 
+                    # Remplacez save_data() par le nom exact de votre fonction de sauvegarde
+                    save_data() 
+                    
+                    st.success("Classement calculé et sauvegardé sur le disque !")
 
                 # Affichage résultat (La parenthèse a été corrigée ici)
                 if "selection_matrix" in st.session_state.projects[idx]["dmaic"]["improve"]:
