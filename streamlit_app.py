@@ -3661,42 +3661,49 @@ else:
             # 2. CONSTRUCTION DU PLAN D'ACTION (Saisie libre pour le responsable)
             st.markdown("### 2. Planification détaillée")
     
+            if "action_plan" not in dmaic_improve:
+                dmaic_improve["action_plan"] = {}
+
             for idx, row in df_filter.iterrows():
                 sol = row["Solution potentielle"]
         
-                # Initialisation si la clé n'existe pas
-                if sol not in dmaic_improve["action_plan"]:
-                    dmaic_improve["action_plan"][sol] = {
-                        "responsable": "", "debut": date.today(), "fin": date.today(),
-                        "charge": 0, "budget": 0, "risques": "", "commentaires": "", "predecesseur": None
-                    }
+                # Récupération des données existantes (si elles ont déjà été validées)
+                saved = dmaic_improve["action_plan"].get(sol, {
+                    "responsable": "", "debut": date.today(), "fin": date.today(),
+                    "charge": 0, "budget": 0, "risques": "", "predecesseur": None
+                })
         
-                # S'assurer que le responsable est une chaîne de caractères (pour la migration des données)
-                current_resp = dmaic_improve["action_plan"][sol].get("responsable", "")
-                if isinstance(current_resp, list):
-                    current_resp = ", ".join(current_resp)
-        
-                # Interface de saisie
                 with st.expander(f"Action : {sol} (Priorité : {row['Priorité']})"):
+                    # Saisie temporaire via des clés uniques (widget ne modifie pas le dict directement)
                     c1, c2 = st.columns(2)
-            
-                    # --- MODIFICATION ICI : Passage en text_input ---
-                    dmaic_improve["action_plan"][sol]["responsable"] = c1.text_input(
-                        f"Responsable(s) - {sol}", 
-                        value=current_resp
-                    )
-            
-                    dmaic_improve["action_plan"][sol]["predecesseur"] = c2.selectbox(
-                        f"Action prédécesseur (optionnel)", 
+                    resp = c1.text_input(f"Responsable(s) - {sol}", value=saved["responsable"], key=f"tmp_resp_{sol}")
+                    predec = c2.selectbox(
+                        f"Action prédécesseur", 
                         [None] + [s for s in df_filter["Solution potentielle"] if s != sol],
-                        index=0 if dmaic_improve["action_plan"][sol]["predecesseur"] is None else [s for s in df_filter["Solution potentielle"]].index(dmaic_improve["action_plan"][sol]["predecesseur"]) + 1
+                        index=0 if saved["predecesseur"] is None else [s for s in df_filter["Solution potentielle"]].index(saved["predecesseur"]) + 1,
+                        key=f"tmp_predec_{sol}"
                     )
-                    dmaic_improve["action_plan"][sol]["debut"] = c1.date_input(f"Début - {sol}", dmaic_improve["action_plan"][sol]["debut"])
-                    dmaic_improve["action_plan"][sol]["fin"] = c2.date_input(f"Fin - {sol}", dmaic_improve["action_plan"][sol]["fin"])
-                    dmaic_improve["action_plan"][sol]["charge"] = c1.number_input(f"Charge (JH) - {sol}", value=dmaic_improve["action_plan"][sol]["charge"])
-                    dmaic_improve["action_plan"][sol]["budget"] = c2.number_input(f"Budget (€) - {sol}", value=dmaic_improve["action_plan"][sol]["budget"])
-                    dmaic_improve["action_plan"][sol]["risques"] = st.text_area(f"Risques - {sol}", dmaic_improve["action_plan"][sol]["risques"])
+                    deb = c1.date_input(f"Début - {sol}", value=saved["debut"], key=f"tmp_deb_{sol}")
+                    fin = c2.date_input(f"Fin - {sol}", value=saved["fin"], key=f"tmp_fin_{sol}")
+                    charg = c1.number_input(f"Charge (JH) - {sol}", value=saved["charge"], key=f"tmp_charg_{sol}")
+                    budg = c2.number_input(f"Budget (€) - {sol}", value=saved["budget"], key=f"tmp_budg_{sol}")
+                    risq = st.text_area(f"Risques - {sol}", value=saved["risques"], key=f"tmp_risq_{sol}")
 
+                    # Bouton de validation par fiche
+                    if st.button(f"Valider la fiche : {sol}", key=f"btn_save_{sol}"):
+                        # Enregistrement dans le dictionnaire réel uniquement maintenant
+                        dmaic_improve["action_plan"][sol] = {
+                            "responsable": resp,
+                            "predecesseur": predec,
+                            "debut": deb,
+                            "fin": fin,
+                            "charge": charg,
+                            "budget": budg,
+                            "risques": risq
+                        }
+                        save_data() # Sauvegarde globale
+                        st.success(f"Action '{sol}' enregistrée.")
+                        
             # 3. GÉNÉRATION DU GANTT (Corrigé pour la saisie libre)
             st.markdown("### 3. Diagramme de Gantt")
             gantt_data = []
