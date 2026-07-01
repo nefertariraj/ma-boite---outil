@@ -3627,8 +3627,99 @@ else:
         
 
         # 4 : SOLUTIONS ACTION PLAN ---
+        import plotly.figure_factory as ff # Nécessaire pour le Gantt
+
+        st.markdown("---")
         st.subheader("4. Solutions action plan")
 
+        if "benefit_effort_results" not in dmaic_improve:
+            st.warning("Veuillez d'abord enregistrer la matrice de bénéfices/efforts (Étape 3).")
+        else:
+            # Récupération des données retenues
+            df_results = pd.DataFrame(dmaic_improve["benefit_effort_results"])
+    
+            # 1. FILTRE DE SÉLECTION
+            st.markdown("### 1. Sélection des solutions à déployer")
+            filtre = st.selectbox(
+                "Priorité minimale à déployer",
+                ["Toutes les solutions", "Très Haute + Haute + Moyenne", "Très Haute + Haute", "Très Haute uniquement"]
+            )
+    
+            # Logique de filtrage
+            prio_order = {"Très Haute": 4, "Haute": 3, "Moyenne": 2, "Faible": 1}
+            df_results['prio_val'] = df_results['Priorité'].map(prio_order)
+    
+            if filtre == "Très Haute uniquement": df_filter = df_results[df_results['prio_val'] == 4]
+            elif filtre == "Très Haute + Haute": df_filter = df_results[df_results['prio_val'] >= 3]
+            elif filtre == "Très Haute + Haute + Moyenne": df_filter = df_results[df_results['prio_val'] >= 2]
+            else: df_filter = df_results
+    
+            # Initialisation structure stockage
+            if "action_plan" not in dmaic_improve:
+                dmaic_improve["action_plan"] = {}
+
+            # 2. CONSTRUCTION DU PLAN D'ACTION (Fiches)
+            st.markdown("### 2. Planification détaillée")
+    
+            for idx, row in df_filter.iterrows():
+                sol = row["Solution potentielle"]
+        
+                if sol not in dmaic_improve["action_plan"]:
+                    dmaic_improve["action_plan"][sol] = {
+                        "responsable": [], "debut": date.today(), "fin": date.today(),
+                        "charge": 0, "budget": 0, "risques": "", "commentaires": "", "predecesseur": None
+                    }
+        
+                # Interface de saisie
+                with st.expander(f"Action : {sol} (Priorité : {row['Priorité']})"):
+                    c1, c2 = st.columns(2)
+                    dmaic_improve["action_plan"][sol]["responsable"] = c1.multiselect(
+                        f"Responsable(s) - {sol}", ["Équipe Projet", "DSI", "RH", "Finance", "Ops"], 
+                        default=dmaic_improve["action_plan"][sol]["responsable"]
+                    )
+                    dmaic_improve["action_plan"][sol]["predecesseur"] = c2.selectbox(
+                        f"Action prédécesseur (optionnel)", 
+                        [None] + [s for s in df_filter["Solution potentielle"] if s != sol],
+                        index=0 if dmaic_improve["action_plan"][sol]["predecesseur"] is None else [s for s in df_filter["Solution potentielle"]].index(dmaic_improve["action_plan"][sol]["predecesseur"]) + 1
+                    )
+                    dmaic_improve["action_plan"][sol]["debut"] = c1.date_input(f"Début - {sol}", dmaic_improve["action_plan"][sol]["debut"])
+                    dmaic_improve["action_plan"][sol]["fin"] = c2.date_input(f"Fin - {sol}", dmaic_improve["action_plan"][sol]["fin"])
+                    dmaic_improve["action_plan"][sol]["charge"] = c1.number_input(f"Charge (JH) - {sol}", value=dmaic_improve["action_plan"][sol]["charge"])
+                    dmaic_improve["action_plan"][sol]["budget"] = c2.number_input(f"Budget (€) - {sol}", value=dmaic_improve["action_plan"][sol]["budget"])
+                    dmaic_improve["action_plan"][sol]["risques"] = st.text_area(f"Risques - {sol}", dmaic_improve["action_plan"][sol]["risques"])
+
+            # 3. GÉNÉRATION DU GANTT
+            st.markdown("### 3. Diagramme de Gantt")
+            gantt_data = []
+            for sol, data in dmaic_improve["action_plan"].items():
+                if sol in df_filter["Solution potentielle"].values:
+                    gantt_data.append(dict(Task=sol, Start=str(data["debut"]), Finish=str(data["fin"]), Resource=str(data["responsable"])))
+    
+            if gantt_data:
+                fig = ff.create_gantt(gantt_data, colors={'Resource': 'rgb(46, 137, 205)'}, index_col='Resource', show_colorbar=True, group_tasks=True)
+                st.plotly_chart(fig, use_container_width=True)
+
+            # 4. INDICATEURS & SYNTHÈSE
+            st.markdown("### 5 & 6. Indicateurs et Synthèse")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Nb Actions", len(dmaic_improve["action_plan"]))
+            c2.metric("Charge Totale (JH)", sum(d['charge'] for d in dmaic_improve["action_plan"].values()))
+            c3.metric("Budget Total (€)", sum(d['budget'] for d in dmaic_improve["action_plan"].values()))
+    
+            # 7. VALIDATION
+            if st.button("✅ Valider le Solution Action Plan"):
+                # Vérification
+                errors = []
+                for sol, data in dmaic_improve["action_plan"].items():
+                    if not data["responsable"]: errors.append(f"{sol}: Responsable manquant")
+                    if data["debut"] >= data["fin"]: errors.append(f"{sol}: Date début >= date fin")
+            
+                if errors:
+                    for e in errors: st.error(e)
+                else:
+                    dmaic_improve["plan_valide"] = True
+                    save_data()
+                    st.success("Plan validé et transmis aux étapes suivantes (FMEA, Future State).")
 
         
         # 5 : PILOT PLAN ---
