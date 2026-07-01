@@ -3479,6 +3479,115 @@ else:
         # 3 : BENEFIT EFFORT MATRIX ---
         st.subheader("3. Benefit effort matrix")
 
+        if "current_project_idx" in st.session_state and st.session_state.current_project_idx is not None:
+            idx = st.session_state.current_project_idx
+            dmaic_improve = st.session_state.projects[idx]["dmaic"]["improve"]
+
+            # Vérification des données
+            if "selection_matrix" not in dmaic_improve:
+                st.warning("Veuillez d'abord compléter la matrice de sélection (Phase 2).")
+            else:
+                # Conversion du JSON en DataFrame
+                df_results = pd.DataFrame(dmaic_improve["selection_matrix"])
+        
+                # Filtre : Retenues uniquement (si la colonne existe)
+                if "Décision" in df_results.columns:
+                    df_filtered = df_results[df_results["Décision"].isin(["Retenue", "Retenue pour pilote"])].copy()
+                else:
+                    df_filtered = df_results.copy()
+
+                if df_filtered.empty:
+                    st.info("Aucune solution 'Retenue' ou 'Retenue pour pilote' trouvée.")
+                else:
+                    # 1. CLASSIFICATION DES CRITÈRES
+                    st.markdown("### ⚙️ Classification des critères")
+                    if "criteria_mapping" not in dmaic_improve:
+                        # Pré-classification automatique
+                        dmaic_improve["criteria_mapping"] = {}
+                        for crit in dmaic_improve["criteria"]:
+                            name = crit["Critère"].lower()
+                            if any(x in name for x in ["coût", "effort", "délai", "complexité", "ressource"]):
+                                dmaic_improve["criteria_mapping"][crit["Critère"]] = "Effort"
+                            else:
+                                dmaic_improve["criteria_mapping"][crit["Critère"]] = "Bénéfice"
+
+                    # Interface de modification
+                    crit_cols = st.columns(len(dmaic_improve["criteria"]))
+                    for i, crit in enumerate(dmaic_improve["criteria"]):
+                        name = crit["Critère"]
+                        dmaic_improve["criteria_mapping"][name] = crit_cols[i].selectbox(
+                            f"{name}", ["Bénéfice", "Effort"], 
+                            index=0 if dmaic_improve["criteria_mapping"].get(name) == "Bénéfice" else 1,
+                            key=f"map_{name}"
+                        )
+
+                    # 2. CALCULS AUTOMATIQUES
+                    poids_map = {c["Critère"]: c["Poids"] for c in dmaic_improve["criteria"]}
+            
+                    def calculate_scores(row):
+                        score_ben = 0
+                        score_eff = 0
+                        for crit_name, cat in dmaic_improve["criteria_mapping"].items():
+                            val = row.get(crit_name, 3) 
+                            w = poids_map.get(crit_name, 0)
+                            if cat == "Bénéfice":
+                                score_ben += val * w
+                            else:
+                                score_eff += val * w
+                        return pd.Series([score_ben, score_eff])
+
+                    df_filtered[["Score Bénéfice", "Score Effort"]] = df_filtered.apply(calculate_scores, axis=1)
+                    df_filtered["Indice de priorité"] = df_filtered["Score Bénéfice"] / df_filtered["Score Effort"].replace(0, 1)
+            
+                    # Détermination Quadrants (Médianes)
+                    ben_mid = df_filtered["Score Bénéfice"].median()
+                    eff_mid = df_filtered["Score Effort"].median()
+            
+                    def get_quadrant(row):
+                        if row["Score Bénéfice"] >= ben_mid and row["Score Effort"] < eff_mid: return "Quick Win"
+                        if row["Score Bénéfice"] >= ben_mid and row["Score Effort"] >= eff_mid: return "Projet Stratégique"
+                        if row["Score Bénéfice"] < ben_mid and row["Score Effort"] < eff_mid: return "Opportunité Secondaire"
+                        return "Faible Priorité"
+
+                    df_filtered["Quadrant"] = df_filtered.apply(get_quadrant, axis=1)
+                    priorite_map = {"Quick Win": "Très Haute", "Projet Stratégique": "Haute", "Opportunité Secondaire": "Moyenne", "Faible Priorité": "Faible"}
+                    df_filtered["Priorité"] = df_filtered["Quadrant"].map(priorite_map)
+
+                    # 3. VISUALISATION (Plotly Graph Objects)
+                    fig = go.Figure()
+
+                    # Ajout des points
+                    fig.add_trace(go.Scatter(
+                        x=df_filtered["Score Effort"], y=df_filtered["Score Bénéfice"],
+                        mode='markers+text', text=df_filtered["Solution potentielle"],
+                        textposition="top center",
+                        marker=dict(size=12, color=df_filtered["Indice de priorité"], colorscale='Viridis', showscale=True)
+                    ))
+
+                    # Mise en forme (Quadrants)
+                    fig.update_layout(
+                        xaxis_title="Score Effort", yaxis_title="Score Bénéfice",
+                        shapes=[
+                            dict(type="line", x0=eff_mid, x1=eff_mid, y0=df_filtered["Score Bénéfice"].min(), y1=df_filtered["Score Bénéfice"].max(), line=dict(dash="dash", color="red")),
+                            dict(type="line", x0=df_filtered["Score Effort"].min(), x1=df_filtered["Score Effort"].max(), y0=ben_mid, y1=ben_mid, line=dict(dash="dash", color="red"))
+                        ],
+                        annotations=[
+                            dict(x=df_filtered["Score Effort"].min(), y=df_filtered["Score Bénéfice"].max(), text="Quick Win", showarrow=False, font=dict(size=14, color="green")),
+                            dict(x=df_filtered["Score Effort"].max(), y=df_filtered["Score Bénéfice"].max(), text="Stratégique", showarrow=False, font=dict(size=14, color="blue")),
+                            dict(x=df_filtered["Score Effort"].min(), y=df_filtered["Score Bénéfice"].min(), text="Opportunité", showarrow=False, font=dict(size=14, color="orange")),
+                            dict(x=df_filtered["Score Effort"].max(), y=df_filtered["Score Bénéfice"].min(), text="Faible Priorité", showarrow=False, font=dict(size=14, color="grey"))
+                        ]
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # 4. TABLEAU RÉCAPITULATIF
+                    st.dataframe(df_filtered[["Solution potentielle", "Score Bénéfice", "Score Effort", "Indice de priorité", "Quadrant", "Priorité"]])
+
+                    # 5. SAUVEGARDE
+                    if st.button("💾 Enregistrer la matrice et les priorités"):
+                        dmaic_improve["benefit_effort_results"] = df_filtered.to_dict(orient="records")
+                        save_data() # Appel de votre fonction définie plus haut
+                        st.success("Priorités enregistrées !")
         
 
         # 4 : SOLUTIONS ACTION PLAN ---
