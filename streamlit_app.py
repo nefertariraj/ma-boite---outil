@@ -3420,16 +3420,13 @@ else:
                     ]
 
                 with st.form(key="form_notation_matrice"):
-                    # 1. Paramétrage critères (Caché par défaut dans un expander)
+                    # 1. Paramétrage critères (Caché par défaut)
                     with st.expander("⚙️ Paramétrage des critères (Cliquer pour afficher/masquer)"):
                         df_crit = pd.DataFrame(st.session_state.projects[idx]["dmaic"]["improve"]["criteria"])
                         edited_crit = st.data_editor(df_crit, num_rows="dynamic", key="editor_crit_matrice")
 
                     # 2. Notation des solutions
-                    # Note : on récupère les critères depuis l'éditeur (soit l'état initial, soit les modifs en cours)
-                    # Si l'éditeur n'est pas utilisé, on prend les critères du projet
-                    cols_a_noter = edited_crit["Critère"].tolist() if 'edited_crit' in locals() else [c['Critère'] for c in st.session_state.projects[idx]["dmaic"]["improve"]["criteria"]]
-                    
+                    cols_a_noter = edited_crit["Critère"].tolist()
                     df_notation = df_sol.copy()
             
                     # On ajoute les colonnes de notation si elles n'existent pas encore
@@ -3438,7 +3435,7 @@ else:
             
                     st.write("### 📝 Notation des solutions")
                     
-                    # Légende ajoutée ici
+                    # Légende
                     st.markdown("""
                     **Légende des scores :**
                     *   **1** : Très faible / Très difficile / Très coûteux
@@ -3464,10 +3461,10 @@ else:
                     st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final
                     st.success("Classement calculé et enregistré !")
 
-                # Affichage résultat
+                # Affichage résultat (La parenthèse a été corrigée ici)
                 if "selection_matrix" in st.session_state.projects[idx]["dmaic"]["improve"]:
                     st.write("### 📊 Résultats")
-                    st.dataframe(st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"]))
+                    st.dataframe(st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"])
         
 
         # 3 : BENEFIT EFFORT MATRIX ---
