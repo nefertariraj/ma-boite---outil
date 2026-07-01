@@ -3691,14 +3691,38 @@ else:
             # 3. GÉNÉRATION DU GANTT
             st.markdown("### 3. Diagramme de Gantt")
             gantt_data = []
+    
             for sol, data in dmaic_improve["action_plan"].items():
-                if sol in df_filter["Solution potentielle"].values:
-                    gantt_data.append(dict(Task=sol, Start=str(data["debut"]), Finish=str(data["fin"]), Resource=str(data["responsable"])))
+                # Nettoyage des données pour le Gantt
+                if data["responsable"] and data["debut"] and data["fin"]:
+                    # Convertir la liste des responsables en chaîne propre
+                    res_string = ", ".join(data["responsable"]) if isinstance(data["responsable"], list) else str(data["responsable"])
+            
+                    gantt_data.append(dict(
+                        Task=sol, 
+                        Start=data["debut"].strftime('%Y-%m-%d'), 
+                        Finish=data["fin"].strftime('%Y-%m-%d'), 
+                        Resource=res_string
+                    ))
     
             if gantt_data:
-                fig = ff.create_gantt(gantt_data, colors={'Resource': 'rgb(46, 137, 205)'}, index_col='Resource', show_colorbar=True, group_tasks=True)
-                st.plotly_chart(fig, use_container_width=True)
-
+                try:
+                    # Création du Gantt avec des paramètres simplifiés
+                    fig = ff.create_gantt(
+                        gantt_data, 
+                        index_col='Resource', 
+                        show_colorbar=True, 
+                        group_tasks=True,
+                        showgrid_x=True,
+                        showgrid_y=True
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Erreur lors de la génération du graphique : {e}")
+                    st.write("Vérifiez que les dates de début et de fin sont correctement saisies pour chaque action.")
+            else:
+                st.info("Remplissez les champs (Responsable, Dates) pour générer le planning.")
+                
             # 4. INDICATEURS & SYNTHÈSE
             st.markdown("### 5 & 6. Indicateurs et Synthèse")
             c1, c2, c3 = st.columns(3)
