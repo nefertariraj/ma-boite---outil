@@ -3658,25 +3658,34 @@ else:
             if "action_plan" not in dmaic_improve:
                 dmaic_improve["action_plan"] = {}
 
-            # 2. CONSTRUCTION DU PLAN D'ACTION (Fiches)
+            # 2. CONSTRUCTION DU PLAN D'ACTION (Saisie libre pour le responsable)
             st.markdown("### 2. Planification détaillée")
     
             for idx, row in df_filter.iterrows():
                 sol = row["Solution potentielle"]
         
+                # Initialisation si la clé n'existe pas
                 if sol not in dmaic_improve["action_plan"]:
                     dmaic_improve["action_plan"][sol] = {
-                        "responsable": [], "debut": date.today(), "fin": date.today(),
+                        "responsable": "", "debut": date.today(), "fin": date.today(),
                         "charge": 0, "budget": 0, "risques": "", "commentaires": "", "predecesseur": None
                     }
+        
+                # S'assurer que le responsable est une chaîne de caractères (pour la migration des données)
+                current_resp = dmaic_improve["action_plan"][sol].get("responsable", "")
+                if isinstance(current_resp, list):
+                    current_resp = ", ".join(current_resp)
         
                 # Interface de saisie
                 with st.expander(f"Action : {sol} (Priorité : {row['Priorité']})"):
                     c1, c2 = st.columns(2)
-                    dmaic_improve["action_plan"][sol]["responsable"] = c1.multiselect(
-                        f"Responsable(s) - {sol}", ["Équipe Projet", "DSI", "RH", "Finance", "Ops"], 
-                        default=dmaic_improve["action_plan"][sol]["responsable"]
+            
+                    # --- MODIFICATION ICI : Passage en text_input ---
+                    dmaic_improve["action_plan"][sol]["responsable"] = c1.text_input(
+                        f"Responsable(s) - {sol}", 
+                        value=current_resp
                     )
+            
                     dmaic_improve["action_plan"][sol]["predecesseur"] = c2.selectbox(
                         f"Action prédécesseur (optionnel)", 
                         [None] + [s for s in df_filter["Solution potentielle"] if s != sol],
@@ -3688,26 +3697,22 @@ else:
                     dmaic_improve["action_plan"][sol]["budget"] = c2.number_input(f"Budget (€) - {sol}", value=dmaic_improve["action_plan"][sol]["budget"])
                     dmaic_improve["action_plan"][sol]["risques"] = st.text_area(f"Risques - {sol}", dmaic_improve["action_plan"][sol]["risques"])
 
-            # 3. GÉNÉRATION DU GANTT
+            # 3. GÉNÉRATION DU GANTT (Corrigé pour la saisie libre)
             st.markdown("### 3. Diagramme de Gantt")
             gantt_data = []
     
             for sol, data in dmaic_improve["action_plan"].items():
-                # Nettoyage des données pour le Gantt
+                # Vérification qu'il y a bien une saisie pour le responsable et les dates
                 if data["responsable"] and data["debut"] and data["fin"]:
-                    # Convertir la liste des responsables en chaîne propre
-                    res_string = ", ".join(data["responsable"]) if isinstance(data["responsable"], list) else str(data["responsable"])
-            
                     gantt_data.append(dict(
                         Task=sol, 
-                        Start=data["debut"].strftime('%Y-%m-%d'), 
-                        Finish=data["fin"].strftime('%Y-%m-%d'), 
-                        Resource=res_string
+                        Start=str(data["debut"]), 
+                        Finish=str(data["fin"]), 
+                        Resource=str(data["responsable"]) # Maintenant une chaîne de caractères simple
                     ))
     
             if gantt_data:
                 try:
-                    # Création du Gantt avec des paramètres simplifiés
                     fig = ff.create_gantt(
                         gantt_data, 
                         index_col='Resource', 
@@ -3718,10 +3723,9 @@ else:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 except Exception as e:
-                    st.error(f"Erreur lors de la génération du graphique : {e}")
-                    st.write("Vérifiez que les dates de début et de fin sont correctement saisies pour chaque action.")
+                    st.error("Erreur de génération du Gantt. Vérifiez vos dates.")
             else:
-                st.info("Remplissez les champs (Responsable, Dates) pour générer le planning.")
+                st.info("Remplissez le responsable et les dates pour générer le planning.")
                 
             # 4. INDICATEURS & SYNTHÈSE
             st.markdown("### 5 & 6. Indicateurs et Synthèse")
