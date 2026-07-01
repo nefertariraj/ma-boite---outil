@@ -3427,11 +3427,15 @@ else:
 
                     # 2. Notation des solutions
                     cols_a_noter = edited_crit["Critère"].tolist()
-                    df_notation = df_sol.copy()
-            
-                    # On ajoute les colonnes de notation si elles n'existent pas encore
-                    for c in cols_a_noter:
-                        if c not in df_notation.columns: df_notation[c] = 3
+                    if "notation_data" in st.session_state.projects[idx]["dmaic"]["improve"]:
+                        # Si on a déjà sauvegardé des notes, on les récupère
+                        df_notation = pd.DataFrame(st.session_state.projects[idx]["dmaic"]["improve"]["notation_data"])
+                    else:
+                        # Sinon, on initialise avec des 3 par défaut
+                        df_notation = df_sol.copy()
+                        for c in cols_a_noter:
+                            if c not in df_notation.columns: 
+                                df_notation[c] = 3
             
                     st.write("### 📝 Notation des solutions")
                     
@@ -3459,16 +3463,18 @@ else:
                     # 1. On enregistre les critères
                     st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
                     
-                    # 2. On convertit le DataFrame en liste de dictionnaires pour le JSON
+                    # 2. ON ENREGISTRE LES SAISIES (C'est ici la correction)
+                    st.session_state.projects[idx]["dmaic"]["improve"]["notation_data"] = df_notes.to_dict(orient="records")
+                    
+                    # 3. On enregistre les résultats finaux
                     st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final.to_dict(orient="records")
                     
-                    # 3. APPEL DE LA FONCTION DE SAUVEGARDE 
-                    # Sauvegarde directe via JSON (si vous n'avez pas de fonction définie)
+                    # 4. APPEL DE LA FONCTION DE SAUVEGARDE 
                     import json
                     with open("projects.json", "w") as f:
                         json.dump(st.session_state.projects, f, indent=4)
                     
-                    st.success("Classement calculé et sauvegardé sur le disque !")
+                    st.success("Classement et notes sauvegardés sur le disque !")
 
                 # Affichage résultat (La parenthèse a été corrigée ici)
                 if "selection_matrix" in st.session_state.projects[idx]["dmaic"]["improve"]:
