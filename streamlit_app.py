@@ -3452,34 +3452,47 @@ else:
                     submit_notation = st.form_submit_button(label="💾 Calculer le classement final")
 
                 if submit_notation:
-                    # Calcul des scores
+                    # 1. Calcul des scores
                     df_final = df_notes.copy()
                     for _, r in edited_crit.iterrows():
                         df_final[f"Score_{r['Critère']}"] = df_final[r['Critère']] * (r['Poids'] / 100)
-            
+                    
                     df_final["Score Total"] = df_final[[f"Score_{c}" for c in cols_a_noter]].sum(axis=1)
                     df_final = df_final.sort_values(by="Score Total", ascending=False)
             
-                    # 1. On enregistre les critères
+                    # 2. Mise à jour de la mémoire temporaire (on stocke les DataFrames ici)
                     st.session_state.projects[idx]["dmaic"]["improve"]["criteria"] = edited_crit.to_dict(orient="records")
-                    
-                    # 2. ON ENREGISTRE LES SAISIES (C'est ici la correction)
                     st.session_state.projects[idx]["dmaic"]["improve"]["notation_data"] = df_notes.to_dict(orient="records")
-                    
-                    # 3. On enregistre les résultats finaux
                     st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"] = df_final.to_dict(orient="records")
                     
-                    # 4. APPEL DE LA FONCTION DE SAUVEGARDE 
-                    import json
-                    with open("projects.json", "w") as f:
-                        json.dump(st.session_state.projects, f, indent=4)
-                    
-                    st.success("Classement et notes sauvegardés sur le disque !")
+                    # 3. FONCTION DE NETTOYAGE : transforme TOUT DataFrame restant en liste
+                    def prepare_for_json(obj):
+                        if isinstance(obj, dict):
+                            return {k: prepare_for_json(v) for k, v in obj.items()}
+                        elif isinstance(obj, list):
+                            return [prepare_for_json(item) for item in obj]
+                        elif isinstance(obj, pd.DataFrame):
+                            return obj.to_dict(orient="records")
+                        else:
+                            return obj
 
-                # Affichage résultat (La parenthèse a été corrigée ici)
+                    # 4. Sauvegarde sécurisée
+                    import json
+                    try:
+                        # On nettoie tout le projet avant d'écrire
+                        data_to_save = prepare_for_json(st.session_state.projects)
+                        with open("projects.json", "w") as f:
+                            json.dump(data_to_save, f, indent=4)
+                        st.success("Classement et notes sauvegardés sur le disque !")
+                    except Exception as e:
+                        st.error(f"Erreur lors de la sauvegarde : {e}")
+
+                # Affichage résultat
                 if "selection_matrix" in st.session_state.projects[idx]["dmaic"]["improve"]:
                     st.write("### 📊 Résultats")
-                    st.dataframe(st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"])
+                    # On affiche en convertissant le JSON (list) en DataFrame pour l'affichage
+                    res_data = st.session_state.projects[idx]["dmaic"]["improve"]["selection_matrix"]
+                    st.dataframe(pd.DataFrame(res_data))
         
 
         # 3 : BENEFIT EFFORT MATRIX ---
