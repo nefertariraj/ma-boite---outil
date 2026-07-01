@@ -61,6 +61,19 @@ def synchroniser_et_capturer_tout(projet_en_cours, index_projet):
 
     return projet_en_cours
 
+def save_data():
+    """
+    Cette fonction définit ce que signifie 'save_data'.
+    Maintenant, quand vous l'appellerez dans vos boutons, 
+    le programme saura quoi faire.
+    """
+    try:
+        # On sauvegarde tout l'état du projet dans projects.json
+        with open("projects.json", "w") as f:
+            json.dump(st.session_state.projects, f, indent=4, default=str)
+    except Exception as e:
+        st.error(f"Erreur de sauvegarde : {e}")
+
 # ==========================================
 # 📋 MODÈLE DE RÉFÉRENCE UNIQUE POUR CHAQUE PROJET
 # ==========================================
