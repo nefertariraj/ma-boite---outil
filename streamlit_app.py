@@ -3769,7 +3769,7 @@ else:
             # Affichage du budget avec séparateur de milliers (espace)
             # Le formatage :,.0f crée un séparateur et replace(" ", " ") met un espace insécable
             budget_formate = f"{total_budget:,.0f}".replace(",", " ")
-            c3.metric("Budget Total (€)", budget_formate)
+            c3.metric("Budget Total (Ar)", budget_formate)
     
             # 7. VALIDATION
             if st.button("✅ Valider le Solution Action Plan"):
