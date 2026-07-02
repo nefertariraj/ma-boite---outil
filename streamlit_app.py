@@ -3853,6 +3853,9 @@ else:
                 t0_va += temp_editors[step].loc[va_mask, "Délai à T0"].sum()
                 actuel_va += temp_editors[step].loc[va_mask, "Délai Actuel"].sum()
         
+            p["future_state_map"] = st.session_state["future_state_map"]
+            p["future_macro_steps"] = st.session_state["future_macro_steps"]
+            
             p["future_metrics"] = {
                 "T0": {"LT": t0_lt, "VA": t0_va, "PCE": (t0_va/t0_lt*100) if t0_lt>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
