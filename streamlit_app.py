@@ -6,6 +6,7 @@ import scipy.stats as stats
 from datetime import datetime, date
 import json
 import io
+import copy
 
 def synchroniser_et_capturer_tout(projet_en_cours, index_projet):
     """
