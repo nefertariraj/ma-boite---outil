@@ -3841,61 +3841,52 @@ else:
                 st.session_state["future_macro_steps"].remove(step)
                 st.rerun()
 
-        # Sauvegarde et Calcul
-        if st.button("💾 Enregistrer futur état et calculer les gains", type="primary"):
-            t0_total, actuel_total = 0.0, 0.0
-            va_t0, va_actuel = 0.0, 0.0
+        # 4. SAUVEGARDE ET CALCUL (Le seul moment où les données sont figées)
+    if st.button("💾 Enregistrer futur état et calculer les gains", type="primary"):
+        t0_lt, actuel_lt = 0.0, 0.0
+        t0_va, actuel_va = 0.0, 0.0
         
-            for step in st.session_state["future_macro_steps"]:
-                st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
+        for step in st.session_state["future_macro_steps"]:
+            # On fige l'édition dans le state
+            st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
             
-                # Calculs
-                t0_total += temp_editors[step]["Délai à T0"].sum()
-                actuel_total += temp_editors[step]["Délai Actuel"].sum()
+            # Calculs consolidés
+            t0_lt += temp_editors[step]["Délai à T0"].sum()
+            actuel_lt += temp_editors[step]["Délai Actuel"].sum()
             
-                # VA
-                va_t0 += temp_editors[step][temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"]["Délai à T0"].sum()
-                va_actuel += temp_editors[step][temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"]["Délai Actuel"].sum()
+            # Filtrage VA (en gérant les cas où le type d'activité pourrait être manquant)
+            va_mask_t0 = temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"
+            t0_va += temp_editors[step].loc[va_mask_t0, "Délai à T0"].sum()
+            actuel_va += temp_editors[step].loc[va_mask_t0, "Délai Actuel"].sum()
         
-            p["future_metrics"] = {
-                "T0": {"LT": t0_total, "VA": va_t0, "PCE": (va_t0/t0_total*100) if t0_total>0 else 0},
-                "Actuel": {"LT": actuel_total, "VA": va_actuel, "PCE": (va_actuel/actuel_total*100) if actuel_total>0 else 0},
-                "Gain": t0_total - actuel_total
-            }
-            st.success("🎯 Données enregistrées et calculs mis à jour !")
+        # Calcul PCE
+        pce_t0 = (t0_va / t0_lt * 100) if t0_lt > 0 else 0
+        pce_actuel = (actuel_va / actuel_lt * 100) if actuel_lt > 0 else 0
+        
+        p["future_metrics"] = {
+            "T0": {"LT": t0_lt, "VA": t0_va, "PCE": pce_t0},
+            "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": pce_actuel},
+            "Gain": t0_lt - actuel_lt
+        }
+        st.success("🎯 Données enregistrées avec succès !")
 
-        # Rapport de Synthèse (Version sécurisée)
-        if "future_metrics" in p:
+        # RAPPORT DE SYNTHÈSE COMPARATIF
+        if "future_metrics" in p and isinstance(p["future_metrics"], dict):
             m = p["future_metrics"]
+            st.markdown("---")
+            st.subheader("📊 Synthèse : T0 (Initial) vs Actuel (Futur)")
         
-            # On vérifie si m est bien un dictionnaire avec la structure attendue
-            if isinstance(m, dict) and "T0" in m and isinstance(m["T0"], dict):
-                st.markdown("---")
-                st.subheader("📊 Synthèse des gains (Comparaison T0 vs Actuel)")
-            
-                # Extraction sécurisée
-                t0 = m.get("T0", {})
-                act = m.get("Actuel", {})
-                gain = m.get("Gain", 0)
-            
-                col1, col2, col3 = st.columns(3)
-            
-                # Calcul des deltas
-                d_lt = act.get('LT', 0) - t0.get('LT', 0)
-                d_va = act.get('VA', 0) - t0.get('VA', 0)
-                d_pce = act.get('PCE', 0) - t0.get('PCE', 0)
-            
-                col1.metric("Lead Time Total", f"{act.get('LT', 0):.1f} min", delta=f"{d_lt:.1f} min")
-                col2.metric("Total Valeur Ajoutée", f"{act.get('VA', 0):.1f} min", delta=f"{d_va:.1f} min")
-                col3.metric("Efficience du Cycle (PCE)", f"{act.get('PCE', 0):.1f}%", delta=f"{d_pce:.1f}%")
-            
-                st.metric("💰 GAIN TOTAL DE TEMPS", f"{gain:.1f} min")
-            else:
-                st.warning("⚠️ Structure des données ancienne. Veuillez cliquer sur 'Enregistrer' pour mettre à jour les métriques.")
-                # Optionnel : bouton pour forcer la réinitialisation si corrompu
-                if st.button("Réinitialiser les métriques"):
-                    del p["future_metrics"]
-                    st.rerun()
+            # Préparation des données pour le tableau comparatif
+            data_synth = {
+                "Indicateur": ["Lead Time Total (min)", "Valeur Ajoutée (min)", "Efficience (PCE %)"],
+                "Valeur T0": [f"{m['T0']['LT']:.1f}", f"{m['T0']['VA']:.1f}", f"{m['T0']['PCE']:.1f}%"],
+                "Valeur Actuel": [f"{m['Actuel']['LT']:.1f}", f"{m['Actuel']['VA']:.1f}", f"{m['Actuel']['PCE']:.1f}%"]
+            }
+        
+            st.table(pd.DataFrame(data_synth))
+        
+            # Affichage du gain final
+            st.metric("💰 GAIN TOTAL DE TEMPS", f"{m['Gain']:.1f} min")
         
 
         # 6 : FUTURE STATE FMEA ---
