@@ -3794,9 +3794,9 @@ else:
             st.session_state["future_state_map"] = copy.deepcopy(p.get("vsm_detailed_map", {}))
             st.session_state["future_macro_steps"] = list(p.get("vsm_macro_steps", []))
 
-        st.info("💡 **Instructions** : Utilisez le formulaire ci-dessous. Vos modifications ne seront prises en compte qu'après avoir cliqué sur 'Enregistrer'.")
+        st.info("💡 **Instructions** : Modifiez vos données, puis validez avec 'Enregistrer'.")
 
-        # Formulaire global pour éviter les mises à jour intempestives
+        # Formulaire global
         with st.form("future_state_form"):
             temp_editors = {}
 
@@ -3805,64 +3805,65 @@ else:
                 data = st.session_state["future_state_map"].get(step, [])
                 df_future = pd.DataFrame(data)
             
-                # Affichage en édition
+                # --- ÉTAPE DE NORMALISATION (Correction du KeyError) ---
+                # On s'assure que les colonnes attendues existent
+                mapping = {
+                    "Détail de la tâche": "Détail de la tâche",
+                    "Valeur": "Délai à T0", # Cas où l'import vient de Measure
+                    "Unité": "Unité",
+                    "Type d'activité": "Type d'activité"
+                }
+                # Renommage automatique si les colonnes Measure sont trouvées
+                df_future = df_future.rename(columns={"Valeur": "Délai à T0"})
+            
+                # Création des colonnes manquantes si nécessaire
+                if "Délai à T0" not in df_future.columns: df_future["Délai à T0"] = 0.0
+                if "Unité" not in df_future.columns: df_future["Unité"] = "Minutes"
+                if "Type d'activité" not in df_future.columns: df_future["Type d'activité"] = "VA (Valeur Ajoutée)"
+                if "Délai Actuel" not in df_future.columns: df_future["Délai Actuel"] = df_future["Délai à T0"]
+
+                # Sélection propre des colonnes
+                cols_to_use = ["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]
+                df_display = df_future[cols_to_use]
+            
                 edited_df = st.data_editor(
-                    df_future[["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]],
+                    df_display,
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_{step}"
                 )
                 temp_editors[step] = edited_df
 
-            # Ajout/Suppression de sections
-            st.markdown("---")
-            new_section = st.text_input("Nom de la nouvelle section à ajouter :")
-        
             submitted = st.form_submit_button("💾 Enregistrer et Calculer les gains", type="primary")
 
-        # Logique de gestion des sections (hors formulaire pour éviter les recharges)
+        # Gestion des sections (Hors formulaire pour éviter la suppression involontaire)
+        new_section = st.text_input("Nom de la nouvelle section :")
         if st.button("➕ Ajouter la section"):
             if new_section and new_section not in st.session_state["future_macro_steps"]:
                 st.session_state["future_macro_steps"].append(new_section)
-                st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "min", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
+                st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # Logique après soumission du formulaire
+        # Logique après soumission
         if submitted:
             t0_lt, actuel_lt = 0.0, 0.0
             t0_va, actuel_va = 0.0, 0.0
         
             for step in st.session_state["future_macro_steps"]:
-                # Sauvegarde des données
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
-            
-                # Calculs
                 t0_lt += temp_editors[step]["Délai à T0"].sum()
                 actuel_lt += temp_editors[step]["Délai Actuel"].sum()
-            
-                va_mask_t0 = temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"
-                t0_va += temp_editors[step].loc[va_mask_t0, "Délai à T0"].sum()
-                actuel_va += temp_editors[step].loc[va_mask_t0, "Délai Actuel"].sum()
+                va_mask = temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"
+                t0_va += temp_editors[step].loc[va_mask, "Délai à T0"].sum()
+                actuel_va += temp_editors[step].loc[va_mask, "Délai Actuel"].sum()
         
             p["future_metrics"] = {
                 "T0": {"LT": t0_lt, "VA": t0_va, "PCE": (t0_va/t0_lt*100) if t0_lt>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
                 "Gain": t0_lt - actuel_lt
             }
-            st.success("🎯 Modifications enregistrées !")
-            st.rerun() # Rafraîchir pour afficher la synthèse à jour
-
-        # Rapport de Synthèse
-        if "future_metrics" in p and isinstance(p["future_metrics"], dict):
-            m = p["future_metrics"]
-            st.markdown("### 📊 Synthèse : T0 vs Actuel")
-            data_synth = {
-                "Indicateur": ["Lead Time Total (min)", "Valeur Ajoutée (min)", "Efficience (PCE %)"],
-                "Valeur T0": [f"{m['T0']['LT']:.1f}", f"{m['T0']['VA']:.1f}", f"{m['T0']['PCE']:.1f}%"],
-                "Valeur Actuel": [f"{m['Actuel']['LT']:.1f}", f"{m['Actuel']['VA']:.1f}", f"{m['Actuel']['PCE']:.1f}%"]
-            }
-            st.table(pd.DataFrame(data_synth))
-            st.metric("💰 GAIN TOTAL DE TEMPS", f"{m['Gain']:.1f} min")
+            st.success("🎯 Données enregistrées !")
+            st.rerun()
         
 
         # 6 : FUTURE STATE FMEA ---
