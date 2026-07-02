@@ -3864,18 +3864,33 @@ else:
             }
             st.success("🎯 Données enregistrées et calculs mis à jour !")
 
-        # Rapport de Synthèse
+        # Rapport de Synthèse (Version sécurisée)
         if "future_metrics" in p:
             m = p["future_metrics"]
-            st.markdown("---")
-            st.subheader("📊 Synthèse des gains (Comparaison T0 vs Actuel)")
         
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Lead Time Total", f"{m['Actuel']['LT']:.1f} min", delta=f"{m['Actuel']['LT'] - m['T0']['LT']:.1f} min")
-            col2.metric("Total Valeur Ajoutée", f"{m['Actuel']['VA']:.1f} min", delta=f"{m['Actuel']['VA'] - m['T0']['VA']:.1f} min")
-            col3.metric("Efficience du Cycle (PCE)", f"{m['Actuel']['PCE']:.1f}%", delta=f"{m['Actuel']['PCE'] - m['T0']['PCE']:.1f}%")
-        
-            st.metric("💰 GAIN TOTAL DE TEMPS", f"{m['Gain']:.1f} min")
+            # Vérification de sécurité : on s'assure que les clés existent
+            if all(k in m for k in ["T0", "Actuel", "Gain"]):
+                st.markdown("---")
+                st.subheader("📊 Synthèse des gains (Comparaison T0 vs Actuel)")
+            
+                # Extraction sécurisée des valeurs avec .get()
+                t0 = m.get("T0", {})
+                act = m.get("Actuel", {})
+            
+                col1, col2, col3 = st.columns(3)
+            
+                # Calcul des deltas sécurisé
+                delta_lt = act.get('LT', 0) - t0.get('LT', 0)
+                delta_va = act.get('VA', 0) - t0.get('VA', 0)
+                delta_pce = act.get('PCE', 0) - t0.get('PCE', 0)
+            
+                col1.metric("Lead Time Total", f"{act.get('LT', 0):.1f} min", delta=f"{delta_lt:.1f} min")
+                col2.metric("Total Valeur Ajoutée", f"{act.get('VA', 0):.1f} min", delta=f"{delta_va:.1f} min")
+                col3.metric("Efficience du Cycle (PCE)", f"{act.get('PCE', 0):.1f}%", delta=f"{delta_pce:.1f}%")
+            
+                st.metric("💰 GAIN TOTAL DE TEMPS", f"{m.get('Gain', 0):.1f} min")
+            else:
+                st.error("Les données de synthèse sont corrompues. Veuillez cliquer à nouveau sur 'Enregistrer' pour recalculer.")
         
 
         # 6 : FUTURE STATE FMEA ---
