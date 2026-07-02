@@ -3841,38 +3841,40 @@ else:
 
         # Logique après soumission
         if submitted:
-            # 1. Mise à jour du session_state avec les valeurs éditées
+            # 1. SYNCHRONISATION CRUCIALE : On récupère chaque éditeur et on écrase l'état
+            # Cela garantit que même si vous avez modifié/supprimé des lignes, c'est ce qui est dans 
+            # 'temp_editors' qui fait foi.
             for step in st.session_state["future_macro_steps"]:
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
-    
-            # 2. Calcul du T0 (RÉFÉRENCE ORIGINALE : vsm_detailed_map)
+            
+            # 2. CALCULS BASÉS SUR LA RÉFÉRENCE ORIGINALE (p["vsm_detailed_map"])
             t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
                 for item in original_map[step]:
-                    val = item.get("Valeur", 0.0)
+                    val = item.get("Valeur", 0.0) 
                     t0_lt_ref += val
                     if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
                         t0_va_ref += val
 
-            # 3. Calcul de l'ACTUEL (depuis les tableaux édités)
+            # 3. CALCULS BASÉS SUR LE NOUVEAU DÉLAI ACTUEL (Utilisation des données tout juste synchronisées)
             actuel_lt, actuel_va = 0.0, 0.0
             for step in st.session_state["future_macro_steps"]:
                 df = pd.DataFrame(st.session_state["future_state_map"][step])
                 actuel_lt += df["Délai Actuel"].sum()
                 va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                 actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
-
-            # 4. SYNCHRONISATION TOTALE AVEC 'p' (Pour la sauvegarde JSON)
+            
+            # 4. MISE À JOUR DE p POUR LA SAUVEGARDE JSON (Copie profonde indispensable)
             p["future_state_map"] = copy.deepcopy(st.session_state["future_state_map"])
             p["future_macro_steps"] = list(st.session_state["future_macro_steps"])
-    
             p["future_metrics"] = {
                 "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
                 "Gain": t0_lt_ref - actuel_lt
             }
-            st.success("🎯 Données enregistrées et gains recalculés !")
+            
+            st.success("🎯 Données verrouillées et projet mis à jour !")
             st.rerun()
 
         # Affichage des résultats
