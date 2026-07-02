@@ -3788,7 +3788,87 @@ else:
 
         # 5 : FUTURE STATE PROCESS MAP ---
         st.subheader("5. Future state process map")
+        
+        # 1. INITIALISATION DES DONNÉES (Import T0 vers Futur)
+            if "future_state_map" not in st.session_state:
+                # On clone la structure Measure pour créer la référence T0
+                st.session_state["future_state_map"] = copy.deepcopy(p.get("vsm_detailed_map", {}))
+                st.session_state["future_macro_steps"] = list(p.get("vsm_macro_steps", []))
+                st.session_state["future_totals"] = {"section_totals": {step: 0.0 for step in st.session_state["future_macro_steps"]}}
 
+            # 2. INTERFACE D'ÉDITION
+            st.info("💡 **Instructions** : Saisissez les délais 'Actuels' pour calculer automatiquement les gains par rapport au T0.")
+    
+            current_future_editors = {}
+
+            for step in st.session_state["future_macro_steps"]:
+                st.subheader(f"Section : {step}")
+        
+                # Récupération des données T0
+                t0_data = st.session_state["future_state_map"].get(step, [])
+                df_future = pd.DataFrame(t0_data)
+        
+                # S'assurer que les colonnes nécessaires existent
+                if "Délai à T0" not in df_future.columns:
+                    df_future["Délai à T0"] = df_future["Valeur"]
+                    df_future["Délai Actuel"] = df_future["Valeur"]
+                    df_future["Type de changement"] = "Inchangé"
+                    df_future["Solution associée"] = "Aucune"
+
+                # Éditeur de données
+                edited_df = st.data_editor(
+                    df_future,
+                    column_config={
+                        "Délai à T0": st.column_config.NumberColumn(disabled=True),
+                        "Type de changement": st.column_config.SelectboxColumn(
+                            options=["Inchangé", "Simplifié", "Automatisé", "Supprimé", "Fusionné", "Ajouté", "Standardisé"]
+                        ),
+                        "Solution associée": st.column_config.SelectboxColumn(
+                            options=p.get("solution_action_plan_list", ["-"]), # Assurez-vous que cette liste existe
+                        )
+                    },
+                    use_container_width=True
+                )
+        
+                # Calcul des gains ligne par ligne
+                edited_df["Gain de délai"] = edited_df["Délai à T0"] - edited_df["Délai Actuel"]
+                edited_df["Gain (%)"] = ((edited_df["Délai à T0"] - edited_df["Délai Actuel"]) / edited_df["Délai à T0"].replace(0, 1)) * 100
+        
+                current_future_editors[step] = edited_df
+
+            # 3. RAPPORT GLOBAL ET SAUVEGARDE
+            if st.button("💾 Enregistrer le Futur État & Calculer les Gains", type="primary"):
+                t0_global = 0.0
+                actuel_global = 0.0
+        
+                for step in st.session_state["future_macro_steps"]:
+                    df = current_future_editors[step]
+                    st.session_state["future_state_map"][step] = df.to_dict('records')
+                    t0_global += df["Délai à T0"].sum()
+                    actuel_global += df["Délai Actuel"].sum()
+
+                # Calcul des métriques globales
+                gain_abs = t0_global - actuel_global
+                gain_pct = ((t0_global - actuel_global) / t0_global * 100) if t0_global > 0 else 0
+
+                # Sauvegarde dans le dictionnaire projet 'p'
+                p["future_state_map"] = st.session_state["future_state_map"]
+                p["future_metrics"] = {"T0_Total": t0_global, "Actuel_Total": actuel_global, "Gain_Abs": gain_abs, "Gain_Pct": gain_pct}
+        
+                st.success("🎯 État futur enregistré et gains calculés !")
+
+            # 4. AFFICHAGE DU RAPPORT
+            if "future_metrics" in p:
+                m = p["future_metrics"]
+                st.markdown("### 📊 Rapport de Synthèse des Gains")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Gain Temps Absolu", f"{m['Gain_Abs']:.1f} min")
+                c2.metric("Réduction Globale", f"{m['Gain_Pct']:.1f}%")
+                c3.metric("Temps Actuel Cible", f"{m['Actuel_Total']:.1f} min")
+
+                # Vérification de cohérence simple
+                if m['Actuel_Total'] > m['T0_Total']:
+                    st.warning("⚠️ Attention : Le temps total actuel est supérieur au temps T0.")
         
 
         # 6 : FUTURE STATE FMEA ---
