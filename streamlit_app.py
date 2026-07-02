@@ -3801,9 +3801,11 @@ else:
             temp_editors = {}
 
             for step in st.session_state["future_macro_steps"]:
-                # --- AJOUT DU BOUTON SUPPRIMER SECTION ---
                 col_head1, col_head2 = st.columns([0.8, 0.2])
                 col_head1.subheader(f"Section : {step}")
+        
+                # Le bouton de suppression doit être géré avec un flag ou en dehors du form si possible,
+                # mais pour rester dans votre structure :
                 if col_head2.form_submit_button(f"🗑️ Supprimer {step}"):
                     st.session_state["future_macro_steps"].remove(step)
                     del st.session_state["future_state_map"][step]
@@ -3811,19 +3813,19 @@ else:
 
                 data = st.session_state["future_state_map"].get(step, [])
                 df_future = pd.DataFrame(data)
-            
+    
                 # Normalisation
                 df_future = df_future.rename(columns={"Valeur": "Délai à T0"})
-                if "Délai à T0" not in df_future.columns: df_future["Délai à T0"] = 0.0
+                for col in ["Délai à T0", "Délai Actuel"]:
+                    if col not in df_future.columns: df_future[col] = 0.0
                 if "Unité" not in df_future.columns: df_future["Unité"] = "Minutes"
                 if "Type d'activité" not in df_future.columns: df_future["Type d'activité"] = "VA (Valeur Ajoutée)"
-                if "Délai Actuel" not in df_future.columns: df_future["Délai Actuel"] = df_future["Délai à T0"]
 
                 cols_to_use = ["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]
-                df_display = df_future[cols_to_use]
-            
+        
+                # IMPORTANT : On utilise le session_state comme source
                 edited_df = st.data_editor(
-                    df_display,
+                    df_future[cols_to_use],
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_{step}"
@@ -3832,52 +3834,39 @@ else:
 
             submitted = st.form_submit_button("💾 Enregistrer et Calculer les gains", type="primary")
 
-        # Gestion des sections (Hors formulaire pour éviter la suppression involontaire)
-        new_section = st.text_input("Nom de la nouvelle section :")
-        if st.button("➕ Ajouter la section"):
-            if new_section and new_section not in st.session_state["future_macro_steps"]:
-                st.session_state["future_macro_steps"].append(new_section)
-                st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
-                st.rerun()
-
-        # Logique après soumission
+        # Logique de soumission
         if submitted:
-            # 1. CALCULS BASÉS SUR LA RÉFÉRENCE ORIGINALE (p["vsm_detailed_map"])
-            t0_lt_ref = 0.0
-            t0_va_ref = 0.0
-            
-            # On parcourt la structure originale de la phase Mesure pour le T0
+            # 1. Mise à jour immédiate du session_state AVANT les calculs
+            for step in st.session_state["future_macro_steps"]:
+                st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
+    
+            # 2. Calcul du T0 (RÉFÉRENCE ORIGINALE)
+            t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
                 for item in original_map[step]:
-                    # On utilise les clés originales de la phase Mesure
-                    valeur = item.get("Valeur", 0.0) 
-                    t0_lt_ref += valeur
+                    val = item.get("Valeur", 0.0)
+                    t0_lt_ref += val
                     if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
-                        t0_va_ref += valeur
+                        t0_va_ref += val
 
-            # 2. CALCULS BASÉS SUR LE NOUVEAU DÉLAI ACTUEL (Tableaux édités)
-            actuel_lt = 0.0
-            actuel_va = 0.0
-            
+            # 3. Calcul de l'ACTUEL (depuis le session_state mis à jour)
+            actuel_lt, actuel_va = 0.0, 0.0
             for step in st.session_state["future_macro_steps"]:
-                st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
-                # On ne prend que le "Délai Actuel" ici
-                actuel_lt += temp_editors[step]["Délai Actuel"].sum()
-                
-                va_mask = temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"
-                actuel_va += temp_editors[step].loc[va_mask, "Délai Actuel"].sum()
-            
-            # 3. MISE À JOUR DE p POUR LA SAUVEGARDE ET LES RÉSULTATS
-            p["future_state_map"] = st.session_state["future_state_map"]
-            p["future_macro_steps"] = st.session_state["future_macro_steps"]
-            
+                df = pd.DataFrame(st.session_state["future_state_map"][step])
+                actuel_lt += df["Délai Actuel"].sum()
+                va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
+                actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
+
+            # 4. SYNCHRONISATION TOTALE AVEC 'p' (Pour votre sauvegarde JSON)
+            p["future_state_map"] = copy.deepcopy(st.session_state["future_state_map"])
+            p["future_macro_steps"] = list(st.session_state["future_macro_steps"])
             p["future_metrics"] = {
                 "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
                 "Gain": t0_lt_ref - actuel_lt
             }
-            st.success("🎯 Données enregistrées et gains recalculés par rapport au T0 initial !")
+            st.success("🎯 Données enregistrées dans le projet !")
             st.rerun()
 
         # --- NOUVEAU BLOC : Affichage permanent des résultats ---
