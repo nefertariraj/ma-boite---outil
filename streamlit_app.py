@@ -3786,24 +3786,13 @@ else:
                     save_data()
                     st.success("Plan validé et transmis aux étapes suivantes (FMEA, Future State).")
 
-        
-        # 5 : PILOT PLAN ---
-        st.subheader("5. Pilot plan")
-    
-
-        
-        # 6 : ACTION PLAN ---
-        st.subheader("6. Action plan")
+        # 5 : FUTURE STATE PROCESS MAP ---
+        st.subheader("5. Future state process map")
 
         
 
-        # 7 : FUTURE STATE PROCESS MAP ---
-        st.subheader("7. Future state process map")
-
-        
-
-        # 8 : FUTURE STATE FMEA ---
-        st.subheader("7. Future state FMEA")
+        # 6 : FUTURE STATE FMEA ---
+        st.subheader("6. Future state FMEA")
 
     
     
