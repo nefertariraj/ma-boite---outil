@@ -3651,8 +3651,8 @@ else:
             # Récupération des données retenues
             df_results = pd.DataFrame(dmaic_improve["benefit_effort_results"])
     
-            # 1. FILTRE DE SÉLECTION
-            st.markdown("### 1. Sélection des solutions à déployer")
+            # a. FILTRE DE SÉLECTION
+            st.markdown("### a. Sélection des solutions à déployer")
             filtre = st.selectbox(
                 "Priorité minimale à déployer",
                 ["Toutes les solutions", "Très Haute + Haute + Moyenne", "Très Haute + Haute", "Très Haute uniquement"]
@@ -3671,8 +3671,8 @@ else:
             if "action_plan" not in dmaic_improve:
                 dmaic_improve["action_plan"] = {}
 
-            # 2. CONSTRUCTION DU PLAN D'ACTION (Saisie libre pour le responsable)
-            st.markdown("### 2. Planification détaillée")
+            # b. CONSTRUCTION DU PLAN D'ACTION (Saisie libre pour le responsable)
+            st.markdown("### b. Planification détaillée")
     
             if "action_plan" not in dmaic_improve:
                 dmaic_improve["action_plan"] = {}
@@ -3723,8 +3723,8 @@ else:
                             save_data() 
                             st.success(f"Action '{sol}' enregistrée !")
                         
-            # 3. GÉNÉRATION DU GANTT (Corrigé pour la saisie libre)
-            st.markdown("### 3. Diagramme de Gantt")
+            # c. GÉNÉRATION DU GANTT (Corrigé pour la saisie libre)
+            st.markdown("### c. Diagramme de Gantt")
             gantt_data = []
     
             for sol, data in dmaic_improve["action_plan"].items():
@@ -3753,8 +3753,8 @@ else:
             else:
                 st.info("Remplissez le responsable et les dates pour générer le planning.")
                 
-            # 4. INDICATEURS & SYNTHÈSE
-            st.markdown("### 5 & 6. Indicateurs et Synthèse")
+            # d. INDICATEURS & SYNTHÈSE
+            st.markdown("### d. Indicateurs et Synthèse")
             c1, c2, c3 = st.columns(3)
 
             # Calcul des totaux
@@ -3771,7 +3771,7 @@ else:
             budget_formate = f"{total_budget:,.0f}".replace(",", " ")
             c3.metric("Budget Total (Ar)", budget_formate)
     
-            # 7. VALIDATION
+            # e. VALIDATION
             if st.button("✅ Valider le Solution Action Plan"):
                 # Vérification
                 errors = []
