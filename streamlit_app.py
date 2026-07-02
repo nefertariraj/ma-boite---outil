@@ -3860,7 +3860,23 @@ else:
             }
             st.success("🎯 Données enregistrées !")
             st.rerun()
+
+        # --- NOUVEAU BLOC : Affichage permanent des résultats ---
+        # On affiche les résultats si le flag est actif OU si les données existent dans 'p'
+        if "future_metrics" in p:
+            m = p["future_metrics"]
+            st.markdown("### 📊 Synthèse des gains")
         
+            # Tableau comparatif
+            data_synth = {
+                "Indicateur": ["Lead Time Total (min)", "Valeur Ajoutée (min)", "Efficience (PCE %)"],
+                "Valeur T0": [f"{m['T0']['LT']:.1f}", f"{m['T0']['VA']:.1f}", f"{m['T0']['PCE']:.1f}%"],
+                "Valeur Actuel": [f"{m['Actuel']['LT']:.1f}", f"{m['Actuel']['VA']:.1f}", f"{m['Actuel']['PCE']:.1f}%"]
+            }
+            st.table(pd.DataFrame(data_synth))
+        
+            # Metric de gain
+            st.metric("💰 GAIN TOTAL DE TEMPS", f"{m['Gain']:.1f} min")
 
         # 6 : FUTURE STATE FMEA ---
         st.subheader("6. Future state FMEA")
