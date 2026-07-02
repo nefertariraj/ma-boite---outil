@@ -3801,28 +3801,24 @@ else:
             temp_editors = {}
 
             for step in st.session_state["future_macro_steps"]:
-                st.subheader(f"Section : {step}")
+                # --- AJOUT DU BOUTON SUPPRIMER SECTION ---
+                col_head1, col_head2 = st.columns([0.8, 0.2])
+                col_head1.subheader(f"Section : {step}")
+                if col_head2.form_submit_button(f"🗑️ Supprimer {step}"):
+                    st.session_state["future_macro_steps"].remove(step)
+                    del st.session_state["future_state_map"][step]
+                    st.rerun()
+
                 data = st.session_state["future_state_map"].get(step, [])
                 df_future = pd.DataFrame(data)
             
-                # --- ÉTAPE DE NORMALISATION (Correction du KeyError) ---
-                # On s'assure que les colonnes attendues existent
-                mapping = {
-                    "Détail de la tâche": "Détail de la tâche",
-                    "Valeur": "Délai à T0", # Cas où l'import vient de Measure
-                    "Unité": "Unité",
-                    "Type d'activité": "Type d'activité"
-                }
-                # Renommage automatique si les colonnes Measure sont trouvées
+                # Normalisation
                 df_future = df_future.rename(columns={"Valeur": "Délai à T0"})
-            
-                # Création des colonnes manquantes si nécessaire
                 if "Délai à T0" not in df_future.columns: df_future["Délai à T0"] = 0.0
                 if "Unité" not in df_future.columns: df_future["Unité"] = "Minutes"
                 if "Type d'activité" not in df_future.columns: df_future["Type d'activité"] = "VA (Valeur Ajoutée)"
                 if "Délai Actuel" not in df_future.columns: df_future["Délai Actuel"] = df_future["Délai à T0"]
 
-                # Sélection propre des colonnes
                 cols_to_use = ["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]
                 df_display = df_future[cols_to_use]
             
