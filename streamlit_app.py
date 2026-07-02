@@ -3756,9 +3756,20 @@ else:
             # 4. INDICATEURS & SYNTHÈSE
             st.markdown("### 5 & 6. Indicateurs et Synthèse")
             c1, c2, c3 = st.columns(3)
-            c1.metric("Nb Actions", len(dmaic_improve["action_plan"]))
-            c2.metric("Charge Totale (JH)", sum(d['charge'] for d in dmaic_improve["action_plan"].values()))
-            c3.metric("Budget Total (€)", sum(d['budget'] for d in dmaic_improve["action_plan"].values()))
+
+            # Calcul des totaux
+            nb_actions = len(dmaic_improve["action_plan"])
+            total_charge = sum(d['charge'] for d in dmaic_improve["action_plan"].values())
+            total_budget = sum(d['budget'] for d in dmaic_improve["action_plan"].values())
+
+            # Affichage des métriques
+            c1.metric("Nb Actions", nb_actions)
+            c2.metric("Charge Totale (JH)", f"{total_charge:,.0f}".replace(",", " "))
+
+            # Affichage du budget avec séparateur de milliers (espace)
+            # Le formatage :,.0f crée un séparateur et replace(" ", " ") met un espace insécable
+            budget_formate = f"{total_budget:,.0f}".replace(",", " ")
+            c3.metric("Budget Total (€)", budget_formate)
     
             # 7. VALIDATION
             if st.button("✅ Valider le Solution Action Plan"):
