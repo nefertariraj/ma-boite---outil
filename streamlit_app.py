@@ -3795,72 +3795,72 @@ else:
             st.session_state["future_state_map"] = copy.deepcopy(p.get("vsm_detailed_map", {}))
             st.session_state["future_macro_steps"] = list(p.get("vsm_macro_steps", []))
 
-        # 2. INTERFACE D'ÉDITION AVEC GESTION DYNAMIQUE
-        st.info("💡 **Instructions** : Modifiez les délais, ajoutez/supprimez des sections ou lignes. Rien n'est enregistré tant que vous ne cliquez pas sur 'Enregistrer'.")
+        st.info("💡 **Instructions** : Modifiez les délais, ajoutez/supprimez des sections ou lignes. Enregistrez pour calculer les gains.")
     
-        # Dictionnaire temporaire pour stocker les éditions avant validation
         temp_editors = {}
 
         for step in st.session_state["future_macro_steps"]:
             st.subheader(f"Section : {step}")
         
-            # Récupération de la structure
+            # Récupération et préparation des données
             data = st.session_state["future_state_map"].get(step, [])
             df_future = pd.DataFrame(data)
         
-            # Nettoyage et préparation des colonnes (si import depuis Measure)
+            # Renommage et ajustement des colonnes (Gestion de l'import Measure)
             if "Valeur" in df_future.columns:
                 df_future = df_future.rename(columns={"Valeur": "Délai à T0"})
         
+            # S'assurer que l'unité existe (par défaut 'Minutes')
+            if "Unité" not in df_future.columns:
+                df_future["Unité"] = "Minutes"
+            
             if "Délai Actuel" not in df_future.columns:
                 df_future["Délai Actuel"] = df_future["Délai à T0"]
         
-            # Éditeur de données : ajout/suppression de lignes autorisé
+            # Sélection et ordre des colonnes : Détail, T0, Unité, Actuel
+            df_display = df_future[["Détail de la tâche", "Délai à T0", "Unité", "Délai Actuel"]]
+        
+            # Éditeur avec largeur ajustée (width="small" pour les colonnes numériques/unités)
             edited_df = st.data_editor(
-                df_future[["Détail de la tâche", "Délai à T0", "Délai Actuel"]],
+                df_display,
                 num_rows="dynamic",
                 column_config={
-                    "Délai à T0": st.column_config.NumberColumn(disabled=True), # Lecture seule
-                    "Délai Actuel": st.column_config.NumberColumn(min_value=0.0, format="%.1f")
+                    "Détail de la tâche": st.column_config.TextColumn("Détail de la tâche", width="large"),
+                    "Délai à T0": st.column_config.NumberColumn("Délai à T0", disabled=True, width="small"),
+                    "Unité": st.column_config.TextColumn("Unité", disabled=True, width="small"),
+                    "Délai Actuel": st.column_config.NumberColumn("Délai Actuel", min_value=0.0, format="%.1f", width="small")
                 },
                 use_container_width=True,
                 key=f"editor_{step}"
             )
             temp_editors[step] = edited_df
         
-            # Optionnel : bouton pour supprimer la section
             if st.button(f"🗑️ Supprimer la section {step}", key=f"del_{step}"):
                 st.session_state["future_macro_steps"].remove(step)
                 st.rerun()
 
-        # 3. GESTION DES SECTIONS
+        # Gestion des sections et Sauvegarde
         new_step_name = st.text_input("Nom de la nouvelle section")
         if st.button("➕ Ajouter une section"):
             if new_step_name and new_step_name not in st.session_state["future_macro_steps"]:
                 st.session_state["future_macro_steps"].append(new_step_name)
-                st.session_state["future_state_map"][new_step_name] = [{"Détail de la tâche": "Nouvelle action", "Délai à T0": 0.0, "Délai Actuel": 0.0}]
+                st.session_state["future_state_map"][new_step_name] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # 4. SAUVEGARDE ET CALCUL FINAL
         if st.button("💾 Enregistrer futur état et calculer les gains", type="primary"):
             t0_total = 0.0
             actuel_total = 0.0
         
             for step in st.session_state["future_macro_steps"]:
-                # Sauvegarde de la version éditée
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
-                # Calculs
                 t0_total += temp_editors[step]["Délai à T0"].sum()
                 actuel_total += temp_editors[step]["Délai Actuel"].sum()
         
-            # Stockage dans 'p' pour persistance JSON
             p["future_state_map"] = st.session_state["future_state_map"]
-            p["future_macro_steps"] = st.session_state["future_macro_steps"]
             p["future_metrics"] = {"T0": t0_total, "Actuel": actuel_total, "Gain": t0_total - actuel_total}
-        
-            st.success("🎯 Données enregistrées ! Rapport disponible ci-dessous.")
+            st.success("🎯 Données enregistrées ! Rapport mis à jour.")
 
-        # 5. RAPPORT FINAL (Comparaison)
+        # Rapport Final
         if "future_metrics" in p:
             m = p["future_metrics"]
             st.markdown("---")
