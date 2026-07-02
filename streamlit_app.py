@@ -3790,37 +3790,34 @@ else:
         # 5 : FUTURE STATE PROCESS MAP ---
         st.subheader("5. Future state process map")
         
-        # 1. INITIALISATION DES DONNÉES
         if "future_state_map" not in st.session_state:
             st.session_state["future_state_map"] = copy.deepcopy(p.get("vsm_detailed_map", {}))
             st.session_state["future_macro_steps"] = list(p.get("vsm_macro_steps", []))
 
-        st.info("💡 **Instructions** : Modifiez les délais, ajoutez/supprimez des sections ou lignes. Enregistrez pour calculer les gains.")
+        st.info("💡 **Instructions** : Modifiez les délais, ajoutez/supprimez des sections ou lignes. Rien n'est enregistré tant que vous ne cliquez pas sur le bouton dédié.")
     
         temp_editors = {}
 
         for step in st.session_state["future_macro_steps"]:
             st.subheader(f"Section : {step}")
         
-            # Récupération et préparation des données
             data = st.session_state["future_state_map"].get(step, [])
             df_future = pd.DataFrame(data)
         
-            # Renommage et ajustement des colonnes (Gestion de l'import Measure)
+            # Préparation des colonnes
             if "Valeur" in df_future.columns:
                 df_future = df_future.rename(columns={"Valeur": "Délai à T0"})
-        
-            # S'assurer que l'unité existe (par défaut 'Minutes')
             if "Unité" not in df_future.columns:
                 df_future["Unité"] = "Minutes"
-            
+            if "Type d'activité" not in df_future.columns:
+                df_future["Type d'activité"] = "VA (Valeur Ajoutée)"
             if "Délai Actuel" not in df_future.columns:
                 df_future["Délai Actuel"] = df_future["Délai à T0"]
         
-            # Sélection et ordre des colonnes : Détail, T0, Unité, Actuel
-            df_display = df_future[["Détail de la tâche", "Délai à T0", "Unité", "Délai Actuel"]]
+            # Colonnes affichées
+            df_display = df_future[["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]]
         
-            # Éditeur avec largeur ajustée (width="small" pour les colonnes numériques/unités)
+            # Éditeur (non réactif en temps réel pour le dictionnaire 'p')
             edited_df = st.data_editor(
                 df_display,
                 num_rows="dynamic",
@@ -3828,6 +3825,11 @@ else:
                     "Détail de la tâche": st.column_config.TextColumn("Détail de la tâche", width="large"),
                     "Délai à T0": st.column_config.NumberColumn("Délai à T0", disabled=True, width="small"),
                     "Unité": st.column_config.TextColumn("Unité", disabled=True, width="small"),
+                    "Type d'activité": st.column_config.SelectboxColumn(
+                        "Type d'activité (Lean)",
+                        options=["VA (Valeur Ajoutée)", "NVA (Non Valeur Ajoutée)", "BNRVA (Business Necessary, Non-Value Added)", "Temps d'attente / Stock"],
+                        width="medium"
+                    ),
                     "Délai Actuel": st.column_config.NumberColumn("Délai Actuel", min_value=0.0, format="%.1f", width="small")
                 },
                 use_container_width=True,
@@ -3839,36 +3841,41 @@ else:
                 st.session_state["future_macro_steps"].remove(step)
                 st.rerun()
 
-        # Gestion des sections et Sauvegarde
-        new_step_name = st.text_input("Nom de la nouvelle section")
-        if st.button("➕ Ajouter une section"):
-            if new_step_name and new_step_name not in st.session_state["future_macro_steps"]:
-                st.session_state["future_macro_steps"].append(new_step_name)
-                st.session_state["future_state_map"][new_step_name] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Délai Actuel": 0.0}]
-                st.rerun()
-
+        # Sauvegarde et Calcul
         if st.button("💾 Enregistrer futur état et calculer les gains", type="primary"):
-            t0_total = 0.0
-            actuel_total = 0.0
+            t0_total, actuel_total = 0.0, 0.0
+            va_t0, va_actuel = 0.0, 0.0
         
             for step in st.session_state["future_macro_steps"]:
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
+            
+                # Calculs
                 t0_total += temp_editors[step]["Délai à T0"].sum()
                 actuel_total += temp_editors[step]["Délai Actuel"].sum()
+            
+                # VA
+                va_t0 += temp_editors[step][temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"]["Délai à T0"].sum()
+                va_actuel += temp_editors[step][temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"]["Délai Actuel"].sum()
         
-            p["future_state_map"] = st.session_state["future_state_map"]
-            p["future_metrics"] = {"T0": t0_total, "Actuel": actuel_total, "Gain": t0_total - actuel_total}
-            st.success("🎯 Données enregistrées ! Rapport mis à jour.")
+            p["future_metrics"] = {
+                "T0": {"LT": t0_total, "VA": va_t0, "PCE": (va_t0/t0_total*100) if t0_total>0 else 0},
+                "Actuel": {"LT": actuel_total, "VA": va_actuel, "PCE": (va_actuel/actuel_total*100) if actuel_total>0 else 0},
+                "Gain": t0_total - actuel_total
+            }
+            st.success("🎯 Données enregistrées et calculs mis à jour !")
 
-        # Rapport Final
+        # Rapport de Synthèse
         if "future_metrics" in p:
             m = p["future_metrics"]
             st.markdown("---")
-            st.subheader("📊 Synthèse des gains")
+            st.subheader("📊 Synthèse des gains (Comparaison T0 vs Actuel)")
+        
             col1, col2, col3 = st.columns(3)
-            col1.metric("Délai T0 Initial", f"{m['T0']:.1f} min")
-            col2.metric("Délai Actuel", f"{m['Actuel']:.1f} min")
-            col3.metric("Gain total", f"{m['Gain']:.1f} min", delta=f"{-(m['Gain']/m['T0']*100 if m['T0']>0 else 0):.1f}%")
+            col1.metric("Lead Time Total", f"{m['Actuel']['LT']:.1f} min", delta=f"{m['Actuel']['LT'] - m['T0']['LT']:.1f} min")
+            col2.metric("Total Valeur Ajoutée", f"{m['Actuel']['VA']:.1f} min", delta=f"{m['Actuel']['VA'] - m['T0']['VA']:.1f} min")
+            col3.metric("Efficience du Cycle (PCE)", f"{m['Actuel']['PCE']:.1f}%", delta=f"{m['Actuel']['PCE'] - m['T0']['PCE']:.1f}%")
+        
+            st.metric("💰 GAIN TOTAL DE TEMPS", f"{m['Gain']:.1f} min")
         
 
         # 6 : FUTURE STATE FMEA ---
