@@ -3842,8 +3842,6 @@ else:
         # Logique après soumission
         if submitted:
             # 1. SYNCHRONISATION CRUCIALE : On récupère chaque éditeur et on écrase l'état
-            # Cela garantit que même si vous avez modifié/supprimé des lignes, c'est ce qui est dans 
-            # 'temp_editors' qui fait foi.
             for step in st.session_state["future_macro_steps"]:
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
             
@@ -3857,7 +3855,7 @@ else:
                     if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
                         t0_va_ref += val
 
-            # 3. CALCULS BASÉS SUR LE NOUVEAU DÉLAI ACTUEL (Utilisation des données tout juste synchronisées)
+            # 3. CALCULS BASÉS SUR LE NOUVEAU DÉLAI ACTUEL
             actuel_lt, actuel_va = 0.0, 0.0
             for step in st.session_state["future_macro_steps"]:
                 df = pd.DataFrame(st.session_state["future_state_map"][step])
@@ -3865,7 +3863,7 @@ else:
                 va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                 actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
             
-            # 4. MISE À JOUR DE p POUR LA SAUVEGARDE JSON (Copie profonde indispensable)
+            # 4. MISE À JOUR DE p (pour l'affichage immédiat)
             p["future_state_map"] = copy.deepcopy(st.session_state["future_state_map"])
             p["future_macro_steps"] = list(st.session_state["future_macro_steps"])
             p["future_metrics"] = {
@@ -3874,7 +3872,21 @@ else:
                 "Gain": t0_lt_ref - actuel_lt
             }
             
-            st.success("🎯 Données verrouillées et projet mis à jour !")
+            # 5. SYNCHRONISATION AVEC LE PROJET ET SAUVEGARDE DISQUE
+            # On récupère l'index du projet en cours
+            idx = st.session_state["current_project_idx"]
+            
+            # Mise à jour de la structure du projet pour la persistance JSON
+            st.session_state.projects[idx]["dmaic"]["future_state"] = {
+                "map": p["future_state_map"],
+                "macro_steps": p["future_macro_steps"],
+                "metrics": p["future_metrics"]
+            }
+            
+            # Sauvegarde physique sur le disque via ta fonction habituelle
+            save_data()
+            
+            st.success("🎯 Données verrouillées et projet sauvegardé sur le disque !")
             st.rerun()
 
         # Affichage des résultats
