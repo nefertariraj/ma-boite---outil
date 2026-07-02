@@ -3842,36 +3842,42 @@ else:
 
         # Logique après soumission
         if submitted:
-            t0_lt, actuel_lt = 0.0, 0.0
-            t0_va, actuel_va = 0.0, 0.0
-        
+            # 1. CALCULS BASÉS SUR LA RÉFÉRENCE ORIGINALE (p["vsm_detailed_map"])
+            t0_lt_ref = 0.0
+            t0_va_ref = 0.0
+            
+            # On parcourt la structure originale de la phase Mesure pour le T0
+            original_map = p.get("vsm_detailed_map", {})
+            for step in original_map:
+                for item in original_map[step]:
+                    # On utilise les clés originales de la phase Mesure
+                    valeur = item.get("Valeur", 0.0) 
+                    t0_lt_ref += valeur
+                    if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
+                        t0_va_ref += valeur
+
+            # 2. CALCULS BASÉS SUR LE NOUVEAU DÉLAI ACTUEL (Tableaux édités)
+            actuel_lt = 0.0
+            actuel_va = 0.0
+            
             for step in st.session_state["future_macro_steps"]:
-                # 1. Sauvegarde des données éditées
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
-                
-                # 2. CALCULS :
-                # Pour le T0, on additionne la colonne "Délai à T0" des données éditées
-                # (Attention : si vous voulez que le T0 soit ABSOLUMENT celui de la phase Mesure, 
-                # il ne faut pas éditer cette colonne dans le tableau, ce que nous avons déjà fait avec disabled=True)
-                t0_lt += temp_editors[step]["Délai à T0"].sum()
+                # On ne prend que le "Délai Actuel" ici
                 actuel_lt += temp_editors[step]["Délai Actuel"].sum()
                 
                 va_mask = temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"
-                t0_va += temp_editors[step].loc[va_mask, "Délai à T0"].sum()
                 actuel_va += temp_editors[step].loc[va_mask, "Délai Actuel"].sum()
             
-            # 3. PERSISTANCE : Mise à jour du dictionnaire 'p' pour votre sauvegarde JSON
+            # 3. MISE À JOUR DE p POUR LA SAUVEGARDE ET LES RÉSULTATS
             p["future_state_map"] = st.session_state["future_state_map"]
             p["future_macro_steps"] = st.session_state["future_macro_steps"]
             
-            # 4. CALCULS DES GAINS
             p["future_metrics"] = {
-                "T0": {"LT": t0_lt, "VA": t0_va, "PCE": (t0_va/t0_lt*100) if t0_lt>0 else 0},
+                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
-                "Gain": t0_lt - actuel_lt
+                "Gain": t0_lt_ref - actuel_lt
             }
-            
-            st.success("🎯 Données enregistrées dans le projet et calculs mis à jour !")
+            st.success("🎯 Données enregistrées et gains recalculés par rapport au T0 initial !")
             st.rerun()
 
         # --- NOUVEAU BLOC : Affichage permanent des résultats ---
