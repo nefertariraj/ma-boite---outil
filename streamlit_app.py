@@ -3868,29 +3868,34 @@ else:
         if "future_metrics" in p:
             m = p["future_metrics"]
         
-            # Vérification de sécurité : on s'assure que les clés existent
-            if all(k in m for k in ["T0", "Actuel", "Gain"]):
+            # On vérifie si m est bien un dictionnaire avec la structure attendue
+            if isinstance(m, dict) and "T0" in m and isinstance(m["T0"], dict):
                 st.markdown("---")
                 st.subheader("📊 Synthèse des gains (Comparaison T0 vs Actuel)")
             
-                # Extraction sécurisée des valeurs avec .get()
+                # Extraction sécurisée
                 t0 = m.get("T0", {})
                 act = m.get("Actuel", {})
+                gain = m.get("Gain", 0)
             
                 col1, col2, col3 = st.columns(3)
             
-                # Calcul des deltas sécurisé
-                delta_lt = act.get('LT', 0) - t0.get('LT', 0)
-                delta_va = act.get('VA', 0) - t0.get('VA', 0)
-                delta_pce = act.get('PCE', 0) - t0.get('PCE', 0)
+                # Calcul des deltas
+                d_lt = act.get('LT', 0) - t0.get('LT', 0)
+                d_va = act.get('VA', 0) - t0.get('VA', 0)
+                d_pce = act.get('PCE', 0) - t0.get('PCE', 0)
             
-                col1.metric("Lead Time Total", f"{act.get('LT', 0):.1f} min", delta=f"{delta_lt:.1f} min")
-                col2.metric("Total Valeur Ajoutée", f"{act.get('VA', 0):.1f} min", delta=f"{delta_va:.1f} min")
-                col3.metric("Efficience du Cycle (PCE)", f"{act.get('PCE', 0):.1f}%", delta=f"{delta_pce:.1f}%")
+                col1.metric("Lead Time Total", f"{act.get('LT', 0):.1f} min", delta=f"{d_lt:.1f} min")
+                col2.metric("Total Valeur Ajoutée", f"{act.get('VA', 0):.1f} min", delta=f"{d_va:.1f} min")
+                col3.metric("Efficience du Cycle (PCE)", f"{act.get('PCE', 0):.1f}%", delta=f"{d_pce:.1f}%")
             
-                st.metric("💰 GAIN TOTAL DE TEMPS", f"{m.get('Gain', 0):.1f} min")
+                st.metric("💰 GAIN TOTAL DE TEMPS", f"{gain:.1f} min")
             else:
-                st.error("Les données de synthèse sont corrompues. Veuillez cliquer à nouveau sur 'Enregistrer' pour recalculer.")
+                st.warning("⚠️ Structure des données ancienne. Veuillez cliquer sur 'Enregistrer' pour mettre à jour les métriques.")
+                # Optionnel : bouton pour forcer la réinitialisation si corrompu
+                if st.button("Réinitialiser les métriques"):
+                    del p["future_metrics"]
+                    st.rerun()
         
 
         # 6 : FUTURE STATE FMEA ---
