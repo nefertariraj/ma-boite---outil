@@ -3803,9 +3803,6 @@ else:
             for step in st.session_state["future_macro_steps"]:
                 col_head1, col_head2 = st.columns([0.8, 0.2])
                 col_head1.subheader(f"Section : {step}")
-        
-                # Le bouton de suppression doit être géré avec un flag ou en dehors du form si possible,
-                # mais pour rester dans votre structure :
                 if col_head2.form_submit_button(f"🗑️ Supprimer {step}"):
                     st.session_state["future_macro_steps"].remove(step)
                     del st.session_state["future_state_map"][step]
@@ -3823,7 +3820,6 @@ else:
 
                 cols_to_use = ["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]
         
-                # IMPORTANT : On utilise le session_state comme source
                 edited_df = st.data_editor(
                     df_future[cols_to_use],
                     num_rows="dynamic",
@@ -3834,13 +3830,22 @@ else:
 
             submitted = st.form_submit_button("💾 Enregistrer et Calculer les gains", type="primary")
 
-        # Logique de soumission
+        # --- AJOUTER SECTION (En dehors du form pour éviter les conflits) ---
+        st.markdown("---")
+        new_section = st.text_input("Nom de la nouvelle section :")
+        if st.button("➕ Ajouter la section"):
+            if new_section and new_section not in st.session_state["future_macro_steps"]:
+                st.session_state["future_macro_steps"].append(new_section)
+                st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
+                st.rerun()
+
+        # Logique après soumission
         if submitted:
-            # 1. Mise à jour immédiate du session_state AVANT les calculs
+            # 1. Mise à jour du session_state avec les valeurs éditées
             for step in st.session_state["future_macro_steps"]:
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
     
-            # 2. Calcul du T0 (RÉFÉRENCE ORIGINALE)
+            # 2. Calcul du T0 (RÉFÉRENCE ORIGINALE : vsm_detailed_map)
             t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
@@ -3850,7 +3855,7 @@ else:
                     if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
                         t0_va_ref += val
 
-            # 3. Calcul de l'ACTUEL (depuis le session_state mis à jour)
+            # 3. Calcul de l'ACTUEL (depuis les tableaux édités)
             actuel_lt, actuel_va = 0.0, 0.0
             for step in st.session_state["future_macro_steps"]:
                 df = pd.DataFrame(st.session_state["future_state_map"][step])
@@ -3858,16 +3863,29 @@ else:
                 va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                 actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
 
-            # 4. SYNCHRONISATION TOTALE AVEC 'p' (Pour votre sauvegarde JSON)
+            # 4. SYNCHRONISATION TOTALE AVEC 'p' (Pour la sauvegarde JSON)
             p["future_state_map"] = copy.deepcopy(st.session_state["future_state_map"])
             p["future_macro_steps"] = list(st.session_state["future_macro_steps"])
+    
             p["future_metrics"] = {
                 "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
                 "Gain": t0_lt_ref - actuel_lt
             }
-            st.success("🎯 Données enregistrées dans le projet !")
+            st.success("🎯 Données enregistrées et gains recalculés !")
             st.rerun()
+
+        # Affichage des résultats
+        if "future_metrics" in p:
+            m = p["future_metrics"]
+            st.markdown("### 📊 Synthèse des gains")
+            data_synth = {
+                "Indicateur": ["Lead Time Total (min)", "Valeur Ajoutée (min)", "Efficience (PCE %)"],
+                "Valeur T0": [f"{m['T0']['LT']:.1f}", f"{m['T0']['VA']:.1f}", f"{m['T0']['PCE']:.1f}%"],
+                "Valeur Actuel": [f"{m['Actuel']['LT']:.1f}", f"{m['Actuel']['VA']:.1f}", f"{m['Actuel']['PCE']:.1f}%"]
+            }
+            st.table(pd.DataFrame(data_synth))
+            st.metric("💰 GAIN TOTAL DE TEMPS", f"{m['Gain']:.1f} min")
 
         # --- NOUVEAU BLOC : Affichage permanent des résultats ---
         # On affiche les résultats si le flag est actif OU si les données existent dans 'p'
