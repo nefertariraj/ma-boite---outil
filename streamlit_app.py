@@ -3794,98 +3794,74 @@ else:
             st.session_state["future_state_map"] = copy.deepcopy(p.get("vsm_detailed_map", {}))
             st.session_state["future_macro_steps"] = list(p.get("vsm_macro_steps", []))
 
-        st.info("💡 **Instructions** : Modifiez les délais, ajoutez/supprimez des sections ou lignes. Rien n'est enregistré tant que vous ne cliquez pas sur le bouton dédié.")
-    
-        temp_editors = {}
+        st.info("💡 **Instructions** : Utilisez le formulaire ci-dessous. Vos modifications ne seront prises en compte qu'après avoir cliqué sur 'Enregistrer'.")
 
-        for step in st.session_state["future_macro_steps"]:
-            st.subheader(f"Section : {step}")
+        # Formulaire global pour éviter les mises à jour intempestives
+        with st.form("future_state_form"):
+            temp_editors = {}
+
+            for step in st.session_state["future_macro_steps"]:
+                st.subheader(f"Section : {step}")
+                data = st.session_state["future_state_map"].get(step, [])
+                df_future = pd.DataFrame(data)
+            
+                # Affichage en édition
+                edited_df = st.data_editor(
+                    df_future[["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]],
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"editor_{step}"
+                )
+                temp_editors[step] = edited_df
+
+            # Ajout/Suppression de sections
+            st.markdown("---")
+            new_section = st.text_input("Nom de la nouvelle section à ajouter :")
         
-            data = st.session_state["future_state_map"].get(step, [])
-            df_future = pd.DataFrame(data)
-        
-            # Préparation des colonnes
-            if "Valeur" in df_future.columns:
-                df_future = df_future.rename(columns={"Valeur": "Délai à T0"})
-            if "Unité" not in df_future.columns:
-                df_future["Unité"] = "Minutes"
-            if "Type d'activité" not in df_future.columns:
-                df_future["Type d'activité"] = "VA (Valeur Ajoutée)"
-            if "Délai Actuel" not in df_future.columns:
-                df_future["Délai Actuel"] = df_future["Délai à T0"]
-        
-            # Colonnes affichées
-            df_display = df_future[["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]]
-        
-            # Éditeur (non réactif en temps réel pour le dictionnaire 'p')
-            edited_df = st.data_editor(
-                df_display,
-                num_rows="dynamic",
-                column_config={
-                    "Détail de la tâche": st.column_config.TextColumn("Détail de la tâche", width="large"),
-                    "Délai à T0": st.column_config.NumberColumn("Délai à T0", disabled=True, width="small"),
-                    "Unité": st.column_config.TextColumn("Unité", disabled=True, width="small"),
-                    "Type d'activité": st.column_config.SelectboxColumn(
-                        "Type d'activité (Lean)",
-                        options=["VA (Valeur Ajoutée)", "NVA (Non Valeur Ajoutée)", "BNRVA (Business Necessary, Non-Value Added)", "Temps d'attente / Stock"],
-                        width="medium"
-                    ),
-                    "Délai Actuel": st.column_config.NumberColumn("Délai Actuel", min_value=0.0, format="%.1f", width="small")
-                },
-                use_container_width=True,
-                key=f"editor_{step}"
-            )
-            temp_editors[step] = edited_df
-        
-            if st.button(f"🗑️ Supprimer la section {step}", key=f"del_{step}"):
-                st.session_state["future_macro_steps"].remove(step)
+            submitted = st.form_submit_button("💾 Enregistrer et Calculer les gains", type="primary")
+
+        # Logique de gestion des sections (hors formulaire pour éviter les recharges)
+        if st.button("➕ Ajouter la section"):
+            if new_section and new_section not in st.session_state["future_macro_steps"]:
+                st.session_state["future_macro_steps"].append(new_section)
+                st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "min", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # 4. SAUVEGARDE ET CALCUL (Le seul moment où les données sont figées)
-    if st.button("💾 Enregistrer futur état et calculer les gains", type="primary"):
-        t0_lt, actuel_lt = 0.0, 0.0
-        t0_va, actuel_va = 0.0, 0.0
+        # Logique après soumission du formulaire
+        if submitted:
+            t0_lt, actuel_lt = 0.0, 0.0
+            t0_va, actuel_va = 0.0, 0.0
         
-        for step in st.session_state["future_macro_steps"]:
-            # On fige l'édition dans le state
-            st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
+            for step in st.session_state["future_macro_steps"]:
+                # Sauvegarde des données
+                st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
             
-            # Calculs consolidés
-            t0_lt += temp_editors[step]["Délai à T0"].sum()
-            actuel_lt += temp_editors[step]["Délai Actuel"].sum()
+                # Calculs
+                t0_lt += temp_editors[step]["Délai à T0"].sum()
+                actuel_lt += temp_editors[step]["Délai Actuel"].sum()
             
-            # Filtrage VA (en gérant les cas où le type d'activité pourrait être manquant)
-            va_mask_t0 = temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"
-            t0_va += temp_editors[step].loc[va_mask_t0, "Délai à T0"].sum()
-            actuel_va += temp_editors[step].loc[va_mask_t0, "Délai Actuel"].sum()
+                va_mask_t0 = temp_editors[step]["Type d'activité"] == "VA (Valeur Ajoutée)"
+                t0_va += temp_editors[step].loc[va_mask_t0, "Délai à T0"].sum()
+                actuel_va += temp_editors[step].loc[va_mask_t0, "Délai Actuel"].sum()
         
-        # Calcul PCE
-        pce_t0 = (t0_va / t0_lt * 100) if t0_lt > 0 else 0
-        pce_actuel = (actuel_va / actuel_lt * 100) if actuel_lt > 0 else 0
-        
-        p["future_metrics"] = {
-            "T0": {"LT": t0_lt, "VA": t0_va, "PCE": pce_t0},
-            "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": pce_actuel},
-            "Gain": t0_lt - actuel_lt
-        }
-        st.success("🎯 Données enregistrées avec succès !")
+            p["future_metrics"] = {
+                "T0": {"LT": t0_lt, "VA": t0_va, "PCE": (t0_va/t0_lt*100) if t0_lt>0 else 0},
+                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
+                "Gain": t0_lt - actuel_lt
+            }
+            st.success("🎯 Modifications enregistrées !")
+            st.rerun() # Rafraîchir pour afficher la synthèse à jour
 
-        # RAPPORT DE SYNTHÈSE COMPARATIF
+        # Rapport de Synthèse
         if "future_metrics" in p and isinstance(p["future_metrics"], dict):
             m = p["future_metrics"]
-            st.markdown("---")
-            st.subheader("📊 Synthèse : T0 (Initial) vs Actuel (Futur)")
-        
-            # Préparation des données pour le tableau comparatif
+            st.markdown("### 📊 Synthèse : T0 vs Actuel")
             data_synth = {
                 "Indicateur": ["Lead Time Total (min)", "Valeur Ajoutée (min)", "Efficience (PCE %)"],
                 "Valeur T0": [f"{m['T0']['LT']:.1f}", f"{m['T0']['VA']:.1f}", f"{m['T0']['PCE']:.1f}%"],
                 "Valeur Actuel": [f"{m['Actuel']['LT']:.1f}", f"{m['Actuel']['VA']:.1f}", f"{m['Actuel']['PCE']:.1f}%"]
             }
-        
             st.table(pd.DataFrame(data_synth))
-        
-            # Affichage du gain final
             st.metric("💰 GAIN TOTAL DE TEMPS", f"{m['Gain']:.1f} min")
         
 
