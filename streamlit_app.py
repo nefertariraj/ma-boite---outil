@@ -3849,14 +3849,18 @@ else:
             if "future_state" not in st.session_state.projects[idx]["dmaic"]:
                 st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
             
-            # 2. SYNCHRONISATION : On va chercher les données directement via les clés de session
+           # 2. SYNCHRONISATION : Correction de l'accès aux données
             for step in st.session_state["future_macro_steps"]:
                 editor_key = f"editor_{step}"
                 if editor_key in st.session_state:
-                    # On met à jour la map du projet directement avec les données de l'éditeur
-                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = st.session_state[editor_key].to_dict('records')
-            
-            st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
+                    data = st.session_state[editor_key]
+                    
+                    # Si c'est déjà un DataFrame (via st.data_editor), on convertit
+                    if hasattr(data, 'to_dict'):
+                        st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data.to_dict('records')
+                    # Si c'est déjà un dictionnaire/liste, on l'assigne directement
+                    else:
+                        st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data
 
             # 3. CALCULS DES MÉTRIQUES
             t0_lt_ref, t0_va_ref = 0.0, 0.0
