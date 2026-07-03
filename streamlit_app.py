@@ -3843,26 +3843,24 @@ else:
         if submitted:
             idx = st.session_state["current_project_idx"]
             
-            # Initialisation de la structure si nécessaire
+            # 1. Vérification de la structure du projet (pour éviter KeyError)
             if "dmaic" not in st.session_state.projects[idx]:
                 st.session_state.projects[idx]["dmaic"] = {}
             if "future_state" not in st.session_state.projects[idx]["dmaic"]:
                 st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
             
-            # SYNCHRONISATION : Utilisation de temp_editors qui contient les résultats de l'éditeur
-            # Cette méthode est bien plus fiable que d'aller chercher dans st.session_state directement
+            # 2. Récupération directe des données depuis temp_editors
+            # temp_editors contient les DataFrames à jour au moment du clic
             for step in st.session_state["future_macro_steps"]:
                 if step in temp_editors:
-                    # temp_editors[step] contient le résultat de l'éditeur (le DataFrame à jour)
-                    df_result = temp_editors[step]
-                    
-                    # On convertit le DataFrame en liste de dicts pour le JSON
-                    # On utilise .to_dict('records') sur le DataFrame directement
-                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = df_result.to_dict('records')
+                    # On transforme le DataFrame en liste de dictionnaires (format JSON standard)
+                    df_final = temp_editors[step]
+                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = df_final.to_dict(orient='records')
             
             st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
 
-            # 3. CALCULS DES MÉTRIQUES (Basé sur temp_editors, donc les données affichées)
+            # 3. Calculs des métriques (en utilisant les données fraîchement mises à jour)
+            # Calcul du T0 (référence)
             t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
@@ -3872,19 +3870,26 @@ else:
                     if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
                         t0_va_ref += val
 
+            # Calcul Actuel
             actuel_lt, actuel_va = 0.0, 0.0
-            # On utilise temp_editors pour lire les données que l'utilisateur est en train de modifier
             for step in st.session_state["future_macro_steps"]:
                 if step in temp_editors:
                     df = temp_editors[step]
-                    # Conversion forcée en float pour éviter les erreurs de type
+                    # Utilisation de .sum() directement sur le dataframe
                     actuel_lt += float(df["Délai Actuel"].sum())
                     va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                     actuel_va += float(df.loc[va_mask, "Délai Actuel"].sum())
 
-           # SAUVEGARDE
+            # 4. Enregistrement des métriques calculées
+            st.session_state.projects[idx]["dmaic"]["future_state"]["metrics"] = {
+                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
+                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
+                "Gain": t0_lt_ref - actuel_lt
+            }
+            
+            # 5. SAUVEGARDE PHYSIQUE
             save_data()
-            st.success("✅ Données sauvegardées !")
+            st.success("✅ Données enregistrées et sauvegardées !")
             st.rerun()
 
         # Affichage des résultats
