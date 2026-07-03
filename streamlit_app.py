@@ -3839,63 +3839,55 @@ else:
                 st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # Logique après soumission (Version robuste type "Improve")
+        # Logique après soumission (Corrigée pour être robuste)
         if submitted:
             idx = st.session_state["current_project_idx"]
             
-            # 1. ACCÈS DIRECT À LA SOURCE DE VÉRITÉ
-            # On pointe directement vers l'objet dans la liste des projets
-            dmaic_data = st.session_state.projects[idx].setdefault("dmaic", {})
-            future_state = dmaic_data.setdefault("future_state", {"map": {}, "macro_steps": []})
+            # 1. Préparation de la structure dans le projet
+            if "dmaic" not in st.session_state.projects[idx]:
+                st.session_state.projects[idx]["dmaic"] = {}
+            if "future_state" not in st.session_state.projects[idx]["dmaic"]:
+                st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
             
-            # 2. SYNCHRONISATION : Transfert des données des éditeurs vers le projet
+            # 2. SYNCHRONISATION : On va chercher les données directement via les clés de session
             for step in st.session_state["future_macro_steps"]:
-                # On met à jour la map directement dans l'objet projet
-                future_state["map"][step] = temp_editors[step].to_dict('records')
+                editor_key = f"editor_{step}"
+                if editor_key in st.session_state:
+                    # On met à jour la map du projet directement avec les données de l'éditeur
+                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = st.session_state[editor_key].to_dict('records')
             
-            future_state["macro_steps"] = list(st.session_state["future_macro_steps"])
+            st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
 
             # 3. CALCULS DES MÉTRIQUES
-            # On réinitialise les compteurs
             t0_lt_ref, t0_va_ref = 0.0, 0.0
-            actuel_lt, actuel_va = 0.0, 0.0
-            
-            # Récupération de la source de vérité
-            project_data = st.session_state.projects[idx]
-            
-            # --- Calcul T0 (basé sur vsm_detailed_map) ---
-            # Utilise p ou project_data.get("vsm_detailed_map", {})
-            original_map = p.get("vsm_detailed_map", {}) 
+            original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
                 for item in original_map[step]:
-                    # Assure-toi que la clé est bien "Valeur" (ou "Délai à T0" si modifié)
                     val = float(item.get("Valeur", 0.0))
                     t0_lt_ref += val
                     if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
                         t0_va_ref += val
 
-            # --- Calcul Actuel (basé sur le Future State mis à jour) ---
-            current_map = project_data["dmaic"]["future_state"]["map"]
+            actuel_lt, actuel_va = 0.0, 0.0
+            current_map = st.session_state.projects[idx]["dmaic"]["future_state"]["map"]
             for step in st.session_state["future_macro_steps"]:
                 if step in current_map:
                     df = pd.DataFrame(current_map[step])
-                    # S'assurer que les colonnes existent pour éviter les erreurs
                     if "Délai Actuel" in df.columns:
                         actuel_lt += df["Délai Actuel"].sum()
                         va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                         actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
 
-            # 4. ENREGISTREMENT DES MÉTRIQUES
-            future_state["metrics"] = {
-                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref > 0 else 0},
-                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt > 0 else 0},
+            # 4. ENREGISTREMENT DANS LE PROJET
+            st.session_state.projects[idx]["dmaic"]["future_state"]["metrics"] = {
+                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
+                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
                 "Gain": t0_lt_ref - actuel_lt
             }
             
-            # 5. SAUVEGARDE GLOBALE
+            # 5. SAUVEGARDE PHYSIQUE
             save_data()
-            
-            st.success("✅ Données synchronisées et sauvegardées avec succès !")
+            st.success("✅ Données sauvegardées avec succès !")
             st.rerun()
 
         # Affichage des résultats
