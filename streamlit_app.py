@@ -3895,31 +3895,38 @@ else:
         # --- AFFICHAGE DES RÉSULTATS (Dynamique) ---
         st.markdown("### 📊 Synthèse des gains")
         
-        # 1. Calcul dynamique en direct (basé sur ce qui est DANS LES ÉDITEURS)
-        # On ne regarde plus 'p', on regarde ce que l'utilisateur voit à l'écran
+        # 1. RÉCUPÉRATION DU T0 (Depuis la phase Mesure déjà stockée en session)
+        # On utilise directement les totaux calculés par la phase mesure
+        t0_data = st.session_state.get("vsm_totals", {})
+        t0_lt_ref = float(t0_data.get("lead_time", 0.0))
+        t0_va_ref = float(t0_data.get("va", 0.0))
+
+        # 2. CALCUL ACTUEL (Depuis les éditeurs du Future State en temps réel)
         calc_actuel_lt = 0.0
         calc_actuel_va = 0.0
         
         for step in st.session_state["future_macro_steps"]:
-            # On cherche dans temp_editors (le formulaire actuel)
             if step in temp_editors:
                 df_temp = temp_editors[step]
+                # Calcul basé sur ce qui est saisi dans le formulaire actuel
                 calc_actuel_lt += float(df_temp["Délai Actuel"].sum())
                 va_mask = df_temp["Type d'activité"] == "VA (Valeur Ajoutée)"
                 calc_actuel_va += float(df_temp.loc[va_mask, "Délai Actuel"].sum())
 
-        # 2. Récupération du T0 (fixe)
-        t0_lt_ref = 0.0 # Remets ton calcul de T0 ici ou récupère la valeur fixe
-        # (Assure-toi que t0_lt_ref est bien calculé à partir de vsm_detailed_map)
+        # 3. AFFICHAGE DE LA SYNTHÈSE
+        st.markdown("### 📊 Synthèse des gains")
         
-        # 3. Affichage
+        # Calcul du PCE Actuel
+        pce_actuel = (calc_actuel_va / calc_actuel_lt * 100) if calc_actuel_lt > 0 else 0
+        gain_total = t0_lt_ref - calc_actuel_lt
+        
         data_synth = {
             "Indicateur": ["Lead Time Total (min)", "Valeur Ajoutée (min)", "Efficience (PCE %)"],
-            "Valeur T0": [f"{t0_lt_ref:.1f}", "...", "..."],
-            "Valeur Actuel": [f"{calc_actuel_lt:.1f}", f"{calc_actuel_va:.1f}", f"{(calc_actuel_va/calc_actuel_lt*100 if calc_actuel_lt>0 else 0):.1f}%"]
+            "Valeur T0 (Mesure)": [f"{t0_lt_ref:.1f}", f"{t0_va_ref:.1f}", f"{(t0_va_ref/t0_lt_ref*100 if t0_lt_ref>0 else 0):.1f}%"],
+            "Valeur Actuel": [f"{calc_actuel_lt:.1f}", f"{calc_actuel_va:.1f}", f"{pce_actuel:.1f}%"]
         }
         st.table(pd.DataFrame(data_synth))
-        st.metric("💰 GAIN TOTAL DE TEMPS", f"{(t0_lt_ref - calc_actuel_lt):.1f} min")
+        st.metric("💰 GAIN TOTAL DE TEMPS", f"{gain_total:.1f} min")
 
 
         # 6 : FUTURE STATE FMEA ---
