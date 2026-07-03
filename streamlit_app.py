@@ -3843,21 +3843,22 @@ else:
         if submitted:
             idx = st.session_state["current_project_idx"]
             
-            # 1. Mise à jour de la structure (Garantie de non-erreur)
+            # Initialisation de la structure si nécessaire
             if "dmaic" not in st.session_state.projects[idx]:
                 st.session_state.projects[idx]["dmaic"] = {}
             if "future_state" not in st.session_state.projects[idx]["dmaic"]:
-                st.session_state.projects[idx]["dmaic"]["future_state"] = {}
+                st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
             
-            # 2. SYNCHRONISATION : On copie les données de l'éditeur dans le projet global
-            # C'est ici que tu "injectes" les modifications dans l'objet qui sera sauvegardé
-            st.session_state.projects[idx]["dmaic"]["future_state"]["map"] = {} # Réinitialise pour éviter les doublons
+            # SYNCHRONISATION : Utilisation de temp_editors qui contient les résultats de l'éditeur
+            # Cette méthode est bien plus fiable que d'aller chercher dans st.session_state directement
             for step in st.session_state["future_macro_steps"]:
-                editor_key = f"editor_{step}"
-                if editor_key in st.session_state:
-                    # Conversion propre en liste de dictionnaires
-                    data_to_save = st.session_state[editor_key].to_dict('records')
-                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data_to_save
+                if step in temp_editors:
+                    # temp_editors[step] contient le résultat de l'éditeur (le DataFrame à jour)
+                    df_result = temp_editors[step]
+                    
+                    # On convertit le DataFrame en liste de dicts pour le JSON
+                    # On utilise .to_dict('records') sur le DataFrame directement
+                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = df_result.to_dict('records')
             
             st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
 
@@ -3881,9 +3882,9 @@ else:
                         va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                         actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
 
-           # 4. SAUVEGARDE
-            save_data() 
-            st.success("✅ Données enregistrées dans le projet et sauvegardées sur le disque !")
+           # SAUVEGARDE
+            save_data()
+            st.success("✅ Données sauvegardées !")
             st.rerun()
 
         # Affichage des résultats
