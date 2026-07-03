@@ -3839,29 +3839,46 @@ else:
                 st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # Logique après soumission (À REMPLACER PAR CECI)
+        # Logique après soumission
         if submitted:
-            # 1. SYNCHRONISATION CRUCIALE
+            # 1. SYNCHRONISATION : Récupérer les données des éditeurs
             for step in st.session_state["future_macro_steps"]:
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
             
-            # 2. CALCULS DES MÉTRIQUES (T0 et Actuel)
-            # ... (garde ta logique de calcul existante) ...
-            
-            # 3. MISE À JOUR DE LA STRUCTURE DU PROJET (L'étape manquante)
+            # 2. CALCULS INTERNES (Calculs sécurisés uniquement dans ce bloc)
+            t0_lt_ref, t0_va_ref = 0.0, 0.0
+            original_map = p.get("vsm_detailed_map", {})
+            for step in original_map:
+                for item in original_map[step]:
+                    val = float(item.get("Valeur", 0.0))
+                    t0_lt_ref += val
+                    if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
+                        t0_va_ref += val
+
+            actuel_lt, actuel_va = 0.0, 0.0
+            for step in st.session_state["future_macro_steps"]:
+                df = pd.DataFrame(st.session_state["future_state_map"][step])
+                actuel_lt += df["Délai Actuel"].sum()
+                va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
+                actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
+
+            # 3. MISE À JOUR DE LA STRUCTURE DU PROJET (Persistance)
             idx = st.session_state["current_project_idx"]
+            p["future_metrics"] = {
+                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
+                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
+                "Gain": t0_lt_ref - actuel_lt
+            }
+            
+            # Sauvegarde dans l'objet projet global
             st.session_state.projects[idx]["dmaic"]["future_state"] = {
                 "map": copy.deepcopy(st.session_state["future_state_map"]),
                 "macro_steps": list(st.session_state["future_macro_steps"]),
-                "metrics": {
-                    "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
-                    "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
-                    "Gain": t0_lt_ref - actuel_lt
-                }
+                "metrics": p["future_metrics"]
             }
             
-            # 4. SAUVEGARDE PHYSIQUE SUR LE DISQUE
-            save_data() 
+            # 4. SAUVEGARDE PHYSIQUE
+            save_data()
             
             st.success("🎯 Données verrouillées et projet sauvegardé sur le disque !")
             st.rerun()
