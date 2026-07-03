@@ -3862,7 +3862,7 @@ else:
             
             st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
 
-            # 3. CALCULS DES MÉTRIQUES
+            # 3. CALCULS DES MÉTRIQUES (Basé sur temp_editors, donc les données affichées)
             t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
@@ -3873,14 +3873,14 @@ else:
                         t0_va_ref += val
 
             actuel_lt, actuel_va = 0.0, 0.0
-            current_map = st.session_state.projects[idx]["dmaic"]["future_state"]["map"]
+            # On utilise temp_editors pour lire les données que l'utilisateur est en train de modifier
             for step in st.session_state["future_macro_steps"]:
-                if step in current_map:
-                    df = pd.DataFrame(current_map[step])
-                    if "Délai Actuel" in df.columns:
-                        actuel_lt += df["Délai Actuel"].sum()
-                        va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
-                        actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
+                if step in temp_editors:
+                    df = temp_editors[step]
+                    # Conversion forcée en float pour éviter les erreurs de type
+                    actuel_lt += float(df["Délai Actuel"].sum())
+                    va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
+                    actuel_va += float(df.loc[va_mask, "Délai Actuel"].sum())
 
            # SAUVEGARDE
             save_data()
