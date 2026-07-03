@@ -3843,29 +3843,25 @@ else:
         if submitted:
             idx = st.session_state["current_project_idx"]
             
-            # 1. SYNCHRONISATION : On utilise directement 'temp_editors' 
-            # (que tu as rempli dans ton formulaire juste avant)
+            # 1. Mise à jour de la structure (Garantie de non-erreur)
+            if "dmaic" not in st.session_state.projects[idx]:
+                st.session_state.projects[idx]["dmaic"] = {}
+            if "future_state" not in st.session_state.projects[idx]["dmaic"]:
+                st.session_state.projects[idx]["dmaic"]["future_state"] = {}
+            
+            # 2. SYNCHRONISATION : On copie les données de l'éditeur dans le projet global
+            # C'est ici que tu "injectes" les modifications dans l'objet qui sera sauvegardé
+            st.session_state.projects[idx]["dmaic"]["future_state"]["map"] = {} # Réinitialise pour éviter les doublons
             for step in st.session_state["future_macro_steps"]:
-                if step in temp_editors:
-                    # On récupère le résultat de l'éditeur directement depuis la boucle du formulaire
-                    df_to_save = temp_editors[step]
-                    
-                    # On s'assure de convertir en dictionnaire proprement
-                    if hasattr(df_to_save, 'to_dict'):
-                        data_dict = df_to_save.to_dict('records')
-                    else:
-                        data_dict = list(df_to_save) # Fallback si c'est déjà une liste/dict
-                    
-                    # Initialisation sécurisée de la structure
-                    if "dmaic" not in st.session_state.projects[idx]: st.session_state.projects[idx]["dmaic"] = {}
-                    if "future_state" not in st.session_state.projects[idx]["dmaic"]: st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
-                    
-                    # Sauvegarde dans le projet
-                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data_dict
+                editor_key = f"editor_{step}"
+                if editor_key in st.session_state:
+                    # Conversion propre en liste de dictionnaires
+                    data_to_save = st.session_state[editor_key].to_dict('records')
+                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data_to_save
             
             st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
 
-            # 2. CALCULS DES MÉTRIQUES
+            # 3. CALCULS DES MÉTRIQUES
             t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
@@ -3885,8 +3881,8 @@ else:
                         va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                         actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
 
-            # 3. SAUVEGARDE
-            save_data()
+           # 4. SAUVEGARDE
+            save_data() 
             st.success("✅ Données enregistrées dans le projet et sauvegardées sur le disque !")
             st.rerun()
 
