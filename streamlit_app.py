@@ -3839,13 +3839,18 @@ else:
                 st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # Logique après soumission
         if submitted:
-            # 1. SYNCHRONISATION : Récupérer les données des éditeurs
-            for step in st.session_state["future_macro_steps"]:
-                st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
+            # 1. RÉCUPÉRER L'INDEX ACTIF
+            idx = st.session_state["current_project_idx"]
             
-            # 2. CALCULS INTERNES (Calculs sécurisés uniquement dans ce bloc)
+            # 2. SYNCHRONISATION DIRECTE DANS LE PROJET (Source de vérité)
+            # On met à jour directement le projet dans la session, pas juste une variable locale 'p'
+            for step in st.session_state["future_macro_steps"]:
+                st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = temp_editors[step].to_dict('records')
+            
+            st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
+
+            # 3. CALCULS DES MÉTRIQUES (On lit depuis le projet mis à jour)
             t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
@@ -3856,31 +3861,25 @@ else:
                         t0_va_ref += val
 
             actuel_lt, actuel_va = 0.0, 0.0
+            # On parcourt le projet mis à jour pour calculer les nouveaux totaux
+            current_map = st.session_state.projects[idx]["dmaic"]["future_state"]["map"]
             for step in st.session_state["future_macro_steps"]:
-                df = pd.DataFrame(st.session_state["future_state_map"][step])
+                df = pd.DataFrame(current_map[step])
                 actuel_lt += df["Délai Actuel"].sum()
                 va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                 actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
 
-            # 3. MISE À JOUR DE LA STRUCTURE DU PROJET (Persistance)
-            idx = st.session_state["current_project_idx"]
-            p["future_metrics"] = {
+            # 4. SAUVEGARDE DES MÉTRIQUES
+            st.session_state.projects[idx]["dmaic"]["future_state"]["metrics"] = {
                 "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
                 "Gain": t0_lt_ref - actuel_lt
             }
             
-            # Sauvegarde dans l'objet projet global
-            st.session_state.projects[idx]["dmaic"]["future_state"] = {
-                "map": copy.deepcopy(st.session_state["future_state_map"]),
-                "macro_steps": list(st.session_state["future_macro_steps"]),
-                "metrics": p["future_metrics"]
-            }
-            
-            # 4. SAUVEGARDE PHYSIQUE
+            # 5. ÉCRITURE PHYSIQUE
             save_data()
             
-            st.success("🎯 Données verrouillées et projet sauvegardé sur le disque !")
+            st.success("✅ Données enregistrées dans le projet et sauvegardées sur le disque !")
             st.rerun()
 
         # Affichage des résultats
