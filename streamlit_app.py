@@ -3840,12 +3840,20 @@ else:
                 st.rerun()
 
         if submitted:
-            # 1. RÉCUPÉRER L'INDEX ACTIF
             idx = st.session_state["current_project_idx"]
             
-            # 2. SYNCHRONISATION DIRECTE DANS LE PROJET (Source de vérité)
-            # On met à jour directement le projet dans la session, pas juste une variable locale 'p'
+            # 1. SÉCURISATION DE LA STRUCTURE (CRUCIAL)
+            # On s'assure que le chemin existe avant d'écrire
+            if "dmaic" not in st.session_state.projects[idx]:
+                st.session_state.projects[idx]["dmaic"] = {}
+            if "future_state" not in st.session_state.projects[idx]["dmaic"]:
+                st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
+            if "map" not in st.session_state.projects[idx]["dmaic"]["future_state"]:
+                st.session_state.projects[idx]["dmaic"]["future_state"]["map"] = {}
+
+            # 2. SYNCHRONISATION
             for step in st.session_state["future_macro_steps"]:
+                # On écrit maintenant en toute sécurité
                 st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = temp_editors[step].to_dict('records')
             
             st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
@@ -3869,17 +3877,15 @@ else:
                 va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                 actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
 
-            # 4. SAUVEGARDE DES MÉTRIQUES
+            # 4. SAUVEGARDE
             st.session_state.projects[idx]["dmaic"]["future_state"]["metrics"] = {
                 "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
                 "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
                 "Gain": t0_lt_ref - actuel_lt
             }
             
-            # 5. ÉCRITURE PHYSIQUE
             save_data()
-            
-            st.success("✅ Données enregistrées dans le projet et sauvegardées sur le disque !")
+            st.success("✅ Données enregistrées avec succès !")
             st.rerun()
 
         # Affichage des résultats
