@@ -3839,30 +3839,33 @@ else:
                 st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # Logique après soumission (Corrigée pour être robuste)
+        # Logique après soumission
         if submitted:
             idx = st.session_state["current_project_idx"]
             
-            # 1. Préparation de la structure dans le projet
-            if "dmaic" not in st.session_state.projects[idx]:
-                st.session_state.projects[idx]["dmaic"] = {}
-            if "future_state" not in st.session_state.projects[idx]["dmaic"]:
-                st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
-            
-           # 2. SYNCHRONISATION : Correction de l'accès aux données
+            # 1. SYNCHRONISATION : On utilise directement 'temp_editors' 
+            # (que tu as rempli dans ton formulaire juste avant)
             for step in st.session_state["future_macro_steps"]:
-                editor_key = f"editor_{step}"
-                if editor_key in st.session_state:
-                    data = st.session_state[editor_key]
+                if step in temp_editors:
+                    # On récupère le résultat de l'éditeur directement depuis la boucle du formulaire
+                    df_to_save = temp_editors[step]
                     
-                    # Si c'est déjà un DataFrame (via st.data_editor), on convertit
-                    if hasattr(data, 'to_dict'):
-                        st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data.to_dict('records')
-                    # Si c'est déjà un dictionnaire/liste, on l'assigne directement
+                    # On s'assure de convertir en dictionnaire proprement
+                    if hasattr(df_to_save, 'to_dict'):
+                        data_dict = df_to_save.to_dict('records')
                     else:
-                        st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data
+                        data_dict = list(df_to_save) # Fallback si c'est déjà une liste/dict
+                    
+                    # Initialisation sécurisée de la structure
+                    if "dmaic" not in st.session_state.projects[idx]: st.session_state.projects[idx]["dmaic"] = {}
+                    if "future_state" not in st.session_state.projects[idx]["dmaic"]: st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
+                    
+                    # Sauvegarde dans le projet
+                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = data_dict
+            
+            st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
 
-            # 3. CALCULS DES MÉTRIQUES
+            # 2. CALCULS DES MÉTRIQUES
             t0_lt_ref, t0_va_ref = 0.0, 0.0
             original_map = p.get("vsm_detailed_map", {})
             for step in original_map:
@@ -3882,16 +3885,9 @@ else:
                         va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
                         actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
 
-            # 4. ENREGISTREMENT DANS LE PROJET
-            st.session_state.projects[idx]["dmaic"]["future_state"]["metrics"] = {
-                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
-                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
-                "Gain": t0_lt_ref - actuel_lt
-            }
-            
-            # 5. SAUVEGARDE PHYSIQUE
+            # 3. SAUVEGARDE
             save_data()
-            st.success("✅ Données sauvegardées avec succès !")
+            st.success("✅ Données enregistrées dans le projet et sauvegardées sur le disque !")
             st.rerun()
 
         # Affichage des résultats
