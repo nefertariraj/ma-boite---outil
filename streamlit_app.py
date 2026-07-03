@@ -3893,8 +3893,7 @@ else:
             st.rerun()
 
         # --- AFFICHAGE DES RÉSULTATS (Dynamique) ---
-        st.markdown("### 📊 Synthèse des gains")
-        
+                
         # 1. RÉCUPÉRATION DU T0 (Depuis la phase Mesure déjà stockée en session)
         # On utilise directement les totaux calculés par la phase mesure
         t0_data = st.session_state.get("vsm_totals", {})
