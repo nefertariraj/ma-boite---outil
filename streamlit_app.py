@@ -3839,52 +3839,29 @@ else:
                 st.session_state["future_state_map"][new_section] = [{"Détail de la tâche": "Action", "Délai à T0": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)", "Délai Actuel": 0.0}]
                 st.rerun()
 
-        # Logique après soumission
+        # Logique après soumission (À REMPLACER PAR CECI)
         if submitted:
-            # 1. SYNCHRONISATION CRUCIALE : On récupère chaque éditeur et on écrase l'état
+            # 1. SYNCHRONISATION CRUCIALE
             for step in st.session_state["future_macro_steps"]:
                 st.session_state["future_state_map"][step] = temp_editors[step].to_dict('records')
             
-            # 2. CALCULS BASÉS SUR LA RÉFÉRENCE ORIGINALE (p["vsm_detailed_map"])
-            t0_lt_ref, t0_va_ref = 0.0, 0.0
-            original_map = p.get("vsm_detailed_map", {})
-            for step in original_map:
-                for item in original_map[step]:
-                    val = item.get("Valeur", 0.0) 
-                    t0_lt_ref += val
-                    if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
-                        t0_va_ref += val
-
-            # 3. CALCULS BASÉS SUR LE NOUVEAU DÉLAI ACTUEL
-            actuel_lt, actuel_va = 0.0, 0.0
-            for step in st.session_state["future_macro_steps"]:
-                df = pd.DataFrame(st.session_state["future_state_map"][step])
-                actuel_lt += df["Délai Actuel"].sum()
-                va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
-                actuel_va += df.loc[va_mask, "Délai Actuel"].sum()
+            # 2. CALCULS DES MÉTRIQUES (T0 et Actuel)
+            # ... (garde ta logique de calcul existante) ...
             
-            # 4. MISE À JOUR DE p (pour l'affichage immédiat)
-            p["future_state_map"] = copy.deepcopy(st.session_state["future_state_map"])
-            p["future_macro_steps"] = list(st.session_state["future_macro_steps"])
-            p["future_metrics"] = {
-                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
-                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
-                "Gain": t0_lt_ref - actuel_lt
-            }
-            
-            # 5. SYNCHRONISATION AVEC LE PROJET ET SAUVEGARDE DISQUE
-            # On récupère l'index du projet en cours
+            # 3. MISE À JOUR DE LA STRUCTURE DU PROJET (L'étape manquante)
             idx = st.session_state["current_project_idx"]
-            
-            # Mise à jour de la structure du projet pour la persistance JSON
             st.session_state.projects[idx]["dmaic"]["future_state"] = {
-                "map": p["future_state_map"],
-                "macro_steps": p["future_macro_steps"],
-                "metrics": p["future_metrics"]
+                "map": copy.deepcopy(st.session_state["future_state_map"]),
+                "macro_steps": list(st.session_state["future_macro_steps"]),
+                "metrics": {
+                    "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
+                    "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
+                    "Gain": t0_lt_ref - actuel_lt
+                }
             }
             
-            # Sauvegarde physique sur le disque via ta fonction habituelle
-            save_data()
+            # 4. SAUVEGARDE PHYSIQUE SUR LE DISQUE
+            save_data() 
             
             st.success("🎯 Données verrouillées et projet sauvegardé sur le disque !")
             st.rerun()
