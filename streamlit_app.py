@@ -3843,53 +3843,28 @@ else:
         if submitted:
             idx = st.session_state["current_project_idx"]
             
-            # 1. Vérification de la structure du projet (pour éviter KeyError)
+            # --- 1. SÉCURISATION DE LA STRUCTURE ---
             if "dmaic" not in st.session_state.projects[idx]:
                 st.session_state.projects[idx]["dmaic"] = {}
             if "future_state" not in st.session_state.projects[idx]["dmaic"]:
-                st.session_state.projects[idx]["dmaic"]["future_state"] = {"map": {}, "macro_steps": []}
-            
-            # 2. Récupération directe des données depuis temp_editors
-            # temp_editors contient les DataFrames à jour au moment du clic
+                st.session_state.projects[idx]["dmaic"]["future_state"] = {}
+
+            # --- 2. SYNCHRONISATION (L'ÉTAPE CRUCIALE) ---
+            # On met à jour directement l'objet projet dans session_state
+            # C'est cet objet qui est écrit sur le disque par save_data()
+            new_map = {}
             for step in st.session_state["future_macro_steps"]:
                 if step in temp_editors:
-                    # On transforme le DataFrame en liste de dictionnaires (format JSON standard)
-                    df_final = temp_editors[step]
-                    st.session_state.projects[idx]["dmaic"]["future_state"]["map"][step] = df_final.to_dict(orient='records')
+                    # On transforme le DataFrame en liste de dictionnaires
+                    new_map[step] = temp_editors[step].to_dict(orient='records')
             
+            st.session_state.projects[idx]["dmaic"]["future_state"]["map"] = new_map
             st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
-
-            # 3. Calculs des métriques (en utilisant les données fraîchement mises à jour)
-            # Calcul du T0 (référence)
-            t0_lt_ref, t0_va_ref = 0.0, 0.0
-            original_map = p.get("vsm_detailed_map", {})
-            for step in original_map:
-                for item in original_map[step]:
-                    val = float(item.get("Valeur", 0.0))
-                    t0_lt_ref += val
-                    if item.get("Type d'activité") == "VA (Valeur Ajoutée)":
-                        t0_va_ref += val
-
-            # Calcul Actuel
-            actuel_lt, actuel_va = 0.0, 0.0
-            for step in st.session_state["future_macro_steps"]:
-                if step in temp_editors:
-                    df = temp_editors[step]
-                    # Utilisation de .sum() directement sur le dataframe
-                    actuel_lt += float(df["Délai Actuel"].sum())
-                    va_mask = df["Type d'activité"] == "VA (Valeur Ajoutée)"
-                    actuel_va += float(df.loc[va_mask, "Délai Actuel"].sum())
-
-            # 4. Enregistrement des métriques calculées
-            st.session_state.projects[idx]["dmaic"]["future_state"]["metrics"] = {
-                "T0": {"LT": t0_lt_ref, "VA": t0_va_ref, "PCE": (t0_va_ref/t0_lt_ref*100) if t0_lt_ref>0 else 0},
-                "Actuel": {"LT": actuel_lt, "VA": actuel_va, "PCE": (actuel_va/actuel_lt*100) if actuel_lt>0 else 0},
-                "Gain": t0_lt_ref - actuel_lt
-            }
             
-            # 5. SAUVEGARDE PHYSIQUE
+            # --- 3. SAUVEGARDE SUR LE DISQUE ---
             save_data()
-            st.success("✅ Données enregistrées et sauvegardées !")
+            
+            st.success("✅ Données sauvegardées de manière permanente.")
             st.rerun()
 
         # --- AFFICHAGE DES RÉSULTATS (Dynamique) ---
