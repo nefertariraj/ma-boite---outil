@@ -3929,7 +3929,7 @@ else:
 
         st.info("💡 **Objectif** : Évaluer l'efficacité prévisionnelle des solutions retenues et mesurer le niveau de risque résiduel ($RPN_{futur}$) en tenant compte des améliorations.")
 
-        # 1. Accès sécurisé à l'index et aux données du projet
+        # 1. Accès sécurisé aux données du projet
         idx = st.session_state.get("current_project_idx", 0)
         if "dmaic" not in st.session_state.projects[idx]:
             st.session_state.projects[idx]["dmaic"] = {}
@@ -3939,49 +3939,67 @@ else:
         dmaic_analyze = st.session_state.projects[idx]["dmaic"].get("analyze", {})
         dmaic_improve = st.session_state.projects[idx]["dmaic"]["improve"]
 
-        # Récupération des données FMEA de la phase Analyse
+        # 2. Récupération des données brutes de la phase Analyse
         fmea_actuel_data = dmaic_analyze.get("fmea_data", {})
+        gemba_plans = dmaic_analyze.get("gemba_plans", {})
+        gemba_obs = dmaic_analyze.get("gemba_observations", {})
+        results_phase1 = dmaic_analyze.get("results", [])
 
-        # 🚨 RÉCUPÉRATION DIRECTE DES CAUSES VALIDÉES DEPUIS L'ÉTAPE 6 DE L'ANALYSE
-        summary_analyze = st.session_state.get("summary_data_phase6", [])
-        if not summary_analyze:
-            gemba_plans = dmaic_analyze.get("gemba_plans", {})
-            gemba_obs = dmaic_analyze.get("gemba_observations", {})
-            results_p1 = dmaic_analyze.get("results", [])
+        # 3. Recalcul et identification dynamique des causes validées/partiellement validées
+        causes_validees_list = []
+
+        for cid, plan in gemba_plans.items():
+            x_nom = plan.get("x_critique", "")
+            cause_nom = plan.get("cause_racine", "")
     
-            summary_analyze = []
-            for cid, plan in gemba_plans.items():
-                x_nom = plan.get("x_critique", "")
-                cause_nom = plan.get("cause_racine", "")
-                p_val = 1.0
-                for r in results_p1:
-                    if str(r.get("Variable X", "")).strip().lower() == str(x_nom).strip().lower():
-                        p_val = float(r.get("P-value", 1.0))
-                        break
-                obs = gemba_obs.get(cid, {})
-                logs = obs.get("logs", []) if isinstance(obs, dict) else []
-                conf = len([l for l in logs if str(l.get("confirme", "")).lower() == 'oui'])
-                total = len(logs)
-                taux = (conf / total * 100) if total > 0 else 0
-        
-                val_terrain = "Confirmée" if taux >= 80 else ("Partiellement confirmée" if taux >= 50 else "Non confirmée")
-                decision = "Cause validée" if (p_val < 0.05 and val_terrain == "Confirmée") else ("Cause partiellement validée" if (p_val < 0.05 and val_terrain == "Partiellement confirmée") else "Autre")
-        
-                summary_analyze.append({"Cause Racine": cause_nom, "Décision": decision})
+            # Recherche de la p-value statistique
+            p_val = 1.0
+            for r in results_phase1:
+                if str(r.get("Variable X", "")).strip().lower() == str(x_nom).strip().lower():
+                    p_val = float(r.get("P-value", 1.0))
+                    break
+            
+            # Calcul du taux terrain
+            obs = gemba_obs.get(cid, {})
+            logs = obs.get("logs", []) if isinstance(obs, dict) else []
+            conf = len([l for l in logs if str(l.get("confirme", "")).lower() == 'oui'])
+            total = len(logs)
+            taux = (conf / total * 100) if total > 0 else 0
+    
+            val_terrain = "Confirmée" if taux >= 80 else ("Partiellement confirmée" if taux >= 50 else "Non confirmée")
+            stat_validee = p_val < 0.05
+    
+            res_stat = "Confirmé" if stat_validee else "Non confirmé"
+    
+            # Détermination de la décision à l'identique de l'étape 6 de l'Analyse
+            if res_stat == "Confirmé" and val_terrain == "Confirmée":
+                decision = "Cause validée"
+            elif res_stat == "Confirmé" and val_terrain == "Partiellement confirmée":
+                decision = "Cause partiellement validée"
+            elif res_stat == "Confirmé" and val_terrain == "Non confirmée":
+                decision = "Contradiction à investiguer"
+            elif res_stat == "Non confirmé" and val_terrain == "Confirmée":
+                decision = "Contradiction à investiguer"
+            elif res_stat == "Non confirmé" and val_terrain == "Partiellement confirmée":
+                decision = "Cause non démontrée"
+            elif res_stat == "Non confirmé" and val_terrain == "Non confirmée":
+                decision = "Cause rejetée"
+            else:
+                decision = "En cours d'analyse"
 
-        # Filtrage strict des causes validées ou partiellement validées (Correction de la variable ici)
-        causes_validees_set = {
-            str(item.get("Cause Racine", "")).strip().lower() 
-            for item in summary_analyze 
-            if item.get("Décision") in ["Cause validée", "Cause partiellement validée"]
-        }
+            if decision in ["Cause validée", "Cause partiellement validée"]:
+                causes_validees_list.append({
+                    "X Critique": x_nom,
+                    "Cause Racine": cause_nom,
+                    "ID": cid
+                })
 
-        # Récupération des solutions depuis improve_strategies
+        # 4. Récupération des solutions depuis Improve
         strategies_data = dmaic_improve.get("strategies", [])
         if not strategies_data and "improve_strategies" in st.session_state:
             strategies_data = st.session_state.improve_strategies.to_dict(orient="records")
 
-        # Construction dynamique des lignes du Future State FMEA
+        # 5. Construction dynamique des lignes FMEA
         future_fmea_key = f"future_state_fmea_{idx}"
         saved_future_fmea = dmaic_improve.get("future_fmea", [])
 
@@ -3991,40 +4009,50 @@ else:
             else:
                 initial_fmea_rows = []
         
-                for cause_id, fmea_vals in fmea_actuel_data.items():
-                    parts = cause_id.split("_", 1)
-                    cause_racine = parts[1] if len(parts) > 1 else cause_id
+                for item in causes_validees_list:
+                    cid = item["ID"]
+                    cause_nom = item["Cause Racine"]
             
-                    if cause_racine.strip().lower() in causes_validees_set:
-                        s_actuel = float(fmea_vals.get("S", 1))
-                        o_actuel = float(fmea_vals.get("O", 1))
-                        d_actuel = float(fmea_vals.get("D", 1))
-                        rpn_actuel = s_actuel * o_actuel * d_actuel
-                
-                        matching_sols = [
-                            s.get("Solution potentielle", "Solution standard") for s in strategies_data
-                            if str(s.get("Cause racine", "")).strip().lower() == str(cause_racine).strip().lower()
-                        ]
-                        sol_text = " / ".join(matching_sols) if matching_sols else "À définir dans Improvement strategies"
-                
-                        initial_fmea_rows.append({
-                            "Cause racine validée": cause_racine,
-                            "Solution(s) retenue(s)": sol_text,
-                            "RPN actuel": rpn_actuel,
-                            "S futur": s_actuel,
-                            "O futur": max(1.0, o_actuel - 1.0),
-                            "D futur": max(1.0, d_actuel - 1.0)
-                        })
-        
+                    # Récupération du RPN initial correspondant dans fmea_data de l'Analyse
+                    fmea_vals = fmea_actuel_data.get(cid, {})
+                    if not fmea_vals:
+                        # Recherche élargie si la clé diffère légèrement
+                        for k, v in fmea_actuel_data.items():
+                            if cause_nom.strip().lower() in k.strip().lower():
+                                fmea_vals = v
+                                break
+            
+                    s_actuel = float(fmea_vals.get("S", 1))
+                    o_actuel = float(fmea_vals.get("O", 1))
+                    d_actuel = float(fmea_vals.get("D", 1))
+                    rpn_actuel = s_actuel * o_actuel * d_actuel
+            
+                    # Recherche des solutions associées
+                    matching_sols = [
+                        s.get("Solution potentielle", "Solution standard") for s in strategies_data
+                        if str(s.get("Cause racine", "")).strip().lower() == str(cause_nom).strip().lower()
+                    ]
+                    sol_text = " / ".join(matching_sols) if matching_sols else "À définir dans Improvement strategies"
+            
+                    initial_fmea_rows.append({
+                        "Cause racine validée": cause_nom,
+                        "Solution(s) retenue(s)": sol_text,
+                        "RPN actuel": rpn_actuel,
+                        "S futur": s_actuel,
+                        "O futur": max(1.0, o_actuel - 1.0),
+                        "D futur": max(1.0, d_actuel - 1.0)
+                    })
+            
                 if not initial_fmea_rows:
                     initial_fmea_rows = [{
-                        "Cause racine validée": "⚠️ Aucune cause 'validée' ou 'partiellement validée' trouvée dans l'étape 6 de la phase Analyse",
+                        "Cause racine validée": "⚠️ Aucune cause 'validée' ou 'partiellement validée' détectée dans la phase Analyse",
                         "Solution(s) retenue(s)": "N/A",
                         "RPN actuel": 0.0,
                         "S futur": 1.0, "O futur": 1.0, "D futur": 1.0
                     }]
                 st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
+        # Paramètre du seuil critique
         seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
 
         st.markdown("### 📝 Réévaluation du futur état (S, O, D)")
@@ -4095,8 +4123,7 @@ else:
                 hide_index=True
             )
     
-            st.info("📌 **Validation de la phase Improve** : La réduction des RPN démontre l'efficacité prévisionnelle des solutions retenues sur les causes racines validées. Cette section servira de base à la revue de fin de phase Improve et à la préparation du Control Plan lors de la phase Control.")
-
+            st.info("📌 **Validation de la phase Improve** : La réduction des RPN démontre l'efficacité prévisionnelle des solutions retenues sur les causes racines validées.")
 
     # --- PHASE CONTROL ---
     with tabs[4]: 
