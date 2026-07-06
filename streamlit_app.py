@@ -3924,54 +3924,65 @@ else:
 
 
         # 6 : FUTURE STATE FMEA ---
+        st.markdown("---")
         st.subheader("6. Future state FMEA")
-        
-        st.info("💡 **Objectif** : Évaluer l'efficacité prévisionnelle des solutions retenues et mesurer le niveau de risque résiduel ($RPN_{futur}$).")
 
-        # 1. Récupération sécurisée des données de la phase Analyse (Current State FMEA & Causes racines)
-        # On cherche d'abord dans l'objet p ou le session_state
-        analyse_fmea_data = p.get("dmaic", {}).get("analyze", {}).get("fmea_table", [])
-        if not analyse_fmea_data:
-            analyse_fmea_data = st.session_state.get("analyze_fmea_table", [])
+        st.info("💡 **Objectif** : Évaluer l'efficacité prévisionnelle des solutions retenues et mesurer le niveau de risque résiduel ($RPN_{futur}$) en tenant compte des améliorations.")
 
-        # Récupération du plan d'action des solutions
-        solution_action_plan = p.get("dmaic", {}).get("improve", {}).get("action_plan", [])
-        if not solution_action_plan:
-            solution_action_plan = st.session_state.get("solution_action_plan", [])
+        # 1. Accès sécurisé à l'index et aux données du projet
+        idx = st.session_state.get("current_project_idx", 0)
+        if "dmaic" not in st.session_state.projects[idx]:
+            st.session_state.projects[idx]["dmaic"] = {}
+        if "improve" not in st.session_state.projects[idx]["dmaic"]:
+            st.session_state.projects[idx]["dmaic"]["improve"] = {}
 
-        # Restauration ou initialisation de la structure Future FMEA
-        future_fmea_key = f"future_state_fmea_{p_idx}"
-        saved_future_fmea = p.get("dmaic", {}).get("improve", {}).get("future_fmea", [])
+        dmaic_analyze = st.session_state.projects[idx]["dmaic"].get("analyze", {})
+        dmaic_improve = st.session_state.projects[idx]["dmaic"]["improve"]
+
+        # Récupération du FMEA actuel de la phase Analyse
+        fmea_actuel_data = dmaic_analyze.get("fmea_data", {})
+
+        # Récupération des solutions depuis improve_strategies
+        strategies_data = dmaic_improve.get("strategies", [])
+        if not strategies_data and "improve_strategies" in st.session_state:
+            strategies_data = st.session_state.improve_strategies.to_dict(orient="records")
+
+        # Construction automatique des lignes du Future State FMEA
+        future_fmea_key = f"future_state_fmea_{idx}"
+        saved_future_fmea = dmaic_improve.get("future_fmea", [])
 
         if future_fmea_key not in st.session_state:
             if saved_future_fmea:
                 st.session_state[future_fmea_key] = pd.DataFrame(saved_future_fmea)
             else:
-                # Construction automatique des lignes basées sur l'Analyse
                 initial_fmea_rows = []
-                for row in analyse_fmea_data:
-                    cause_racine = row.get("Cause racine") or row.get("Cause Racine") or "Cause non définie"
-                    s_actuel = float(row.get("Severity (S)") or row.get("S") or 5.0)
-                    o_actuel = float(row.get("Occurrence (O)") or row.get("O") or 5.0)
-                    d_actuel = float(row.get("Detection (D)") or row.get("D") or 5.0)
+                # Parcourir les causes enregistrées dans le FMEA actuel
+                for cause_id, fmea_vals in fmea_actuel_data.items():
+                    # Extraire la cause racine depuis l'identifiant ou la structure
+                    parts = cause_id.split("_", 1)
+                    cause_racine = parts[1] if len(parts) > 1 else cause_id
+            
+                    s_actuel = float(fmea_vals.get("S", 1))
+                    o_actuel = float(fmea_vals.get("O", 1))
+                    d_actuel = float(fmea_vals.get("D", 1))
                     rpn_actuel = s_actuel * o_actuel * d_actuel
             
-                    # Recherche des solutions associées dans le plan d'action
-                    matching_solutions = [
-                        s.get("Solution", "Solution standard") for s in solution_action_plan 
-                        if s.get("Cause racine", "").strip().lower() == cause_racine.strip().lower()
+                    # Recherche des solutions associées dans les stratégies de la phase improve
+                    matching_sols = [
+                        s.get("Solution potentielle", "Solution standard") for s in strategies_data
+                        if str(s.get("Cause racine", "")).strip().lower() == str(cause_racine).strip().lower()
                     ]
-                    sol_text = " / ".join(matching_solutions) if matching_solutions else "À associer depuis le plan d'action"
+                    sol_text = " / ".join(matching_sols) if matching_sols else "Aucune solution associée"
             
                     initial_fmea_rows.append({
                         "Cause racine validée": cause_racine,
                         "Solution(s) retenue(s)": sol_text,
                         "RPN actuel": rpn_actuel,
                         "S futur": s_actuel,  # par défaut identique
-                        "O futur": max(1.0, o_actuel - 2.0),  # estimation d'amélioration
-                        "D futur": max(1.0, d_actuel - 1.0)   # estimation d'amélioration
+                        "O futur": max(1.0, o_actuel - 1.0),
+                        "D futur": max(1.0, d_actuel - 1.0)
                     })
-        
+            
                 if not initial_fmea_rows:
                     initial_fmea_rows = [{
                         "Cause racine validée": "Exemple de cause racine",
@@ -3981,18 +3992,19 @@ else:
                     }]
                 st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
-        # Seuil critique paramétrable
-        seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_{p_idx}")
+        # Paramètre du seuil critique
+        seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
 
-        st.markdown("### 📝 Évaluation du futur état (S, O, D résiduels)")
+        st.markdown("### 📝 Réévaluation du futur état (S, O, D)")
+        # Ajustement compact de l'éditeur de données pour occuper la largeur utile sans espace vide superflu
         edited_future_fmea = st.data_editor(
             st.session_state[future_fmea_key],
             use_container_width=True,
             num_rows="fixed",
-            key=f"editor_future_fmea_{p_idx}",
+            key=f"editor_future_fmea_view_{idx}",
             column_config={
-                "Cause racine validée": st.column_config.TextColumn("Cause racine validée", disabled=True, width="large"),
-                "Solution(s) retenue(s)": st.column_config.TextColumn("Solution(s) retenue(s)", disabled=True, width="large"),
+                "Cause racine validée": st.column_config.TextColumn("Cause racine validée", disabled=True, width="medium"),
+                "Solution(s) retenue(s)": st.column_config.TextColumn("Solution(s) retenue(s)", disabled=True, width="medium"),
                 "RPN actuel": st.column_config.NumberColumn("RPN actuel", disabled=True, format="%.1f", width="small"),
                 "S futur": st.column_config.NumberColumn("S futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
                 "O futur": st.column_config.NumberColumn("O futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
@@ -4000,7 +4012,7 @@ else:
             }
         )
 
-        if st.button("💾 Enregistrer la Future State FMEA & Calculer les gains", type="primary", use_container_width=True, key=f"save_future_fmea_{p_idx}"):
+        if st.button("💾 Enregistrer la Future State FMEA & Calculer", type="primary", use_container_width=True, key=f"btn_save_future_fmea_{idx}"):
             df_res = edited_future_fmea.copy()
     
             # Calculs automatiques
@@ -4008,7 +4020,7 @@ else:
             df_res["Réduction du risque"] = df_res["RPN actuel"] - df_res["RPN futur"]
             df_res["Pourcentage de réduction"] = ((df_res["RPN actuel"] - df_res["RPN futur"]) / df_res["RPN actuel"].replace(0, 1)) * 100
     
-            # Interprétation et Efficacité
+            # Interprétation et Efficacité automatiques
             def interpret_reduction(row):
                 red_pct = row["Pourcentage de réduction"]
                 rpn_fut = row["RPN futur"]
@@ -4033,27 +4045,31 @@ else:
     
             st.session_state[future_fmea_key] = df_res
     
-            # Sauvegarde dans le dictionnaire projet p
-            if "dmaic" not in p: p["dmaic"] = {}
-            if "improve" not in p["dmaic"]: p["dmaic"]["improve"] = {}
-            p["dmaic"]["improve"]["future_fmea"] = df_res.to_dict('records')
-    
+            # Sauvegarde définitive dans le session_state du projet
+            st.session_state.projects[idx]["dmaic"]["improve"]["future_fmea"] = df_res.to_dict('records')
             save_data()
-            st.success("✅ Future State FMEA enregistrée et calculs de réduction mis à jour avec succès !")
+    
+            st.success("✅ Future State FMEA enregistrée de manière permanente !")
             st.rerun()
 
-        # Affichage des Tableaux de Synthèse & Efficacité
-        if "RPN futur" in st.session_state[future_fmea_key].columns:
-            st.markdown("### 📊 Tableau de Synthèse des Risques Résiduels")
-            df_current_stored = st.session_state[future_fmea_key]
-    
-            st.table(df_current_stored[["Cause racine validée", "RPN actuel", "RPN futur", "Réduction du risque", "Pourcentage de réduction", "Interprétation"]])
+        # Affichage des Tableaux de Synthèse optimisés en largeur
+        current_stored_df = st.session_state[future_fmea_key]
+        if "RPN futur" in current_stored_df.columns:
+            st.markdown("### 📊 Tableau de Synthèse des Risques")
+            st.dataframe(
+                current_stored_df[["Cause racine validée", "RPN actuel", "RPN futur", "Réduction du risque", "Pourcentage de réduction", "Interprétation"]],
+                use_container_width=True,
+                hide_index=True
+            )
     
             st.markdown("### 🎯 Évaluation de l'efficacité des solutions")
-            st.table(df_current_stored[["Cause racine validée", "Solution(s) retenue(s)", "Réduction du risque", "Efficacité"]])
+            st.dataframe(
+                current_stored_df[["Cause racine validée", "Solution(s) retenue(s)", "Réduction du risque", "Efficacité"]],
+                use_container_width=True,
+                hide_index=True
+            )
     
             st.info("📌 **Validation de la phase Improve** : La réduction des RPN démontre l'efficacité prévisionnelle des solutions retenues sur les causes racines validées. Cette section servira de base à la revue de fin de phase Improve et à la préparation du Control Plan lors de la phase Control.")
-    
     
     # --- PHASE CONTROL ---
     with tabs[4]: 
