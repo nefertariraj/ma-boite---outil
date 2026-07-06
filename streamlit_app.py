@@ -3790,9 +3790,18 @@ else:
         # 5 : FUTURE STATE PROCESS MAP ---
         st.subheader("5. Future state process map")
         
+        # 🚨 CORRECTION INITIALISATION : Lecture sécurisée depuis p ou dmaic
+        dmaic_data = p.get("dmaic", {})
+        future_state_data = dmaic_data.get("future_state", {})
+
         if "future_state_map" not in st.session_state:
-            st.session_state["future_state_map"] = copy.deepcopy(p.get("vsm_detailed_map", {}))
-            st.session_state["future_macro_steps"] = list(p.get("vsm_macro_steps", []))
+            # On vérifie si la map existe dans dmaic/future_state ou dans les clés directes de p
+            saved_map = future_state_data.get("map") or p.get("future_state_map", {})
+            st.session_state["future_state_map"] = copy.deepcopy(saved_map) if saved_map else copy.deepcopy(p.get("vsm_detailed_map", {}))
+
+        if "future_macro_steps" not in st.session_state:
+            saved_steps = future_state_data.get("macro_steps") or p.get("future_macro_steps", [])
+            st.session_state["future_macro_steps"] = list(saved_steps) if saved_steps else list(p.get("vsm_macro_steps", []))
 
         st.info("💡 **Instructions** : Modifiez vos données, puis validez avec 'Enregistrer'.")
 
@@ -3841,8 +3850,8 @@ else:
 
         # Logique après soumission
         if submitted:
-            idx = st.session_state["current_project_idx"]
-            
+            idx = st.session_state.get("current_project_idx", 0)
+    
             # --- 1. SÉCURISATION DE LA STRUCTURE ---
             if "dmaic" not in st.session_state.projects[idx]:
                 st.session_state.projects[idx]["dmaic"] = {}
@@ -3850,20 +3859,31 @@ else:
                 st.session_state.projects[idx]["dmaic"]["future_state"] = {}
 
             # --- 2. SYNCHRONISATION (L'ÉTAPE CRUCIALE) ---
-            # On met à jour directement l'objet projet dans session_state
-            # C'est cet objet qui est écrit sur le disque par save_data()
             new_map = {}
             for step in st.session_state["future_macro_steps"]:
                 if step in temp_editors:
-                    # On transforme le DataFrame en liste de dictionnaires
                     new_map[step] = temp_editors[step].to_dict(orient='records')
-            
+    
+            # Mise à jour dans session_state.projects
             st.session_state.projects[idx]["dmaic"]["future_state"]["map"] = new_map
             st.session_state.projects[idx]["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
-            
+    
+            # 🚨 CORRECTION SAUVEGARDE JSON (Mise à jour directe de p)
+            if "dmaic" not in p:
+                p["dmaic"] = {}
+            if "future_state" not in p["dmaic"]:
+                p["dmaic"]["future_state"] = {}
+        
+            p["dmaic"]["future_state"]["map"] = new_map
+            p["dmaic"]["future_state"]["macro_steps"] = list(st.session_state["future_macro_steps"])
+    
+            # Raccourcis directs au cas où le script lit directement p[...]
+            p["future_state_map"] = new_map
+            p["future_macro_steps"] = list(st.session_state["future_macro_steps"])
+
             # --- 3. SAUVEGARDE SUR LE DISQUE ---
             save_data()
-            
+    
             st.success("✅ Données sauvegardées de manière permanente.")
             st.rerun()
 
