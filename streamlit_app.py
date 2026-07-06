@@ -3927,6 +3927,17 @@ else:
         st.markdown("---")
         st.subheader("6. Future state FMEA")
 
+        idx = st.session_state.get("current_project_idx", 0)
+        project_dict = st.session_state.projects[idx].get("dmaic", {})
+        dmaic_analyze = project_dict.get("analyze", {})
+
+        # Affichage des clés et du contenu brut pour vérifier où résident les données
+        st.write("1. Contenu de `gemba_plans` :", dmaic_analyze.get("gemba_plans", {}))
+        st.write("2. Contenu de `gemba_observations` :", dmaic_analyze.get("gemba_observations", {}))
+        st.write("3. Contenu de `results` (Phase 1) :", dmaic_analyze.get("results", []))
+        st.write("4. Contenu de `fmea_data` (Phase 3) :", dmaic_analyze.get("fmea_data", {}))
+        st.write("5. Contenu de `x_analyses` (Phase 2) :", dmaic_analyze.get("x_analyses", {}))
+        
         st.info("💡 **Objectif** : Évaluer l'efficacité prévisionnelle des solutions retenues et mesurer le niveau de risque résiduel ($RPN_{futur}$) en tenant compte des améliorations.")
 
         # 1. Accès sécurisé aux données du projet
