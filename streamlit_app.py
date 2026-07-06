@@ -3927,8 +3927,6 @@ else:
         st.markdown("---")
         st.subheader("6. Future state FMEA")
 
-        st.info("💡 **Objectif** : Évaluer l'efficacité prévisionnelle des solutions retenues et mesurer le niveau de risque résiduel ($RPN_{futur}$) en tenant compte des améliorations.")
-
         # 1. Accès sécurisé aux données du projet
         idx = st.session_state.get("current_project_idx", 0)
         if "dmaic" not in st.session_state.projects[idx]:
@@ -3941,33 +3939,16 @@ else:
 
         fmea_actuel_data = dmaic_analyze.get("fmea_data", {})
         gemba_plans = dmaic_analyze.get("gemba_plans", {})
-        gemba_obs = dmaic_analyze.get("gemba_observations", {})
 
-        # 2. Récupération directe et permissive de toutes les causes identifiées ayant un plan Gemba
+        # 2. Extraction directe et systématique depuis gemba_plans
         causes_validees_list = []
-
         for cid, plan in gemba_plans.items():
             x_nom = str(plan.get("x_critique", "")).strip()
             cause_nom = str(plan.get("cause_racine", "")).strip()
-    
-            # On accepte la cause si elle possède des logs ou un statut dans les observations terrain
-            obs_info = gemba_obs.get(cid, {})
-            has_logs = len(obs_info.get("logs", [])) > 0
-    
-            # Ajout systématique des causes analysées sur le terrain pour éviter le filtre bloquant
-            if has_logs or cid in gemba_obs:
+            if cause_nom:
                 causes_validees_list.append({
                     "X Critique": x_nom,
                     "Cause Racine": cause_nom,
-                    "ID": cid
-                })
-
-        # Solution de secours : si la liste est vide, on prend directement toutes les causes des plans Gemba
-        if not causes_validees_list:
-            for cid, plan in gemba_plans.items():
-                causes_validees_list.append({
-                    "X Critique": str(plan.get("x_critique", "")).strip(),
-                    "Cause Racine": str(plan.get("cause_racine", "")).strip(),
                     "ID": cid
                 })
 
@@ -3976,48 +3957,52 @@ else:
         if not strategies_data and "improve_strategies" in st.session_state:
             strategies_data = st.session_state.improve_strategies.to_dict(orient="records")
 
-        # 4. Construction des lignes FMEA
+        # 4. Gestion de la session et forçage de la mise à jour
         future_fmea_key = f"future_state_fmea_{idx}"
-        saved_future_fmea = dmaic_improve.get("future_fmea", [])
+
+        # Bouton pour forcer le rechargement des données si le cache bloque l'affichage
+        col_btn1, col_btn2 = st.columns([0.8, 0.2])
+        with col_btn2:
+            if st.button("🔄 Rafraîchir", key=f"force_refresh_{idx}"):
+                if future_fmea_key in st.session_state:
+                    del st.session_state[future_fmea_key]
+                st.rerun()
 
         if future_fmea_key not in st.session_state:
-            if saved_future_fmea:
-                st.session_state[future_fmea_key] = pd.DataFrame(saved_future_fmea)
-            else:
-                initial_fmea_rows = []
-                for item in causes_validees_list:
-                    cid = item["ID"]
-                    cause_nom = item["Cause Racine"]
-            
-                    fmea_vals = fmea_actuel_data.get(cid, {})
-                    s_actuel = float(fmea_vals.get("S", 1))
-                    o_actuel = float(fmea_vals.get("O", 1))
-                    d_actuel = float(fmea_vals.get("D", 1))
-                    rpn_actuel = s_actuel * o_actuel * d_actuel
-            
-                    matching_sols = [
-                        s.get("Solution potentielle", "Solution standard") for s in strategies_data
-                        if str(s.get("Cause racine", "")).strip().lower() == cause_nom.lower()
-                    ]
-                    sol_text = " / ".join(matching_sols) if matching_sols else "À définir"
-            
-                    initial_fmea_rows.append({
-                        "Cause racine validée": cause_nom,
-                        "Solution(s) retenue(s)": sol_text,
-                        "RPN actuel": rpn_actuel,
-                        "S futur": s_actuel,
-                        "O futur": max(1.0, o_actuel - 1.0),
-                        "D futur": max(1.0, d_actuel - 1.0)
-                    })
-            
-                if not initial_fmea_rows:
-                    initial_fmea_rows = [{
-                        "Cause racine validée": "Aucune cause disponible",
-                        "Solution(s) retenue(s)": "N/A",
-                        "RPN actuel": 0.0,
-                        "S futur": 1.0, "O futur": 1.0, "D futur": 1.0
-                    }]
-                st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
+            initial_fmea_rows = []
+            for item in causes_validees_list:
+                cid = item["ID"]
+                cause_nom = item["Cause Racine"]
+        
+                fmea_vals = fmea_actuel_data.get(cid, {})
+                s_actuel = float(fmea_vals.get("S", 6))  # Valeur par défaut de sécurité si absent
+                o_actuel = float(fmea_vals.get("O", 5))
+                d_actuel = float(fmea_vals.get("D", 5))
+                rpn_actuel = s_actuel * o_actuel * d_actuel
+        
+                matching_sols = [
+                    s.get("Solution potentielle", "Solution standard") for s in strategies_data
+                    if str(s.get("Cause racine", "")).strip().lower() == cause_nom.lower()
+                ]
+                sol_text = " / ".join(matching_sols) if matching_sols else "À définir"
+        
+                initial_fmea_rows.append({
+                    "Cause racine validée": cause_nom,
+                    "Solution(s) retenue(s)": sol_text,
+                    "RPN actuel": rpn_actuel,
+                    "S futur": s_actuel,
+                    "O futur": max(1.0, o_actuel - 1.0),
+                    "D futur": max(1.0, d_actuel - 1.0)
+                })
+        
+            if not initial_fmea_rows:
+                initial_fmea_rows = [{
+                    "Cause racine validée": "⚠️ Aucune cause trouvée dans gemba_plans",
+                    "Solution(s) retenue(s)": "N/A",
+                    "RPN actuel": 0.0,
+                    "S futur": 1.0, "O futur": 1.0, "D futur": 1.0
+                }]
+            st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
         # Paramètre du seuil critique
         seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
@@ -4055,7 +4040,7 @@ else:
                 else: interp = "Impact faible des solutions"
         
                 if rpn_fut > seuil_critique:
-                    interp += " - Risque résiduel critique (actions complémentaires recommandées)"
+                    interp += " - Risque résiduel critique"
                 return interp
 
             def class_efficacite(red_pct):
@@ -4072,27 +4057,17 @@ else:
             if "save_data" in globals():
                 save_data()
     
-            st.success("✅ Future State FMEA enregistrée de manière permanente !")
+            st.success("✅ Future State FMEA enregistrée avec succès !")
             st.rerun()
 
         current_stored_df = st.session_state[future_fmea_key]
-        if "RPN futur" in current_stored_df.columns:
+        if "RPN futur" in current_stored_df.columns and "Cause racine validée" in current_stored_df.columns:
             st.markdown("### 📊 Tableau de Synthèse des Risques")
             st.dataframe(
                 current_stored_df[["Cause racine validée", "RPN actuel", "RPN futur", "Réduction du risque", "Pourcentage de réduction", "Interprétation"]],
                 use_container_width=True,
                 hide_index=True
             )
-    
-            st.markdown("### 🎯 Évaluation de l'efficacité des solutions")
-            st.dataframe(
-                current_stored_df[["Cause racine validée", "Solution(s) retenue(s)", "Réduction du risque", "Efficacité"]],
-                use_container_width=True,
-                hide_index=True
-            )
-    
-            st.info("📌 **Validation de la phase Improve** : La réduction des RPN démontre l'efficacité prévisionnelle des solutions retenues sur les causes racines validées.")
-
     
     # --- PHASE CONTROL ---
     with tabs[4]: 
