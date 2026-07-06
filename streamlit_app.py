@@ -3939,15 +3939,53 @@ else:
         dmaic_analyze = st.session_state.projects[idx]["dmaic"].get("analyze", {})
         dmaic_improve = st.session_state.projects[idx]["dmaic"]["improve"]
 
-        # Récupération du FMEA actuel de la phase Analyse
+        # Récupération des données FMEA de la phase Analyse
         fmea_actuel_data = dmaic_analyze.get("fmea_data", {})
+
+        # Récupération des décisions de la phase Analyse (étape 6 - validation des causes)
+        # On reconstruit la liste ou on cherche les causes validées depuis x_analyses & gemba
+        x_analyses = dmaic_analyze.get("x_analyses", {})
+        gemba_plans = dmaic_analyze.get("gemba_plans", {})
+        gemba_obs = dmaic_analyze.get("gemba_observations", {})
+
+        # Calcul des décisions par cause pour identifier lesquelles sont validées / partiellement validées
+        causes_validees_set = set()
+        for cid, plan in gemba_plans.items():
+            cause_nom = plan.get("cause_racine", "")
+            x_nom = plan.get("x_critique", "")
+    
+            # Calcul p-value phase 1
+            results_phase1 = dmaic_analyze.get("results", [])
+            p_val = 1.0
+            for r in results_phase1:
+                if str(r.get("Variable X", "")).strip().lower() == str(x_nom).strip().lower():
+                    p_val = float(r.get("P-value", 1.0))
+                    break
+            
+            # Calcul terrain
+            obs = gemba_obs.get(cid, {})
+            logs = obs.get("logs", []) if isinstance(obs, dict) else []
+            conf = len([l for l in logs if str(l.get("confirme", "")).lower() == 'oui'])
+            total = len(logs)
+            taux = (conf / total * 100) if total > 0 else 0
+    
+            val_terrain = "Confirmée" if taux >= 80 else ("Partiellement confirmée" if taux >= 50 else "Non confirmée")
+            stat_validee = p_val < 0.05
+    
+            res_stat = "Confirmé" if stat_validee else "Non confirmé"
+            if res_stat == "Confirmé" and val_terrain == "Confirmée": decision = "Cause validée"
+            elif res_stat == "Confirmé" and val_terrain == "Partiellement confirmée": decision = "Cause partiellement validée"
+            else: decision = "Autre"
+    
+            if decision in ["Cause validée", "Cause partiellement validée"]:
+                causes_validees_set.add(cause_nom.strip().lower())
 
         # Récupération des solutions depuis improve_strategies
         strategies_data = dmaic_improve.get("strategies", [])
         if not strategies_data and "improve_strategies" in st.session_state:
             strategies_data = st.session_state.improve_strategies.to_dict(orient="records")
 
-        # Construction automatique des lignes du Future State FMEA
+        # Construction automatique des lignes du Future State FMEA filtrées sur les causes validées/partiellement validées
         future_fmea_key = f"future_state_fmea_{idx}"
         saved_future_fmea = dmaic_improve.get("future_fmea", [])
 
@@ -3956,39 +3994,40 @@ else:
                 st.session_state[future_fmea_key] = pd.DataFrame(saved_future_fmea)
             else:
                 initial_fmea_rows = []
-                # Parcourir les causes enregistrées dans le FMEA actuel
+                # On parcourt les entrées du FMEA actuel de l'Analyse
                 for cause_id, fmea_vals in fmea_actuel_data.items():
-                    # Extraire la cause racine depuis l'identifiant ou la structure
                     parts = cause_id.split("_", 1)
                     cause_racine = parts[1] if len(parts) > 1 else cause_id
             
-                    s_actuel = float(fmea_vals.get("S", 1))
-                    o_actuel = float(fmea_vals.get("O", 1))
-                    d_actuel = float(fmea_vals.get("D", 1))
-                    rpn_actuel = s_actuel * o_actuel * d_actuel
-            
-                    # Recherche des solutions associées dans les stratégies de la phase improve
-                    matching_sols = [
-                        s.get("Solution potentielle", "Solution standard") for s in strategies_data
-                        if str(s.get("Cause racine", "")).strip().lower() == str(cause_racine).strip().lower()
-                    ]
-                    sol_text = " / ".join(matching_sols) if matching_sols else "Aucune solution associée"
-            
-                    initial_fmea_rows.append({
-                        "Cause racine validée": cause_racine,
-                        "Solution(s) retenue(s)": sol_text,
-                        "RPN actuel": rpn_actuel,
-                        "S futur": s_actuel,  # par défaut identique
-                        "O futur": max(1.0, o_actuel - 1.0),
-                        "D futur": max(1.0, d_actuel - 1.0)
-                    })
-            
+                    # FILTRE STRICT : On ne garde que les causes validées ou partiellement validées
+                    if cause_racine.strip().lower() in causes_validees_set:
+                        s_actuel = float(fmea_vals.get("S", 1))
+                        o_actuel = float(fmea_vals.get("O", 1))
+                        d_actuel = float(fmea_vals.get("D", 1))
+                        rpn_actuel = s_actuel * o_actuel * d_actuel
+                
+                        # Recherche des solutions associées dans les stratégies de la phase Improve
+                        matching_sols = [
+                            s.get("Solution potentielle", "Solution standard") for s in strategies_data
+                            if str(s.get("Cause racine", "")).strip().lower() == str(cause_racine).strip().lower()
+                        ]
+                        sol_text = " / ".join(matching_sols) if matching_sols else "Aucune solution associée"
+                
+                        initial_fmea_rows.append({
+                            "Cause racine validée": cause_racine,
+                            "Solution(s) retenue(s)": sol_text,
+                            "RPN actuel": rpn_actuel,
+                            "S futur": s_actuel,
+                            "O futur": max(1.0, o_actuel - 1.0),
+                            "D futur": max(1.0, d_actuel - 1.0)
+                        })
+                
                 if not initial_fmea_rows:
                     initial_fmea_rows = [{
-                        "Cause racine validée": "Exemple de cause racine",
-                        "Solution(s) retenue(s)": "Exemple de solution",
-                        "RPN actuel": 125.0,
-                        "S futur": 5.0, "O futur": 3.0, "D futur": 2.0
+                        "Cause racine validée": "Aucune cause validée disponible dans la phase Analyse",
+                        "Solution(s) retenue(s)": "N/A",
+                        "RPN actuel": 0.0,
+                        "S futur": 1.0, "O futur": 1.0, "D futur": 1.0
                     }]
                 st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
@@ -3996,7 +4035,6 @@ else:
         seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
 
         st.markdown("### 📝 Réévaluation du futur état (S, O, D)")
-        # Ajustement compact de l'éditeur de données pour occuper la largeur utile sans espace vide superflu
         edited_future_fmea = st.data_editor(
             st.session_state[future_fmea_key],
             use_container_width=True,
@@ -4020,7 +4058,6 @@ else:
             df_res["Réduction du risque"] = df_res["RPN actuel"] - df_res["RPN futur"]
             df_res["Pourcentage de réduction"] = ((df_res["RPN actuel"] - df_res["RPN futur"]) / df_res["RPN actuel"].replace(0, 1)) * 100
     
-            # Interprétation et Efficacité automatiques
             def interpret_reduction(row):
                 red_pct = row["Pourcentage de réduction"]
                 rpn_fut = row["RPN futur"]
@@ -4044,15 +4081,12 @@ else:
             df_res["Efficacité"] = df_res["Pourcentage de réduction"].apply(class_efficacite)
     
             st.session_state[future_fmea_key] = df_res
-    
-            # Sauvegarde définitive dans le session_state du projet
             st.session_state.projects[idx]["dmaic"]["improve"]["future_fmea"] = df_res.to_dict('records')
             save_data()
     
             st.success("✅ Future State FMEA enregistrée de manière permanente !")
             st.rerun()
 
-        # Affichage des Tableaux de Synthèse optimisés en largeur
         current_stored_df = st.session_state[future_fmea_key]
         if "RPN futur" in current_stored_df.columns:
             st.markdown("### 📊 Tableau de Synthèse des Risques")
