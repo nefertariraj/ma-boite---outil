@@ -3942,50 +3942,48 @@ else:
         # Récupération des données FMEA de la phase Analyse
         fmea_actuel_data = dmaic_analyze.get("fmea_data", {})
 
-        # Récupération des décisions de la phase Analyse (étape 6 - validation des causes)
-        # On reconstruit la liste ou on cherche les causes validées depuis x_analyses & gemba
-        x_analyses = dmaic_analyze.get("x_analyses", {})
-        gemba_plans = dmaic_analyze.get("gemba_plans", {})
-        gemba_obs = dmaic_analyze.get("gemba_observations", {})
+        # 🚨 RÉCUPÉRATION DIRECTE DES CAUSES VALIDÉES DEPUIS L'ÉTAPE 6 DE L'ANALYSE
+        # On cherche dans la session ou dans les structures sauvegardées du projet
+        summary_analyze = st.session_state.get("summary_data_phase6", [])
+        if not summary_analyze:
+            # Alternative : reconstruction depuis le tableau final stocké ou les gemba plans
+            gemba_plans = dmaic_analyze.get("gemba_plans", {})
+            gemba_obs = dmaic_analyze.get("gemba_observations", {})
+            results_p1 = dmaic_analyze.get("results", [])
+    
+            summary_analyze = []
+            for cid, plan in gemba_plans.items():
+                x_nom = plan.get("x_critique", "")
+                cause_nom = plan.get("cause_racine", "")
+                p_val = 1.0
+                for r in results_p1:
+                    if str(r.get("Variable X", "")).strip().lower() == str(x_nom).strip().lower():
+                        p_val = float(r.get("P-value", 1.0))
+                        break
+                obs = gemba_obs.get(cid, {})
+                logs = obs.get("logs", []) if isinstance(obs, dict) else []
+                conf = len([l for l in logs if str(l.get("confirme", "")).lower() == 'oui'])
+                total = len(logs)
+                taux = (conf / total * 100) if total > 0 else 0
+        
+                val_terrain = "Confirmée" if taux >= 80 else ("Partiellement confirmée" if taux >= 50 else "Non confirmée")
+                decision = "Cause validée" if (p_val < 0.05 and val_terrain == "Confirmée") else ("Cause partiellement validée" if (p_val < 0.05 and val_terrain == "Partiellement confirmée") else "Autre")
+        
+                summary_analyze.append({"Cause Racine": cause_nom, "Décision": decision})
 
-        # Calcul des décisions par cause pour identifier lesquelles sont validées / partiellement validées
-        causes_validees_set = set()
-        for cid, plan in gemba_plans.items():
-            cause_nom = plan.get("cause_racine", "")
-            x_nom = plan.get("x_critique", "")
-    
-            # Calcul p-value phase 1
-            results_phase1 = dmaic_analyze.get("results", [])
-            p_val = 1.0
-            for r in results_phase1:
-                if str(r.get("Variable X", "")).strip().lower() == str(x_nom).strip().lower():
-                    p_val = float(r.get("P-value", 1.0))
-                    break
-            
-            # Calcul terrain
-            obs = gemba_obs.get(cid, {})
-            logs = obs.get("logs", []) if isinstance(obs, dict) else []
-            conf = len([l for l in logs if str(l.get("confirme", "")).lower() == 'oui'])
-            total = len(logs)
-            taux = (conf / total * 100) if total > 0 else 0
-    
-            val_terrain = "Confirmée" if taux >= 80 else ("Partiellement confirmée" if taux >= 50 else "Non confirmée")
-            stat_validee = p_val < 0.05
-    
-            res_stat = "Confirmé" if stat_validee else "Non confirmé"
-            if res_stat == "Confirmé" and val_terrain == "Confirmée": decision = "Cause validée"
-            elif res_stat == "Confirmé" and val_terrain == "Partiellement confirmée": decision = "Cause partiellement validée"
-            else: decision = "Autre"
-    
-            if decision in ["Cause validée", "Cause partiellement validée"]:
-                causes_validees_set.add(cause_nom.strip().lower())
+        # Filtrage strict des causes validées ou partiellement validées
+        causes_validees_ C_set = {
+            str(item.get("Cause Racine", "")).strip().lower() 
+            for item in summary_analyze 
+            if item.get("Décision") in ["Cause validée", "Cause partiellement validée"]
+        }
 
         # Récupération des solutions depuis improve_strategies
         strategies_data = dmaic_improve.get("strategies", [])
         if not strategies_data and "improve_strategies" in st.session_state:
             strategies_data = st.session_state.improve_strategies.to_dict(orient="records")
 
-        # Construction automatique des lignes du Future State FMEA filtrées sur les causes validées/partiellement validées
+        # Construction dynamique des lignes du Future State FMEA
         future_fmea_key = f"future_state_fmea_{idx}"
         saved_future_fmea = dmaic_improve.get("future_fmea", [])
 
@@ -3994,24 +3992,25 @@ else:
                 st.session_state[future_fmea_key] = pd.DataFrame(saved_future_fmea)
             else:
                 initial_fmea_rows = []
-                # On parcourt les entrées du FMEA actuel de l'Analyse
+        
+                # On parcourt toutes les défaillances enregistrées dans le Current State FMEA de l'Analyse
                 for cause_id, fmea_vals in fmea_actuel_data.items():
                     parts = cause_id.split("_", 1)
                     cause_racine = parts[1] if len(parts) > 1 else cause_id
             
-                    # FILTRE STRICT : On ne garde que les causes validées ou partiellement validées
-                    if cause_racine.strip().lower() in causes_validees_set:
+                    # Vérification si la cause est validée (par correspondance textuelle)
+                    if cause_racine.strip().lower() in causes_validees_ C_set:
                         s_actuel = float(fmea_vals.get("S", 1))
                         o_actuel = float(fmea_vals.get("O", 1))
                         d_actuel = float(fmea_vals.get("D", 1))
                         rpn_actuel = s_actuel * o_actuel * d_actuel
                 
-                        # Recherche des solutions associées dans les stratégies de la phase Improve
+                        # Recherche des solutions associées dans les stratégies Improve
                         matching_sols = [
                             s.get("Solution potentielle", "Solution standard") for s in strategies_data
                             if str(s.get("Cause racine", "")).strip().lower() == str(cause_racine).strip().lower()
                         ]
-                        sol_text = " / ".join(matching_sols) if matching_sols else "Aucune solution associée"
+                        sol_text = " / ".join(matching_sols) if matching_sols else "À définir dans Improvement strategies"
                 
                         initial_fmea_rows.append({
                             "Cause racine validée": cause_racine,
@@ -4021,10 +4020,11 @@ else:
                             "O futur": max(1.0, o_actuel - 1.0),
                             "D futur": max(1.0, d_actuel - 1.0)
                         })
-                
+        
+                # Sécurité si aucune cause n'est encore validée en amont
                 if not initial_fmea_rows:
                     initial_fmea_rows = [{
-                        "Cause racine validée": "Aucune cause validée disponible dans la phase Analyse",
+                        "Cause racine validée": "⚠️ Aucune cause 'validée' ou 'partiellement validée' trouvée dans l'étape 6 de la phase Analyse",
                         "Solution(s) retenue(s)": "N/A",
                         "RPN actuel": 0.0,
                         "S futur": 1.0, "O futur": 1.0, "D futur": 1.0
@@ -4104,6 +4104,7 @@ else:
             )
     
             st.info("📌 **Validation de la phase Improve** : La réduction des RPN démontre l'efficacité prévisionnelle des solutions retenues sur les causes racines validées. Cette section servira de base à la revue de fin de phase Improve et à la préparation du Control Plan lors de la phase Control.")
+
     
     # --- PHASE CONTROL ---
     with tabs[4]: 
