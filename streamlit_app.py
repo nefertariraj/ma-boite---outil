@@ -3943,10 +3943,8 @@ else:
         fmea_actuel_data = dmaic_analyze.get("fmea_data", {})
 
         # 🚨 RÉCUPÉRATION DIRECTE DES CAUSES VALIDÉES DEPUIS L'ÉTAPE 6 DE L'ANALYSE
-        # On cherche dans la session ou dans les structures sauvegardées du projet
         summary_analyze = st.session_state.get("summary_data_phase6", [])
         if not summary_analyze:
-            # Alternative : reconstruction depuis le tableau final stocké ou les gemba plans
             gemba_plans = dmaic_analyze.get("gemba_plans", {})
             gemba_obs = dmaic_analyze.get("gemba_observations", {})
             results_p1 = dmaic_analyze.get("results", [])
@@ -3971,8 +3969,8 @@ else:
         
                 summary_analyze.append({"Cause Racine": cause_nom, "Décision": decision})
 
-        # Filtrage strict des causes validées ou partiellement validées
-        causes_validees_ C_set = {
+        # Filtrage strict des causes validées ou partiellement validées (Correction de la variable ici)
+        causes_validees_set = {
             str(item.get("Cause Racine", "")).strip().lower() 
             for item in summary_analyze 
             if item.get("Décision") in ["Cause validée", "Cause partiellement validée"]
@@ -3993,19 +3991,16 @@ else:
             else:
                 initial_fmea_rows = []
         
-                # On parcourt toutes les défaillances enregistrées dans le Current State FMEA de l'Analyse
                 for cause_id, fmea_vals in fmea_actuel_data.items():
                     parts = cause_id.split("_", 1)
                     cause_racine = parts[1] if len(parts) > 1 else cause_id
             
-                    # Vérification si la cause est validée (par correspondance textuelle)
-                    if cause_racine.strip().lower() in causes_validees_ C_set:
+                    if cause_racine.strip().lower() in causes_validees_set:
                         s_actuel = float(fmea_vals.get("S", 1))
                         o_actuel = float(fmea_vals.get("O", 1))
                         d_actuel = float(fmea_vals.get("D", 1))
                         rpn_actuel = s_actuel * o_actuel * d_actuel
                 
-                        # Recherche des solutions associées dans les stratégies Improve
                         matching_sols = [
                             s.get("Solution potentielle", "Solution standard") for s in strategies_data
                             if str(s.get("Cause racine", "")).strip().lower() == str(cause_racine).strip().lower()
@@ -4021,7 +4016,6 @@ else:
                             "D futur": max(1.0, d_actuel - 1.0)
                         })
         
-                # Sécurité si aucune cause n'est encore validée en amont
                 if not initial_fmea_rows:
                     initial_fmea_rows = [{
                         "Cause racine validée": "⚠️ Aucune cause 'validée' ou 'partiellement validée' trouvée dans l'étape 6 de la phase Analyse",
@@ -4031,7 +4025,6 @@ else:
                     }]
                 st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
-        # Paramètre du seuil critique
         seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
 
         st.markdown("### 📝 Réévaluation du futur état (S, O, D)")
@@ -4053,7 +4046,6 @@ else:
         if st.button("💾 Enregistrer la Future State FMEA & Calculer", type="primary", use_container_width=True, key=f"btn_save_future_fmea_{idx}"):
             df_res = edited_future_fmea.copy()
     
-            # Calculs automatiques
             df_res["RPN futur"] = df_res["S futur"] * df_res["O futur"] * df_res["D futur"]
             df_res["Réduction du risque"] = df_res["RPN actuel"] - df_res["RPN futur"]
             df_res["Pourcentage de réduction"] = ((df_res["RPN actuel"] - df_res["RPN futur"]) / df_res["RPN actuel"].replace(0, 1)) * 100
@@ -4105,7 +4097,7 @@ else:
     
             st.info("📌 **Validation de la phase Improve** : La réduction des RPN démontre l'efficacité prévisionnelle des solutions retenues sur les causes racines validées. Cette section servira de base à la revue de fin de phase Improve et à la préparation du Control Plan lors de la phase Control.")
 
-    
+
     # --- PHASE CONTROL ---
     with tabs[4]: 
         st.header("Phase Control")
