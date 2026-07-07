@@ -3927,7 +3927,7 @@ else:
         st.markdown("---")
         st.subheader("6. Future state FMEA")
 
-       # 1. Accès sécurisé aux données du projet
+        # 1. Accès sécurisé aux données du projet
         idx = st.session_state.get("current_project_idx", 0)
         if "dmaic" not in st.session_state.projects[idx]:
             st.session_state.projects[idx]["dmaic"] = {}
@@ -3935,7 +3935,7 @@ else:
             st.session_state.projects[idx]["dmaic"]["improve"] = {}
 
         dmaic_analyze = st.session_state.projects[idx]["dmaic"].get("analyze", {})
-        dmaic_improve = st.session_state.projects[idx]["dmaic"]["improve"]
+        dmaic_improve = st.session_state.projects[idx]["dmaic"].get("improve", {})
 
         fmea_actuel_data = dmaic_analyze.get("fmea_data", {})
         gemba_plans = dmaic_analyze.get("gemba_plans", {})
@@ -3949,14 +3949,12 @@ else:
             x_nom = str(plan.get("x_critique", "")).strip()
             cause_nom = str(plan.get("cause_racine", "")).strip()
     
-            # Recherche de la p-value statistique
             p_val = 1.0
             for r in results_phase1:
                 if str(r.get("Variable X", "")).strip().lower() == x_nom.lower():
                     p_val = float(r.get("P-value", 1.0))
                     break
             
-            # Calcul du taux terrain depuis les observations
             obs_info = gemba_obs.get(cid, {})
             logs = obs_info.get("logs", []) if isinstance(obs_info, dict) else []
             conf = len([l for l in logs if str(l.get("confirme", "")).strip().lower() == 'oui'])
@@ -3967,7 +3965,6 @@ else:
             stat_validee = p_val < 0.05
             res_stat = "Confirmé" if stat_validee else "Non confirmé"
     
-            # Détermination de la décision exacte du tableau récapitulatif
             if res_stat == "Confirmé" and val_terrain == "Confirmée":
                 decision = "Cause validée"
             elif res_stat == "Confirmé" and val_terrain == "Partiellement confirmée":
@@ -3983,7 +3980,6 @@ else:
             else:
                 decision = "En cours d'analyse"
 
-            # FILTRE STRICT : On ne prend que les causes validées ou partiellement validées
             if decision in ["Cause validée", "Cause partiellement validée"]:
                 if cause_nom:
                     causes_validees_list.append({
@@ -3992,12 +3988,7 @@ else:
                         "ID": cid
                     })
 
-        # 3. Récupération des solutions depuis Improve
-        strategies_data = dmaic_improve.get("strategies", [])
-        if not strategies_data and "improve_strategies" in st.session_state:
-            strategies_data = st.session_state.improve_strategies.to_dict(orient="records")
-
-        # 4. Gestion de la session et forçage de la mise à jour
+        # 3. Gestion de la session et forçage de la mise à jour (Sans les solutions)
         future_fmea_key = f"future_state_fmea_{idx}"
 
         col_btn1, col_btn2 = st.columns([0.8, 0.2])
@@ -4019,46 +4010,50 @@ else:
                 d_actuel = float(fmea_vals.get("D", 5))
                 rpn_actuel = s_actuel * o_actuel * d_actuel
         
-                matching_sols = [
-                    s.get("Solution potentielle", "Solution standard") for s in strategies_data
-                    if str(s.get("Cause racine", "")).strip().lower() == cause_nom.lower()
-                ]
-                sol_text = " / ".join(matching_sols) if matching_sols else "À définir"
+                s_futur = s_actuel
+                o_futur = max(1.0, o_actuel - 1.0)
+                d_futur = max(1.0, d_actuel - 1.0)
+                rpn_futur = s_futur * o_futur * d_futur
         
                 initial_fmea_rows.append({
                     "Cause racine validée": cause_nom,
-                    "Solution(s) retenue(s)": sol_text,
                     "RPN actuel": rpn_actuel,
-                    "S futur": s_actuel,
-                    "O futur": max(1.0, o_actuel - 1.0),
-                    "D futur": max(1.0, d_actuel - 1.0)
+                    "S futur": s_futur,
+                    "O futur": o_futur,
+                    "D futur": d_futur,
+                    "RPN futur": rpn_futur
                 })
         
             if not initial_fmea_rows:
                 initial_fmea_rows = [{
                     "Cause racine validée": "⚠️ Aucune cause 'validée' ou 'partiellement validée' trouvée dans la phase Analyse",
-                    "Solution(s) retenue(s)": "N/A",
                     "RPN actuel": 0.0,
-                    "S futur": 1.0, "O futur": 1.0, "D futur": 1.0
+                    "S futur": 1.0, "O futur": 1.0, "D futur": 1.0, "RPN futur": 1.0
                 }]
             st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
         # Paramètre du seuil critique
         seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
 
-        st.markdown("### 📝 Réévaluation du futur état (S, O, D)")
+        st.markdown("### 📝 Réévaluation du futur état (S, O, D & Calcul immédiat du RPN futur)")
+
+        # Mise à jour en temps réel du RPN futur directement dans l'éditeur de ligne
+        df_current = st.session_state[future_fmea_key].copy()
+        if "S futur" in df_current.columns and "O futur" in df_current.columns and "D futur" in df_current.columns:
+            df_current["RPN futur"] = df_current["S futur"] * df_current["O futur"] * df_current["D futur"]
+
         edited_future_fmea = st.data_editor(
-            st.session_state[future_fmea_key],
+            df_current,
             use_container_width=True,
             num_rows="fixed",
             key=f"editor_future_fmea_view_{idx}",
             column_config={
                 "Cause racine validée": st.column_config.TextColumn("Cause racine validée", disabled=True, width="medium"),
-                "Solution(s) retenue(s)": st.column_config.TextColumn("Solution(s) retenue(s)", disabled=True, width="medium"),
                 "RPN actuel": st.column_config.NumberColumn("RPN actuel", disabled=True, format="%.1f", width="small"),
                 "S futur": st.column_config.NumberColumn("S futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
                 "O futur": st.column_config.NumberColumn("O futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
-                "D futur": st.column_config.NumberColumn("D futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small")
+                "D futur": st.column_config.NumberColumn("D futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
+                "RPN futur": st.column_config.NumberColumn("RPN futur", disabled=True, format="%.1f", width="small")
             }
         )
 
