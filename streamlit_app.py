@@ -4036,76 +4036,69 @@ else:
                     }]
                 st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
-        # Paramètre du seuil critique
-        seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
+        # 4. Utilisation d'un formulaire pour bloquer les sauvegardes et calculs automatiques au clic extérieur
+        with st.form(key=f"form_future_fmea_{idx}"):
+            seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
 
-        st.markdown("### 📝 Réévaluation du futur état (S, O, D & RPN futur)")
+            st.markdown("### 📝 Réévaluation du futur état (S, O, D & RPN futur)")
 
-        # Affichage de l'éditeur sans forcer de recalcul global en dehors du bouton
-        edited_future_fmea = st.data_editor(
-            st.session_state[future_fmea_key],
-            use_container_width=True,
-            num_rows="fixed",
-            key=f"editor_future_fmea_view_{idx}",
-            column_config={
-                "Cause racine validée": st.column_config.TextColumn("Cause racine validée", disabled=True, width="medium"),
-                "RPN actuel": st.column_config.NumberColumn("RPN actuel", disabled=True, format="%.1f", width="small"),
-                "S futur": st.column_config.NumberColumn("S futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
-                "O futur": st.column_config.NumberColumn("O futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
-                "D futur": st.column_config.NumberColumn("D futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
-                "RPN futur": st.column_config.NumberColumn("RPN futur", disabled=True, format="%.1f", width="small")
-            }
-        )
+            df_current = st.session_state[future_fmea_key].copy()
+            if "S futur" in df_current.columns and "O futur" in df_current.columns and "D futur" in df_current.columns:
+                df_current["RPN futur"] = df_current["S futur"] * df_current["O futur"] * df_current["D futur"]
 
-        # La mise à jour et les calculs s'effectuent uniquement lors du clic sur le bouton
-        if st.button("💾 Enregistrer la Future State FMEA & Calculer", type="primary", use_container_width=True, key=f"btn_save_future_fmea_{idx}"):
-            df_res = edited_future_fmea.copy()
-    
-            # Recalcul officiel du RPN futur par multiplication des colonnes éditées
-            df_res["RPN futur"] = df_res["S futur"] * df_res["O futur"] * df_res["D futur"]
-            df_res["Réduction du risque"] = df_res["RPN actuel"] - df_res["RPN futur"]
-            df_res["Pourcentage de réduction"] = ((df_res["RPN actuel"] - df_res["RPN futur"]) / df_res["RPN actuel"].replace(0, 1)) * 100
-    
-            def interpret_reduction(row):
-                red_pct = row["Pourcentage de réduction"]
-                rpn_fut = row["RPN futur"]
-        
-                if red_pct >= 70: interp = "Risque fortement réduit"
-                elif red_pct >= 40: interp = "Risque significativement réduit"
-                elif red_pct >= 20: interp = "Réduction limitée"
-                else: interp = "Impact faible des solutions"
-        
-                if rpn_fut > seuil_critique:
-                    interp += " - Risque résiduel critique"
-                return interp
-
-            def class_efficacite(red_pct):
-                if red_pct >= 70: return "Très efficace"
-                elif red_pct >= 40: return "Efficace"
-                elif red_pct >= 20: return "Partiellement efficace"
-                else: return "Peu efficace"
-
-            df_res["Interprétation"] = df_res.apply(interpret_reduction, axis=1)
-            df_res["Efficacité"] = df_res["Pourcentage de réduction"].apply(class_efficacite)
-    
-            st.session_state[future_fmea_key] = df_res
-            st.session_state.projects[idx]["dmaic"]["improve"]["future_fmea"] = df_res.to_dict('records')
-            if "save_data" in globals():
-                save_data()
-    
-            st.success("✅ Future State FMEA enregistrée avec succès !")
-            st.rerun()
-
-        # 5. Affichage sécurisé du tableau de synthèse des risques
-        current_stored_df = st.session_state[future_fmea_key]
-        if "RPN futur" in current_stored_df.columns and "Cause racine validée" in current_stored_df.columns:
-            st.markdown("### 📊 Tableau de Synthèse des Risques")
-            cols_to_show = [c for c in ["Cause racine validée", "RPN actuel", "RPN futur", "Réduction du risque", "Pourcentage de réduction", "Interprétation"] if c in current_stored_df.columns]
-            st.dataframe(
-                current_stored_df[cols_to_show],
+            edited_future_fmea = st.data_editor(
+                df_current,
                 use_container_width=True,
-                hide_index=True
+                num_rows="fixed",
+                key=f"editor_future_fmea_view_{idx}",
+                column_config={
+                    "Cause racine validée": st.column_config.TextColumn("Cause racine validée", disabled=True, width="medium"),
+                    "RPN actuel": st.column_config.NumberColumn("RPN actuel", disabled=True, format="%.1f", width="small"),
+                    "S futur": st.column_config.NumberColumn("S futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
+                    "O futur": st.column_config.NumberColumn("O futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
+                    "D futur": st.column_config.NumberColumn("D futur (1-10)", min_value=1.0, max_value=10.0, step=1.0, format="%.0f", width="small"),
+                    "RPN futur": st.column_config.NumberColumn("RPN futur", disabled=True, format="%.1f", width="small")
+                }
             )
+
+            submit_button = st.form_submit_button("💾 Enregistrer la Future State FMEA & Calculer", type="primary", use_container_width=True)
+
+            if submit_button:
+                df_res = edited_future_fmea.copy()
+        
+                df_res["RPN futur"] = df_res["S futur"] * df_res["O futur"] * df_res["D futur"]
+                df_res["Réduction du risque"] = df_res["RPN actuel"] - df_res["RPN futur"]
+                df_res["Pourcentage de réduction"] = ((df_res["RPN actuel"] - df_res["RPN futur"]) / df_res["RPN actuel"].replace(0, 1)) * 100
+        
+                def interpret_reduction(row):
+                    red_pct = row["Pourcentage de réduction"]
+                    rpn_fut = row["RPN futur"]
+            
+                    if red_pct >= 70: interp = "Risque fortement réduit"
+                    elif red_pct >= 40: interp = "Risque significativement réduit"
+                    elif red_pct >= 20: interp = "Réduction limitée"
+                    else: interp = "Impact faible des solutions"
+            
+                    if rpn_fut > seuil_critique:
+                        interp += " - Risque résiduel critique"
+                    return interp
+
+                def class_efficacite(red_pct):
+                    if red_pct >= 70: return "Très efficace"
+                    elif red_pct >= 40: return "Efficace"
+                    elif red_pct >= 20: return "Partiellement efficace"
+                    else: return "Peu efficace"
+
+                df_res["Interprétation"] = df_res.apply(interpret_reduction, axis=1)
+                df_res["Efficacité"] = df_res["Pourcentage de réduction"].apply(class_efficacite)
+        
+                st.session_state[future_fmea_key] = df_res
+                st.session_state.projects[idx]["dmaic"]["improve"]["future_fmea"] = df_res.to_dict('records')
+                if "save_data" in globals():
+                    save_data()
+        
+                st.success("✅ Future State FMEA enregistrée avec succès !")
+                st.rerun()
     
     # --- PHASE CONTROL ---
     with tabs[4]: 
