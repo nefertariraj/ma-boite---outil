@@ -3988,7 +3988,7 @@ else:
                         "ID": cid
                     })
 
-        # 3. Gestion de la session et forçage de la mise à jour (Sans les solutions)
+        # 3. Gestion de la session et initialisation
         future_fmea_key = f"future_state_fmea_{idx}"
 
         col_btn1, col_btn2 = st.columns([0.8, 0.2])
@@ -3999,51 +3999,51 @@ else:
                 st.rerun()
 
         if future_fmea_key not in st.session_state:
-            initial_fmea_rows = []
-            for item in causes_validees_list:
-                cid = item["ID"]
-                cause_nom = item["Cause Racine"]
-        
-                fmea_vals = fmea_actuel_data.get(cid, {})
-                s_actuel = float(fmea_vals.get("S", 6))
-                o_actuel = float(fmea_vals.get("O", 5))
-                d_actuel = float(fmea_vals.get("D", 5))
-                rpn_actuel = s_actuel * o_actuel * d_actuel
-        
-                s_futur = s_actuel
-                o_futur = max(1.0, o_actuel - 1.0)
-                d_futur = max(1.0, d_actuel - 1.0)
-                rpn_futur = s_futur * o_futur * d_futur
-        
-                initial_fmea_rows.append({
-                    "Cause racine validée": cause_nom,
-                    "RPN actuel": rpn_actuel,
-                    "S futur": s_futur,
-                    "O futur": o_futur,
-                    "D futur": d_futur,
-                    "RPN futur": rpn_futur
-                })
-        
-            if not initial_fmea_rows:
-                initial_fmea_rows = [{
-                    "Cause racine validée": "⚠️ Aucune cause 'validée' ou 'partiellement validée' trouvée dans la phase Analyse",
-                    "RPN actuel": 0.0,
-                    "S futur": 1.0, "O futur": 1.0, "D futur": 1.0, "RPN futur": 1.0
-                }]
-            st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
+            saved_future_fmea = dmaic_improve.get("future_fmea", [])
+            if saved_future_fmea:
+                st.session_state[future_fmea_key] = pd.DataFrame(saved_future_fmea)
+            else:
+                initial_fmea_rows = []
+                for item in causes_validees_list:
+                    cid = item["ID"]
+                    cause_nom = item["Cause Racine"]
+            
+                    fmea_vals = fmea_actuel_data.get(cid, {})
+                    s_actuel = float(fmea_vals.get("S", 6))
+                    o_actuel = float(fmea_vals.get("O", 5))
+                    d_actuel = float(fmea_vals.get("D", 5))
+                    rpn_actuel = s_actuel * o_actuel * d_actuel
+            
+                    s_futur = s_actuel
+                    o_futur = max(1.0, o_actuel - 1.0)
+                    d_futur = max(1.0, d_actuel - 1.0)
+                    rpn_futur = s_futur * o_futur * d_futur
+            
+                    initial_fmea_rows.append({
+                        "Cause racine validée": cause_nom,
+                        "RPN actuel": rpn_actuel,
+                        "S futur": s_futur,
+                        "O futur": o_futur,
+                        "D futur": d_futur,
+                        "RPN futur": rpn_futur
+                    })
+            
+                if not initial_fmea_rows:
+                    initial_fmea_rows = [{
+                        "Cause racine validée": "⚠️ Aucune cause 'validée' ou 'partiellement validée' trouvée dans la phase Analyse",
+                        "RPN actuel": 0.0,
+                        "S futur": 1.0, "O futur": 1.0, "D futur": 1.0, "RPN futur": 1.0
+                    }]
+                st.session_state[future_fmea_key] = pd.DataFrame(initial_fmea_rows)
 
         # Paramètre du seuil critique
         seuil_critique = st.number_input("Seuil RPN critique paramétrable :", value=100.0, step=10.0, key=f"seuil_rpn_improve_{idx}")
 
-        st.markdown("### 📝 Réévaluation du futur état (S, O, D & Calcul immédiat du RPN futur)")
+        st.markdown("### 📝 Réévaluation du futur état (S, O, D & RPN futur)")
 
-        # Mise à jour en temps réel du RPN futur directement dans l'éditeur de ligne
-        df_current = st.session_state[future_fmea_key].copy()
-        if "S futur" in df_current.columns and "O futur" in df_current.columns and "D futur" in df_current.columns:
-            df_current["RPN futur"] = df_current["S futur"] * df_current["O futur"] * df_current["D futur"]
-
+        # Affichage de l'éditeur sans forcer de recalcul global en dehors du bouton
         edited_future_fmea = st.data_editor(
-            df_current,
+            st.session_state[future_fmea_key],
             use_container_width=True,
             num_rows="fixed",
             key=f"editor_future_fmea_view_{idx}",
@@ -4057,9 +4057,11 @@ else:
             }
         )
 
+        # La mise à jour et les calculs s'effectuent uniquement lors du clic sur le bouton
         if st.button("💾 Enregistrer la Future State FMEA & Calculer", type="primary", use_container_width=True, key=f"btn_save_future_fmea_{idx}"):
             df_res = edited_future_fmea.copy()
     
+            # Recalcul officiel du RPN futur par multiplication des colonnes éditées
             df_res["RPN futur"] = df_res["S futur"] * df_res["O futur"] * df_res["D futur"]
             df_res["Réduction du risque"] = df_res["RPN actuel"] - df_res["RPN futur"]
             df_res["Pourcentage de réduction"] = ((df_res["RPN actuel"] - df_res["RPN futur"]) / df_res["RPN actuel"].replace(0, 1)) * 100
@@ -4094,11 +4096,13 @@ else:
             st.success("✅ Future State FMEA enregistrée avec succès !")
             st.rerun()
 
+        # 5. Affichage sécurisé du tableau de synthèse des risques
         current_stored_df = st.session_state[future_fmea_key]
         if "RPN futur" in current_stored_df.columns and "Cause racine validée" in current_stored_df.columns:
             st.markdown("### 📊 Tableau de Synthèse des Risques")
+            cols_to_show = [c for c in ["Cause racine validée", "RPN actuel", "RPN futur", "Réduction du risque", "Pourcentage de réduction", "Interprétation"] if c in current_stored_df.columns]
             st.dataframe(
-                current_stored_df[["Cause racine validée", "RPN actuel", "RPN futur", "Réduction du risque", "Pourcentage de réduction", "Interprétation"]],
+                current_stored_df[cols_to_show],
                 use_container_width=True,
                 hide_index=True
             )
