@@ -4141,11 +4141,18 @@ else:
         if "collection_data" not in ctrl_data:
             ctrl_data["collection_data"] = []
 
-        df_ctrl_input = pd.DataFrame(ctrl_data["collection_data"])
-        if df_ctrl_input.empty:
+        # Conversion sécurisée en DataFrame avec types explicites
+        if ctrl_data["collection_data"]:
+            df_ctrl_input = pd.DataFrame(ctrl_data["collection_data"])
+            # S'assurer que la colonne Date est au bon format datetime/string
+            if "Date" in df_ctrl_input.columns:
+                df_ctrl_input["Date"] = pd.to_datetime(df_ctrl_input["Date"]).dt.date
+            if "Valeur mesurée" in df_ctrl_input.columns:
+                df_ctrl_input["Valeur mesurée"] = pd.to_numeric(df_ctrl_input["Valeur mesurée"], errors="coerce").fillna(0.0)
+        else:
             df_ctrl_input = pd.DataFrame([{
-                "Vague": selected_wave,
-                "Date": pd.Timestamp.today().strftime("%Y-%m-%d"),
+                "Vague": ctrl_data["waves"][0] if ctrl_data["waves"] else "T0",
+                "Date": pd.Timestamp.today().date(),
                 "Valeur mesurée": 0.0,
                 "Commentaire": ""
             }])
@@ -4164,8 +4171,13 @@ else:
         )
 
         if st.button("💾 Enregistrer la Collecte Control", key=f"save_ctrl_coll_{p_idx}"):
-            ctrl_data["collection_data"] = edited_ctrl_df.to_dict('records')
+            # Conversion de la date en chaîne de caractères pour une sérialisation JSON parfaite
+            df_to_save = edited_ctrl_df.copy()
+            if "Date" in df_to_save.columns:
+                df_to_save["Date"] = pd.to_datetime(df_to_save["Date"]).dt.strftime("%Y-%m-%d")
+            ctrl_data["collection_data"] = df_to_save.to_dict('records')
             st.success("Données de contrôle enregistrées avec succès.")
+            st.rerun()
 
         # ---------------------------------------------------------------------
         # 3. DESCRIPTIVE STATISTICS & ANALYSE DES GAINS
