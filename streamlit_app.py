@@ -4144,48 +4144,26 @@ else:
                 pass
 
         # ---------------------------------------------------------------------
-        # 1. DATA CONTROL PLAN & GESTION MULTI-VAGUES (Avec suppression)
+        # 1. DATA CONTROL PLAN & GESTION DES VAGUES
         # ---------------------------------------------------------------------
-        st.subheader("1. Data Control Plan & Campagnes de Suivi")
-        st.caption("Le référentiel T0 est pris directement de la phase Mesure (immuable). Gérez ci-dessous vos vagues post-amélioration (T1, T2...) et supprimez-les au besoin.")
+        st.subheader("1. Data Control Plan")
 
         if "waves" not in ctrl_data:
             ctrl_data["waves"] = ["T1"]  # Vagues dynamiques par défaut hors T0
 
-        # Interface d'ajout et de suppression des vagues
-        col_w_manage1, col_w_manage2 = st.columns([3, 1])
-        with col_w_manage2:
-            if st.button("➕ Ajouter une vague", key=f"add_wave_global_{safe_p_idx}"):
-                # Recherche du prochain index T libre
-                existing_nums = []
-                for w in ctrl_data["waves"]:
-                    m = re.search(r'T(\d+)', str(w).upper())
-                    if m: existing_nums.append(int(m.group(1)))
-                prochain_num = max(existing_nums, default=0) + 1
-                nouvelle_vague = f"T{prochain_num}"
-                if nouvelle_vague not in ctrl_data["waves"]:
-                    ctrl_data["waves"].append(nouvelle_vague)
-                    st.rerun()
+        # Bouton unique pour ajouter une vague
+        if st.button("➕ Ajouter une vague", key=f"add_wave_global_{safe_p_idx}"):
+            existing_nums = []
+            for w in ctrl_data["waves"]:
+                m = re.search(r'T(\d+)', str(w).upper())
+                if m: existing_nums.append(int(m.group(1)))
+            prochain_num = max(existing_nums, default=0) + 1
+            nouvelle_vague = f"T{prochain_num}"
+            if nouvelle_vague not in ctrl_data["waves"]:
+                ctrl_data["waves"].append(nouvelle_vague)
+                st.rerun()
 
-        # Affichage des vagues modifiables avec option de suppression
-        if ctrl_data["waves"]:
-            st.markdown("**Vagues de suivi configurées :**")
-            for w_del in list(ctrl_data["waves"]):
-                col_v_lbl, col_v_btn = st.columns([4, 1])
-                with col_v_lbl:
-                    st.text(f"• Période {w_del}")
-                with col_v_btn:
-                    if st.button("🗑️ Supprimer", key=f"del_wave_{w_del}_{safe_p_idx}"):
-                        ctrl_data["waves"].remove(w_del)
-                        # Nettoyage des données associées dans master data si elles existent
-                        if "ctrl_master_data" in ctrl_data and not ctrl_data["ctrl_master_data"].empty:
-                            ctrl_data["ctrl_master_data"] = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] != w_del].reset_index(drop=True)
-                        st.success(f"Vague {w_del} supprimée.")
-                        st.rerun()
-        else:
-            st.info("💡 Aucune vague de suivi active. Cliquez sur 'Ajouter une vague' pour commencer la surveillance.")
-
-        # Liste d'options pour les métriques ciblées (T0 + vagues dynamiques restantes)
+        # Liste d'options pour les métriques ciblées (T0 + vagues dynamiques)
         toutes_les_vagues_options = ["T0 (Référence Mesure)"] + ctrl_data["waves"]
         selected_wave = st.selectbox("Vague active de suivi (pour métriques ciblées) :", options=toutes_les_vagues_options, key=f"active_wave_{safe_p_idx}")
 
@@ -4223,7 +4201,7 @@ else:
 
         st.markdown("---")
 
-        # Écran 2 : Saisie / Import par Vague (onglets exclusifs aux vagues dynamiques T1, T2...)
+        # Écran 2 : Saisie / Import par Vague (Uniquement les vagues créées + bouton de suppression par onglet)
         st.markdown("### 📝 Écran 2 : Saisie des Données de Contrôle & Import Excel par Vague")
     
         dict_dfs_vagues = {}
@@ -4232,8 +4210,18 @@ else:
 
             for i, v_name in enumerate(ctrl_data["waves"]):
                 with onglets_vagues[i]:
-                    st.markdown(f"##### Gestion des données pour la période `{v_name}`")
-                
+                    # Bouton de suppression de cette vague spécifique directement dans l'onglet
+                    col_tab_hd1, col_tab_hd2 = st.columns([4, 1])
+                    with col_tab_hd1:
+                        st.markdown(f"##### Gestion des données pour la période `{v_name}`")
+                    with col_tab_hd2:
+                        if st.button("🗑️ Supprimer vague", key=f"del_wave_tab_{v_name}_{safe_p_idx}"):
+                            ctrl_data["waves"].remove(v_name)
+                            if "ctrl_master_data" in ctrl_data and not ctrl_data["ctrl_master_data"].empty:
+                                ctrl_data["ctrl_master_data"] = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] != v_name].reset_index(drop=True)
+                            st.success(f"Vague {v_name} supprimée.")
+                            st.rerun()
+
                     uploaded_ctrl_file = st.file_uploader(f"Importer un fichier Excel pour {v_name}", type=["xlsx", "xls"], key=f"ctrl_excel_up_{v_name}_{safe_p_idx}")
                 
                     df_vague_courante = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
@@ -4300,6 +4288,8 @@ else:
                     edited_v_table = pd.DataFrame(edited_v_table)
                     edited_v_table["Vague"] = v_name
                     dict_dfs_vagues[v_name] = edited_v_table
+        else:
+            st.info("💡 Aucune vague de suivi active. Cliquez sur 'Ajouter une vague' ci-dessus.")
 
         if dict_dfs_vagues:
             ctrl_data["ctrl_master_data"] = pd.concat(list(dict_dfs_vagues.values()), ignore_index=True)
@@ -4368,7 +4358,7 @@ else:
                     p_v = max(1e-7, min(0.5, taux_d if taux_d < 0.5 else 1 - taux_d))
                     t_val = math.sqrt(-2.0 * math.log(p_v))
                     z_val = t_val - ((2.515517 + 0.802853 * t_val + 0.010328 * t_val * t_val) / 
-                           (1.0 + 1.432788 * t_val + 0.189269 * t_val * t_val + 0.001308 * t_val * t_val * t_val))
+                               (1.0 + 1.432788 * t_val + 0.189269 * t_val * t_val + 0.001308 * t_val * t_val * t_val))
                     sig_brut = z_val if taux_d < 0.5 else -z_val
                     sig_lvl = max(0.0, min(6.0, round(sig_brut + 1.5, 2)))
             except Exception:
