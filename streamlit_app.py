@@ -4321,3 +4321,122 @@ else:
                     st.dataframe(stats_res, use_container_width=True, hide_index=True)
         else:
             st.info("Aucune donnée disponible pour l'analyse comparative.")
+
+        st.markdown("---")
+        # =====================================================================
+        # 4. PROCESS CAPABILITY COMPARATIF (T0 vs Vagues Améliorées)
+        # =====================================================================
+        st.subheader("4. Process Capability (Comparatif T0 vs Vagues Post-Amélioration)")
+        st.caption("Évaluation comparative du niveau Sigma et du DPMO entre la référence T0 et les vagues de contrôle (T1, T2...).")
+
+        # Préparation des données T0 et Contrôle Actuel
+        df_t0_cap = df_t0_data.copy() if "df_t0_data" in locals() and not df_t0_data.empty else pd.DataFrame()
+        df_ctrl_cap = ctrl_data["ctrl_master_data"].copy() if not ctrl_data["ctrl_master_data"].empty else pd.DataFrame()
+
+        def _calculer_metriques_capabilite(df_subset):
+            if df_subset.empty:
+                return 0, 1, 1, 0.0, 0.0
+            r_units = len(df_subset.dropna(subset=["ID observation"]))
+            r_opp = max(1, len([v for v in liste_variables_dynamiques if v in df_subset.columns]))
+        
+            # Comptage des défauts qualitatifs / non-conformes
+            def_count = 0
+            for var in liste_variables_dynamiques:
+                if var in df_subset.columns:
+                    def_count += int(df_subset[var].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1", "NON-CONFORME"]).sum())
+        
+            u_val = max(1, r_units)
+            dpmo_val = (def_count / (u_val * r_opp)) * 1_000_000
+        
+            # Calcul niveau Sigma
+            sig_lvl = 0.0
+            try:
+                if dpmo_val <= 0:
+                    sig_lvl = 6.0
+                else:
+                    taux_d = dpmo_val / 1_000_000
+                    p_v = max(1e-7, min(0.5, taux_d if taux_d < 0.5 else 1 - taux_d))
+                    t_val = math.sqrt(-2.0 * math.log(p_v))
+                    z_val = t_val - ((2.515517 + 0.802853 * t_val + 0.010328 * t_val * t_val) / 
+                               (1.0 + 1.432788 * t_val + 0.189269 * t_val * t_val + 0.001308 * t_val * t_val * t_val))
+                    sig_brut = z_val if taux_d < 0.5 else -z_val
+                    sig_lvl = max(0.0, min(6.0, round(sig_brut + 1.5, 2)))
+            except Exception:
+                sig_lvl = 0.0
+            return def_count, u_val, r_opp, dpmo_val, sig_lvl
+
+        def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite(df_t0_cap)
+    
+        # Filtrer les données de contrôle par vague sélectionnée pour comparaison
+        df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == selected_wave] if "Vague" in df_ctrl_cap.columns else df_ctrl_cap
+        def_w, u_w, opp_w, dpmo_w, sig_w = _calculer_metriques_capabilite(df_wave_selected)
+
+        cap_col1, cap_col2 = st.columns(2)
+        with cap_col1:
+            st.markdown(f"**Référence T0 (Mesure)**")
+            st.metric("DPMO (T0)", f"{dpmo_t0:,.0f}")
+            st.metric("Niveau Sigma (T0)", f"🔵 {sig_t0} σ")
+        with cap_col2:
+            st.markdown(f"**{selected_wave} (Suivi)**")
+            delta_dpmo = dpmo_w - dpmo_t0
+            delta_sigma = sig_w - sig_t0
+            st.metric("DPMO (Vague active)", f"{dpmo_w:,.0f}", delta=f"{delta_dpmo:,.0f}", delta_color="inverse")
+            st.metric("Niveau Sigma (Vague active)", f"🟢 {sig_w} σ" if sig_w >= sig_t0 else f"🟠 {sig_w} σ", delta=f"{delta_sigma:+.2f} σ")
+
+        st.markdown("---")
+
+        # =====================================================================
+        # 5. CONTROL CHART MIXTE (Fusion séquentielle T0 et T1 sur le même graphique)
+        # =====================================================================
+        st.subheader("5. Carte de Contrôle Mixte (Évolution T0 vers Vagues de Suivi)")
+        st.caption("Affichage consolidé et séquentiel des données de référence (T0) et de la phase post-amélioration sur une même ligne temporelle.")
+
+        # Concaténation des deux jeux de données en identifiant clairement les phases
+        df_t0_plot = df_t0_cap.copy() if not df_t0_cap.empty else pd.DataFrame()
+        if not df_t0_plot.empty:
+            df_t0_plot["Phase_Suivi"] = "T0 (Référence)"
+            if "Date de modification" not in df_t0_plot.columns:
+                df_t0_plot["Date de modification"] = "2026-06-01"
+
+        df_ctrl_plot = df_wave_selected.copy() if not df_wave_selected.empty else pd.DataFrame()
+        if not df_ctrl_plot.empty:
+            df_ctrl_plot["Phase_Suivi"] = selected_wave
+
+        df_mixte = pd.concat([df_t0_plot, df_ctrl_plot], ignore_index=True)
+
+        if df_mixte.empty:
+            st.info("💡 Veuillez alimenter vos données T0 et importer un suivi de contrôle pour afficher la carte mixte.")
+        else:
+            # Sélection de la variable quantitative à tracer
+            quant_vars_mixte = [v for v in liste_variables_dynamiques if v in df_mixte.columns and not any(k in v.lower() for k in ["statut", "verdict", "validation", "ok", "ko"])]
+        
+            if not quant_vars_mixte:
+                st.warning("⚠️ Aucune variable quantitative exploitable pour la carte de contrôle mixte.")
+            else:
+                var_choisie_mixte = st.selectbox("Sélectionner la variable quantitative pour le Control Chart :", options=quant_vars_mixte, key=f"mixte_var_{safe_p_idx}")
+            
+                df_mixte["Valeur_Num"] = pd.to_numeric(df_mixte[var_choisie_mixte], errors="coerce")
+                df_clean_mixte = df_mixte.dropna(subset=["Valeur_Num"]).reset_index(drop=True)
+            
+                if len(df_clean_mixte) < 2:
+                    st.warning("Données insuffisantes (minimum 2 points requis pour tracer la carte).")
+                else:
+                    # Calcul de la ligne centrale (CL) basée uniquement sur la portion T0 pour référence stable
+                    df_t0_subset = df_clean_mixte[df_clean_mixte["Phase_Suivi"] == "T0 (Référence)"]
+                    cl_ref = df_t0_subset["Valeur_Num"].mean() if not df_t0_subset.empty else df_clean_mixte["Valeur_Num"].mean()
+                
+                    # Étendue mobile globale/moyenne pour les limites de contrôle
+                    df_clean_mixte["MR"] = df_clean_mixte["Valeur_Num"].diff().abs()
+                    mr_ref = df_clean_mixte["MR"].mean()
+                    ucl = cl_ref + 2.66 * mr_ref
+                    lcl = max(0.0, cl_ref - 2.66 * mr_ref)
+
+                    # Préparation du graphique pour st.line_chart / st.altair_chart
+                    chart_data = df_clean_mixte[["ID observation", "Valeur_Num", "Phase_Suivi"]].copy()
+                    chart_data["CL"] = cl_ref
+                    chart_data["UCL"] = ucl
+                    chart_data["LCL"] = lcl
+                
+                    st.markdown(f"##### Évolution de l'indicateur `{var_choisie_mixte}` (T0 vs {selected_wave})")
+                    st.line_chart(chart_data.set_index("ID observation")[["Valeur_Num", "CL", "UCL", "LCL"]])
+                    st.success("📊 L'affichage séquentiel permet d'observer l'impact des actions d'amélioration par rapport aux limites initiales de T0.")
