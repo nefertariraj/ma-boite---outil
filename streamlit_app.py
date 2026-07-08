@@ -4144,48 +4144,44 @@ else:
                 pass
 
         # ---------------------------------------------------------------------
-        # 1. DATA CONTROL PLAN & GESTION DES VAGUES
+        # 1. DATA CONTROL PLAN & GESTION MULTI-VAGUES UNIFIÉE
         # ---------------------------------------------------------------------
         st.subheader("1. Data Control Plan & Campagnes de Suivi")
-        st.caption("La vague T0 correspond aux données de référence de la phase Mesure. Définissez les vagues post-amélioration (T1, T2...).")
+        st.caption("La vague T0 correspond aux données de référence. Gérez et ajoutez vos vagues post-amélioration (T1, T2...).")
 
         if "waves" not in ctrl_data:
-            ctrl_data["waves"] = ["T0 (Référence Mesure)", "T1 (Post-Amélioration)"]
+            ctrl_data["waves"] = ["T1"]  # Vagues dynamiques par défaut hors T0
 
-        w_col1, w_col2, w_col3 = st.columns([2, 1, 1])
-        with w_col1:
-            selected_wave = st.selectbox("Vague active de suivi :", options=ctrl_data["waves"], key=f"active_wave_{safe_p_idx}")
+        w_col1, w_col2 = st.columns([3, 1])
         with w_col2:
-            new_wave_name = st.text_input("Ajouter une vague :", placeholder="Ex: T2", label_visibility="collapsed", key=f"new_wave_in_{safe_p_idx}")
-        with w_col3:
-            if st.button("➕ Ajouter la vague", key=f"add_wave_btn_{safe_p_idx}", use_container_width=True):
-                if new_wave_name.strip() and new_wave_name.strip() not in ctrl_data["waves"]:
-                    ctrl_data["waves"].append(new_wave_name.strip())
-                    st.success(f"Vague '{new_wave_name}' ajoutée.")
+            if st.button("➕ Ajouter une vague", key=f"add_wave_global_{safe_p_idx}"):
+                prochain_num = len(ctrl_data["waves"]) + 1
+                nouvelle_vague = f"T{prochain_num}"
+                if nouvelle_vague not in ctrl_data["waves"]:
+                    ctrl_data["waves"].append(nouvelle_vague)
                     st.rerun()
+
+        # Liste combinée pour les sélections d'affichage (T0 + vagues dynamiques)
+        toutes_les_vagues_options = ["T0 (Référence Mesure)"] + [f"Vague {v}" if not v.startswith("Vague") else v for v in ctrl_data["waves"]]
+        selected_wave = st.selectbox("Vague active de suivi (pour métriques ciblées) :", options=toutes_les_vagues_options, key=f"active_wave_{safe_p_idx}")
 
         st.markdown("---")
 
         # ---------------------------------------------------------------------
-        # 2. COLLECTE DES DONNÉES DE CONTRÔLE (Format identique Phase Mesure)
+        # 2. COLLECTE ET SAISIE DES DONNÉES DE CONTRÔLE PAR VAGUE
         # ---------------------------------------------------------------------
-        st.markdown("## 2 - Collecte des Données de Contrôle")
+        st.markdown("## 2 - Collecte des Données de Contrôle & Saisie Multi-Vagues")
 
         if "ctrl_plan" not in ctrl_data:
             ctrl_data["ctrl_plan"] = {"taille_prevue": 50, "date_debut": "2026-07-01", "date_fin_est": "2026-07-15"}
 
-        if "ctrl_master_data" not in ctrl_data:
+        # Initialisation du stockage global des données de contrôle si absent
+        if "ctrl_master_data" not in ctrl_data or not isinstance(ctrl_data["ctrl_master_data"], pd.DataFrame):
             cols_init = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
             ctrl_data["ctrl_master_data"] = pd.DataFrame(columns=cols_init)
 
-        # Assurer la cohérence structurelle du DataFrame de contrôle
-        colonnes_requises_ctrl = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
-        for col_c in colonnes_requises_ctrl:
-            if col_c not in ctrl_data["ctrl_master_data"].columns:
-                ctrl_data["ctrl_master_data"][col_c] = None
-
-        # --- ÉCRAN 1 : RÉSUMÉ DE LA COLLECTE (Formulaire sans sauvegarde temps réel) ---
-        st.markdown("### 📋 Écran 1 : Résumé de la Collecte de Contrôle")
+        # Paramètres de l'Écran 1 (Résumé de la collecte)
+        st.markdown("### 📋 Écran 1 : Paramètres d'Échantillonnage")
         with st.form(key=f"form_ecran1_ctrl_{safe_p_idx}"):
             e1_c1, e1_c2, e1_c3 = st.columns(3)
             with e1_c1:
@@ -4195,164 +4191,108 @@ else:
             with e1_c3:
                 d_fin = st.text_input("Date estimée de fin", value=ctrl_data["ctrl_plan"].get("date_fin_est", "2026-07-15"))
 
-            submitted_e1 = st.form_submit_button("💾 Enregistrer les paramètres de l'Écran 1")
+            submitted_e1 = st.form_submit_button("💾 Enregistrer les paramètres")
             if submitted_e1:
                 ctrl_data["ctrl_plan"]["taille_prevue"] = n_prev
                 ctrl_data["ctrl_plan"]["date_debut"] = d_deb
                 ctrl_data["ctrl_plan"]["date_fin_est"] = d_fin
-                st.success("Paramètres d'échantillonnage de contrôle enregistrés.")
-
-        st.markdown("#### Liste des variables définies (Même référentiel Phase Mesure)")
-        colonnes_affichage_e1 = ["Variable Critique (liée au Y)", "Nature de la Donnée"]
-        if not df_msa_source.empty:
-            if "Type de Donnée" in df_msa_source.columns and "Nature de la Donnée" not in df_msa_source.columns:
-                df_msa_source = df_msa_source.rename(columns={"Type de Donnée": "Nature de la Donnée"})
-            cols_dispos = [c for c in colonnes_affichage_e1 if c in df_msa_source.columns]
-            st.table(df_msa_source[cols_dispos])
-        else:
-            st.table(pd.DataFrame([{"Variable Critique (liée au Y)": v, "Nature de la Donnée": "Quantitative/Qualitative"} for v in liste_variables_dynamiques]))
+                st.success("Paramètres enregistrés.")
 
         st.markdown("---")
 
-        # --- ÉCRAN 2 : SAISIE ET IMPORTATION (Sans sauvegarde en temps réel) ---
-        st.markdown("### 📝 Écran 2 : Saisie des Données de Contrôle & Import Excel")
-        uploaded_ctrl_file = st.file_uploader("Télécharger un fichier Excel de suivi (Écrase les données de contrôle en cours)", type=["xlsx", "xls"], key=f"ctrl_excel_up_{safe_p_idx}")
-
-        if uploaded_ctrl_file:
-            file_cache_key_ctrl = f"processed_ctrl_{uploaded_ctrl_file.name}_{uploaded_ctrl_file.size}"
-            if st.session_state.get("ctrl_last_processed_file") != file_cache_key_ctrl:
-                try:
-                    raw_imp_ctrl = pd.read_excel(uploaded_ctrl_file).dropna(how="all").reset_index(drop=True)
-                    regex_clean = re.compile(r'[_\-\s\./\\]+')
-                    def _struct_clean(text):
-                        if pd.isna(text): return ""
-                        t = str(text).lower().strip()
-                        t = regex_clean.sub(' ', t)
-                        return "".join(c for c in t if c.isalnum() or c == ' ')
-
-                    cols_f = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
-                    aligned_c_df = pd.DataFrame(columns=cols_f, index=range(len(raw_imp_ctrl)))
-                    c_excel = list(raw_imp_ctrl.columns)
-                    c_clean = [_struct_clean(c) for c in c_excel]
-
-                    # ID Observation detection
-                    id_src = next((col for col in c_excel if _struct_clean(col) in {"id", "observation", "code", "num", "index", "identifiant"}), None)
-                    if id_src:
-                        aligned_c_df["ID observation"] = raw_imp_ctrl[id_src].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                    else:
-                        aligned_c_df["ID observation"] = [f"Ctrl_Obs_{i+1}" for i in range(len(raw_imp_ctrl))]
-
-                    # Vague detection or default to active selection
-                    vague_src = next((col for col in c_excel if "vague" in _struct_clean(col)), None)
-                    if vague_src:
-                        aligned_c_df["Vague"] = raw_imp_ctrl[vague_src].astype(str)
-                    else:
-                        aligned_c_df["Vague"] = selected_wave
-
-                    # Variables mapping
-                    for var_c in liste_variables_dynamiques:
-                        v_cl = _struct_clean(var_c)
-                        w1 = set(v_cl.split())
-                        best_m, best_s = None, 0.0
-                        for idx, col in enumerate(c_excel):
-                            w2 = set(c_clean[idx].split())
-                            if not w1 or not w2: continue
-                            score = len(w1.intersection(w2)) / max(len(w1), len(w2))
-                            if v_cl in c_clean[idx] or c_clean[idx] in v_cl: score += 0.3
-                            if score > best_s:
-                                best_s = score
-                                best_m = col
-                        if best_m and best_s >= 0.35:
-                            aligned_c_df[var_c] = raw_imp_ctrl[best_m].values
-                        else:
-                            aligned_c_df[var_c] = None
-
-                    tz_val = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-                    aligned_c_df["Date de modification"] = tz_val
-                    ctrl_data["ctrl_master_data"] = aligned_c_df.reset_index(drop=True).where(pd.notnull(aligned_c_df), None)
-                    st.session_state["ctrl_last_processed_file"] = file_cache_key_ctrl
-                    st.success(f"🚀 Fichier de contrôle importé avec succès ({len(aligned_c_df)} lignes).")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur d'import : {e}")
-
-        # Formulaire de validation unique pour le tableau de données de contrôle (Evite le rechargement intempestif)
-        with st.form(key=f"form_editor_ctrl_{safe_p_idx}"):
-            st.markdown("#### 🛠️ Tableau de Saisie des Données de Contrôle")
-            edited_ctrl_table = st.data_editor(
-                ctrl_data["ctrl_master_data"],
-                num_rows="dynamic",
-                use_container_width=True,
-                key=f"ctrl_grid_edit_{safe_p_idx}",
-                column_config={
-                    "Vague": st.column_config.SelectboxColumn("Vague", options=ctrl_data["waves"])
-                }
-            )
-            submit_ctrl_table = st.form_submit_button("💾 Enregistrer les modifications du Tableau de Contrôle", type="primary")
-            if submit_ctrl_table:
-                ctrl_data["ctrl_master_data"] = pd.DataFrame(edited_ctrl_table)
-                st.success("Données de contrôle sauvegardées dans la session.")
-
-        st.markdown("---")
-
-        # =====================================================================
-        # GESTION DYNAMIQUE DES VAGUES DE CONTRÔLE (T1, T2, T3...)
-        # =====================================================================
-
-        # 1. Initialisation dans st.session_state si ce n'est pas déjà fait
-        if "vagues_actives" not in st.session_state:
-            st.session_state["vagues_actives"] = ["T1"]  # Par défaut on commence avec T1
-
-        # Bouton ou action pour rajouter une vague
-        col_vague_btn1, col_vague_btn2 = st.columns([3, 1])
-        with col_vague_btn2:
-            if st.button("➕ Ajouter une vague"):
-                prochain_num = len(st.session_state["vagues_actives"]) + 1
-                nouvelle_vague = f"T{prochain_num}"
-                if nouvelle_vague not in st.session_state["vagues_actives"]:
-                    st.session_state["vagues_actives"].append(nouvelle_vague)
-                    st.rerun()
-
-        # Affichage dynamique des sections de saisie par vague dans l'Écran 2
-        st.subheader("2. Saisie des données de contrôle (Post-Amélioration)")
-
-        # Dictionnaire pour stocker les DataFrames saisis pour chaque vague
+        # Écran 2 : Saisie / Import par Vague (onglets dynamiques pour T1, T2...)
+        st.markdown("### 📝 Écran 2 : Saisie des Données de Contrôle & Import Excel par Vague")
+    
         dict_dfs_vagues = {}
+        onglets_vagues = st.tabs([f"Vague {v}" for v in ctrl_data["waves"]])
 
-        # Utilisation d'onglets ou d'expandeurs pour chaque vague active (T1, T2, T3...)
-        onglets_vagues = st.tabs([f"Vague {v}" for v in st.session_state["vagues_actives"]])
-
-        for i, v_name in enumerate(st.session_state["vagues_actives"]):
+        for i, v_name in enumerate(ctrl_data["waves"]):
             with onglets_vagues[i]:
-                st.markdown(f"##### Tableau de saisie pour la période `{v_name}`")
-                # Exemple de composant de saisie (data_editor ou import)
-                # Vous récupérez ici le DataFrame saisi pour la vague v_name
-                df_saisi_v = st.data_editor(
-                    pd.DataFrame(columns=["ID observation"] + liste_variables_dynamiques),
-                    key=f"editor_data_{v_name}_{safe_p_idx}",
-                    num_rows="dynamic"
+                st.markdown(f"##### Gestion des données pour la période `{v_name}`")
+            
+                # Option d'import Excel spécifique à l'onglet de la vague en cours
+                uploaded_ctrl_file = st.file_uploader(f"Importer un fichier Excel pour {v_name}", type=["xlsx", "xls"], key=f"ctrl_excel_up_{v_name}_{safe_p_idx}")
+            
+                df_vague_courante = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
+            
+                # Récupérer l'existant pour cette vague dans master_data si présent
+                existing_sub = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] == v_name] if not ctrl_data["ctrl_master_data"].empty and "Vague" in ctrl_data["ctrl_master_data"].columns else pd.DataFrame()
+                if not existing_sub.empty:
+                    df_vague_courante = existing_sub.copy()
+
+                if uploaded_ctrl_file:
+                    file_cache_key_ctrl = f"processed_ctrl_{v_name}_{uploaded_ctrl_file.name}_{uploaded_ctrl_file.size}"
+                    if st.session_state.get(f"ctrl_last_processed_{v_name}") != file_cache_key_ctrl:
+                        try:
+                            raw_imp_ctrl = pd.read_excel(uploaded_ctrl_file).dropna(how="all").reset_index(drop=True)
+                            regex_clean = re.compile(r'[_\-\s\./\\]+')
+                            def _struct_clean(text):
+                                if pd.isna(text): return ""
+                                t = str(text).lower().strip()
+                                t = regex_clean.sub(' ', t)
+                                return "".join(c for c in t if c.isalnum() or c == ' ')
+
+                            cols_f = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
+                            aligned_c_df = pd.DataFrame(columns=cols_f, index=range(len(raw_imp_ctrl)))
+                            c_excel = list(raw_imp_ctrl.columns)
+                            c_clean = [_struct_clean(c) for c in c_excel]
+
+                            id_src = next((col for col in c_excel if _struct_clean(col) in {"id", "observation", "code", "num", "index", "identifiant"}), None)
+                            if id_src:
+                                aligned_c_df["ID observation"] = raw_imp_ctrl[id_src].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                            else:
+                                aligned_c_df["ID observation"] = [f"{v_name}_Obs_{x+1}" for x in range(len(raw_imp_ctrl))]
+
+                            aligned_c_df["Vague"] = v_name
+
+                            for var_c in liste_variables_dynamiques:
+                                v_cl = _struct_clean(var_c)
+                                w1 = set(v_cl.split())
+                                best_m, best_s = None, 0.0
+                                for idx, col in enumerate(c_excel):
+                                    w2 = set(c_clean[idx].split())
+                                    if not w1 or not w2: continue
+                                    score = len(w1.intersection(w2)) / max(len(w1), len(w2))
+                                    if v_cl in c_clean[idx] or c_clean[idx] in v_cl: score += 0.3
+                                    if score > best_s:
+                                        best_s = score
+                                        best_m = col
+                                if best_m and best_s >= 0.35:
+                                    aligned_c_df[var_c] = raw_imp_ctrl[best_m].values
+                                else:
+                                    aligned_c_df[var_c] = None
+
+                            tz_val = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                            aligned_c_df["Date de modification"] = tz_val
+                            df_vague_courante = aligned_c_df.reset_index(drop=True).where(pd.notnull(aligned_c_df), None)
+                            st.session_state[f"ctrl_last_processed_{v_name}"] = file_cache_key_ctrl
+                            st.success(f"🚀 Fichier importé pour {v_name} ({len(df_vague_courante)} lignes).")
+                        except Exception as e:
+                            st.error(f"Erreur d'import : {e}")
+
+                # Tableau de saisie éditable pour l'onglet actif
+                edited_v_table = st.data_editor(
+                    df_vague_courante,
+                    num_rows="dynamic",
+                    use_container_width=True,
+                    key=f"ctrl_grid_edit_{v_name}_{safe_p_idx}"
                 )
-                # On ajoute une colonne indicateur de vague
-                df_saisi_v["Vague"] = v_name
-                dict_dfs_vagues[v_name] = df_saisi_v
+                # Forcer l'assignation de la colonne Vague correcte
+                edited_v_table = pd.DataFrame(edited_v_table)
+                edited_v_table["Vague"] = v_name
+                dict_dfs_vagues[v_name] = edited_v_table
 
-        # Consolidation globale des vagues pour les analyses comparatives
-        df_ctrl_master_conso = pd.concat(list(dict_dfs_vagues.values()), ignore_index=True)
+        # Consolidation de toutes les vagues de contrôle
+        if dict_dfs_vagues:
+            ctrl_data["ctrl_master_data"] = pd.concat(list(dict_dfs_vagues.values()), ignore_index=True)
 
-        # =====================================================================
-        # PROPAGATION AUX STATISTIQUES, CAPABILITÉ ET CONTROL CHART
-        # =====================================================================
-        # Le DataFrame consolidé 'df_ctrl_master_conso' contient désormais l'ensemble 
-        # des lignes T1, T2, etc. La fonction groupby("Vague") intégrera automatiquement 
-        # les nouvelles lignes "T2", "T3" dans les tableaux comparatifs et les graphiques.
+        st.markdown("---")
 
-        
         # ---------------------------------------------------------------------
         # 3. STATISTIQUES COMPARATIVES (T0 vs Vagues)
         # ---------------------------------------------------------------------
         st.subheader("3. Statistiques Descriptives & Comparatif T0 vs Vagues")
-    
-        # Fusion des données T0 et données Control pour analyse globale
+
         df_combined = pd.DataFrame()
         if not df_t0_data.empty:
             df_t0_copy = df_t0_data.copy()
@@ -4367,7 +4307,7 @@ else:
                     st.markdown(f"##### Indicateur : {var_item}")
                     num_s = pd.to_numeric(df_combined[var_item], errors="coerce")
                     df_combined["_tmp_val"] = num_s
-                    stats_res = df_combined.groupby("Vague")["_tmp_val"].agg(
+                    stats_res = df_combined.groupby("Vague", sort=False)["_tmp_val"].agg(
                         N="count", Moyenne="mean", Médiane="median", Écart_type="std"
                     ).reset_index().round(2)
                     st.dataframe(stats_res, use_container_width=True, hide_index=True)
@@ -4375,14 +4315,14 @@ else:
             st.info("Aucune donnée disponible pour l'analyse comparative.")
 
         st.markdown("---")
-        # =====================================================================
-        # 4. PROCESS CAPABILITY COMPARATIF (T0 vs Vagues Améliorées)
-        # =====================================================================
-        st.subheader("4. Process Capability (Comparatif T0 vs Vagues Post-Amélioration)")
-        st.caption("Évaluation comparative du niveau Sigma et du DPMO entre la référence T0 et les vagues de contrôle (T1, T2...).")
 
-        # Préparation des données T0 et Contrôle Actuel
-        df_t0_cap = df_t0_data.copy() if "df_t0_data" in locals() and not df_t0_data.empty else pd.DataFrame()
+        # ---------------------------------------------------------------------
+        # 4. PROCESS CAPABILITY COMPARATIF (T0 vs Vagues)
+        # ---------------------------------------------------------------------
+        st.subheader("4. Process Capability (Comparatif T0 vs Vagues Post-Amélioration)")
+        st.caption("Évaluation comparative du niveau Sigma et du DPMO entre la référence T0 et les vagues de contrôle.")
+
+        df_t0_cap = df_t0_data.copy() if not df_t0_data.empty else pd.DataFrame()
         df_ctrl_cap = ctrl_data["ctrl_master_data"].copy() if not ctrl_data["ctrl_master_data"].empty else pd.DataFrame()
 
         def _calculer_metriques_capabilite(df_subset):
@@ -4391,7 +4331,6 @@ else:
             r_units = len(df_subset.dropna(subset=["ID observation"]))
             r_opp = max(1, len([v for v in liste_variables_dynamiques if v in df_subset.columns]))
         
-            # Comptage des défauts qualitatifs / non-conformes
             def_count = 0
             for var in liste_variables_dynamiques:
                 if var in df_subset.columns:
@@ -4400,7 +4339,6 @@ else:
             u_val = max(1, r_units)
             dpmo_val = (def_count / (u_val * r_opp)) * 1_000_000
         
-            # Calcul niveau Sigma
             sig_lvl = 0.0
             try:
                 if dpmo_val <= 0:
@@ -4419,8 +4357,13 @@ else:
 
         def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite(df_t0_cap)
     
-        # Filtrer les données de contrôle par vague sélectionnée pour comparaison
-        df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == selected_wave] if "Vague" in df_ctrl_cap.columns else df_ctrl_cap
+        # Filtrer les données par rapport à la vague sélectionnée
+        if "T0" in selected_wave:
+            df_wave_selected = df_t0_cap
+        else:
+            clean_sel_w = selected_wave.replace("Vague ", "").strip()
+            df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == clean_sel_w] if "Vague" in df_ctrl_cap.columns else df_ctrl_cap
+        
         def_w, u_w, opp_w, dpmo_w, sig_w = _calculer_metriques_capabilite(df_wave_selected)
 
         cap_col1, cap_col2 = st.columns(2)
@@ -4437,27 +4380,24 @@ else:
 
         st.markdown("---")
 
-        # =====================================================================
-        # 5. CONTROL CHART MIXTE (Fusion séquentielle T0 et T1 sur le même graphique)
-        # =====================================================================
-        st.subheader("5. Carte de Contrôle Mixte (Évolution séquentielle et recalcul par vague)")
-        st.caption("Affichage chronologique strict garanti avec T0 au commencement, suivi des vagues T1, T2..., avec recalcul dynamique des limites par vague.")
+        # ---------------------------------------------------------------------
+        # 5. CONTROL CHART MIXTE (T0 au début, puis T1, T2...)
+        # ---------------------------------------------------------------------
+        st.subheader("5. Carte de Contrôle Mixte (Séquence chronologique : T0 en premier)")
+        st.caption("Affichage chronologique strict débutant par T0, suivi des vagues, avec adaptation dynamique des limites (CL/UCL/LCL) par vague.")
 
-        # 1. Harmonisation et préparation du dataset global (T0 + Vagues de contrôle)
-        df_t0_plot = df_t0_cap.copy() if "df_t0_cap" in locals() and not df_t0_cap.empty else pd.DataFrame()
+        df_t0_plot = df_t0_cap.copy() if not df_t0_cap.empty else pd.DataFrame()
         if not df_t0_plot.empty:
             df_t0_plot["Vague"] = "T0 (Référence Mesure)"
             if "Date de modification" not in df_t0_plot.columns:
                 df_t0_plot["Date de modification"] = "2026-06-01 00:00:00"
 
         df_ctrl_plot = df_ctrl_cap.copy() if not df_ctrl_cap.empty else pd.DataFrame()
-
         df_mixte = pd.concat([df_t0_plot, df_ctrl_plot], ignore_index=True)
 
         if df_mixte.empty:
-            st.info("💡 Veuillez alimenter vos données T0 et importer/saisir un suivi de contrôle pour afficher la carte mixte.")
+            st.info("💡 Veuillez alimenter vos données T0 et ajouter/importer des données de contrôle.")
         else:
-            # Sélection de la variable quantitative à tracer
             quant_vars_mixte = [v for v in liste_variables_dynamiques if v in df_mixte.columns and not any(k in v.lower() for k in ["statut", "verdict", "validation", "ok", "ko"])]
         
             if not quant_vars_mixte:
@@ -4472,7 +4412,6 @@ else:
                 if df_clean_mixte.empty:
                     st.warning("Aucune valeur numérique valide trouvée pour cette variable.")
                 else:
-                    # 2. Attribution d'un poids de tri numérique strict : -1 pour T0/Référence, et le numéro pour T1, T2...
                     def _ordre_vague_chronologique(vague_val):
                         v_str = str(vague_val).upper()
                         if "T0" in v_str or "RÉFÉRENCE" in v_str:
@@ -4483,17 +4422,13 @@ else:
                         return 99
 
                     df_clean_mixte["_sort_order"] = df_clean_mixte["Vague"].apply(_ordre_vague_chronologique)
-                
-                    # Tri global rigoureux et réinitialisation complète de l'index pour écraser tout désordre initial
                     df_clean_mixte = df_clean_mixte.sort_values(by=["_sort_order", "Date_Parsed", "ID observation"], ascending=[True, True, True]).reset_index(drop=True)
 
-                    # 3. Extraction de la liste des vagues UNIQUEMENT par ordre d'apparition (SANS set pour préserver l'ordre exact)
                     vagues_ordonnees = []
                     for v in df_clean_mixte["Vague"]:
                         if v not in vagues_ordonnees:
                             vagues_ordonnees.append(v)
 
-                    # 4. Calcul dynamique et spécifique des limites par vague séquentielle
                     cl_list, ucl_list, lcl_list = [], [], []
 
                     for v_item in vagues_ordonnees:
@@ -4502,23 +4437,20 @@ else:
                     
                         mr_v = sub_vague["Valeur_Num"].diff().abs().mean()
                         if pd.isna(mr_v) or mr_v == 0:
-                            mr_v = 0.001  # Sécurité anti-aplatissement
+                            mr_v = 0.001 
                         
                         ucl_v = cl_v + 2.66 * mr_v
                         lcl_v = max(0.0, cl_v - 2.66 * mr_v) if sub_vague["Valeur_Num"].min() >= 0 else cl_v - 2.66 * mr_v
 
-                        # Application des limites ligne par ligne dans ce sous-ensemble
                         for idx_row in sub_vague.index:
                             cl_list.append((idx_row, cl_v))
                             ucl_list.append((idx_row, ucl_v))
                             lcl_list.append((idx_row, lcl_v))
 
-                    # Réaffectation alignée par index trié
                     df_clean_mixte["CL"] = [val for _, val in sorted(cl_list, key=lambda x: x[0])]
                     df_clean_mixte["UCL"] = [val for _, val in sorted(ucl_list, key=lambda x: x[0])]
                     df_clean_mixte["LCL"] = [val for _, val in sorted(lcl_list, key=lambda x: x[0])]
 
-                    # 5. Affichage graphique (utilisation d'un index séquentiel propre pour forcer le sens de lecture gauche $\rightarrow$ droite)
                     chart_display_df = df_clean_mixte[["Valeur_Num", "CL", "UCL", "LCL", "Vague"]].copy()
                     chart_display_df.index.name = "Séquence_Chronologique"
                 
