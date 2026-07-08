@@ -4163,7 +4163,7 @@ else:
                 ctrl_data["waves"].append(nouvelle_vague)
                 st.rerun()
 
-        # Liste d'options pour les métriques ciblées (T0 + vagues dynamiques)
+        # Liste d'options unique et dédupliquée pour la vague active (T0 unique + vagues dynamiques)
         toutes_les_vagues_options = ["T0 (Référence Mesure)"] + ctrl_data["waves"]
         selected_wave = st.selectbox("Vague active de suivi (pour métriques ciblées) :", options=toutes_les_vagues_options, key=f"active_wave_{safe_p_idx}")
 
@@ -4201,7 +4201,7 @@ else:
 
         st.markdown("---")
 
-        # Écran 2 : Saisie / Import par Vague (Uniquement les vagues créées + bouton de suppression par onglet)
+        # Écran 2 : Saisie / Import par Vague (Uniquement les vagues dynamiques créées, sans onglet T0)
         st.markdown("### 📝 Écran 2 : Saisie des Données de Contrôle & Import Excel par Vague")
     
         dict_dfs_vagues = {}
