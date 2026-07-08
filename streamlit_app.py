@@ -4115,7 +4115,7 @@ else:
         ctrl_data = p["control"]
 
         # ---------------------------------------------------------------------
-        # 0. RÉCUPÉRATION DES VARIABLES CRITIQUES & DONNÉES T0 (Phase Mesure)
+        # 0. RÉCUPÉRATION DES VARIABLES CRITIQUES & DONNÉES T0 (Phase Mesure - Immuable)
         # ---------------------------------------------------------------------
         safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
         safe_p_idx = safe_idx
@@ -4135,7 +4135,7 @@ else:
         if not liste_variables_dynamiques:
             liste_variables_dynamiques = ["Temps de traitement", "Statut conformité"]
 
-        # Initialisation de la vague T0 à partir des données de la Phase Mesure si elles existent
+        # Chargement immuable de T0 depuis la Phase Mesure
         df_t0_data = pd.DataFrame()
         if "dc_saved_df_json" in p and p["dc_saved_df_json"]:
             try:
@@ -4144,38 +4144,61 @@ else:
                 pass
 
         # ---------------------------------------------------------------------
-        # 1. DATA CONTROL PLAN & GESTION MULTI-VAGUES UNIFIÉE
+        # 1. DATA CONTROL PLAN & GESTION MULTI-VAGUES (Avec suppression)
         # ---------------------------------------------------------------------
         st.subheader("1. Data Control Plan & Campagnes de Suivi")
-        st.caption("La vague T0 correspond aux données de référence. Gérez et ajoutez vos vagues post-amélioration (T1, T2...).")
+        st.caption("Le référentiel T0 est pris directement de la phase Mesure (immuable). Gérez ci-dessous vos vagues post-amélioration (T1, T2...) et supprimez-les au besoin.")
 
         if "waves" not in ctrl_data:
             ctrl_data["waves"] = ["T1"]  # Vagues dynamiques par défaut hors T0
 
-        w_col1, w_col2 = st.columns([3, 1])
-        with w_col2:
+        # Interface d'ajout et de suppression des vagues
+        col_w_manage1, col_w_manage2 = st.columns([3, 1])
+        with col_w_manage2:
             if st.button("➕ Ajouter une vague", key=f"add_wave_global_{safe_p_idx}"):
-                prochain_num = len(ctrl_data["waves"]) + 1
+                # Recherche du prochain index T libre
+                existing_nums = []
+                for w in ctrl_data["waves"]:
+                    m = re.search(r'T(\d+)', str(w).upper())
+                    if m: existing_nums.append(int(m.group(1)))
+                prochain_num = max(existing_nums, default=0) + 1
                 nouvelle_vague = f"T{prochain_num}"
                 if nouvelle_vague not in ctrl_data["waves"]:
                     ctrl_data["waves"].append(nouvelle_vague)
                     st.rerun()
 
-        # Liste combinée pour les sélections d'affichage (T0 + vagues dynamiques)
-        toutes_les_vagues_options = ["T0 (Référence Mesure)"] + [f"Vague {v}" if not v.startswith("Vague") else v for v in ctrl_data["waves"]]
+        # Affichage des vagues modifiables avec option de suppression
+        if ctrl_data["waves"]:
+            st.markdown("**Vagues de suivi configurées :**")
+            for w_del in list(ctrl_data["waves"]):
+                col_v_lbl, col_v_btn = st.columns([4, 1])
+                with col_v_lbl:
+                    st.text(f"• Période {w_del}")
+                with col_v_btn:
+                    if st.button("🗑️ Supprimer", key=f"del_wave_{w_del}_{safe_p_idx}"):
+                        ctrl_data["waves"].remove(w_del)
+                        # Nettoyage des données associées dans master data si elles existent
+                        if "ctrl_master_data" in ctrl_data and not ctrl_data["ctrl_master_data"].empty:
+                            ctrl_data["ctrl_master_data"] = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] != w_del].reset_index(drop=True)
+                        st.success(f"Vague {w_del} supprimée.")
+                        st.rerun()
+        else:
+            st.info("💡 Aucune vague de suivi active. Cliquez sur 'Ajouter une vague' pour commencer la surveillance.")
+
+        # Liste d'options pour les métriques ciblées (T0 + vagues dynamiques restantes)
+        toutes_les_vagues_options = ["T0 (Référence Mesure)"] + ctrl_data["waves"]
         selected_wave = st.selectbox("Vague active de suivi (pour métriques ciblées) :", options=toutes_les_vagues_options, key=f"active_wave_{safe_p_idx}")
 
         st.markdown("---")
 
         # ---------------------------------------------------------------------
-        # 2. COLLECTE ET SAISIE DES DONNÉES DE CONTRÔLE PAR VAGUE
+        # 2. COLLECTE ET SAISIE DES DONNÉES DE CONTRÔLE (Écran 1 & Écran 2)
         # ---------------------------------------------------------------------
         st.markdown("## 2 - Collecte des Données de Contrôle & Saisie Multi-Vagues")
 
         if "ctrl_plan" not in ctrl_data:
             ctrl_data["ctrl_plan"] = {"taille_prevue": 50, "date_debut": "2026-07-01", "date_fin_est": "2026-07-15"}
 
-        # Initialisation du stockage global des données de contrôle si absent
         if "ctrl_master_data" not in ctrl_data or not isinstance(ctrl_data["ctrl_master_data"], pd.DataFrame):
             cols_init = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
             ctrl_data["ctrl_master_data"] = pd.DataFrame(columns=cols_init)
@@ -4200,91 +4223,88 @@ else:
 
         st.markdown("---")
 
-        # Écran 2 : Saisie / Import par Vague (onglets dynamiques pour T1, T2...)
+        # Écran 2 : Saisie / Import par Vague (onglets exclusifs aux vagues dynamiques T1, T2...)
         st.markdown("### 📝 Écran 2 : Saisie des Données de Contrôle & Import Excel par Vague")
     
         dict_dfs_vagues = {}
-        onglets_vagues = st.tabs([f"Vague {v}" for v in ctrl_data["waves"]])
+        if ctrl_data["waves"]:
+            onglets_vagues = st.tabs([f"Vague {v}" for v in ctrl_data["waves"]])
 
-        for i, v_name in enumerate(ctrl_data["waves"]):
-            with onglets_vagues[i]:
-                st.markdown(f"##### Gestion des données pour la période `{v_name}`")
-            
-                # Option d'import Excel spécifique à l'onglet de la vague en cours
-                uploaded_ctrl_file = st.file_uploader(f"Importer un fichier Excel pour {v_name}", type=["xlsx", "xls"], key=f"ctrl_excel_up_{v_name}_{safe_p_idx}")
-            
-                df_vague_courante = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
-            
-                # Récupérer l'existant pour cette vague dans master_data si présent
-                existing_sub = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] == v_name] if not ctrl_data["ctrl_master_data"].empty and "Vague" in ctrl_data["ctrl_master_data"].columns else pd.DataFrame()
-                if not existing_sub.empty:
-                    df_vague_courante = existing_sub.copy()
+            for i, v_name in enumerate(ctrl_data["waves"]):
+                with onglets_vagues[i]:
+                    st.markdown(f"##### Gestion des données pour la période `{v_name}`")
+                
+                    uploaded_ctrl_file = st.file_uploader(f"Importer un fichier Excel pour {v_name}", type=["xlsx", "xls"], key=f"ctrl_excel_up_{v_name}_{safe_p_idx}")
+                
+                    df_vague_courante = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
+                    existing_sub = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] == v_name] if not ctrl_data["ctrl_master_data"].empty and "Vague" in ctrl_data["ctrl_master_data"].columns else pd.DataFrame()
+                    if not existing_sub.empty:
+                        df_vague_courante = existing_sub.copy()
 
-                if uploaded_ctrl_file:
-                    file_cache_key_ctrl = f"processed_ctrl_{v_name}_{uploaded_ctrl_file.name}_{uploaded_ctrl_file.size}"
-                    if st.session_state.get(f"ctrl_last_processed_{v_name}") != file_cache_key_ctrl:
-                        try:
-                            raw_imp_ctrl = pd.read_excel(uploaded_ctrl_file).dropna(how="all").reset_index(drop=True)
-                            regex_clean = re.compile(r'[_\-\s\./\\]+')
-                            def _struct_clean(text):
-                                if pd.isna(text): return ""
-                                t = str(text).lower().strip()
-                                t = regex_clean.sub(' ', t)
-                                return "".join(c for c in t if c.isalnum() or c == ' ')
+                    if uploaded_ctrl_file:
+                        file_cache_key_ctrl = f"processed_ctrl_{v_name}_{uploaded_ctrl_file.name}_{uploaded_ctrl_file.size}"
+                        if st.session_state.get(f"ctrl_last_processed_{v_name}") != file_cache_key_ctrl:
+                            try:
+                                raw_imp_ctrl = pd.read_excel(uploaded_ctrl_file).dropna(how="all").reset_index(drop=True)
+                                regex_clean = re.compile(r'[_\-\s\./\\]+')
+                                def _struct_clean(text):
+                                    if pd.isna(text): return ""
+                                    t = str(text).lower().strip()
+                                    t = regex_clean.sub(' ', t)
+                                    return "".join(c for c in t if c.isalnum() or c == ' ')
 
-                            cols_f = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
-                            aligned_c_df = pd.DataFrame(columns=cols_f, index=range(len(raw_imp_ctrl)))
-                            c_excel = list(raw_imp_ctrl.columns)
-                            c_clean = [_struct_clean(c) for c in c_excel]
+                                cols_f = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
+                                aligned_c_df = pd.DataFrame(columns=cols_f, index=range(len(raw_imp_ctrl)))
+                                c_excel = list(raw_imp_ctrl.columns)
+                                c_clean = [_struct_clean(c) for c in c_excel]
 
-                            id_src = next((col for col in c_excel if _struct_clean(col) in {"id", "observation", "code", "num", "index", "identifiant"}), None)
-                            if id_src:
-                                aligned_c_df["ID observation"] = raw_imp_ctrl[id_src].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
-                            else:
-                                aligned_c_df["ID observation"] = [f"{v_name}_Obs_{x+1}" for x in range(len(raw_imp_ctrl))]
-
-                            aligned_c_df["Vague"] = v_name
-
-                            for var_c in liste_variables_dynamiques:
-                                v_cl = _struct_clean(var_c)
-                                w1 = set(v_cl.split())
-                                best_m, best_s = None, 0.0
-                                for idx, col in enumerate(c_excel):
-                                    w2 = set(c_clean[idx].split())
-                                    if not w1 or not w2: continue
-                                    score = len(w1.intersection(w2)) / max(len(w1), len(w2))
-                                    if v_cl in c_clean[idx] or c_clean[idx] in v_cl: score += 0.3
-                                    if score > best_s:
-                                        best_s = score
-                                        best_m = col
-                                if best_m and best_s >= 0.35:
-                                    aligned_c_df[var_c] = raw_imp_ctrl[best_m].values
+                                id_src = next((col for col in c_excel if _struct_clean(col) in {"id", "observation", "code", "num", "index", "identifiant"}), None)
+                                if id_src:
+                                    aligned_c_df["ID observation"] = raw_imp_ctrl[id_src].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
                                 else:
-                                    aligned_c_df[var_c] = None
+                                    aligned_c_df["ID observation"] = [f"{v_name}_Obs_{x+1}" for x in range(len(raw_imp_ctrl))]
 
-                            tz_val = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
-                            aligned_c_df["Date de modification"] = tz_val
-                            df_vague_courante = aligned_c_df.reset_index(drop=True).where(pd.notnull(aligned_c_df), None)
-                            st.session_state[f"ctrl_last_processed_{v_name}"] = file_cache_key_ctrl
-                            st.success(f"🚀 Fichier importé pour {v_name} ({len(df_vague_courante)} lignes).")
-                        except Exception as e:
-                            st.error(f"Erreur d'import : {e}")
+                                aligned_c_df["Vague"] = v_name
 
-                # Tableau de saisie éditable pour l'onglet actif
-                edited_v_table = st.data_editor(
-                    df_vague_courante,
-                    num_rows="dynamic",
-                    use_container_width=True,
-                    key=f"ctrl_grid_edit_{v_name}_{safe_p_idx}"
-                )
-                # Forcer l'assignation de la colonne Vague correcte
-                edited_v_table = pd.DataFrame(edited_v_table)
-                edited_v_table["Vague"] = v_name
-                dict_dfs_vagues[v_name] = edited_v_table
+                                for var_c in liste_variables_dynamiques:
+                                    v_cl = _struct_clean(var_c)
+                                    w1 = set(v_cl.split())
+                                    best_m, best_s = None, 0.0
+                                    for idx, col in enumerate(c_excel):
+                                        w2 = set(c_clean[idx].split())
+                                        if not w1 or not w2: continue
+                                        score = len(w1.intersection(w2)) / max(len(w1), len(w2))
+                                        if v_cl in c_clean[idx] or c_clean[idx] in v_cl: score += 0.3
+                                        if score > best_s:
+                                            best_s = score
+                                            best_m = col
+                                    if best_m and best_s >= 0.35:
+                                        aligned_c_df[var_c] = raw_imp_ctrl[best_m].values
+                                    else:
+                                        aligned_c_df[var_c] = None
 
-        # Consolidation de toutes les vagues de contrôle
+                                tz_val = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                                aligned_c_df["Date de modification"] = tz_val
+                                df_vague_courante = aligned_c_df.reset_index(drop=True).where(pd.notnull(aligned_c_df), None)
+                                st.session_state[f"ctrl_last_processed_{v_name}"] = file_cache_key_ctrl
+                                st.success(f"🚀 Fichier importé pour {v_name} ({len(df_vague_courante)} lignes).")
+                            except Exception as e:
+                                st.error(f"Erreur d'import : {e}")
+
+                    edited_v_table = st.data_editor(
+                        df_vague_courante,
+                        num_rows="dynamic",
+                        use_container_width=True,
+                        key=f"ctrl_grid_edit_{v_name}_{safe_p_idx}"
+                    )
+                    edited_v_table = pd.DataFrame(edited_v_table)
+                    edited_v_table["Vague"] = v_name
+                    dict_dfs_vagues[v_name] = edited_v_table
+
         if dict_dfs_vagues:
             ctrl_data["ctrl_master_data"] = pd.concat(list(dict_dfs_vagues.values()), ignore_index=True)
+        else:
+            ctrl_data["ctrl_master_data"] = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
 
         st.markdown("---")
 
@@ -4348,7 +4368,7 @@ else:
                     p_v = max(1e-7, min(0.5, taux_d if taux_d < 0.5 else 1 - taux_d))
                     t_val = math.sqrt(-2.0 * math.log(p_v))
                     z_val = t_val - ((2.515517 + 0.802853 * t_val + 0.010328 * t_val * t_val) / 
-                               (1.0 + 1.432788 * t_val + 0.189269 * t_val * t_val + 0.001308 * t_val * t_val * t_val))
+                           (1.0 + 1.432788 * t_val + 0.189269 * t_val * t_val + 0.001308 * t_val * t_val * t_val))
                     sig_brut = z_val if taux_d < 0.5 else -z_val
                     sig_lvl = max(0.0, min(6.0, round(sig_brut + 1.5, 2)))
             except Exception:
@@ -4357,12 +4377,10 @@ else:
 
         def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite(df_t0_cap)
     
-        # Filtrer les données par rapport à la vague sélectionnée
         if "T0" in selected_wave:
             df_wave_selected = df_t0_cap
         else:
-            clean_sel_w = selected_wave.replace("Vague ", "").strip()
-            df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == clean_sel_w] if "Vague" in df_ctrl_cap.columns else df_ctrl_cap
+            df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == selected_wave] if "Vague" in df_ctrl_cap.columns else df_ctrl_cap
         
         def_w, u_w, opp_w, dpmo_w, sig_w = _calculer_metriques_capabilite(df_wave_selected)
 
@@ -4415,7 +4433,7 @@ else:
                     def _ordre_vague_chronologique(vague_val):
                         v_str = str(vague_val).upper()
                         if "T0" in v_str or "RÉFÉRENCE" in v_str:
-                            return -1
+                        return -1
                         match_num = re.search(r'T(\d+)', v_str)
                         if match_num:
                             return int(match_num.group(1))
