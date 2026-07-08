@@ -4389,7 +4389,7 @@ else:
         # 5. CONTROL CHART MIXTE (Fusion séquentielle T0 et T1 sur le même graphique)
         # =====================================================================
         st.subheader("5. Carte de Contrôle Mixte (Évolution séquentielle et recalcul par vague)")
-        st.caption("Affichage chronologique séquentiel garanti avec T0 au commencement du graphique, et adaptation des limites (CL/UCL/LCL) par vague.")
+        st.caption("Affichage chronologique strict garanti avec T0 au commencement, suivi des vagues T1, T2..., avec recalcul dynamique des limites par vague.")
 
         # 1. Harmonisation et préparation du dataset global (T0 + Vagues de contrôle)
         df_t0_plot = df_t0_cap.copy() if "df_t0_cap" in locals() and not df_t0_cap.empty else pd.DataFrame()
@@ -4411,7 +4411,7 @@ else:
             if not quant_vars_mixte:
                 st.warning("⚠️ Aucune variable quantitative exploitable pour la carte de contrôle mixte.")
             else:
-                var_choisie_mixte = st.selectbox("Sélectionner la variable quantitative pour le Control Chart :", options=quant_vars_mixte, key=f"mixte_var_strict_{safe_p_idx}")
+                var_choisie_mixte = st.selectbox("Sélectionner la variable quantitative pour le Control Chart :", options=quant_vars_mixte, key=f"mixte_var_final_{safe_p_idx}")
             
                 df_mixte["Valeur_Num"] = pd.to_numeric(df_mixte[var_choisie_mixte], errors="coerce")
                 df_mixte["Date_Parsed"] = pd.to_datetime(df_mixte["Date de modification"], errors="coerce")
@@ -4420,8 +4420,8 @@ else:
                 if df_clean_mixte.empty:
                     st.warning("Aucune valeur numérique valide trouvée pour cette variable.")
                 else:
-                    # 2. Attribution d'un poids de tri numérique strict : -1 pour T0/Référence, 1 pour T1, 2 pour T2...
-                    def _ordre_vague_strict(vague_val):
+                    # 2. Attribution d'un poids de tri numérique strict : -1 pour T0/Référence, et le numéro pour T1, T2...
+                    def _ordre_vague_chronologique(vague_val):
                         v_str = str(vague_val).upper()
                         if "T0" in v_str or "RÉFÉRENCE" in v_str:
                             return -1
@@ -4430,23 +4430,20 @@ else:
                             return int(match_num.group(1))
                         return 99
 
-                    df_clean_mixte["_sort_order"] = df_clean_mixte["Vague"].apply(_ordre_vague_strict)
+                    df_clean_mixte["_sort_order"] = df_clean_mixte["Vague"].apply(_ordre_vague_chronologique)
                 
-                    # Tri global rigoureux par ordre croissant de _sort_order, puis par date
+                    # Tri global rigoureux et réinitialisation complète de l'index pour écraser tout désordre initial
                     df_clean_mixte = df_clean_mixte.sort_values(by=["_sort_order", "Date_Parsed", "ID observation"], ascending=[True, True, True]).reset_index(drop=True)
 
-                    # 3. Calcul dynamique et spécifique des limites par vague (dans l'ordre séquentiel établi)
-                    # On conserve l'ordre d'apparition des vagues dans le DataFrame trié
+                    # 3. Extraction de la liste des vagues UNIQUEMENT par ordre d'apparition (SANS set pour préserver l'ordre exact)
                     vagues_ordonnees = []
-                    seen = set()
                     for v in df_clean_mixte["Vague"]:
-                        if v not in seen:
+                        if v not in vagues_ordonnees:
                             vagues_ordonnees.append(v)
-                            seen.add(v)
 
-                    cl_arr, ucl_arr, lcl_arr = [], [], []
+                    # 4. Calcul dynamique et spécifique des limites par vague séquentielle
+                    cl_list, ucl_list, lcl_list = [], [], []
 
-                    # Itération propre selon l'ordre chronologique des vagues
                     for v_item in vagues_ordonnees:
                         sub_vague = df_clean_mixte[df_clean_mixte["Vague"] == v_item]
                         cl_v = sub_vague["Valeur_Num"].mean()
@@ -4458,22 +4455,23 @@ else:
                         ucl_v = cl_v + 2.66 * mr_v
                         lcl_v = max(0.0, cl_v - 2.66 * mr_v) if sub_vague["Valeur_Num"].min() >= 0 else cl_v - 2.66 * mr_v
 
-                        # Remplissage par correspondance d'index
+                        # Application des limites ligne par ligne dans ce sous-ensemble
                         for idx_row in sub_vague.index:
-                            cl_arr.append((idx_row, cl_v))
-                            ucl_arr.append((idx_row, ucl_v))
-                            lcl_arr.append((idx_row, lcl_v))
+                            cl_list.append((idx_row, cl_v))
+                            ucl_list.append((idx_row, ucl_v))
+                            lcl_list.append((idx_row, lcl_v))
 
-                    # Remise en ordre des listes générées selon l'index initial de la ligne
-                    df_clean_mixte["CL"] = [val for _, val in sorted(cl_arr, key=lambda x: x[0])]
-                    df_clean_mixte["UCL"] = [val for _, val in sorted(ucl_arr, key=lambda x: x[0])]
-                    df_clean_mixte["LCL"] = [val for _, val in sorted(lcl_arr, key=lambda x: x[0])]
+                    # Réaffectation alignée par index trié
+                    df_clean_mixte["CL"] = [val for _, val in sorted(cl_list, key=lambda x: x[0])]
+                    df_clean_mixte["UCL"] = [val for _, val in sorted(ucl_list, key=lambda x: x[0])]
+                    df_clean_mixte["LCL"] = [val for _, val in sorted(lcl_list, key=lambda x: x[0])]
 
-                    # 4. Affichage graphique et récapitulatif
-                    chart_display_df = df_clean_mixte[["ID observation", "Valeur_Num", "CL", "UCL", "LCL", "Vague"]].copy()
+                    # 5. Affichage graphique (utilisation d'un index séquentiel propre pour forcer le sens de lecture gauche $\rightarrow$ droite)
+                    chart_display_df = df_clean_mixte[["Valeur_Num", "CL", "UCL", "LCL", "Vague"]].copy()
+                    chart_display_df.index.name = "Séquence_Chronologique"
                 
-                    st.markdown(f"##### Chronologie respectée (T0 au début $\\rightarrow$ vagues suivantes) pour : `{var_choisie_mixte}`")
-                    st.line_chart(chart_display_df.set_index("ID observation")[["Valeur_Num", "CL", "UCL", "LCL"]])
+                    st.markdown(f"##### Évolution séquentielle (T0 au début $\\rightarrow$ vagues de suivi) pour : `{var_choisie_mixte}`")
+                    st.line_chart(chart_display_df[["Valeur_Num", "CL", "UCL", "LCL"]])
                 
                     st.markdown("###### Paramètres statistiques par vague :")
                     recap_stats = df_clean_mixte.groupby("Vague", sort=False).agg(
