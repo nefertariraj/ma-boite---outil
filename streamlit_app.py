@@ -4433,7 +4433,7 @@ else:
                     def _ordre_vague_chronologique(vague_val):
                         v_str = str(vague_val).upper()
                         if "T0" in v_str or "RÉFÉRENCE" in v_str:
-                        return -1
+                            return -1
                         match_num = re.search(r'T(\d+)', v_str)
                         if match_num:
                             return int(match_num.group(1))
