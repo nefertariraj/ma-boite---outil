@@ -4104,181 +4104,220 @@ else:
     with tabs[4]: 
         st.header("Phase Control")
 
+        from datetime import datetime, timezone, timedelta
+        import io
+        import re
+        import math
+
         if "control" not in p:
             p["control"] = {}
 
         ctrl_data = p["control"]
 
         # ---------------------------------------------------------------------
+        # 0. RÉCUPÉRATION DES VARIABLES CRITIQUES & DONNÉES T0 (Phase Mesure)
+        # ---------------------------------------------------------------------
+        safe_idx = str(p_idx) if 'p_idx' in locals() else "default"
+        safe_p_idx = safe_idx
+        msa_classif_key = f"msa_classification_table_{safe_idx}"
+        nom_colonne_variable = "Variable Critique (liée au Y)"
+
+        liste_variables_dynamiques = []
+        df_msa_source = pd.DataFrame()
+
+        if msa_classif_key in st.session_state and not st.session_state[msa_classif_key].empty:
+            df_msa_source = st.session_state[msa_classif_key]
+            if nom_colonne_variable in df_msa_source.columns:
+                liste_variables_dynamiques = df_msa_source[nom_colonne_variable].dropna().tolist()
+        elif "master_dcp_table" in st.session_state and len(st.session_state["master_dcp_table"]) > 0:
+            liste_variables_dynamiques = [row["Variable à mesurer"] for row in st.session_state["master_dcp_table"] if "Variable à mesurer" in row]
+
+        if not liste_variables_dynamiques:
+            liste_variables_dynamiques = ["Temps de traitement", "Statut conformité"]
+
+        # Initialisation de la vague T0 à partir des données de la Phase Mesure si elles existent
+        df_t0_data = pd.DataFrame()
+        if "dc_saved_df_json" in p and p["dc_saved_df_json"]:
+            try:
+                df_t0_data = pd.read_json(io.StringIO(p["dc_saved_df_json"]))
+            except Exception:
+                pass
+
+        # ---------------------------------------------------------------------
         # 1. DATA CONTROL PLAN & GESTION DES VAGUES
         # ---------------------------------------------------------------------
         st.subheader("1. Data Control Plan & Campagnes de Suivi")
+        st.caption("La vague T0 correspond aux données de référence de la phase Mesure. Définissez les vagues post-amélioration (T1, T2...).")
 
         if "waves" not in ctrl_data:
-            ctrl_data["waves"] = ["T0 (Initial)", "T1 (Post-Amélioration)"]
+            ctrl_data["waves"] = ["T0 (Référence Mesure)", "T1 (Post-Amélioration)"]
 
-        col_w1, col_w2 = st.columns([2, 1])
-        with col_w1:
-            selected_wave = st.selectbox(
-                "Sélectionner la vague active de suivi :",
-                options=ctrl_data["waves"],
-                key=f"active_wave_{p_idx}"
-            )
-        with col_w2:
-            st.write("")
-            new_wave_name = st.text_input("Nouvelle vague :", placeholder="Ex: T2", label_visibility="collapsed")
-            if st.button("➕ Ajouter la vague", key=f"add_wave_{p_idx}"):
+        w_col1, w_col2, w_col3 = st.columns([2, 1, 1])
+        with w_col1:
+            selected_wave = st.selectbox("Vague active de suivi :", options=ctrl_data["waves"], key=f"active_wave_{safe_p_idx}")
+        with w_col2:
+            new_wave_name = st.text_input("Ajouter une vague :", placeholder="Ex: T2", label_visibility="collapsed", key=f"new_wave_in_{safe_p_idx}")
+        with w_col3:
+            if st.button("➕ Ajouter la vague", key=f"add_wave_btn_{safe_p_idx}", use_container_width=True):
                 if new_wave_name.strip() and new_wave_name.strip() not in ctrl_data["waves"]:
                     ctrl_data["waves"].append(new_wave_name.strip())
                     st.success(f"Vague '{new_wave_name}' ajoutée.")
                     st.rerun()
 
-        # ---------------------------------------------------------------------
-        # 2. DATA COLLECTION (Saisie par vague)
-        # ---------------------------------------------------------------------
-        st.subheader("2. Collecte des Données de Contrôle")
+        st.markdown("---")
 
-        if "collection_data" not in ctrl_data:
-            ctrl_data["collection_data"] = []
+        # ---------------------------------------------------------------------
+        # 2. COLLECTE DES DONNÉES DE CONTRÔLE (Format identique Phase Mesure)
+        # ---------------------------------------------------------------------
+        st.markdown("## 2 - Collecte des Données de Contrôle")
 
-        # Conversion sécurisée en DataFrame avec types explicites
-        if ctrl_data["collection_data"]:
-            df_ctrl_input = pd.DataFrame(ctrl_data["collection_data"])
-            # S'assurer que la colonne Date est au bon format datetime/string
-            if "Date" in df_ctrl_input.columns:
-                df_ctrl_input["Date"] = pd.to_datetime(df_ctrl_input["Date"]).dt.date
-            if "Valeur mesurée" in df_ctrl_input.columns:
-                df_ctrl_input["Valeur mesurée"] = pd.to_numeric(df_ctrl_input["Valeur mesurée"], errors="coerce").fillna(0.0)
+        if "ctrl_plan" not in ctrl_data:
+            ctrl_data["ctrl_plan"] = {"taille_prevue": 50, "date_debut": "2026-07-01", "date_fin_est": "2026-07-15"}
+
+        if "ctrl_master_data" not in ctrl_data:
+            cols_init = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
+            ctrl_data["ctrl_master_data"] = pd.DataFrame(columns=cols_init)
+
+        # Assurer la cohérence structurelle du DataFrame de contrôle
+        colonnes_requises_ctrl = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
+        for col_c in colonnes_requises_ctrl:
+            if col_c not in ctrl_data["ctrl_master_data"].columns:
+                ctrl_data["ctrl_master_data"][col_c] = None
+
+        # --- ÉCRAN 1 : RÉSUMÉ DE LA COLLECTE (Formulaire sans sauvegarde temps réel) ---
+        st.markdown("### 📋 Écran 1 : Résumé de la Collecte de Contrôle")
+        with st.form(key=f"form_ecran1_ctrl_{safe_p_idx}"):
+            e1_c1, e1_c2, e1_c3 = st.columns(3)
+            with e1_c1:
+                n_prev = st.number_input("Taille d'échantillon prévue (N)", min_value=1, value=int(ctrl_data["ctrl_plan"].get("taille_prevue", 50)))
+            with e1_c2:
+                d_deb = st.text_input("Date de début de collecte", value=ctrl_data["ctrl_plan"].get("date_debut", "2026-07-01"))
+            with e1_c3:
+                d_fin = st.text_input("Date estimée de fin", value=ctrl_data["ctrl_plan"].get("date_fin_est", "2026-07-15"))
+
+            submitted_e1 = st.form_submit_button("💾 Enregistrer les paramètres de l'Écran 1")
+            if submitted_e1:
+                ctrl_data["ctrl_plan"]["taille_prevue"] = n_prev
+                ctrl_data["ctrl_plan"]["date_debut"] = d_deb
+                ctrl_data["ctrl_plan"]["date_fin_est"] = d_fin
+                st.success("Paramètres d'échantillonnage de contrôle enregistrés.")
+
+        st.markdown("#### Liste des variables définies (Même référentiel Phase Mesure)")
+        colonnes_affichage_e1 = ["Variable Critique (liée au Y)", "Nature de la Donnée"]
+        if not df_msa_source.empty:
+            if "Type de Donnée" in df_msa_source.columns and "Nature de la Donnée" not in df_msa_source.columns:
+                df_msa_source = df_msa_source.rename(columns={"Type de Donnée": "Nature de la Donnée"})
+            cols_dispos = [c for c in colonnes_affichage_e1 if c in df_msa_source.columns]
+            st.table(df_msa_source[cols_dispos])
         else:
-            df_ctrl_input = pd.DataFrame([{
-                "Vague": ctrl_data["waves"][0] if ctrl_data["waves"] else "T0",
-                "Date": pd.Timestamp.today().date(),
-                "Valeur mesurée": 0.0,
-                "Commentaire": ""
-            }])
+            st.table(pd.DataFrame([{"Variable Critique (liée au Y)": v, "Nature de la Donnée": "Quantitative/Qualitative"} for v in liste_variables_dynamiques]))
 
-        edited_ctrl_df = st.data_editor(
-            df_ctrl_input,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"ctrl_data_editor_{p_idx}",
-            column_config={
-                "Vague": st.column_config.SelectboxColumn("Vague", options=ctrl_data["waves"]),
-                "Date": st.column_config.DateColumn("Date de collecte"),
-                "Valeur mesurée": st.column_config.NumberColumn("Valeur", format="%.2f"),
-                "Commentaire": st.column_config.TextColumn("Remarques terrain")
-            }
-        )
+        st.markdown("---")
 
-        if st.button("💾 Enregistrer la Collecte Control", key=f"save_ctrl_coll_{p_idx}"):
-            # Conversion de la date en chaîne de caractères pour une sérialisation JSON parfaite
-            df_to_save = edited_ctrl_df.copy()
-            if "Date" in df_to_save.columns:
-                df_to_save["Date"] = pd.to_datetime(df_to_save["Date"]).dt.strftime("%Y-%m-%d")
-            ctrl_data["collection_data"] = df_to_save.to_dict('records')
-            st.success("Données de contrôle enregistrées avec succès.")
-            st.rerun()
+        # --- ÉCRAN 2 : SAISIE ET IMPORTATION (Sans sauvegarde en temps réel) ---
+        st.markdown("### 📝 Écran 2 : Saisie des Données de Contrôle & Import Excel")
+        uploaded_ctrl_file = st.file_uploader("Télécharger un fichier Excel de suivi (Écrase les données de contrôle en cours)", type=["xlsx", "xls"], key=f"ctrl_excel_up_{safe_p_idx}")
+
+        if uploaded_ctrl_file:
+            file_cache_key_ctrl = f"processed_ctrl_{uploaded_ctrl_file.name}_{uploaded_ctrl_file.size}"
+            if st.session_state.get("ctrl_last_processed_file") != file_cache_key_ctrl:
+                try:
+                    raw_imp_ctrl = pd.read_excel(uploaded_ctrl_file).dropna(how="all").reset_index(drop=True)
+                    regex_clean = re.compile(r'[_\-\s\./\\]+')
+                    def _struct_clean(text):
+                        if pd.isna(text): return ""
+                        t = str(text).lower().strip()
+                        t = regex_clean.sub(' ', t)
+                        return "".join(c for c in t if c.isalnum() or c == ' ')
+
+                    cols_f = ["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques
+                    aligned_c_df = pd.DataFrame(columns=cols_f, index=range(len(raw_imp_ctrl)))
+                    c_excel = list(raw_imp_ctrl.columns)
+                    c_clean = [_struct_clean(c) for c in c_excel]
+
+                    # ID Observation detection
+                    id_src = next((col for col in c_excel if _struct_clean(col) in {"id", "observation", "code", "num", "index", "identifiant"}), None)
+                    if id_src:
+                        aligned_c_df["ID observation"] = raw_imp_ctrl[id_src].astype(str).str.replace(r'\.0$', '', regex=True).str.strip()
+                    else:
+                        aligned_c_df["ID observation"] = [f"Ctrl_Obs_{i+1}" for i in range(len(raw_imp_ctrl))]
+
+                    # Vague detection or default to active selection
+                    vague_src = next((col for col in c_excel if "vague" in _struct_clean(col)), None)
+                    if vague_src:
+                        aligned_c_df["Vague"] = raw_imp_ctrl[vague_src].astype(str)
+                    else:
+                        aligned_c_df["Vague"] = selected_wave
+
+                    # Variables mapping
+                    for var_c in liste_variables_dynamiques:
+                        v_cl = _struct_clean(var_c)
+                        w1 = set(v_cl.split())
+                        best_m, best_s = None, 0.0
+                        for idx, col in enumerate(c_excel):
+                            w2 = set(c_clean[idx].split())
+                            if not w1 or not w2: continue
+                            score = len(w1.intersection(w2)) / max(len(w1), len(w2))
+                            if v_cl in c_clean[idx] or c_clean[idx] in v_cl: score += 0.3
+                            if score > best_s:
+                                best_s = score
+                                best_m = col
+                        if best_m and best_s >= 0.35:
+                            aligned_c_df[var_c] = raw_imp_ctrl[best_m].values
+                        else:
+                            aligned_c_df[var_c] = None
+
+                    tz_val = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d %H:%M:%S")
+                    aligned_c_df["Date de modification"] = tz_val
+                    ctrl_data["ctrl_master_data"] = aligned_c_df.reset_index(drop=True).where(pd.notnull(aligned_c_df), None)
+                    st.session_state["ctrl_last_processed_file"] = file_cache_key_ctrl
+                    st.success(f"🚀 Fichier de contrôle importé avec succès ({len(aligned_c_df)} lignes).")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erreur d'import : {e}")
+
+        # Formulaire de validation unique pour le tableau de données de contrôle (Evite le rechargement intempestif)
+        with st.form(key=f"form_editor_ctrl_{safe_p_idx}"):
+            st.markdown("#### 🛠️ Tableau de Saisie des Données de Contrôle")
+            edited_ctrl_table = st.data_editor(
+                ctrl_data["ctrl_master_data"],
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"ctrl_grid_edit_{safe_p_idx}",
+                column_config={
+                    "Vague": st.column_config.SelectboxColumn("Vague", options=ctrl_data["waves"])
+                }
+            )
+            submit_ctrl_table = st.form_submit_button("💾 Enregistrer les modifications du Tableau de Contrôle", type="primary")
+            if submit_ctrl_table:
+                ctrl_data["ctrl_master_data"] = pd.DataFrame(edited_ctrl_table)
+                st.success("Données de contrôle sauvegardées dans la session.")
+
+        st.markdown("---")
 
         # ---------------------------------------------------------------------
-        # 3. DESCRIPTIVE STATISTICS & ANALYSE DES GAINS
+        # 3. STATISTIQUES COMPARATIVES (T0 vs Vagues)
         # ---------------------------------------------------------------------
         st.subheader("3. Statistiques Descriptives & Comparatif T0 vs Vagues")
-
-        if len(ctrl_data["collection_data"]) > 0:
-            df_ana = pd.DataFrame(ctrl_data["collection_data"])
-            summary_stats = df_ana.groupby("Vague")["Valeur mesurée"].agg(
-                N="count",
-                Moyenne="mean",
-                Médiane="median",
-                Min="min",
-                Max="max",
-                Écart_type="std"
-            ).reset_index()
-            st.dataframe(summary_stats, use_container_width=True, hide_index=True)
+    
+        # Fusion des données T0 et données Control pour analyse globale
+        df_combined = pd.DataFrame()
+        if not df_t0_data.empty:
+            df_t0_copy = df_t0_data.copy()
+            df_t0_copy["Vague"] = "T0 (Référence Mesure)"
+            df_combined = pd.concat([df_t0_copy, ctrl_data["ctrl_master_data"]], ignore_index=True)
         else:
-            st.info("Veuillez renseigner des données de collecte pour afficher les statistiques comparatives.")
+            df_combined = ctrl_data["ctrl_master_data"]
 
-        # ---------------------------------------------------------------------
-        # 4. PROCESS CAPABILITY (Cp, Cpk, Niveau Sigma)
-        # ---------------------------------------------------------------------
-        st.subheader("4. Évolution de la Capacité du Processus (Cp / Cpk)")
-
-        usl_val = p.get("USL", 100.0)
-        lsl_val = p.get("LSL", 0.0)
-
-        st.caption(f"Limites de spécification actuelles -> USL : {usl_val} | LSL : {lsl_val}")
-
-        if len(ctrl_data["collection_data"]) > 0:
-            df_cap = pd.DataFrame(ctrl_data["collection_data"])
-            cap_rows = []
-            for wv, group in df_cap.groupby("Vague"):
-                vals = group["Valeur mesurée"].dropna()
-                if len(vals) > 1 and vals.std() > 0:
-                    cp = (usl_val - lsl_val) / (6 * vals.std())
-                    cpk = min((usl_val - vals.mean()) / (3 * vals.std()), (vals.mean() - lsl_val) / (3 * vals.std()))
-                    cap_rows.append({"Vague": wv, "Cp": round(cp, 2), "Cpk": round(cpk, 2)})
-            if cap_rows:
-                st.dataframe(pd.DataFrame(cap_rows), use_container_width=True, hide_index=True)
-
-        # ---------------------------------------------------------------------
-        # 5. CONTROL CHARTS & DÉTECTION DES ANOMALIES
-        # ---------------------------------------------------------------------
-        st.subheader("5. Cartes de Contrôle & Détection Automatique d'Anomalies")
-
-        if len(ctrl_data["collection_data"]) > 0:
-            df_cc = pd.DataFrame(ctrl_data["collection_data"])
-            mean_cc = df_cc["Valeur mesurée"].mean()
-            std_cc = df_cc["Valeur mesurée"].std() if df_cc["Valeur mesurée"].std() > 0 else 1.0
-            ucl = mean_cc + 3 * std_cc
-            lcl = mean_cc - 3 * std_cc
-
-            st.line_chart(df_cc.set_index("Date")["Valeur mesurée"])
-            st.caption(f"Ligne centrale (Moyenne) : {mean_cc:.2f} | UCL : {ucl:.2f} | LCL : {lcl:.2f}")
-
-        # ---------------------------------------------------------------------
-        # 6. REACTION PLAN (Gestion des actions correctives)
-        # ---------------------------------------------------------------------
-        st.subheader("6. Plan de Réaction (Reaction Plan)")
-
-        if "reaction_plan" not in ctrl_data:
-            ctrl_data["reaction_plan"] = [{
-                "Date": pd.Timestamp.today().strftime("%Y-%m-%d"),
-                "Variable": "Indicateur Principal",
-                "Anomalie détectée": "Aucune pour l'instant",
-                "Gravité": "Faible",
-                "Cause identifiée": "-",
-                "Action corrective": "-",
-                "Responsable": "Pilote Processus",
-                "Échéance": pd.Timestamp.today().strftime("%Y-%m-%d"),
-                "Statut": "Clos"
-            }]
-
-        df_react = pd.DataFrame(ctrl_data["reaction_plan"])
-        edited_react = st.data_editor(
-            df_react,
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"reaction_editor_{p_idx}",
-            column_config={
-                "Statut": st.column_config.SelectboxColumn("Statut", options=["Ouvert", "En cours", "Clos"])
-            }
-        )
-
-        if st.button("💾 Enregistrer le Plan de Réaction", key=f"save_react_{p_idx}"):
-            ctrl_data["reaction_plan"] = edited_react.to_dict('records')
-            st.success("Plan de réaction mis à jour.")
-
-        # ---------------------------------------------------------------------
-        # 7. BENEFITS SUSTAINMENT & 8. PROJECT CLOSURE
-        # ---------------------------------------------------------------------
-        st.subheader("7 & 8. Maintien des Gains & Clôture du Projet")
-
-        col_close1, col_close2 = st.columns(2)
-        with col_close1:
-            st.markdown("**Bilan de maintien des gains :**")
-            st.success("📈 Gains maintenus (Évaluation validée par le système)")
-        with col_close2:
-            st.markdown("**Synthèse de clôture :**")
-            st.checkbox("Données collectées", value=True, disabled=True)
-            st.checkbox("Gains démontrés et pérennisés", value=True, disabled=True)
-            st.checkbox("Projet prêt à clôturer", value=True)
+        if not df_combined.empty and "Vague" in df_combined.columns:
+            for var_item in liste_variables_dynamiques:
+                if var_item in df_combined.columns:
+                    st.markdown(f"##### Indicateur : {var_item}")
+                    num_s = pd.to_numeric(df_combined[var_item], errors="coerce")
+                    df_combined["_tmp_val"] = num_s
+                    stats_res = df_combined.groupby("Vague")["_tmp_val"].agg(
+                        N="count", Moyenne="mean", Médiane="median", Écart_type="std"
+                    ).reset_index().round(2)
+                    st.dataframe(stats_res, use_container_width=True, hide_index=True)
+        else:
+            st.info("Aucune donnée disponible pour l'analyse comparative.")
