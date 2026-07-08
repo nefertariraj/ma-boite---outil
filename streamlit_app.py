@@ -4389,7 +4389,7 @@ else:
         # 5. CONTROL CHART MIXTE (Fusion séquentielle T0 et T1 sur le même graphique)
         # =====================================================================
         st.subheader("5. Carte de Contrôle Mixte (Évolution séquentielle et recalcul par vague)")
-        st.caption("Affichage chronologique des données (T0, T1, T2...) avec recalcul spécifique de la moyenne (CL) et des limites (UCL/LCL) pour chaque vague.")
+        st.caption("Affichage chronologique strict débutant par la référence T0, avec adaptation des limites (CL/UCL/LCL) par vague.")
 
         # 1. Harmonisation et préparation du dataset global (T0 + Vagues de contrôle)
         df_t0_plot = df_t0_cap.copy() if "df_t0_cap" in locals() and not df_t0_cap.empty else pd.DataFrame()
@@ -4411,7 +4411,7 @@ else:
             if not quant_vars_mixte:
                 st.warning("⚠️ Aucune variable quantitative exploitable pour la carte de contrôle mixte.")
             else:
-                var_choisie_mixte = st.selectbox("Sélectionner la variable quantitative pour le Control Chart :", options=quant_vars_mixte, key=f"mixte_var_dyn_{safe_p_idx}")
+                var_choisie_mixte = st.selectbox("Sélectionner la variable quantitative pour le Control Chart :", options=quant_vars_mixte, key=f"mixte_var_fixed_{safe_p_idx}")
             
                 df_mixte["Valeur_Num"] = pd.to_numeric(df_mixte[var_choisie_mixte], errors="coerce")
                 df_mixte["Date_Parsed"] = pd.to_datetime(df_mixte["Date de modification"], errors="coerce")
@@ -4420,57 +4420,50 @@ else:
                 if df_clean_mixte.empty:
                     st.warning("Aucune valeur numérique valide trouvée pour cette variable.")
                 else:
-                    # 2. Ordonnancement chronologique croissant (T0 d'abord, puis T1, T2, etc.)
-                    # Définition d'un ordre de tri personnalisé des vagues si le format commence par T0, T1...
-                    def _vague_sort_key(vague_str):
+                    # 2. Tri chronologique strict : T0 positionné en premier, puis T1, T2...
+                    def _vague_strict_chronologique(vague_str):
                         v_str = str(vague_str).upper()
-                        if "T0" in v_str: return 0
-                        # Extraction d'un chiffre après T si présent (ex: T1, T2)
-                        import re
+                        if "T0" in v_str or "RÉFÉRENCE" in v_str: 
+                            return -1  # Priorité absolue en premier
                         m = re.search(r'T(\d+)', v_str)
                         return int(m.group(1)) if m else 99
 
-                    df_clean_mixte["_sort_order"] = df_clean_mixte["Vague"].apply(_vague_sort_key)
+                    df_clean_mixte["_sort_order"] = df_clean_mixte["Vague"].apply(_vague_strict_chronologique)
                     df_clean_mixte = df_clean_mixte.sort_values(by=["_sort_order", "Date_Parsed", "ID observation"]).reset_index(drop=True)
 
-                    # 3. Calcul dynamique et spécifique des limites (CL, UCL, LCL) par vague
+                    # 3. Calcul dynamique et spécifique des limites (CL, UCL, LCL) par vague dans l'ordre établi
                     list_vagues_presentes = df_clean_mixte["Vague"].unique()
                 
-                    # Listes pour stocker les calculs par point alignés sur l'index chronologique
                     cl_list, ucl_list, lcl_list = [], [], []
 
                     for v_item in list_vagues_presentes:
                         sub_vague = df_clean_mixte[df_clean_mixte["Vague"] == v_item]
                         cl_v = sub_vague["Valeur_Num"].mean()
                     
-                        # Étendue mobile (Moving Range) pour cette vague spécifique
                         mr_v = sub_vague["Valeur_Num"].diff().abs().mean()
                         if pd.isna(mr_v) or mr_v == 0:
-                            mr_v = 0.001  # Sécurité anti-aplatissement si 1 seul point ou valeurs identiques
+                            mr_v = 0.001  # Sécurité anti-aplatissement
                         
                         ucl_v = cl_v + 2.66 * mr_v
                         lcl_v = max(0.0, cl_v - 2.66 * mr_v) if sub_vague["Valeur_Num"].min() >= 0 else cl_v - 2.66 * mr_v
 
-                        # Application des valeurs aux lignes de la vague correspondante
                         for idx_row in sub_vague.index:
                             cl_list.append((idx_row, cl_v))
                             ucl_list.append((idx_row, ucl_v))
                             lcl_list.append((idx_row, lcl_v))
 
-                    # Réaffectation ordonnée dans le DataFrame d'affichage
                     df_clean_mixte["CL"] = [val for _, val in sorted(cl_list)]
                     df_clean_mixte["UCL"] = [val for _, val in sorted(ucl_list)]
                     df_clean_mixte["LCL"] = [val for _, val in sorted(lcl_list)]
 
-                    # 4. Affichage graphique chronologique consolidé
+                    # 4. Affichage graphique et récapitulatif
                     chart_display_df = df_clean_mixte[["ID observation", "Valeur_Num", "CL", "UCL", "LCL", "Vague"]].copy()
                 
-                    st.markdown(f"##### Chronologie et adaptation des limites pour : `{var_choisie_mixte}`")
+                    st.markdown(f"##### Chronologie alignée (T0 $\\rightarrow$ Suivi) pour : `{var_choisie_mixte}`")
                     st.line_chart(chart_display_df.set_index("ID observation")[["Valeur_Num", "CL", "UCL", "LCL"]])
                 
-                    # Tableau récapitulatif des caractéristiques par vague pour une transparence totale
                     st.markdown("###### Paramètres statistiques par vague :")
-                    recap_stats = df_clean_mixte.groupby("Vague").agg(
+                    recap_stats = df_clean_mixte.groupby("Vague", sort=False).agg(
                         Moyenne_CL=("CL", "first"),
                         UCL_specifique=("UCL", "first"),
                         LCL_specifique=("LCL", "first"),
