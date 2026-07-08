@@ -4151,6 +4151,10 @@ else:
         if "waves" not in ctrl_data:
             ctrl_data["waves"] = ["T1"]  # Vagues dynamiques par défaut hors T0
 
+        # Initialisation du stockage persistant par vagues s'il n'existe pas
+        if "vagues_data_cache" not in ctrl_data:
+            ctrl_data["vagues_data_cache"] = {}
+
         # Bouton unique pour ajouter une vague
         if st.button("➕ Ajouter une vague", key=f"add_wave_global_{safe_p_idx}"):
             existing_nums = []
@@ -4163,7 +4167,7 @@ else:
                 ctrl_data["waves"].append(nouvelle_vague)
                 st.rerun()
 
-        # Liste d'options unique et dédupliquée pour la vague active (T0 unique + vagues dynamiques)
+        # Liste d'options unique et dédupliquée pour la vague active
         toutes_les_vagues_options = ["T0 (Référence Mesure)"] + ctrl_data["waves"]
         selected_wave = st.selectbox("Vague active de suivi (pour métriques ciblées) :", options=toutes_les_vagues_options, key=f"active_wave_{safe_p_idx}")
 
@@ -4201,7 +4205,7 @@ else:
 
         st.markdown("---")
 
-        # Écran 2 : Saisie / Import par Vague (Uniquement les vagues dynamiques créées, sans onglet T0)
+        # Écran 2 : Saisie / Import par Vague (Gestion persistante de chaque onglet)
         st.markdown("### 📝 Écran 2 : Saisie des Données de Contrôle & Import Excel par Vague")
     
         dict_dfs_vagues = {}
@@ -4210,13 +4214,14 @@ else:
 
             for i, v_name in enumerate(ctrl_data["waves"]):
                 with onglets_vagues[i]:
-                    # Bouton de suppression de cette vague spécifique directement dans l'onglet
                     col_tab_hd1, col_tab_hd2 = st.columns([4, 1])
                     with col_tab_hd1:
                         st.markdown(f"##### Gestion des données pour la période `{v_name}`")
                     with col_tab_hd2:
                         if st.button("🗑️ Supprimer vague", key=f"del_wave_tab_{v_name}_{safe_p_idx}"):
                             ctrl_data["waves"].remove(v_name)
+                            if v_name in ctrl_data["vagues_data_cache"]:
+                                del ctrl_data["vagues_data_cache"][v_name]
                             if "ctrl_master_data" in ctrl_data and not ctrl_data["ctrl_master_data"].empty:
                                 ctrl_data["ctrl_master_data"] = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] != v_name].reset_index(drop=True)
                             st.success(f"Vague {v_name} supprimée.")
@@ -4224,10 +4229,14 @@ else:
 
                     uploaded_ctrl_file = st.file_uploader(f"Importer un fichier Excel pour {v_name}", type=["xlsx", "xls"], key=f"ctrl_excel_up_{v_name}_{safe_p_idx}")
                 
-                    df_vague_courante = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
-                    existing_sub = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] == v_name] if not ctrl_data["ctrl_master_data"].empty and "Vague" in ctrl_data["ctrl_master_data"].columns else pd.DataFrame()
-                    if not existing_sub.empty:
-                        df_vague_courante = existing_sub.copy()
+                    # Récupération depuis le cache persistant ou la master data existante
+                    if v_name in ctrl_data["vagues_data_cache"] and not ctrl_data["vagues_data_cache"][v_name].empty:
+                        df_vague_courante = ctrl_data["vagues_data_cache"][v_name].copy()
+                    else:
+                        df_vague_courante = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
+                        existing_sub = ctrl_data["ctrl_master_data"][ctrl_data["ctrl_master_data"]["Vague"] == v_name] if not ctrl_data["ctrl_master_data"].empty and "Vague" in ctrl_data["ctrl_master_data"].columns else pd.DataFrame()
+                        if not existing_sub.empty:
+                            df_vague_courante = existing_sub.copy()
 
                     if uploaded_ctrl_file:
                         file_cache_key_ctrl = f"processed_ctrl_{v_name}_{uploaded_ctrl_file.name}_{uploaded_ctrl_file.size}"
@@ -4287,12 +4296,18 @@ else:
                     )
                     edited_v_table = pd.DataFrame(edited_v_table)
                     edited_v_table["Vague"] = v_name
+                
+                    # Sauvegarde immédiate dans le cache persistant par vague
+                    ctrl_data["vagues_data_cache"][v_name] = edited_v_table
                     dict_dfs_vagues[v_name] = edited_v_table
         else:
             st.info("💡 Aucune vague de suivi active. Cliquez sur 'Ajouter une vague' ci-dessus.")
 
+        # Consolidation globale de toutes les vagues
         if dict_dfs_vagues:
             ctrl_data["ctrl_master_data"] = pd.concat(list(dict_dfs_vagues.values()), ignore_index=True)
+        elif "vagues_data_cache" in ctrl_data and ctrl_data["vagues_data_cache"]:
+            ctrl_data["ctrl_master_data"] = pd.concat(list(ctrl_data["vagues_data_cache"].values()), ignore_index=True)
         else:
             ctrl_data["ctrl_master_data"] = pd.DataFrame(columns=["ID observation", "Date de modification", "Vague"] + liste_variables_dynamiques)
 
