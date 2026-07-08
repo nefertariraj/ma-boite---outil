@@ -4295,6 +4295,58 @@ else:
 
         st.markdown("---")
 
+        # =====================================================================
+        # GESTION DYNAMIQUE DES VAGUES DE CONTRÔLE (T1, T2, T3...)
+        # =====================================================================
+
+        # 1. Initialisation dans st.session_state si ce n'est pas déjà fait
+        if "vagues_actives" not in st.session_state:
+            st.session_state["vagues_actives"] = ["T1"]  # Par défaut on commence avec T1
+
+        # Bouton ou action pour rajouter une vague
+        col_vague_btn1, col_vague_btn2 = st.columns([3, 1])
+        with col_vague_btn2:
+            if st.button("➕ Ajouter une vague"):
+                prochain_num = len(st.session_state["vagues_actives"]) + 1
+                nouvelle_vague = f"T{prochain_num}"
+                if nouvelle_vague not in st.session_state["vagues_actives"]:
+                    st.session_state["vagues_actives"].append(nouvelle_vague)
+                    st.rerun()
+
+        # Affichage dynamique des sections de saisie par vague dans l'Écran 2
+        st.subheader("2. Saisie des données de contrôle (Post-Amélioration)")
+
+        # Dictionnaire pour stocker les DataFrames saisis pour chaque vague
+        dict_dfs_vagues = {}
+
+        # Utilisation d'onglets ou d'expandeurs pour chaque vague active (T1, T2, T3...)
+        onglets_vagues = st.tabs([f"Vague {v}" for v in st.session_state["vagues_actives"]])
+
+        for i, v_name in enumerate(st.session_state["vagues_actives"]):
+            with onglets_vagues[i]:
+                st.markdown(f"##### Tableau de saisie pour la période `{v_name}`")
+                # Exemple de composant de saisie (data_editor ou import)
+                # Vous récupérez ici le DataFrame saisi pour la vague v_name
+                df_saisi_v = st.data_editor(
+                    pd.DataFrame(columns=["ID observation"] + liste_variables_dynamiques),
+                    key=f"editor_data_{v_name}_{safe_p_idx}",
+                    num_rows="dynamic"
+                )
+                # On ajoute une colonne indicateur de vague
+                df_saisi_v["Vague"] = v_name
+                dict_dfs_vagues[v_name] = df_saisi_v
+
+        # Consolidation globale des vagues pour les analyses comparatives
+        df_ctrl_master_conso = pd.concat(list(dict_dfs_vagues.values()), ignore_index=True)
+
+        # =====================================================================
+        # PROPAGATION AUX STATISTIQUES, CAPABILITÉ ET CONTROL CHART
+        # =====================================================================
+        # Le DataFrame consolidé 'df_ctrl_master_conso' contient désormais l'ensemble 
+        # des lignes T1, T2, etc. La fonction groupby("Vague") intégrera automatiquement 
+        # les nouvelles lignes "T2", "T3" dans les tableaux comparatifs et les graphiques.
+
+        
         # ---------------------------------------------------------------------
         # 3. STATISTIQUES COMPARATIVES (T0 vs Vagues)
         # ---------------------------------------------------------------------
