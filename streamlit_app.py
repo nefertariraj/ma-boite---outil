@@ -2096,7 +2096,7 @@ else:
 
                 col_spec1, col_spec2 = st.columns(2)
                 with col_spec1:
-                    # Initialisation sécurisée basée sur l'état existant
+                    # Récupération sécurisée systématique de toutes les valeurs de secours
                     val_ex = master_cfg.get("valeur_exacte", 0.0)
                     val_sup_eq = master_cfg.get("valeur_seuil", 0.0)
                     val_inf_eq = master_cfg.get("valeur_seuil", 10.0)
@@ -2104,6 +2104,7 @@ else:
                     b_sup = master_cfg.get("borne_sup", 10.0)
                     prop_att = master_cfg.get("proposition_attributs", "Standard visuel validé")
 
+                    # Affichage des widgets selon le type actif
                     if selected_spec_type == "Valeur exacte":
                         val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(val_ex), key=f"val_ex_{var_clean_id}_{safe_idx}")
                     elif selected_spec_type == "Supérieur ou égal à (≥)":
@@ -2126,7 +2127,7 @@ else:
                     st.markdown("- Respecte la règle $\rightarrow$ Statut : `OK`")
                     st.markdown("- Hors règle $\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
 
-                # Mise à jour propre de la configuration dans la session courante
+                # Mise à jour conditionnelle ciblée et sécurisée dans master_cfg
                 master_cfg["type_specification"] = selected_spec_type
                 if selected_spec_type == "Valeur exacte":
                     master_cfg["valeur_exacte"] = val_ex
@@ -2137,7 +2138,7 @@ else:
                 elif selected_spec_type == "Intervalle (Entre min et max)":
                     master_cfg["borne_inf"] = b_inf
                     master_cfg["borne_sup"] = b_sup
-                else:
+                elif selected_spec_type.startswith("Attribut qualitatif"):
                     master_cfg["proposition_attributs"] = prop_att
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
