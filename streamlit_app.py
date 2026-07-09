@@ -2146,8 +2146,9 @@ else:
                         p[p_master_save_key] = {}
                     p[p_master_save_key].update(master_cfg)
                     
-                    # On force aussi la validation/présence de la variable pour que l'affichage du protocole se débloque
-                    p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
+                    # C'est LA ligne indispensable : on force l'indicateur à True pour que la condition 
+                    # d'affichage globale (plus haut dans votre script) détecte la présence du protocole à la reprise
+                    p["protocol_saved"] = True
                 
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
