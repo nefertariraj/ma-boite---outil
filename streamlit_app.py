@@ -1859,6 +1859,20 @@ else:
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
 
+        # --- CORRECTION DE RÉACTIVATION AU CHARGEMENT DU JSON ---
+        if isinstance(p, dict):
+            # Si le protocole a été sauvegardé, on s'assure qu'il est bien reconnu
+            if p.get("protocol_saved") and not st.session_state.get(lock_key, False):
+                st.session_state[lock_key] = True
+            
+            # Restauration des statuts de validation des variables depuis la table sauvegardée dans 'p'
+            if "msa_table_saved" in p and isinstance(p["msa_table_saved"], list):
+                for row_saved in p["msa_table_saved"]:
+                    v_name = row_saved.get("Variable Critique (liée au Y)")
+                    if v_name and row_saved.get("Statut de validation") == "test effectué":
+                        v_c_init = "".join(e for e in str(v_name) if e.isalnum())
+                        st.session_state[f"status_lock_{v_c_init}_{safe_idx}"] = True
+        
         # --- CORRECTION DE SYNCHRONISATION PRIORITAIRE (L'ancre au démarrage) ---
         if p.get("msa_table_saved"):
              st.session_state[lock_key] = True
