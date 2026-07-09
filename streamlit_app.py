@@ -2069,11 +2069,11 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Corrigé pour persistance JSON) ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Isolé et sécurisé) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
-                # Initialisation sécurisée robuste tolérante au rechargement JSON
+                # Initialisation stricte isolée
                 if session_key not in st.session_state:
                     if isinstance(p, dict) and save_key in p and isinstance(p[save_key], dict):
                         st.session_state[session_key] = p[save_key].copy()
@@ -2084,11 +2084,11 @@ else:
                             "valeur_seuil": 0.0,
                             "borne_inf": 0.0,
                             "borne_sup": 10.0,
-                            "proposition_attributs": "Conforme / Non-conforme (Standard visuel ou référentiel textuel validé)"
+                            "proposition_attributs": "Conforme / Non-conforme"
                         }
 
-                # Récupération immédiate et sûre de l'état actuel de configuration
-                master_cfg = st.session_state[session_key]
+                # On utilise une variable locale dédiée pour éviter les conflits d'affichage
+                local_master_cfg = st.session_state[session_key]
 
                 with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
                     st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
@@ -2101,7 +2101,7 @@ else:
                         "Attribut qualitatif (Sans valeur numérique - Proposition Master Black Belt)"
                     ]
 
-                    current_type = master_cfg.get("type_specification", "Valeur exacte")
+                    current_type = local_master_cfg.get("type_specification", "Valeur exacte")
                     current_type_idx = type_spec_options.index(current_type) if current_type in type_spec_options else 0
 
                     selected_spec_type = st.selectbox(
@@ -2113,12 +2113,11 @@ else:
 
                     col_spec1, col_spec2 = st.columns(2)
                     
-                    # Déclaration sécurisée par défaut des variables locales du formulaire
-                    val_ex = master_cfg.get("valeur_exacte", 0.0)
-                    val_seuil = master_cfg.get("valeur_seuil", 0.0)
-                    b_inf = master_cfg.get("borne_inf", 0.0)
-                    b_sup = master_cfg.get("borne_sup", 10.0)
-                    prop_att = master_cfg.get("proposition_attributs", "Standard visuel validé")
+                    val_ex = local_master_cfg.get("valeur_exacte", 0.0)
+                    val_seuil = local_master_cfg.get("valeur_seuil", 0.0)
+                    b_inf = local_master_cfg.get("borne_inf", 0.0)
+                    b_sup = local_master_cfg.get("borne_sup", 10.0)
+                    prop_att = local_master_cfg.get("proposition_attributs", "Standard visuel validé")
 
                     with col_spec1:
                         if selected_spec_type == "Valeur exacte":
@@ -2142,16 +2141,16 @@ else:
                     submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
                     if submit_master:
-                        master_cfg["type_specification"] = selected_spec_type
-                        master_cfg["valeur_exacte"] = val_ex
-                        master_cfg["valeur_seuil"] = val_seuil
-                        master_cfg["borne_inf"] = b_inf
-                        master_cfg["borne_sup"] = b_sup
-                        master_cfg["proposition_attributs"] = prop_att
+                        local_master_cfg["type_specification"] = selected_spec_type
+                        local_master_cfg["valeur_exacte"] = val_ex
+                        local_master_cfg["valeur_seuil"] = val_seuil
+                        local_master_cfg["borne_inf"] = b_inf
+                        local_master_cfg["borne_sup"] = b_sup
+                        local_master_cfg["proposition_attributs"] = prop_att
                         
-                        st.session_state[session_key] = master_cfg
+                        st.session_state[session_key] = local_master_cfg
                         if isinstance(p, dict):
-                            p[save_key] = master_cfg.copy()
+                            p[save_key] = local_master_cfg.copy()
                             
                         st.success("🎯 Valeur de référence enregistrée avec succès !")
                         
