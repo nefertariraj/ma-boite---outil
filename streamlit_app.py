@@ -4547,41 +4547,45 @@ else:
                 
             return def_count, u_val, r_opp, dpmo_val, sig_lvl
 
-        # --- CALCUL DES MÉTRIQUES POUR T0 ---
-        def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite_y_only(df_t0_cap, nom_variable_y_comp, master_cfg_comp)
+        st.markdown(f"**Variable cible analysée :** `{nom_variable_y_comp or 'Non définie'}`")
 
-        # --- EXTRACTION ET TRI DES VAGUES DISPONIBLES (T1, T2...) ---
+        # --- CONSTITUTION DES DONNÉES DU TABLEAU COMPARATIF ---
+        lignes_tableau = []
+
+        # Ajout de T0
+        def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite_y_only(df_t0_cap, nom_variable_y_comp, master_cfg_comp)
+        lignes_tableau.append({
+            "Vague": "T0 (Référence Mesure)",
+            "Unités (N)": u_t0,
+            "Défauts": def_t0,
+            "DPMO": f"{dpmo_t0:,.0f}",
+            "Niveau Sigma": f"{sig_t0} σ",
+            "Évolution DPMO": "Baseline"
+        })
+
+        # Extraction dynamique des vagues additionnelles (T1, T2...)
         vagues_disponibles = []
         if not df_ctrl_cap.empty and "Vague" in df_ctrl_cap.columns:
             vagues_disponibles = sorted(df_ctrl_cap["Vague"].dropna().unique().tolist())
 
-        st.markdown(f"**Variable cible analysée :** `{nom_variable_y_comp or 'Non définie'}`")
+        for vague_nom in vagues_disponibles:
+            df_vague_encours = df_ctrl_cap[df_ctrl_cap["Vague"] == vague_nom]
+            def_v, u_v, opp_v, dpmo_v, sig_v = _calculer_metriques_capabilite_y_only(df_vague_encours, nom_variable_y_comp, master_cfg_comp)
+            
+            delta_dpmo = dpmo_v - dpmo_t0
+            signe_delta = f"{delta_dpmo:+,.0f}" if delta_dpmo != 0 else "0"
+            
+            lignes_tableau.append({
+                "Vague": vague_nom,
+                "Unités (N)": u_v,
+                "Défauts": def_v,
+                "DPMO": f"{dpmo_v:,.0f}",
+                "Niveau Sigma": f"{sig_v} σ",
+                "Évolution DPMO": signe_delta
+            })
 
-        # --- AFFICHAGE COMPARATIF CÔTE À CÔTE ---
-        col_t0, col_waves = st.columns([1, max(1, len(vagues_disponibles))])
-        
-        with col_t0:
-            st.markdown("##### 📌 Baseline T0")
-            st.metric("DPMO (T0)", f"{dpmo_t0:,.0f}")
-            st.metric("Niveau Sigma (T0)", f"🔵 {sig_t0} σ")
-
-        with col_waves:
-            st.markdown("##### 🚀 Suivi des Vagues Post-Amélioration")
-            if vagues_disponibles:
-                cols_vagues = st.columns(len(vagues_disponibles))
-                for idx_v, vague_nom in enumerate(vagues_disponibles):
-                    df_vague_encours = df_ctrl_cap[df_ctrl_cap["Vague"] == vague_nom]
-                    def_v, u_v, opp_v, dpmo_v, sig_v = _calculer_metriques_capabilite_y_only(df_vague_encours, nom_variable_y_comp, master_cfg_comp)
-                    
-                    delta_dpmo = dpmo_v - dpmo_t0
-                    delta_sigma = sig_v - sig_t0
-                    
-                    with cols_vagues[idx_v]:
-                        st.markdown(f"**{vague_nom}**")
-                        st.metric("DPMO", f"{dpmo_v:,.0f}", delta=f"{delta_dpmo:,.0f}", delta_color="inverse")
-                        st.metric("Sigma", f"🟢 {sig_v} σ" if sig_v >= sig_t0 else f"🟠 {sig_v} σ", delta=f"{delta_sigma:+.2f} σ")
-            else:
-                st.info("ℹ️ Aucune vague additionnelle (T1, T2, etc.) n'est encore enregistrée.")
+        df_comparatif_final = pd.DataFrame(lignes_tableau)
+        st.dataframe(df_comparatif_final, use_container_width=True, hide_index=True)
 
         st.markdown("---")
 
