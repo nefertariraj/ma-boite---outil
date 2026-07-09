@@ -2096,7 +2096,7 @@ else:
 
                 col_spec1, col_spec2 = st.columns(2)
                 with col_spec1:
-                    # Initialisation sécurisée des variables pour éviter toute absence de définition
+                    # Initialisation sécurisée basée sur l'état existant
                     val_ex = master_cfg.get("valeur_exacte", 0.0)
                     val_sup_eq = master_cfg.get("valeur_seuil", 0.0)
                     val_inf_eq = master_cfg.get("valeur_seuil", 10.0)
@@ -2105,28 +2105,28 @@ else:
                     prop_att = master_cfg.get("proposition_attributs", "Standard visuel validé")
 
                     if selected_spec_type == "Valeur exacte":
-                        val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(master_cfg.get("valeur_exacte", 0.0)), key=f"val_ex_{var_clean_id}_{safe_idx}")
+                        val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(val_ex), key=f"val_ex_{var_clean_id}_{safe_idx}")
                     elif selected_spec_type == "Supérieur ou égal à (≥)":
-                        val_sup_eq = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(master_cfg.get("valeur_seuil", 0.0)), key=f"val_supeq_{var_clean_id}_{safe_idx}")
+                        val_sup_eq = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(val_sup_eq), key=f"val_supeq_{var_clean_id}_{safe_idx}")
                     elif selected_spec_type == "Inférieur ou égal à (≤)":
-                        val_inf_eq = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(master_cfg.get("valeur_seuil", 10.0)), key=f"val_infeq_{var_clean_id}_{safe_idx}")
+                        val_inf_eq = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(val_inf_eq), key=f"val_infeq_{var_clean_id}_{safe_idx}")
                     elif selected_spec_type == "Intervalle (Entre min et max)":
-                        b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(master_cfg.get("borne_inf", 0.0)), key=f"binf_{var_clean_id}_{safe_idx}")
-                        b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(master_cfg.get("borne_sup", 10.0)), key=f"bsup_{var_clean_id}_{safe_idx}")
+                        b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(b_inf), key=f"binf_{var_clean_id}_{safe_idx}")
+                        b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(b_sup), key=f"bsup_{var_clean_id}_{safe_idx}")
                     else:
                         st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
                         st.info(
                             "> **Posture Master Black Belt (Attributs)** : En l'absence de métrique continue, le standard 'Master' s'établit par un **référentiel de conformité consensuel et univoque** "
                             "(ex: gabarit visuel, photo étalon, description textuelle stricte du résultat attendu, ou arbre de décision binaire)."
                         )
-                        prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=master_cfg.get("proposition_attributs", "Standard visuel validé"), key=f"prop_att_{var_clean_id}_{safe_idx}")
+                        prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=prop_att, key=f"prop_att_{var_clean_id}_{safe_idx}")
 
                 with col_spec2:
                     st.markdown("##### ⚖️ Règle d'évaluation")
-                    st.markdown("- Respecte la règle $\\rightarrow$ Statut : `OK`")
-                    st.markdown("- Hors règle $\\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
+                    st.markdown("- Respecte la règle $\rightarrow$ Statut : `OK`")
+                    st.markdown("- Hors règle $\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
 
-                # Mise à jour immédiate de la configuration dans la session
+                # Mise à jour propre de la configuration dans la session courante
                 master_cfg["type_specification"] = selected_spec_type
                 if selected_spec_type == "Valeur exacte":
                     master_cfg["valeur_exacte"] = val_ex
