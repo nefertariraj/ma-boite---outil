@@ -2139,13 +2139,6 @@ else:
                     master_cfg["borne_sup"] = b_sup
                 else:
                     master_cfg["proposition_attributs"] = prop_att
-
-                if 'p' in locals() and isinstance(p, dict):
-                    p_master_save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
-                    if p_master_save_key not in p:
-                        p[p_master_save_key] = {}
-                    # On met à jour uniquement les valeurs modifiées par l'utilisateur
-                    p[p_master_save_key].update(master_cfg)
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
