@@ -2140,11 +2140,11 @@ else:
                 else:
                     master_cfg["proposition_attributs"] = prop_att
 
-               if 'p' in locals() and isinstance(p, dict):
-                        # On s'assure d'initialiser/conserver le dictionnaire de config sans écraser le reste
-                        if "reference_master_config" not in p:
-                            p["reference_master_config"] = {}
-                        p["reference_master_config"].update(master_cfg)
+                if 'p' in locals() and isinstance(p, dict):
+                    # On s'assure d'initialiser/conserver le dictionnaire de config sans écraser le reste
+                    if "reference_master_config" not in p:
+                        p["reference_master_config"] = {}
+                    p["reference_master_config"].update(master_cfg)
                 
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
