@@ -2141,11 +2141,15 @@ else:
                     master_cfg["proposition_attributs"] = prop_att
 
                 if 'p' in locals() and isinstance(p, dict):
-                    # On s'assure d'utiliser une clé unique par variable pour ne pas tout écraser ou perdre le lien
                     p_master_save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
-                    if p_master_save_key not in p:
-                        p[p_master_save_key] = {}
-                    p[p_master_save_key].update(master_cfg)
+                    # Si la sauvegarde existe déjà dans le JSON importé, on charge les données dans session_state
+                    if p_master_save_key in p and f"reference_master_config_{var_clean_id}_{safe_idx}" in st.session_state:
+                        st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"].update(p[p_master_save_key])
+                    else:
+                        # Sinon, on enregistre l'état actuel dans p
+                        if p_master_save_key not in p:
+                            p[p_master_save_key] = {}
+                        p[p_master_save_key].update(master_cfg)
                 
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
