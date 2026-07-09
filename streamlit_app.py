@@ -2096,6 +2096,14 @@ else:
 
                 col_spec1, col_spec2 = st.columns(2)
                 with col_spec1:
+                    # Initialisation sécurisée des variables pour éviter toute absence de définition
+                    val_ex = master_cfg.get("valeur_exacte", 0.0)
+                    val_sup_eq = master_cfg.get("valeur_seuil", 0.0)
+                    val_inf_eq = master_cfg.get("valeur_seuil", 10.0)
+                    b_inf = master_cfg.get("borne_inf", 0.0)
+                    b_sup = master_cfg.get("borne_sup", 10.0)
+                    prop_att = master_cfg.get("proposition_attributs", "Standard visuel validé")
+
                     if selected_spec_type == "Valeur exacte":
                         val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(master_cfg.get("valeur_exacte", 0.0)), key=f"val_ex_{var_clean_id}_{safe_idx}")
                     elif selected_spec_type == "Supérieur ou égal à (≥)":
@@ -2122,8 +2130,10 @@ else:
                 master_cfg["type_specification"] = selected_spec_type
                 if selected_spec_type == "Valeur exacte":
                     master_cfg["valeur_exacte"] = val_ex
-                elif selected_spec_type in ["Supérieur ou égal à (≥)", "Inférieur ou égal à (≤)"]:
-                    master_cfg["valeur_seuil"] = val_sup_eq if selected_spec_type == "Supérieur ou égal à (≥)" else val_inf_eq
+                elif selected_spec_type == "Supérieur ou égal à (≥)":
+                    master_cfg["valeur_seuil"] = val_sup_eq
+                elif selected_spec_type == "Inférieur ou égal à (≤)":
+                    master_cfg["valeur_seuil"] = val_inf_eq
                 elif selected_spec_type == "Intervalle (Entre min et max)":
                     master_cfg["borne_inf"] = b_inf
                     master_cfg["borne_sup"] = b_sup
@@ -2738,33 +2748,39 @@ else:
                 return float(config_master.get("borne_inf", 0.0)) <= num_val <= float(config_master.get("borne_sup", 10.0))
             return True
 
-        # Récupération de la configuration Master active de l'étape 4
-        master_cfg_active = st.session_state.get(f"reference_master_config_{var_clean_id}_{safe_idx}", {
+        # Utilisation d'une récupération sécurisée par défaut sans variable manquante
+        master_cfg_active = st.session_state.get("reference_master_config", {
             "type_specification": "Valeur exacte",
             "valeur_exacte": 0.0
         })
+        
+        # Si une configuration spécifique existe dans la session, on essaie de la récupérer via les variables globales disponibles
+        if "reference_master_config" not in st.session_state and 'safe_p_idx' in locals():
+            master_cfg_active = st.session_state.get(f"reference_master_config_{safe_p_idx}", master_cfg_active)
 
         # --- CALCUL AUTOMATIQUE DU NOMBRE DE DÉFAUTS RÉELS ---
-        raw_units = len(df_active.dropna(subset=["ID observation"])) if not df_active.empty and "ID observation" in df_active.columns else (len(df_active) if not df_active.empty else 0)
-        liste_cols_evaluees = [v for v in liste_variables_dynamiques if v in df_active.columns] if not df_active.empty else []
+        df_active_local = df_active if 'df_active' in locals() and not df_active.empty else pd.DataFrame()
+        liste_cols_evaluees = liste_variables_dynamiques if 'liste_variables_dynamiques' in locals() else []
+        
+        raw_units = len(df_active_local.dropna(subset=["ID observation"])) if not df_active_local.empty and "ID observation" in df_active_local.columns else (len(df_active_local) if not df_active_local.empty else 0)
         
         calculated_defects = 0
-        if not df_active.empty and liste_cols_evaluees:
-            for idx_row, row in df_active.iterrows():
+        if not df_active_local.empty and liste_cols_evaluees:
+            for idx_row, row in df_active_local.iterrows():
                 for var_col in liste_cols_evaluees:
-                    if not _evaluer_conformite_ligne_v2(row[var_col], master_cfg_active):
-                        calculated_defects += 1
+                    if var_col in df_active_local.columns:
+                        if not _evaluer_conformite_ligne_v2(row[var_col], master_cfg_active):
+                            calculated_defects += 1
 
         val_units = max(1, int(raw_units))
-        val_opp = max(1, len(liste_cols_evaluees))
+        val_opp = max(1, len([v for v in liste_cols_evaluees if not df_active_local.empty and v in df_active_local.columns]))
 
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("**Paramètres de Capabilité (Calculés par rapport au Master)**")
-            # Affichage en lecture seule (ou désactivé) du nombre de défauts réel issu de la comparaison
             st.metric("Nombre total de défauts réels constatés", f"{calculated_defects}")
-            st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key=f"final_cap_units_{var_clean_id}_{safe_idx}", disabled=True)
-            st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key=f"final_cap_opp_{var_clean_id}_{safe_idx}", disabled=True)
+            st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key="final_cap_units_safe", disabled=True)
+            st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key="final_cap_opp_safe", disabled=True)
         
         # --- CALCUL SÉCURISÉ DU DPMO ET DU NIVEAU SIGMA ---
         dpmo_calculé = (calculated_defects / (val_units * val_opp)) * 1_000_000
