@@ -2146,11 +2146,19 @@ else:
                         p[p_master_save_key] = {}
                     p[p_master_save_key].update(master_cfg)
                     
-                    # On force le déclenchement du protocole et des statuts pour que l'affichage complet se débloque
+                    # On force le déclenchement global
                     p["protocol_saved"] = True
-                    if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
-                        st.session_state[local_msa_key].loc[st.session_state[local_msa_key]["Variable Critique (liée au Y)"] == selected_var_to_test, "Statut de validation"] = "test effectué"
-                
+                    
+                    # --- RESTAURATION IMMÉDIATE DANS LA SESSION POUR FORCER L'AFFICHAGE COMPLET ---
+                    if p_rep_save_key in p:
+                        st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
+                    if p_reprod_save_key in p:
+                        st.session_state[dynamic_reprod_key] = pd.DataFrame(p[p_reprod_save_key])
+                    if p_bias_hist_save_key in p:
+                        if "msa_bias_history" not in st.session_state:
+                            st.session_state["msa_bias_history"] = {}
+                        st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]  
+                        
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📊 Lancer l'analyse des risques de biais", key=f"btn_analyze_bias_{var_clean_id}_{safe_idx}", use_container_width=True):
