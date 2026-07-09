@@ -2065,8 +2065,11 @@ else:
                 
                 st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
 
-                if f"reference_master_config_{var_clean_id}_{safe_idx}" not in st.session_state:
-                    st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"] = {
+                session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
+                save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
+
+                if session_key not in st.session_state:
+                    st.session_state[session_key] = {
                         "type_specification": "Valeur exacte",
                         "valeur_exacte": 0.0,
                         "valeur_seuil": 0.0,
@@ -2074,8 +2077,10 @@ else:
                         "borne_sup": 10.0,
                         "proposition_attributs": "Conforme / Non-conforme (Standard visuel ou référentiel textuel validé)"
                     }
+                    if 'p' in locals() and isinstance(p, dict) and save_key in p:
+                        st.session_state[session_key].update(p[save_key])
 
-                master_cfg = st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"]
+                master_cfg = st.session_state[session_key]
 
                 type_spec_options = [
                     "Valeur exacte",
