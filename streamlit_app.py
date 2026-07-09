@@ -2064,12 +2064,72 @@ else:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
                 st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
-                valeur_reference = st.number_input(
-                    f"Saisissez la valeur théorique / standard attendue (Entrez 0.0 si pas de standard défini) :",
-                    value=0.0,
-                    step=0.1,
-                    key=f"msa_ref_val_{var_clean_id}_{safe_idx}"
+
+                if f"reference_master_config_{var_clean_id}_{safe_idx}" not in st.session_state:
+                    st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"] = {
+                        "type_specification": "Valeur exacte",
+                        "valeur_exacte": 0.0,
+                        "valeur_seuil": 0.0,
+                        "borne_inf": 0.0,
+                        "borne_sup": 10.0,
+                        "proposition_attributs": "Conforme / Non-conforme (Standard visuel ou référentiel textuel validé)"
+                    }
+
+                master_cfg = st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"]
+
+                type_spec_options = [
+                    "Valeur exacte",
+                    "Supérieur ou égal à (≥)",
+                    "Inférieur ou égal à (≤)",
+                    "Intervalle (Entre min et max)",
+                    "Attribut qualitatif (Sans valeur numérique - Proposition Master Black Belt)"
+                ]
+
+                current_type_idx = type_spec_options.index(master_cfg.get("type_specification", "Valeur exacte")) if master_cfg.get("type_specification") in type_spec_options else 0
+
+                selected_spec_type = st.selectbox(
+                    "Type de règle de référence (Standard Master) :",
+                    options=type_spec_options,
+                    index=current_type_idx,
+                    key=f"spec_type_{var_clean_id}_{safe_idx}"
                 )
+
+                col_spec1, col_spec2 = st.columns(2)
+                with col_spec1:
+                    if selected_spec_type == "Valeur exacte":
+                        val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(master_cfg.get("valeur_exacte", 0.0)), key=f"val_ex_{var_clean_id}_{safe_idx}")
+                    elif selected_spec_type == "Supérieur ou égal à (≥)":
+                        val_sup_eq = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(master_cfg.get("valeur_seuil", 0.0)), key=f"val_supeq_{var_clean_id}_{safe_idx}")
+                    elif selected_spec_type == "Inférieur ou égal à (≤)":
+                        val_inf_eq = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(master_cfg.get("valeur_seuil", 10.0)), key=f"val_infeq_{var_clean_id}_{safe_idx}")
+                    elif selected_spec_type == "Intervalle (Entre min et max)":
+                        b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(master_cfg.get("borne_inf", 0.0)), key=f"binf_{var_clean_id}_{safe_idx}")
+                        b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(master_cfg.get("borne_sup", 10.0)), key=f"bsup_{var_clean_id}_{safe_idx}")
+                    else:
+                        st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
+                        st.info(
+                            "> **Posture Master Black Belt (Attributs)** : En l'absence de métrique continue, le standard 'Master' s'établit par un **référentiel de conformité consensuel et univoque** "
+                            "(ex: gabarit visuel, photo étalon, description textuelle stricte du résultat attendu, ou arbre de décision binaire)."
+                        )
+                        prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=master_cfg.get("proposition_attributs", "Standard visuel validé"), key=f"prop_att_{var_clean_id}_{safe_idx}")
+
+                with col_spec2:
+                    st.markdown("##### ⚖️ Règle d'évaluation")
+                    st.markdown("- Respecte la règle $\\rightarrow$ Statut : `OK`")
+                    st.markdown("- Hors règle $\\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
+
+                # Mise à jour immédiate de la configuration dans la session
+                master_cfg["type_specification"] = selected_spec_type
+                if selected_spec_type == "Valeur exacte":
+                    master_cfg["valeur_exacte"] = val_ex
+                elif selected_spec_type in ["Supérieur ou égal à (≥)", "Inférieur ou égal à (≤)"]:
+                    master_cfg["valeur_seuil"] = val_sup_eq if selected_spec_type == "Supérieur ou égal à (≥)" else val_inf_eq
+                elif selected_spec_type == "Intervalle (Entre min et max)":
+                    master_cfg["borne_inf"] = b_inf
+                    master_cfg["borne_sup"] = b_sup
+                else:
+                    master_cfg["proposition_attributs"] = prop_att
+                        )
                 
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -2652,27 +2712,63 @@ else:
         st.divider()
         st.subheader("6. Measure process capability")
 
-        # --- SÉCURISATION : Préparation des variables ---
-        # Calcul des unités et opportunités de manière robuste
-        raw_units = len(df_active.dropna(subset=["ID observation"])) if not df_active.empty else 0
-        raw_opp = len([v for v in liste_variables_dynamiques if v in df_active.columns])
+        # --- FONCTIONS INTERNES D'ÉVALUATION ---
+        def _evaluer_conformite_ligne_v2(val_observee, config_master):
+            if pd.isna(val_observee):
+                return True
+            t_spec = config_master.get("type_specification", "Valeur exacte")
+            
+            if t_spec == "Attribut qualitatif (Sans valeur numérique - Proposition Master Black Belt)":
+                v_str = str(val_observee).strip().upper()
+                if v_str in ["KO", "NON OK", "NON", "ERREUR", "RETOUCHE", "1", "NON-CONFORME"]:
+                    return False
+                return True
+
+            try:
+                num_val = float(val_observee)
+            except (ValueError, TypeError):
+                return str(val_observee).strip().upper() not in ["KO", "NON OK", "1", "NON-CONFORME"]
+
+            if t_spec == "Valeur exacte":
+                return math.isclose(num_val, float(config_master.get("valeur_exacte", 0.0)), rel_tol=1e-5, abs_tol=1e-5)
+            elif t_spec == "Supérieur ou égal à (≥)":
+                return num_val >= float(config_master.get("valeur_seuil", 0.0))
+            elif t_spec == "Inférieur ou égal à (≤)":
+                return num_val <= float(config_master.get("valeur_seuil", 0.0))
+            elif t_spec == "Intervalle (Entre min et max)":
+                return float(config_master.get("borne_inf", 0.0)) <= num_val <= float(config_master.get("borne_sup", 10.0))
+            return True
+
+        # Récupération de la configuration Master active de l'étape 4
+        master_cfg_active = st.session_state.get(f"reference_master_config_{var_clean_id}_{safe_idx}", {
+            "type_specification": "Valeur exacte",
+            "valeur_exacte": 0.0
+        })
+
+        # --- CALCUL AUTOMATIQUE DU NOMBRE DE DÉFAUTS RÉELS ---
+        raw_units = len(df_active.dropna(subset=["ID observation"])) if not df_active.empty and "ID observation" in df_active.columns else (len(df_active) if not df_active.empty else 0)
+        liste_cols_evaluees = [v for v in liste_variables_dynamiques if v in df_active.columns] if not df_active.empty else []
         
-        # On définit des valeurs sûres (valeur > 0 pour les diviseurs)
-        val_defects = int(total_defauts_terrain) if isinstance(total_defauts_terrain, (int, float)) else 0
+        calculated_defects = 0
+        if not df_active.empty and liste_cols_evaluees:
+            for idx_row, row in df_active.iterrows():
+                for var_col in liste_cols_evaluees:
+                    if not _evaluer_conformite_ligne_v2(row[var_col], master_cfg_active):
+                        calculated_defects += 1
+
         val_units = max(1, int(raw_units))
-        val_opp = max(1, int(raw_opp))
+        val_opp = max(1, len(liste_cols_evaluees))
 
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("**Paramètres de Capabilité**")
-            # Widgets sécurisés
-            defects = st.number_input("Nombre total de défauts constatés", min_value=0, value=val_defects, key="final_cap_defects")
-            units = st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key="final_cap_units")
-            opp = st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key="final_cap_opp")
+            st.markdown("**Paramètres de Capabilité (Calculés par rapport au Master)**")
+            # Affichage en lecture seule (ou désactivé) du nombre de défauts réel issu de la comparaison
+            st.metric("Nombre total de défauts réels constatés", f"{calculated_defects}")
+            st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key=f"final_cap_units_{var_clean_id}_{safe_idx}", disabled=True)
+            st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key=f"final_cap_opp_{var_clean_id}_{safe_idx}", disabled=True)
         
-        # --- CALCUL SÉCURISÉ ---
-        # On évite la division par zéro avec les valeurs bornées ci-dessus
-        dpmo_calculé = (defects / (units * opp)) * 1_000_000
+        # --- CALCUL SÉCURISÉ DU DPMO ET DU NIVEAU SIGMA ---
+        dpmo_calculé = (calculated_defects / (val_units * val_opp)) * 1_000_000
         
         import math
         sigma_level = 0.0
@@ -2681,7 +2777,6 @@ else:
                 sigma_level = 6.0
             else:
                 taux_defaut = dpmo_calculé / 1_000_000
-                # On borne la probabilité pour éviter math.log(0)
                 p_val = max(1e-7, min(0.5, taux_defaut if taux_defaut < 0.5 else 1 - taux_defaut))
                 
                 t = math.sqrt(-2.0 * math.log(p_val))
@@ -2695,10 +2790,8 @@ else:
 
         with c2:
             st.markdown("<br><br>", unsafe_allow_html=True)
-            # On force le float pour l'affichage du metric
-            st.metric("DPMO", f"{float(dpmo_calculé):,.0f}")
+            st.metric("DPMO Réel", f"{float(dpmo_calculé):,.0f}")
             
-            # Affichage visuel du niveau Sigma
             if sigma_level >= 4.0:
                 st.metric("Niveau Sigma du Processus", f"🟢 {sigma_level} σ")
             elif sigma_level >= 2.5:
