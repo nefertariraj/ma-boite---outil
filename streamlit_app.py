@@ -1858,20 +1858,6 @@ else:
         # --------------------------------------------------
         st.divider()
         st.subheader("4. Validate Measurement System (MSA)")
-
-        # --- CORRECTION DE RÉACTIVATION AU CHARGEMENT DU JSON ---
-        if isinstance(p, dict):
-            # Si le protocole a été sauvegardé, on s'assure qu'il est bien reconnu
-            if p.get("protocol_saved") and not st.session_state.get(lock_key, False):
-                st.session_state[lock_key] = True
-            
-            # Restauration des statuts de validation des variables depuis la table sauvegardée dans 'p'
-            if "msa_table_saved" in p and isinstance(p["msa_table_saved"], list):
-                for row_saved in p["msa_table_saved"]:
-                    v_name = row_saved.get("Variable Critique (liée au Y)")
-                    if v_name and row_saved.get("Statut de validation") == "test effectué":
-                        v_c_init = "".join(e for e in str(v_name) if e.isalnum())
-                        st.session_state[f"status_lock_{v_c_init}_{safe_idx}"] = True
         
         # --- CORRECTION DE SYNCHRONISATION PRIORITAIRE (L'ancre au démarrage) ---
         if p.get("msa_table_saved"):
@@ -2077,14 +2063,15 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE ---
-                with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
-                    st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Strictement isolant) ---
+                session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
+                save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
-                    session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
-                    save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
-
-                    if session_key not in st.session_state:
+                # Initialisation sécurisée depuis le projet 'p' ou valeurs par défaut
+                if session_key not in st.session_state:
+                    if 'p' in locals() and isinstance(p, dict) and save_key in p:
+                        st.session_state[session_key] = p[save_key].copy()
+                    else:
                         st.session_state[session_key] = {
                             "type_specification": "Valeur exacte",
                             "valeur_exacte": 0.0,
@@ -2093,8 +2080,9 @@ else:
                             "borne_sup": 10.0,
                             "proposition_attributs": "Conforme / Non-conforme (Standard visuel ou référentiel textuel validé)"
                         }
-                        if 'p' in locals() and isinstance(p, dict) and save_key in p:
-                            st.session_state[session_key].update(p[save_key])
+
+                with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
+                    st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
 
                     master_cfg = st.session_state[session_key]
 
@@ -2135,10 +2123,6 @@ else:
                             b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(master_cfg.get("borne_sup", 10.0)), key=f"bsup_{var_clean_id}_{safe_idx}")
                         else:
                             st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
-                            st.info(
-                                "> **Posture Master Black Belt (Attributs)** : En l'absence de métrique continue, le standard 'Master' s'établit par un **référentiel de conformité consensuel et univoque** "
-                                "(ex: gabarit visuel, photo étalon, description textuelle stricte du résultat attendu, ou arbre de décision binaire)."
-                            )
                             prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=master_cfg.get("proposition_attributs", "Standard visuel validé"), key=f"prop_att_{var_clean_id}_{safe_idx}")
 
                     with col_spec2:
@@ -2146,7 +2130,6 @@ else:
                         st.markdown("- Respecte la règle $\rightarrow$ Statut : `OK`")
                         st.markdown("- Hors règle $\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
 
-                    # Bouton unique de validation du formulaire
                     submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
                     if submit_master:
@@ -2163,7 +2146,7 @@ else:
                         else:
                             master_cfg["proposition_attributs"] = prop_att
                         
-                        # Sauvegarde dans le dictionnaire p global du projet
+                        st.session_state[session_key] = master_cfg
                         if 'p' in locals() and isinstance(p, dict):
                             p[save_key] = master_cfg.copy()
                             
