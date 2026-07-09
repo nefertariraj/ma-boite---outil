@@ -4465,19 +4465,67 @@ else:
         st.subheader("4. Process Capability (Comparatif T0 vs Vagues Post-Amélioration)")
         st.caption("Évaluation comparative du niveau Sigma et du DPMO entre la référence T0 et les vagues de contrôle.")
 
-        df_t0_cap = df_t0_data.copy() if not df_t0_data.empty else pd.DataFrame()
-        df_ctrl_cap = ctrl_data["ctrl_master_data"].copy() if not ctrl_data["ctrl_master_data"].empty else pd.DataFrame()
+        import math
 
-        def _calculer_metriques_capabilite(df_subset):
-            if df_subset.empty:
+        # --- FONCTION INTERNE D'ÉVALUATION DE CONFORMITÉ ---
+        def _evaluer_conformite_ligne_v2(val_observee, config_master):
+            if pd.isna(val_observee):
+                return True
+            t_spec = config_master.get("type_specification", "Valeur exacte")
+            
+            if t_spec == "Attribut qualitatif (Sans valeur numérique - Proposition Master Black Belt)":
+                v_str = str(val_observee).strip().upper()
+                if v_str in ["KO", "NON OK", "NON", "ERREUR", "RETOUCHE", "1", "NON-CONFORME"]:
+                    return False
+                return True
+
+            try:
+                num_val = float(val_observee)
+            except (ValueError, TypeError):
+                return str(val_observee).strip().upper() not in ["KO", "NON OK", "1", "NON-CONFORME"]
+
+            if t_spec == "Valeur exacte":
+                return math.isclose(num_val, float(config_master.get("valeur_exacte", 0.0)), rel_tol=1e-5, abs_tol=1e-5)
+            elif t_spec == "Supérieur ou égal à (≥)":
+                return num_val >= float(config_master.get("valeur_seuil", 0.0))
+            elif t_spec == "Inférieur ou égal à (≤)":
+                return num_val <= float(config_master.get("valeur_seuil", 0.0))
+            elif t_spec == "Intervalle (Entre min et max)":
+                return float(config_master.get("borne_inf", 0.0)) <= num_val <= float(config_master.get("borne_sup", 10.0))
+            return True
+
+        # --- IDENTIFICATION DE LA VARIABLE Y ACTIVE ---
+        nom_variable_y_comp = None
+        if 'selected_var_to_test' in locals() and selected_var_to_test:
+            nom_variable_y_comp = selected_var_to_test
+        elif 'nom_colonne_variable' in locals() and not df_classification_current.empty:
+            list_y_cands_comp = df_classification_current[nom_colonne_variable].dropna().tolist()
+            if list_y_cands_comp:
+                nom_variable_y_comp = list_y_cands_comp[0]
+
+        # Récupération de la configuration Master active
+        master_cfg_comp = st.session_state.get("reference_master_config", {
+            "type_specification": "Valeur exacte",
+            "valeur_exacte": 0.0
+        })
+        if 'var_clean_id' in locals() and f"reference_master_config_{var_clean_id}_{safe_idx}" in st.session_state:
+            master_cfg_comp = st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"]
+
+        df_t0_cap = df_t0_data.copy() if 't0_data' in locals() and not df_t0_data.empty else (df_t0_data.copy() if 'df_t0_data' in locals() and not df_t0_data.empty else pd.DataFrame())
+        df_ctrl_cap = ctrl_data["ctrl_master_data"].copy() if 'ctrl_data' in locals() and not ctrl_data["ctrl_master_data"].empty else pd.DataFrame()
+
+        # --- FONCTION DE CALCUL CIBLÉE SUR LE Y ---
+        def _calculer_metriques_capabilite_y_only(df_subset, var_y, cfg_master):
+            if df_subset.empty or not var_y or var_y not in df_subset.columns:
                 return 0, 1, 1, 0.0, 0.0
-            r_units = len(df_subset.dropna(subset=["ID observation"]))
-            r_opp = max(1, len([v for v in liste_variables_dynamiques if v in df_subset.columns]))
+                
+            r_units = len(df_subset.dropna(subset=["ID observation"])) if "ID observation" in df_subset.columns else len(df_subset)
+            r_opp = 1  # 1 opportunité pour le Y
         
             def_count = 0
-            for var in liste_variables_dynamiques:
-                if var in df_subset.columns:
-                    def_count += int(df_subset[var].astype(str).str.strip().str.upper().isin(["NON OK", "KO", "RETOUCHE", "1", "NON-CONFORME"]).sum())
+            for idx_row, row in df_subset.iterrows():
+                if not _evaluer_conformite_ligne_v2(row[var_y], cfg_master):
+                    def_count += 1
         
             u_val = max(1, r_units)
             dpmo_val = (def_count / (u_val * r_opp)) * 1_000_000
@@ -4491,21 +4539,23 @@ else:
                     p_v = max(1e-7, min(0.5, taux_d if taux_d < 0.5 else 1 - taux_d))
                     t_val = math.sqrt(-2.0 * math.log(p_v))
                     z_val = t_val - ((2.515517 + 0.802853 * t_val + 0.010328 * t_val * t_val) / 
-                               (1.0 + 1.432788 * t_val + 0.189269 * t_val * t_val + 0.001308 * t_val * t_val * t_val))
+                                   (1.0 + 1.432788 * t_val + 0.189269 * t_val * t_val + 0.001308 * t_val * t_val * t_val))
                     sig_brut = z_val if taux_d < 0.5 else -z_val
                     sig_lvl = max(0.0, min(6.0, round(sig_brut + 1.5, 2)))
             except Exception:
                 sig_lvl = 0.0
+                
             return def_count, u_val, r_opp, dpmo_val, sig_lvl
 
-        def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite(df_t0_cap)
+        def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite_y_only(df_t0_cap, nom_variable_y_comp, master_cfg_comp)
     
-        if "T0" in selected_wave:
+        active_wave_name = selected_wave if 'selected_wave' in locals() else "Vague active"
+        if "T0" in active_wave_name:
             df_wave_selected = df_t0_cap
         else:
-            df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == selected_wave] if "Vague" in df_ctrl_cap.columns else df_ctrl_cap
+            df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == active_wave_name] if not df_ctrl_cap.empty and "Vague" in df_ctrl_cap.columns else df_ctrl_cap
         
-        def_w, u_w, opp_w, dpmo_w, sig_w = _calculer_metriques_capabilite(df_wave_selected)
+        def_w, u_w, opp_w, dpmo_w, sig_w = _calculer_metriques_capabilite_y_only(df_wave_selected, nom_variable_y_comp, master_cfg_comp)
 
         cap_col1, cap_col2 = st.columns(2)
         with cap_col1:
@@ -4513,7 +4563,7 @@ else:
             st.metric("DPMO (T0)", f"{dpmo_t0:,.0f}")
             st.metric("Niveau Sigma (T0)", f"🔵 {sig_t0} σ")
         with cap_col2:
-            st.markdown(f"**{selected_wave} (Suivi)**")
+            st.markdown(f"**{active_wave_name} (Suivi)**")
             delta_dpmo = dpmo_w - dpmo_t0
             delta_sigma = sig_w - sig_t0
             st.metric("DPMO (Vague active)", f"{dpmo_w:,.0f}", delta=f"{delta_dpmo:,.0f}", delta_color="inverse")
