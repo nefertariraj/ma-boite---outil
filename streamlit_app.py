@@ -1907,23 +1907,16 @@ else:
         # 1. On récupère le dataframe de la session ou du projet
         df_msa_actif = st.session_state.get(local_msa_key, pd.DataFrame())
         
-        # 2. Vérification élargie et robuste pour le rechargement JSON
+        # 2. Vérification si le statut 'test effectué' existe déjà en mémoire ou dans le projet
         has_test_done_in_session = False
         if not df_msa_actif.empty and "Statut de validation" in df_msa_actif.columns:
             has_test_done_in_session = "test effectué" in df_msa_actif["Statut de validation"].values
             
-        # On vérifie si un statut 'test effectué' ou si des clés de sauvegarde terrain existent déjà dans le projet 'p' rechargé
-        has_test_done_in_project = False
-        if p.get("msa_table_saved") is not None:
-            has_test_done_in_project = any(
-                row.get("Statut de validation") == "test effectué" for row in p["msa_table_saved"]
-            )
-        
-        # Sécurité supplémentaire pour la reconnexion JSON : si des sauvegardes de répétabilité/reproductibilité existent dans 'p'
-        if not has_test_done_in_project and isinstance(p, dict):
-            has_test_done_in_project = any(k.startswith("save_rep_") or k.startswith("save_reprod_") for k in p.keys())
+        has_test_done_in_project = p.get("msa_table_saved") is not None and any(
+            row.get("Statut de validation") == "test effectué" for row in p["msa_table_saved"]
+        )
 
-        # 3. La condition finale élargie et tolérante au JSON
+        # 3. La condition finale est élargie
         if p.get("protocol_saved") or has_test_done_in_session or has_test_done_in_project:    
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
