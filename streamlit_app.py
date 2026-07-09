@@ -2142,14 +2142,12 @@ else:
 
                 if 'p' in locals() and isinstance(p, dict):
                     p_master_save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
-                    # Si la sauvegarde existe déjà dans le JSON importé, on charge les données dans session_state
-                    if p_master_save_key in p and f"reference_master_config_{var_clean_id}_{safe_idx}" in st.session_state:
-                        st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"].update(p[p_master_save_key])
-                    else:
-                        # Sinon, on enregistre l'état actuel dans p
-                        if p_master_save_key not in p:
-                            p[p_master_save_key] = {}
-                        p[p_master_save_key].update(master_cfg)
+                    if p_master_save_key not in p:
+                        p[p_master_save_key] = {}
+                    p[p_master_save_key].update(master_cfg)
+                    
+                    # On force aussi la validation/présence de la variable pour que l'affichage du protocole se débloque
+                    p[f"validated_status_{var_clean_id}_{safe_idx}"] = True
                 
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
