@@ -2721,6 +2721,8 @@ else:
         st.divider()
         st.subheader("6. Measure process capability")
 
+        import math  # Importation sécurisée de math ici
+
         # --- FONCTIONS INTERNES D'ÉVALUATION ---
         def _evaluer_conformite_ligne_v2(val_observee, config_master):
             if pd.isna(val_observee):
@@ -2754,7 +2756,6 @@ else:
             "valeur_exacte": 0.0
         })
         
-        # Si une configuration spécifique existe dans la session, on essaie de la récupérer via les variables globales disponibles
         if "reference_master_config" not in st.session_state and 'safe_p_idx' in locals():
             master_cfg_active = st.session_state.get(f"reference_master_config_{safe_p_idx}", master_cfg_active)
 
@@ -2785,7 +2786,6 @@ else:
         # --- CALCUL SÉCURISÉ DU DPMO ET DU NIVEAU SIGMA ---
         dpmo_calculé = (calculated_defects / (val_units * val_opp)) * 1_000_000
         
-        import math
         sigma_level = 0.0
         try:
             if dpmo_calculé <= 0:
