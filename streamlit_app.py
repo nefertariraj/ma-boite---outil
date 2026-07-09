@@ -2063,13 +2063,13 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Version épurée d'origine) ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Corrigé pour persistance JSON) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
-                # Initialisation sécurisée depuis le projet 'p' ou valeurs par défaut
+                # Initialisation sécurisée robuste tolérante au rechargement JSON
                 if session_key not in st.session_state:
-                    if save_key in p and isinstance(p[save_key], dict):
+                    if isinstance(p, dict) and save_key in p and isinstance(p[save_key], dict):
                         st.session_state[session_key] = p[save_key].copy()
                     else:
                         st.session_state[session_key] = {
@@ -2081,10 +2081,11 @@ else:
                             "proposition_attributs": "Conforme / Non-conforme (Standard visuel ou référentiel textuel validé)"
                         }
 
+                # Récupération immédiate et sûre de l'état actuel de configuration
+                master_cfg = st.session_state[session_key]
+
                 with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
                     st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
-
-                    master_cfg = st.session_state[session_key]
 
                     type_spec_options = [
                         "Valeur exacte",
@@ -2106,7 +2107,7 @@ else:
 
                     col_spec1, col_spec2 = st.columns(2)
                     
-                    # Initialisation des variables temporaires pour éviter les désynchronisations du formulaire
+                    # Déclaration sécurisée par défaut des variables locales du formulaire
                     val_ex = master_cfg.get("valeur_exacte", 0.0)
                     val_seuil = master_cfg.get("valeur_seuil", 0.0)
                     b_inf = master_cfg.get("borne_inf", 0.0)
@@ -2114,19 +2115,18 @@ else:
                     prop_att = master_cfg.get("proposition_attributs", "Standard visuel validé")
 
                     with col_spec1:
-                        # Affichage exclusif du champ correspondant au choix de la liste déroulante
                         if selected_spec_type == "Valeur exacte":
-                            val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(master_cfg.get("valeur_exacte", 0.0)), key=f"val_ex_{var_clean_id}_{safe_idx}")
+                            val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(val_ex), key=f"val_ex_{var_clean_id}_{safe_idx}")
                         elif selected_spec_type == "Supérieur ou égal à (≥)":
-                            val_seuil = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(master_cfg.get("valeur_seuil", 0.0)), key=f"val_supeq_{var_clean_id}_{safe_idx}")
+                            val_seuil = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(val_seuil), key=f"val_supeq_{var_clean_id}_{safe_idx}")
                         elif selected_spec_type == "Inférieur ou égal à (≤)":
-                            val_seuil = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(master_cfg.get("valeur_seuil", 10.0)), key=f"val_infeq_{var_clean_id}_{safe_idx}")
+                            val_seuil = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(val_seuil), key=f"val_infeq_{var_clean_id}_{safe_idx}")
                         elif selected_spec_type == "Intervalle (Entre min et max)":
-                            b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(master_cfg.get("borne_inf", 0.0)), key=f"binf_{var_clean_id}_{safe_idx}")
-                            b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(master_cfg.get("borne_sup", 10.0)), key=f"bsup_{var_clean_id}_{safe_idx}")
+                            b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(b_inf), key=f"binf_{var_clean_id}_{safe_idx}")
+                            b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(b_sup), key=f"bsup_{var_clean_id}_{safe_idx}")
                         else:
                             st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
-                            prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=master_cfg.get("proposition_attributs", "Standard visuel validé"), key=f"prop_att_{var_clean_id}_{safe_idx}")
+                            prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=str(prop_att), key=f"prop_att_{var_clean_id}_{safe_idx}")
 
                     with col_spec2:
                         st.markdown("##### ⚖️ Règle d'évaluation")
