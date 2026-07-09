@@ -2146,9 +2146,10 @@ else:
                         p[p_master_save_key] = {}
                     p[p_master_save_key].update(master_cfg)
                     
-                    # C'est LA ligne indispensable : on force l'indicateur à True pour que la condition 
-                    # d'affichage globale (plus haut dans votre script) détecte la présence du protocole à la reprise
+                    # On force le déclenchement du protocole et des statuts pour que l'affichage complet se débloque
                     p["protocol_saved"] = True
+                    if local_msa_key in st.session_state and not st.session_state[local_msa_key].empty:
+                        st.session_state[local_msa_key].loc[st.session_state[local_msa_key]["Variable Critique (liée au Y)"] == selected_var_to_test, "Statut de validation"] = "test effectué"
                 
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
