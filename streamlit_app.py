@@ -2140,24 +2140,14 @@ else:
                 else:
                     master_cfg["proposition_attributs"] = prop_att
 
+                SAUVEGARDE
                 if 'p' in locals() and isinstance(p, dict):
                     p_master_save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
                     if p_master_save_key not in p:
                         p[p_master_save_key] = {}
                     p[p_master_save_key].update(master_cfg)
-                    
-                    # On force le déclenchement global
-                    p["protocol_saved"] = True
-                    
-                    # --- RESTAURATION IMMÉDIATE DANS LA SESSION POUR FORCER L'AFFICHAGE COMPLET ---
-                    if p_rep_save_key in p:
-                        st.session_state[dynamic_rep_key] = pd.DataFrame(p[p_rep_save_key])
-                    if p_reprod_save_key in p:
-                        st.session_state[dynamic_reprod_key] = pd.DataFrame(p[p_reprod_save_key])
-                    if p_bias_hist_save_key in p:
-                        if "msa_bias_history" not in st.session_state:
-                            st.session_state["msa_bias_history"] = {}
-                        st.session_state["msa_bias_history"][bias_hist_key] = p[p_bias_hist_save_key]  
+                    # On s'assure juste de propager le flag global de sauvegarde du protocole sans modifier le comportement UI
+                    p["protocol_saved"] = True  
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
