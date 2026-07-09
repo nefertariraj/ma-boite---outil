@@ -2721,9 +2721,9 @@ else:
         st.divider()
         st.subheader("6. Measure process capability")
 
-        import math  # Importation sécurisée de math ici
+        import math  # Importation sécurisée de math
 
-        # --- FONCTIONS INTERNES D'ÉVALUATION ---
+        # --- FONCTION INTERNE D'ÉVALUATION DE CONFORMITÉ ---
         def _evaluer_conformite_ligne_v2(val_observee, config_master):
             if pd.isna(val_observee):
                 return True
@@ -2750,41 +2750,51 @@ else:
                 return float(config_master.get("borne_inf", 0.0)) <= num_val <= float(config_master.get("borne_sup", 10.0))
             return True
 
-        # Utilisation d'une récupération sécurisée par défaut sans variable manquante
+        # --- IDENTIFICATION DE LA VARIABLE Y (CIBLE PRINCIPALE) ---
+        # On essaie de récupérer le nom du Y actif dans la session ou l'état du projet
+        nom_variable_y = None
+        if 'selected_var_to_test' in locals() and selected_var_to_test:
+            nom_variable_y = selected_var_to_test
+        elif 'nom_colonne_variable' in locals() and not df_classification_current.empty:
+            # S'il y a une liste, on prend la première variable critique ou celle liée au Y
+            list_y_candidates = df_classification_current[nom_colonne_variable].dropna().tolist()
+            if list_y_candidates:
+                nom_variable_y = list_y_candidates[0]
+
+        # Récupération de la configuration Master active associée au Y
         master_cfg_active = st.session_state.get("reference_master_config", {
             "type_specification": "Valeur exacte",
             "valeur_exacte": 0.0
         })
-        
-        if "reference_master_config" not in st.session_state and 'safe_p_idx' in locals():
-            master_cfg_active = st.session_state.get(f"reference_master_config_{safe_p_idx}", master_cfg_active)
+        if 'var_clean_id' in locals() and f"reference_master_config_{var_clean_id}_{safe_idx}" in st.session_state:
+            master_cfg_active = st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"]
 
-        # --- CALCUL AUTOMATIQUE DU NOMBRE DE DÉFAUTS RÉELS ---
+        # --- CALCUL STRICTEMENT BASÉ SUR LA VARIABLE Y ---
         df_active_local = df_active if 'df_active' in locals() and not df_active.empty else pd.DataFrame()
-        liste_cols_evaluees = liste_variables_dynamiques if 'liste_variables_dynamiques' in locals() else []
         
         raw_units = len(df_active_local.dropna(subset=["ID observation"])) if not df_active_local.empty and "ID observation" in df_active_local.columns else (len(df_active_local) if not df_active_local.empty else 0)
         
-        calculated_defects = 0
-        if not df_active_local.empty and liste_cols_evaluees:
+        calculated_defects_y = 0
+        if not df_active_local.empty and nom_variable_y and nom_variable_y in df_active_local.columns:
             for idx_row, row in df_active_local.iterrows():
-                for var_col in liste_cols_evaluees:
-                    if var_col in df_active_local.columns:
-                        if not _evaluer_conformite_ligne_v2(row[var_col], master_cfg_active):
-                            calculated_defects += 1
+                if not _evaluer_conformite_ligne_v2(row[nom_variable_y], master_cfg_active):
+                    calculated_defects_y += 1
+        else:
+            # Fallback si la colonne Y n'est pas explicitée dans le DF actif
+            calculated_defects_y = 0
 
         val_units = max(1, int(raw_units))
-        val_opp = max(1, len([v for v in liste_cols_evaluees if not df_active_local.empty and v in df_active_local.columns]))
+        val_opp = 1  # Exactement 1 opportunité par unité (le Y lui-même)
 
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("**Paramètres de Capabilité (Calculés par rapport au Master)**")
-            st.metric("Nombre total de défauts réels constatés", f"{calculated_defects}")
-            st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key="final_cap_units_safe", disabled=True)
-            st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key="final_cap_opp_safe", disabled=True)
+            st.markdown(f"**Paramètres de Capabilité (Cible unique : {nom_variable_y or 'Variable Y'})**")
+            st.metric("Nombre total de défauts réels (sur le Y)", f"{calculated_defects_y}")
+            st.number_input("Nombre d'unités inspectées (N)", min_value=1, value=val_units, key="final_cap_units_y_only", disabled=True)
+            st.number_input("Nombre d'opportunités par unité", min_value=1, value=val_opp, key="final_cap_opp_y_only", disabled=True)
         
-        # --- CALCUL SÉCURISÉ DU DPMO ET DU NIVEAU SIGMA ---
-        dpmo_calculé = (calculated_defects / (val_units * val_opp)) * 1_000_000
+        # --- CALCUL SÉCURISÉ DU DPMO ET DU NIVEAU SIGMA SUR LE Y ---
+        dpmo_calculé = (calculated_defects_y / (val_units * val_opp)) * 1_000_000
         
         sigma_level = 0.0
         try:
@@ -2805,7 +2815,7 @@ else:
 
         with c2:
             st.markdown("<br><br>", unsafe_allow_html=True)
-            st.metric("DPMO Réel", f"{float(dpmo_calculé):,.0f}")
+            st.metric("DPMO Réel (du Y)", f"{float(dpmo_calculé):,.0f}")
             
             if sigma_level >= 4.0:
                 st.metric("Niveau Sigma du Processus", f"🟢 {sigma_level} σ")
