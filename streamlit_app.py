@@ -1895,14 +1895,12 @@ else:
             
             edited_msa_df = st.data_editor(df_msa, num_rows="fixed", use_container_width=True)
     
-            # Bouton de sauvegarde corrigé
+            # Bouton de sauvegarde
             if st.button("💾 Enregistrer MSA et Protocole", key=f"btn_save_{idx_str}", type="primary"):
                 p["msa_table_saved"] = edited_msa_df.to_dict('records')
-                # On conserve l'enregistrement sans écraser par une structure vide bloquante
-                if not p.get("protocol_saved"):
-                    p["protocol_saved"] = True
+                # Note: assurez-vous que edited_proto_df est défini ici si vous l'utilisez
+                p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
-                st.rerun()
 
         # --- LOGIQUE D'AFFICHAGE ROBUSTE ET PERSISTANTE ---
         
