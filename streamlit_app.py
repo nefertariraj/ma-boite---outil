@@ -1907,22 +1907,16 @@ else:
         # 1. On récupère le dataframe de la session ou du projet
         df_msa_actif = st.session_state.get(local_msa_key, pd.DataFrame())
         
-        # 2. Vérification robuste du statut d'exécution (incluant les variantes de vos sauvegardes)
+        # 2. Vérification si le statut 'test effectué' existe déjà en mémoire ou dans le projet
         has_test_done_in_session = False
         if not df_msa_actif.empty and "Statut de validation" in df_msa_actif.columns:
-            has_test_done_in_session = any(
-                str(val).strip().lower() in ["test effectué", "validé", "test effectue"] 
-                for val in df_msa_actif["Statut de validation"].values
-            )
+            has_test_done_in_session = "test effectué" in df_msa_actif["Statut de validation"].values
             
-        has_test_done_in_project = False
-        if p.get("msa_table_saved") is not None:
-            has_test_done_in_project = any(
-                str(row.get("Statut de validation", "")).strip().lower() in ["test effectué", "validé", "test effectue"] 
-                for row in p["msa_table_saved"]
-            )
+        has_test_done_in_project = p.get("msa_table_saved") is not None and any(
+            row.get("Statut de validation") == "test effectué" for row in p["msa_table_saved"]
+        )
 
-        # 3. La condition finale d'origine préservée et tolérante aux libellés
+        # 3. La condition finale est élargie
         if p.get("protocol_saved") or has_test_done_in_session or has_test_done_in_project:    
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
