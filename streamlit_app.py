@@ -2139,6 +2139,9 @@ else:
                     master_cfg["borne_sup"] = b_sup
                 else:
                     master_cfg["proposition_attributs"] = prop_att
+
+                if 'p' in locals() and isinstance(p, dict):
+                    p["reference_master_config"] = master_cfg
                 
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
