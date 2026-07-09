@@ -4511,8 +4511,8 @@ else:
         if 'var_clean_id' in locals() and f"reference_master_config_{var_clean_id}_{safe_idx}" in st.session_state:
             master_cfg_comp = st.session_state[f"reference_master_config_{var_clean_id}_{safe_idx}"]
 
-        df_t0_cap = df_t0_data.copy() if 't0_data' in locals() and not df_t0_data.empty else (df_t0_data.copy() if 'df_t0_data' in locals() and not df_t0_data.empty else pd.DataFrame())
-        df_ctrl_cap = ctrl_data["ctrl_master_data"].copy() if 'ctrl_data' in locals() and not ctrl_data["ctrl_master_data"].empty else pd.DataFrame()
+        df_t0_cap = df_t0_data.copy() if not df_t0_data.empty else pd.DataFrame()
+        df_ctrl_cap = ctrl_data["ctrl_master_data"].copy() if not ctrl_data["ctrl_master_data"].empty else pd.DataFrame()
 
         # --- FONCTION DE CALCUL CIBLÉE SUR LE Y ---
         def _calculer_metriques_capabilite_y_only(df_subset, var_y, cfg_master):
@@ -4547,27 +4547,41 @@ else:
                 
             return def_count, u_val, r_opp, dpmo_val, sig_lvl
 
+        # --- CALCUL DES MÉTRIQUES POUR T0 ---
         def_t0, u_t0, opp_t0, dpmo_t0, sig_t0 = _calculer_metriques_capabilite_y_only(df_t0_cap, nom_variable_y_comp, master_cfg_comp)
-    
-        active_wave_name = selected_wave if 'selected_wave' in locals() else "Vague active"
-        if "T0" in active_wave_name:
-            df_wave_selected = df_t0_cap
-        else:
-            df_wave_selected = df_ctrl_cap[df_ctrl_cap["Vague"] == active_wave_name] if not df_ctrl_cap.empty and "Vague" in df_ctrl_cap.columns else df_ctrl_cap
-        
-        def_w, u_w, opp_w, dpmo_w, sig_w = _calculer_metriques_capabilite_y_only(df_wave_selected, nom_variable_y_comp, master_cfg_comp)
 
-        cap_col1, cap_col2 = st.columns(2)
-        with cap_col1:
-            st.markdown(f"**Référence T0 (Mesure)**")
+        # --- EXTRACTION ET TRI DES VAGUES DISPONIBLES (T1, T2...) ---
+        vagues_disponibles = []
+        if not df_ctrl_cap.empty and "Vague" in df_ctrl_cap.columns:
+            vagues_disponibles = sorted(df_ctrl_cap["Vague"].dropna().unique().tolist())
+
+        st.markdown(f"**Variable cible analysée :** `{nom_variable_y_comp or 'Non définie'}`")
+
+        # --- AFFICHAGE COMPARATIF CÔTE À CÔTE ---
+        col_t0, col_waves = st.columns([1, max(1, len(vagues_disponibles))])
+        
+        with col_t0:
+            st.markdown("##### 📌 Baseline T0")
             st.metric("DPMO (T0)", f"{dpmo_t0:,.0f}")
             st.metric("Niveau Sigma (T0)", f"🔵 {sig_t0} σ")
-        with cap_col2:
-            st.markdown(f"**{active_wave_name} (Suivi)**")
-            delta_dpmo = dpmo_w - dpmo_t0
-            delta_sigma = sig_w - sig_t0
-            st.metric("DPMO (Vague active)", f"{dpmo_w:,.0f}", delta=f"{delta_dpmo:,.0f}", delta_color="inverse")
-            st.metric("Niveau Sigma (Vague active)", f"🟢 {sig_w} σ" if sig_w >= sig_t0 else f"🟠 {sig_w} σ", delta=f"{delta_sigma:+.2f} σ")
+
+        with col_waves:
+            st.markdown("##### 🚀 Suivi des Vagues Post-Amélioration")
+            if vagues_disponibles:
+                cols_vagues = st.columns(len(vagues_disponibles))
+                for idx_v, vague_nom in enumerate(vagues_disponibles):
+                    df_vague_encours = df_ctrl_cap[df_ctrl_cap["Vague"] == vague_nom]
+                    def_v, u_v, opp_v, dpmo_v, sig_v = _calculer_metriques_capabilite_y_only(df_vague_encours, nom_variable_y_comp, master_cfg_comp)
+                    
+                    delta_dpmo = dpmo_v - dpmo_t0
+                    delta_sigma = sig_v - sig_t0
+                    
+                    with cols_vagues[idx_v]:
+                        st.markdown(f"**{vague_nom}**")
+                        st.metric("DPMO", f"{dpmo_v:,.0f}", delta=f"{delta_dpmo:,.0f}", delta_color="inverse")
+                        st.metric("Sigma", f"🟢 {sig_v} σ" if sig_v >= sig_t0 else f"🟠 {sig_v} σ", delta=f"{delta_sigma:+.2f} σ")
+            else:
+                st.info("ℹ️ Aucune vague additionnelle (T1, T2, etc.) n'est encore enregistrée.")
 
         st.markdown("---")
 
