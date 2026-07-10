@@ -2065,7 +2065,7 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Liaison d'état unifiée type + valeur) ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Affichage dynamique d'origine & Persistance JSON complète) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
@@ -2093,7 +2093,7 @@ else:
 
                 current_cfg = st.session_state[session_key]
 
-                # 2. Synchronisation obligatoire des valeurs dans st.session_state pour la persistance des widgets
+                # Pré-initialisation sécurisée dans session_state pour chaque valeur
                 if k_vex not in st.session_state:
                     st.session_state[k_vex] = float(current_cfg.get("valeur_exacte", 0.0))
                 if k_vseuil not in st.session_state:
@@ -2119,7 +2119,7 @@ else:
                     t_courant = current_cfg.get("type_specification", "Valeur exacte")
                     idx_courant = type_spec_options.index(t_courant) if t_courant in type_spec_options else 0
 
-                    # Menu déroulant principal
+                    # Menu déroulant principal pour sélectionner le type
                     choix_type = st.selectbox(
                         "Type de règle de référence (Standard Master) :",
                         options=type_spec_options,
@@ -2130,7 +2130,7 @@ else:
                     col_spec1, col_spec2 = st.columns(2)
 
                     with col_spec1:
-                        # Affichage dynamique conditionnel lié aux clés de st.session_state
+                        # Affichage dynamique conditionnel d'origine selon le choix sélectionné
                         if choix_type == "Valeur exacte":
                             st.number_input("Définir la valeur cible exacte (Master) :", key=k_vex)
                         elif choix_type in ["Supérieur ou égal à (≥)", "Inférieur ou égal à (≤)"]:
@@ -2150,7 +2150,7 @@ else:
                     submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
                     if submit_master:
-                        # Récupération sécurisée et unifiée directement depuis st.session_state
+                        # Récupération unifiée et sécurisée du type validé et de ses données associées
                         final_type = st.session_state.get(k_type, choix_type)
         
                         updated_data = {
@@ -2162,12 +2162,12 @@ else:
                             "proposition_attributs": str(st.session_state.get(k_patt, "Conforme / Non-conforme")) if final_type.startswith("Attribut qualitatif") else "Conforme / Non-conforme"
                         }
         
-                        # Sauvegarde unifiée dans la session et répercussion dans p pour le fichier JSON
+                        # Sauvegarde unifiée dans la session et répercussion immédiate dans p pour le fichier JSON
                         st.session_state[session_key] = updated_data
                         if isinstance(p, dict):
                             p[save_key] = updated_data.copy()
             
-                        st.success("🎯 Type et valeur de référence enregistrés et sauvegardés dans le JSON avec succès !")
+                        st.success("🎯 La totalité du formulaire (type et valeurs associées) est enregistrée et sauvegardée dans le JSON avec succès !")
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
