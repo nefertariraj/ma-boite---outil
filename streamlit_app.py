@@ -661,20 +661,17 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. Nettoyage de la mémoire active des widgets/formulaires de l'ancien projet
+                # 1. PURGE RADICALE DE TOUTES LES CLÉS LIÉES AUX WIDGETS ET DONNÉES ACTIVES
+                # On nettoie tout ce qui peut contenir l'état d'un formulaire ou d'un tableau précédent
+                keys_to_delete = []
                 for k in list(st.session_state.keys()):
-                    if any(k.startswith(prefix) for prefix in [
-                        "reference_master_config_", 
-                        "spec_type_", 
-                        "val_ex_", 
-                        "val_seuil_", 
-                        "binf_", 
-                        "bsup_", 
-                        "prop_att_", 
-                        "master_dcp_table_", 
-                        "msa_classification_table_"
-                    ]):
-                        del st.session_state[k]
+                    # On évite de supprimer les variables système globales comme 'projects', 'authenticated', etc.
+                    if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
+                        continue
+                    keys_to_delete.append(k)
+                    
+                for k in keys_to_delete:
+                    del st.session_state[k]
 
                 # 2. Copie profonde et isolée du modèle de référence unique
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
