@@ -2065,7 +2065,7 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Corrigé pour la persistance JSON complète) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
@@ -2108,40 +2108,39 @@ else:
 
                     col_spec1, col_spec2 = st.columns(2)
                     
+                    # Récupération sécurisée des anciennes valeurs en mémoire
                     v_ex = local_master_cfg.get("valeur_exacte", 0.0)
                     v_seuil = local_master_cfg.get("valeur_seuil", 0.0)
                     b_inf_val = local_master_cfg.get("borne_inf", 0.0)
                     b_sup_val = local_master_cfg.get("borne_sup", 10.0)
                     p_att = local_master_cfg.get("proposition_attributs", "Conforme / Non-conforme")
 
+                    # Initialisation par défaut des variables pour éviter les incohérences si non sélectionnées
+                    val_ex, val_seuil, b_inf, b_sup, prop_att = v_ex, v_seuil, b_inf_val, b_sup_val, p_att
+
                     with col_spec1:
                         if selected_spec_type == "Valeur exacte":
                             val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(v_ex), key=f"val_ex_{var_clean_id}_{safe_idx}")
-                            val_seuil, b_inf, b_sup, prop_att = v_seuil, b_inf_val, b_sup_val, p_att
                         elif selected_spec_type == "Supérieur ou égal à (≥)":
                             val_seuil = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(v_seuil), key=f"val_supeq_{var_clean_id}_{safe_idx}")
-                            val_ex, b_inf, b_sup, prop_att = v_ex, b_inf_val, b_sup_val, p_att
                         elif selected_spec_type == "Inférieur ou égal à (≤)":
                             val_seuil = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(v_seuil), key=f"val_infeq_{var_clean_id}_{safe_idx}")
-                            val_ex, b_inf, b_sup, prop_att = v_ex, b_inf_val, b_sup_val, p_att
                         elif selected_spec_type == "Intervalle (Entre min et max)":
                             b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(b_inf_val), key=f"binf_{var_clean_id}_{safe_idx}")
                             b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(b_sup_val), key=f"bsup_{var_clean_id}_{safe_idx}")
-                            val_ex, val_seuil, prop_att = v_ex, v_seuil, p_att
                         else:
                             st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
                             prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=str(p_att), key=f"prop_att_{var_clean_id}_{safe_idx}")
-                            val_ex, val_seuil, b_inf, b_sup = v_ex, v_seuil, b_inf_val, b_sup_val
 
                     with col_spec2:
                         st.markdown("##### ⚖️ Règle d'évaluation")
                         st.markdown("- Respecte la règle $\rightarrow$ Statut : `OK`")
                         st.markdown("- Hors règle $\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
 
-                    submit_master = st.form_submit_button("✅ Actualiser en mémoire la valeur de référence", type="secondary")
+                    submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
-                    # On met à jour l'état local dans la session dès la soumission du form
                     if submit_master:
+                        # Mise à jour complète de la session et écriture directe dans le dictionnaire p pour le JSON
                         st.session_state[session_key] = {
                             "type_specification": selected_spec_type,
                             "valeur_exacte": val_ex,
@@ -2150,11 +2149,10 @@ else:
                             "borne_sup": b_sup,
                             "proposition_attributs": prop_att
                         }
-                        st.success("Mémoire mise à jour (Pensez à enregistrer le projet global plus bas).")
-
-                # Sauvegarde explicite et définitive dans p (pour le JSON) reliée à la variable active
-                if session_key in st.session_state and isinstance(p, dict):
-                    p[save_key] = st.session_state[session_key].copy()
+                        if isinstance(p, dict):
+                            p[save_key] = st.session_state[session_key].copy()
+                            
+                        st.success("🎯 Valeur de référence enregistrée et injectée dans le projet avec succès !")
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
