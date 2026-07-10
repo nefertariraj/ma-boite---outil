@@ -2071,7 +2071,7 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Affichage dynamique d'origine & Persistance JSON complète) ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Affichage dynamique d'origine & Persistance complète) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
@@ -2158,7 +2158,7 @@ else:
                     if submit_master:
                         # Récupération unifiée et sécurisée du type validé et de ses données associées
                         final_type = st.session_state.get(k_type, choix_type)
-        
+                        
                         updated_data = {
                             "type_specification": final_type,
                             "valeur_exacte": float(st.session_state.get(k_vex, 0.0)) if final_type == "Valeur exacte" else 0.0,
@@ -2167,13 +2167,13 @@ else:
                             "borne_sup": float(st.session_state.get(k_bsup, 10.0)) if final_type == "Intervalle (Entre min et max)" else 10.0,
                             "proposition_attributs": str(st.session_state.get(k_patt, "Conforme / Non-conforme")) if final_type.startswith("Attribut qualitatif") else "Conforme / Non-conforme"
                         }
-        
-                        # Sauvegarde unifiée dans la session et répercussion immédiate dans p pour le fichier JSON
+                        
+                        # Sauvegarde dans la session et répercussion immédiate dans p pour le fichier JSON
                         st.session_state[session_key] = updated_data
                         if isinstance(p, dict):
                             p[save_key] = updated_data.copy()
-            
-                        st.success("🎯 La totalité du formulaire (type et valeurs associées) est enregistrée et sauvegardée dans le JSON avec succès !")
+                            
+                        st.success("🎯 La totalité du formulaire (type et valeurs associées) est enregistrée et sauvegardée dans le JSON avec succès !") avec succès !")
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
