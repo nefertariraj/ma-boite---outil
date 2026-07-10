@@ -1916,9 +1916,24 @@ else:
             row.get("Statut de validation") == "test effectué" for row in p["msa_table_saved"]
         )
 
-        # 3. La condition finale est élargie
-        if p.get("protocol_saved") or has_test_done_in_session or has_test_done_in_project:    
+        # SÉCURITÉ EXPERTE : On s'assure que les variables critiques sont extraites en priorité de la session ou du projet p
+        if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
+            list_variables_critiques = df_classification_current[nom_colonne_variable].dropna().tolist()
+        elif p.get("msa_table_saved"):
+            # Si le DataFrame n'est pas encore chargé au premier run JSON, on le récupère direct du projet sauvegardé
+            list_variables_critiques = [row.get("Variable Critique (liée au Y)") for row in p["msa_table_saved"]]
+        else:
+            list_variables_critiques = []
+
+        # Affichage inconditionnel du bloc dès lors qu'il y a des variables à traiter (évite le bug du titre seul au rechargement)
+        if len(list_variables_critiques) > 0 or p.get("protocol_saved"):
             st.markdown("##### 👟 Exécution du Protocole Terrain")
+            
+            # Initialisation par défaut des dictionnaires de session s'ils manquent après l'import JSON
+            if "msa_validated_vars" not in st.session_state:
+                st.session_state["msa_validated_vars"] = {}
+            if "msa_bias_history" not in st.session_state:
+                st.session_state["msa_bias_history"] = {}
             
             if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
                 list_variables_critiques = df_classification_current[nom_colonne_variable].dropna().tolist()
