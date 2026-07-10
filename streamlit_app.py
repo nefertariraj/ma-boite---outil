@@ -1951,8 +1951,8 @@ else:
         
             selected_var_to_test = mapping_variables.get(selected_option, "")
 
-                # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
-                st.markdown("##### 📈 Historique des protocoles validés")
+            # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
+            st.markdown("##### 📈 Historique des protocoles validés")
                 
                 variables_valides = []
                 for var in list_variables_critiques:
