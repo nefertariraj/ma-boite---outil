@@ -2137,6 +2137,7 @@ else:
                     submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
                     if submit_master:
+                        # Mise à jour sécurisée des valeurs du dictionnaire local
                         local_master_cfg["type_specification"] = selected_spec_type
                         local_master_cfg["valeur_exacte"] = val_ex
                         local_master_cfg["valeur_seuil"] = val_seuil
@@ -2144,11 +2145,12 @@ else:
                         local_master_cfg["borne_sup"] = b_sup
                         local_master_cfg["proposition_attributs"] = prop_att
                         
+                        # Synchronisation immédiate session_state et projet p garanti
                         st.session_state[session_key] = local_master_cfg
                         if isinstance(p, dict):
                             p[save_key] = local_master_cfg.copy()
                             
-                        st.success("🎯 Valeur de référence enregistrée avec succès !")
+                        st.success(f"🎯 Valeur de référence enregistrée avec succès pour : **{selected_var_to_test}** !")
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
