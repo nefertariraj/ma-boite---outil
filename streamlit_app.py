@@ -2173,7 +2173,7 @@ else:
                         if isinstance(p, dict):
                             p[save_key] = updated_data.copy()
                             
-                        st.success("🎯 La totalité du formulaire (type et valeurs associées) est enregistrée et sauvegardée dans le JSON avec succès !")
+                        st.success("🎯 La totalité du formulaire est enregistrée et sauvegardée avec succès !") 
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
