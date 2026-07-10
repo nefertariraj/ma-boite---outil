@@ -1956,42 +1956,6 @@ else:
 
                 # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
                 st.markdown("##### 📈 Historique des protocoles validés")
-        
-            # Initialisation sécurisée de l'état de session
-            if "msa_validated_vars" not in st.session_state:
-                st.session_state["msa_validated_vars"] = {}
-            if "msa_bias_history" not in st.session_state:
-                st.session_state["msa_bias_history"] = {}
-
-            # Génération des options du sélecteur
-            options_sélecteur = []
-            mapping_variables = {}
-            for var in list_variables_critiques:
-                if str(var).strip() == "":
-                    continue
-                v_c = "".join(e for e in str(var) if e.isalnum())
-                if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or p.get(f"validated_status_{v_c}_{safe_idx}", False):
-                    label = f"✅ {var}"
-                else:
-                    label = f"⏳ {var}"
-                options_sélecteur.append(label)
-                mapping_variables[label] = var
-
-            # Sécurité d'affichage si la liste est vide au premier run de la sauvegarde
-            if not options_sélecteur:
-                options_sélecteur = ["En attente de variables critiques..."]
-                mapping_variables = {options_sélecteur[0]: ""}
-
-            selected_option = st.selectbox(
-                "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
-                options=options_sélecteur,
-                key=f"msa_selected_var_{safe_idx}"
-            )
-        
-            selected_var_to_test = mapping_variables.get(selected_option, "")
-
-            # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
-            st.markdown("##### 📈 Historique des protocoles validés")
                 
                 variables_valides = []
                 for var in list_variables_critiques:
