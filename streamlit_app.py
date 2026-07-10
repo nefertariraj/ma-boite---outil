@@ -2065,11 +2065,11 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Corrigé et persistant) ---
+                # --- BLOC VALEUR DE RÉFÉRENCE (Logique standard par bouton d'enregistrement) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
-                # Restauration ou initialisation depuis 'p' ou la session
+                # Restauration initiale depuis 'p' si disponible
                 if session_key not in st.session_state:
                     if isinstance(p, dict) and save_key in p and isinstance(p[save_key], dict):
                         st.session_state[session_key] = p[save_key].copy()
@@ -2083,76 +2083,69 @@ else:
                             "proposition_attributs": "Conforme / Non-conforme"
                         }
 
-                # On récupère l'état actuel en session
                 local_master_cfg = st.session_state[session_key]
 
-                with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
-                    st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
+                st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
 
-                    type_spec_options = [
-                        "Valeur exacte",
-                        "Supérieur ou égal à (≥)",
-                        "Inférieur ou égal à (≤)",
-                        "Intervalle (Entre min et max)",
-                        "Attribut qualitatif (Sans valeur numérique - Proposition Master Black Belt)"
-                    ]
+                type_spec_options = [
+                    "Valeur exacte",
+                    "Supérieur ou égal à (≥)",
+                    "Inférieur ou égal à (≤)",
+                    "Intervalle (Entre min et max)",
+                    "Attribut qualitatif (Sans valeur numérique - Proposition Master Black Belt)"
+                ]
 
-                    current_type = local_master_cfg.get("type_specification", "Valeur exacte")
-                    current_type_idx = type_spec_options.index(current_type) if current_type in type_spec_options else 0
+                current_type = local_master_cfg.get("type_specification", "Valeur exacte")
+                current_type_idx = type_spec_options.index(current_type) if current_type in type_spec_options else 0
 
-                    selected_spec_type = st.selectbox(
-                        "Type de règle de référence (Standard Master) :",
-                        options=type_spec_options,
-                        index=current_type_idx,
-                        key=f"spec_type_{var_clean_id}_{safe_idx}"
-                    )
+                selected_spec_type = st.selectbox(
+                    "Type de règle de référence (Standard Master) :",
+                    options=type_spec_options,
+                    index=current_type_idx,
+                    key=f"spec_type_{var_clean_id}_{safe_idx}"
+                )
 
-                    col_spec1, col_spec2 = st.columns(2)
-                    
-                    val_ex = local_master_cfg.get("valeur_exacte", 0.0)
-                    val_seuil = local_master_cfg.get("valeur_seuil", 0.0)
-                    b_inf = local_master_cfg.get("borne_inf", 0.0)
-                    b_sup = local_master_cfg.get("borne_sup", 10.0)
-                    prop_att = local_master_cfg.get("proposition_attributs", "Standard visuel validé")
+                col_spec1, col_spec2 = st.columns(2)
+                
+                val_ex = local_master_cfg.get("valeur_exacte", 0.0)
+                val_seuil = local_master_cfg.get("valeur_seuil", 0.0)
+                b_inf = local_master_cfg.get("borne_inf", 0.0)
+                b_sup = local_master_cfg.get("borne_sup", 10.0)
+                prop_att = local_master_cfg.get("proposition_attributs", "Conforme / Non-conforme")
 
-                    with col_spec1:
-                        if selected_spec_type == "Valeur exacte":
-                            val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(val_ex), key=f"val_ex_{var_clean_id}_{safe_idx}")
-                        elif selected_spec_type == "Supérieur ou égal à (≥)":
-                            val_seuil = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(val_seuil), key=f"val_supeq_{var_clean_id}_{safe_idx}")
-                        elif selected_spec_type == "Inférieur ou égal à (≤)":
-                            val_seuil = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(val_seuil), key=f"val_infeq_{var_clean_id}_{safe_idx}")
-                        elif selected_spec_type == "Intervalle (Entre min et max)":
-                            b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(b_inf), key=f"binf_{var_clean_id}_{safe_idx}")
-                            b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(b_sup), key=f"bsup_{var_clean_id}_{safe_idx}")
-                        else:
-                            st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
-                            prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=str(prop_att), key=f"prop_att_{var_clean_id}_{safe_idx}")
+                with col_spec1:
+                    if selected_spec_type == "Valeur exacte":
+                        val_ex = st.number_input("Définir la valeur cible exacte (Master) :", value=float(val_ex), key=f"val_ex_{var_clean_id}_{safe_idx}")
+                    elif selected_spec_type == "Supérieur ou égal à (≥)":
+                        val_seuil = st.number_input("Valeur seuil minimale acceptable (≥) :", value=float(val_seuil), key=f"val_supeq_{var_clean_id}_{safe_idx}")
+                    elif selected_spec_type == "Inférieur ou égal à (≤)":
+                        val_seuil = st.number_input("Valeur seuil maximale acceptable (≤) :", value=float(val_seuil), key=f"val_infeq_{var_clean_id}_{safe_idx}")
+                    elif selected_spec_type == "Intervalle (Entre min et max)":
+                        b_inf = st.number_input("Borne inférieure de l'intervalle :", value=float(b_inf), key=f"binf_{var_clean_id}_{safe_idx}")
+                        b_sup = st.number_input("Borne supérieure de l'intervalle :", value=float(b_sup), key=f"bsup_{var_clean_id}_{safe_idx}")
+                    else:
+                        st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
+                        prop_att = st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=str(prop_att), key=f"prop_att_{var_clean_id}_{safe_idx}")
 
-                    with col_spec2:
-                        st.markdown("##### ⚖️ Règle d'évaluation")
-                        st.markdown("- Respecte la règle $\rightarrow$ Statut : `OK`")
-                        st.markdown("- Hors règle $\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
+                with col_spec2:
+                    st.markdown("##### ⚖️ Règle d'évaluation")
+                    st.markdown("- Respecte la règle $\rightarrow$ Statut : `OK`")
+                    st.markdown("- Hors règle $\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
 
-                    submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
-
-                    if submit_master:
-                        # Construction du dictionnaire mis à jour
-                        updated_cfg = {
-                            "type_specification": selected_spec_type,
-                            "valeur_exacte": val_ex,
-                            "valeur_seuil": val_seuil,
-                            "borne_inf": b_inf,
-                            "borne_sup": b_sup,
-                            "proposition_attributs": prop_att
-                        }
-                        
-                        # Sauvegarde immédiate dans st.session_state ET dans le projet p (qui va dans le JSON)
-                        st.session_state[session_key] = updated_cfg
-                        if isinstance(p, dict):
-                            p[save_key] = updated_cfg.copy()
-                            
-                        st.success(f"🎯 Valeur de référence enregistrée avec succès pour : **{selected_var_to_test}** !")
+                # Bouton d'enregistrement explicite calqué sur le fonctionnement du protocole terrain
+                if st.button("💾 Enregistrer la valeur de référence", key=f"btn_save_master_{var_clean_id}_{safe_idx}", type="primary"):
+                    saved_config = {
+                        "type_specification": selected_spec_type,
+                        "valeur_exacte": val_ex,
+                        "valeur_seuil": val_seuil,
+                        "borne_inf": b_inf,
+                        "borne_sup": b_sup,
+                        "proposition_attributs": prop_att
+                    }
+                    st.session_state[session_key] = saved_config
+                    if isinstance(p, dict):
+                        p[save_key] = saved_config.copy()
+                    st.success(f"✅ Valeur de référence enregistrée dans le projet pour : **{selected_var_to_test}** !")
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
