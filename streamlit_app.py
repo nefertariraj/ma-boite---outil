@@ -1902,21 +1902,60 @@ else:
                 p["protocol_saved"] = edited_msa_df.to_dict('records') 
                 st.success("✅ Données enregistrées dans le projet !")
 
-            # --- LOGIQUE D'AFFICHAGE ROBUSTE ET PERSISTANTE ---
+        # --- LOGIQUE D'AFFICHAGE ROBUSTE ET PERSISTANTE ---
         
-            # 1. On récupère le dataframe de la session ou du projet
-            df_msa_actif = st.session_state.get(local_msa_key, pd.DataFrame())
+        # 1. On récupère le dataframe de la session ou du projet
+        df_msa_actif = st.session_state.get(local_msa_key, pd.DataFrame())
         
-            # 2. Récupération prioritaire et unique des variables critiques
+        # 2. Vérification si le statut 'test effectué' existe déjà en mémoire ou dans le projet
+        has_test_done_in_session = False
+        if not df_msa_actif.empty and "Statut de validation" in df_msa_actif.columns:
+            has_test_done_in_session = "test effectué" in df_msa_actif["Statut de validation"].values
+            
+        has_test_done_in_project = p.get("msa_table_saved") is not None and any(
+            row.get("Statut de validation") == "test effectué" for row in p["msa_table_saved"]
+        )
+
+        # 3. La condition finale est élargie
+        if p.get("protocol_saved") or has_test_done_in_session or has_test_done_in_project:    
+            st.markdown("##### 👟 Exécution du Protocole Terrain")
+            
             if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
                 list_variables_critiques = df_classification_current[nom_colonne_variable].dropna().tolist()
-            elif p.get("msa_table_saved"):
-                list_variables_critiques = [row.get("Variable Critique (liée au Y)") for row in p["msa_table_saved"]]
             else:
                 list_variables_critiques = []
+            
+            if list_variables_critiques:
+                if "msa_validated_vars" not in st.session_state:
+                    st.session_state["msa_validated_vars"] = {}
+                if "msa_bias_history" not in st.session_state:
+                    st.session_state["msa_bias_history"] = {}
 
-            # 3. Affichage inconditionnel du bloc d'exécution du protocole
-            st.markdown("##### 👟 Exécution du Protocole Terrain")
+                # Génération des options du sélecteur avec un indicateur de statut clair
+                options_sélecteur = []
+                mapping_variables = {}
+                for var in list_variables_critiques:
+                    if str(var).strip() == "":
+                        continue
+                    v_c = "".join(e for e in str(var) if e.isalnum())
+                    if st.session_state.get(f"status_lock_{v_c}_{safe_idx}", False) or p.get(f"validated_status_{v_c}_{safe_idx}", False):
+                        label = f"✅ {var}"
+                    else:
+                        label = f"⏳ {var}"
+                    options_sélecteur.append(label)
+                    mapping_variables[label] = var
+
+                selected_option = st.selectbox(
+                    "Sélectionnez la variable à tester actuellement parmi vos variables critiques :",
+                    options=options_sélecteur,
+                    key=f"msa_selected_var_{safe_idx}"
+                )
+                
+                # Récupération sécurisée du nom propre de la variable sans couper arbitrairement l'émoji
+                selected_var_to_test = mapping_variables.get(selected_option, "")
+
+                # --- TABLEAU DE BORD DES MESURES DÉJÀ VALIDÉES ---
+                st.markdown("##### 📈 Historique des protocoles validés")
         
             # Initialisation sécurisée de l'état de session
             if "msa_validated_vars" not in st.session_state:
