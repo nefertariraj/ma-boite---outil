@@ -2065,11 +2065,11 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Isolé et sécurisé) ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Corrigé et persistant) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
-                # Initialisation stricte isolée
+                # Restauration ou initialisation depuis 'p' ou la session
                 if session_key not in st.session_state:
                     if isinstance(p, dict) and save_key in p and isinstance(p[save_key], dict):
                         st.session_state[session_key] = p[save_key].copy()
@@ -2083,7 +2083,7 @@ else:
                             "proposition_attributs": "Conforme / Non-conforme"
                         }
 
-                # On utilise une variable locale dédiée pour éviter les conflits d'affichage
+                # On récupère l'état actuel en session
                 local_master_cfg = st.session_state[session_key]
 
                 with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
@@ -2137,18 +2137,20 @@ else:
                     submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
                     if submit_master:
-                        # Mise à jour sécurisée des valeurs du dictionnaire local
-                        local_master_cfg["type_specification"] = selected_spec_type
-                        local_master_cfg["valeur_exacte"] = val_ex
-                        local_master_cfg["valeur_seuil"] = val_seuil
-                        local_master_cfg["borne_inf"] = b_inf
-                        local_master_cfg["borne_sup"] = b_sup
-                        local_master_cfg["proposition_attributs"] = prop_att
+                        # Construction du dictionnaire mis à jour
+                        updated_cfg = {
+                            "type_specification": selected_spec_type,
+                            "valeur_exacte": val_ex,
+                            "valeur_seuil": val_seuil,
+                            "borne_inf": b_inf,
+                            "borne_sup": b_sup,
+                            "proposition_attributs": prop_att
+                        }
                         
-                        # Synchronisation immédiate session_state et projet p garanti
-                        st.session_state[session_key] = local_master_cfg
+                        # Sauvegarde immédiate dans st.session_state ET dans le projet p (qui va dans le JSON)
+                        st.session_state[session_key] = updated_cfg
                         if isinstance(p, dict):
-                            p[save_key] = local_master_cfg.copy()
+                            p[save_key] = updated_cfg.copy()
                             
                         st.success(f"🎯 Valeur de référence enregistrée avec succès pour : **{selected_var_to_test}** !")
                         
