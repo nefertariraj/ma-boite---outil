@@ -47,6 +47,12 @@ def synchroniser_et_capturer_tout(projet_en_cours, index_projet):
     projet_en_cours["msa_action_choice"] = st.session_state.get(f"msa_action_choice_{cle_unique}", "")
     projet_en_cours["msa_is_validated_status"] = st.session_state.get(f"msa_sign_off_{cle_unique}", False)
 
+    for cle_interne in list(st.session_state.keys()):
+        if cle_interne.startswith("reference_master_config_") and cle_interne.endswith(f"_{cle_unique}"):
+            suffixe_variable = cle_interne.replace("reference_master_config_", "")
+            save_target_key = f"save_master_config_{suffixe_variable}"
+            projet_en_cours[save_target_key] = st.session_state[cle_interne].copy()
+
     # 4. Capture automatique de tous les autres champs de saisie de ce projet
     for cle_interne in st.session_state.keys():
         if cle_interne.endswith(f"_{cle_unique}"):
