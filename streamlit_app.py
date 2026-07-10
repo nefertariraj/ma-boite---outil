@@ -2065,11 +2065,11 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Correction définitive de la persistance JSON) ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Affichage dynamique d'origine & Sauvegarde JSON corrigée) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
-                # 1. Initialisation de l'état de session depuis 'p' ou par défaut
+                # 1. Restauration initiale depuis l'état ou le dictionnaire projet 'p'
                 if session_key not in st.session_state:
                     if isinstance(p, dict) and save_key in p and isinstance(p[save_key], dict):
                         st.session_state[session_key] = p[save_key].copy()
@@ -2083,7 +2083,7 @@ else:
                             "proposition_attributs": "Conforme / Non-conforme"
                         }
 
-                # Clés uniques des widgets dans st.session_state
+                # Définition des clés uniques pour chaque widget
                 k_type = f"spec_type_{var_clean_id}_{safe_idx}"
                 k_vex = f"val_ex_{var_clean_id}_{safe_idx}"
                 k_vseuil = f"val_seuil_{var_clean_id}_{safe_idx}"
@@ -2093,17 +2093,17 @@ else:
 
                 current_cfg = st.session_state[session_key]
 
-                # 2. Synchronisation des valeurs par défaut dans le session_state AVANT le formulaire
-                # pour éviter que Streamlit n'initialise à 0.0 de manière intempestive.
-                for k, default_val in [
-                    (k_vex, current_cfg.get("valeur_exacte", 0.0)),
-                    (k_vseuil, current_cfg.get("valeur_seuil", 0.0)),
-                    (k_binf, current_cfg.get("borne_inf", 0.0)),
-                    (k_bsup, current_cfg.get("borne_sup", 10.0)),
-                    (k_patt, current_cfg.get("proposition_attributs", "Conforme / Non-conforme"))
-                ]:
-                    if k not in st.session_state:
-                        st.session_state[k] = default_val
+                # Pré-initialisation sécurisée dans session_state pour éviter les écrasements à 0.0
+                if k_vex not in st.session_state:
+                    st.session_state[k_vex] = float(current_cfg.get("valeur_exacte", 0.0))
+                if k_vseuil not in st.session_state:
+                    st.session_state[k_vseuil] = float(current_cfg.get("valeur_seuil", 0.0))
+                if k_binf not in st.session_state:
+                    st.session_state[k_binf] = float(current_cfg.get("borne_inf", 0.0))
+                if k_bsup not in st.session_state:
+                    st.session_state[k_bsup] = float(current_cfg.get("borne_sup", 10.0))
+                if k_patt not in st.session_state:
+                    st.session_state[k_patt] = str(current_cfg.get("proposition_attributs", "Conforme / Non-conforme"))
 
                 with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
                     st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
@@ -2119,6 +2119,7 @@ else:
                     t_courant = current_cfg.get("type_specification", "Valeur exacte")
                     idx_courant = type_spec_options.index(t_courant) if t_courant in type_spec_options else 0
 
+                    # Menu déroulant principal
                     choix_type = st.selectbox(
                         "Type de règle de référence (Standard Master) :",
                         options=type_spec_options,
@@ -2126,10 +2127,10 @@ else:
                         key=k_type
                     )
 
-                    col1, col2 = st.columns(2)
+                    col_spec1, col_spec2 = st.columns(2)
 
-                    with col1:
-                        # Affichage conditionnel basé sur la valeur actuelle de la sélection
+                    with col_spec1:
+                        # Remise de l'affichage dynamique d'origine selon le choix exact
                         if choix_type == "Valeur exacte":
                             st.number_input("Définir la valeur cible exacte (Master) :", key=k_vex)
                         elif choix_type in ["Supérieur ou égal à (≥)", "Inférieur ou égal à (≤)"]:
@@ -2141,7 +2142,7 @@ else:
                             st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
                             st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", key=k_patt)
 
-                    with col2:
+                    with col_spec2:
                         st.markdown("##### ⚖️ Règle d'évaluation")
                         st.markdown("- Respecte la règle $\rightarrow$ Statut : `OK`")
                         st.markdown("- Hors règle $\rightarrow$ Statut : `Défaut (Non-OK / Non-conforme)`")
@@ -2149,9 +2150,9 @@ else:
                     submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
                     if submit_master:
-                        # Récupération directe et sécurisée depuis les clés persistantes de st.session_state
+                        # Récupération sécurisée du type et des valeurs validées
                         final_type = st.session_state.get(k_type, choix_type)
-        
+                        
                         updated_data = {
                             "type_specification": final_type,
                             "valeur_exacte": float(st.session_state.get(k_vex, 0.0)) if final_type == "Valeur exacte" else 0.0,
@@ -2160,13 +2161,13 @@ else:
                             "borne_sup": float(st.session_state.get(k_bsup, 10.0)) if final_type == "Intervalle (Entre min et max)" else 10.0,
                             "proposition_attributs": str(st.session_state.get(k_patt, "Conforme / Non-conforme")) if final_type.startswith("Attribut qualitatif") else "Conforme / Non-conforme"
                         }
-        
-                        # Enregistrement robuste dans la session et répercussion directe dans le dictionnaire p pour votre JSON
+                        
+                        # Sauvegarde dans la session et répercussion immédiate dans le dictionnaire p pour le JSON
                         st.session_state[session_key] = updated_data
                         if isinstance(p, dict):
                             p[save_key] = updated_data.copy()
-            
-                        st.success("🎯 Valeur de référence, type et seuil sauvegardés avec succès dans le JSON !")
+                            
+                        st.success("🎯 Valeur de référence, type et données associés enregistrés avec succès dans le JSON !")
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
