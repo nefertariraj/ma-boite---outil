@@ -1916,12 +1916,14 @@ else:
             row.get("Statut de validation") == "test effectué" for row in p["msa_table_saved"]
         )
 
-        # 3. La condition finale est élargie
+       # 3. La condition finale reste strictement la vôtre
         if p.get("protocol_saved") or has_test_done_in_session or has_test_done_in_project:    
             st.markdown("##### 👟 Exécution du Protocole Terrain")
             
             if not df_classification_current.empty and nom_colonne_variable in df_classification_current.columns:
                 list_variables_critiques = df_classification_current[nom_colonne_variable].dropna().tolist()
+            elif p.get("msa_table_saved"):
+                list_variables_critiques = [row.get("Variable Critique (liée au Y)") for row in p["msa_table_saved"] if row.get("Variable Critique (liée au Y)")]
             else:
                 list_variables_critiques = []
             
