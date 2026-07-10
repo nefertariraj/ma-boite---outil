@@ -3482,7 +3482,11 @@ else:
 
         # 6. CRITÈRE DE CLÔTURE
         st.divider()
-        tous_decides = all(d not in ["En cours d'analyse"] for d in df_final["Décision"])
+        # Sécurité anti-KeyError : on vérifie que df_final est un vrai DataFrame et que la colonne 'Décision' y existe
+        if isinstance(df_final, pd.DataFrame) and "Décision" in df_final.columns and not df_final.empty:
+            tous_decides = all(d not in ["En cours d'analyse"] for d in df_final["Décision"])
+        else:
+            tous_decides = False
         if tous_decides and len(df_final) > 0:
             st.success("✅ Tous les critères de clôture sont remplis. Vous pouvez passer en phase Improve.")
         else:
