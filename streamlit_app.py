@@ -2065,7 +2065,7 @@ else:
                     if f"editor_reprod_{var_clean_id}_{safe_idx}" in st.session_state:
                         edited_reprod = st.session_state[f"editor_reprod_{var_clean_id}_{safe_idx}"]
                 
-                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Affichage dynamique d'origine & Sauvegarde JSON corrigée) ---
+                # --- BLOC FORMULAIRE POUR VALEUR DE RÉFÉRENCE (Sauvegarde unifiée type + valeur) ---
                 session_key = f"reference_master_config_{var_clean_id}_{safe_idx}"
                 save_key = f"save_master_config_{var_clean_id}_{safe_idx}"
 
@@ -2093,18 +2093,6 @@ else:
 
                 current_cfg = st.session_state[session_key]
 
-                # Pré-initialisation sécurisée dans session_state pour éviter les écrasements à 0.0
-                if k_vex not in st.session_state:
-                    st.session_state[k_vex] = float(current_cfg.get("valeur_exacte", 0.0))
-                if k_vseuil not in st.session_state:
-                    st.session_state[k_vseuil] = float(current_cfg.get("valeur_seuil", 0.0))
-                if k_binf not in st.session_state:
-                    st.session_state[k_binf] = float(current_cfg.get("borne_inf", 0.0))
-                if k_bsup not in st.session_state:
-                    st.session_state[k_bsup] = float(current_cfg.get("borne_sup", 10.0))
-                if k_patt not in st.session_state:
-                    st.session_state[k_patt] = str(current_cfg.get("proposition_attributs", "Conforme / Non-conforme"))
-
                 with st.form(key=f"form_master_cfg_{var_clean_id}_{safe_idx}"):
                     st.markdown("##### 🎯 Valeur de Référence (Master / Standard)")
 
@@ -2119,7 +2107,7 @@ else:
                     t_courant = current_cfg.get("type_specification", "Valeur exacte")
                     idx_courant = type_spec_options.index(t_courant) if t_courant in type_spec_options else 0
 
-                    # Menu déroulant principal
+                    # Menu déroulant principal (qui fonctionne déjà pour la sauvegarde du type)
                     choix_type = st.selectbox(
                         "Type de règle de référence (Standard Master) :",
                         options=type_spec_options,
@@ -2129,18 +2117,25 @@ else:
 
                     col_spec1, col_spec2 = st.columns(2)
 
+                    # Récupération des valeurs mémorisées actuelles par défaut
+                    v_ex_m = float(current_cfg.get("valeur_exacte", 0.0))
+                    v_seuil_m = float(current_cfg.get("valeur_seuil", 0.0))
+                    b_inf_m = float(current_cfg.get("borne_inf", 0.0))
+                    b_sup_m = float(current_cfg.get("borne_sup", 10.0))
+                    p_att_m = str(current_cfg.get("proposition_attributs", "Conforme / Non-conforme"))
+
                     with col_spec1:
-                        # Remise de l'affichage dynamique d'origine selon le choix exact
+                        # Restauration de l'affichage dynamique d'origine par choix
                         if choix_type == "Valeur exacte":
-                            st.number_input("Définir la valeur cible exacte (Master) :", key=k_vex)
+                            st.number_input("Définir la valeur cible exacte (Master) :", value=v_ex_m, key=k_vex)
                         elif choix_type in ["Supérieur ou égal à (≥)", "Inférieur ou égal à (≤)"]:
-                            st.number_input("Valeur seuil acceptée :", key=k_vseuil)
+                            st.number_input("Valeur seuil acceptée :", value=v_seuil_m, key=k_vseuil)
                         elif choix_type == "Intervalle (Entre min et max)":
-                            st.number_input("Borne inférieure de l'intervalle :", key=k_binf)
-                            st.number_input("Borne supérieure de l'intervalle :", key=k_bsup)
+                            st.number_input("Borne inférieure de l'intervalle :", value=b_inf_m, key=k_binf)
+                            st.number_input("Borne supérieure de l'intervalle :", value=b_sup_m, key=k_bsup)
                         else:
                             st.markdown("##### 🧠 Analyse MBB - Attributs / Données Qualitatives")
-                            st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", key=k_patt)
+                            st.text_area("Proposition de référentiel qualitatif (Master Attribut) :", value=p_att_m, key=k_patt)
 
                     with col_spec2:
                         st.markdown("##### ⚖️ Règle d'évaluation")
@@ -2150,24 +2145,24 @@ else:
                     submit_master = st.form_submit_button("✅ Valider et enregistrer la valeur de référence", type="primary")
 
                     if submit_master:
-                        # Récupération sécurisée du type et des valeurs validées
+                        # Utilisation de la même rigueur de capture pour le type et les valeurs associées
                         final_type = st.session_state.get(k_type, choix_type)
                         
                         updated_data = {
                             "type_specification": final_type,
-                            "valeur_exacte": float(st.session_state.get(k_vex, 0.0)) if final_type == "Valeur exacte" else 0.0,
-                            "valeur_seuil": float(st.session_state.get(k_vseuil, 0.0)) if final_type in ["Supérieur ou égal à (≥)", "Inférieur ou égal à (≤)"] else 0.0,
-                            "borne_inf": float(st.session_state.get(k_binf, 0.0)) if final_type == "Intervalle (Entre min et max)" else 0.0,
-                            "borne_sup": float(st.session_state.get(k_bsup, 10.0)) if final_type == "Intervalle (Entre min et max)" else 10.0,
-                            "proposition_attributs": str(st.session_state.get(k_patt, "Conforme / Non-conforme")) if final_type.startswith("Attribut qualitatif") else "Conforme / Non-conforme"
+                            "valeur_exacte": float(st.session_state.get(k_vex, v_ex_m)) if final_type == "Valeur exacte" else 0.0,
+                            "valeur_seuil": float(st.session_state.get(k_vseuil, v_seuil_m)) if final_type in ["Supérieur ou égal à (≥)", "Inférieur ou égal à (≤)"] else 0.0,
+                            "borne_inf": float(st.session_state.get(k_binf, b_inf_m)) if final_type == "Intervalle (Entre min et max)" else 0.0,
+                            "borne_sup": float(st.session_state.get(k_bsup, b_sup_m)) if final_type == "Intervalle (Entre min et max)" else 10.0,
+                            "proposition_attributs": str(st.session_state.get(k_patt, p_att_m)) if final_type.startswith("Attribut qualitatif") else "Conforme / Non-conforme"
                         }
                         
-                        # Sauvegarde dans la session et répercussion immédiate dans le dictionnaire p pour le JSON
+                        # Sauvegarde globale dans la session et répercussion dans p pour le fichier JSON
                         st.session_state[session_key] = updated_data
                         if isinstance(p, dict):
                             p[save_key] = updated_data.copy()
                             
-                        st.success("🎯 Valeur de référence, type et données associés enregistrés avec succès dans le JSON !")
+                        st.success("🎯 Type et valeur de référence enregistrés et sauvegardés dans le JSON avec succès !")
                         
                 # --- BOUTON DÉDIÉ : LANCER L'ANALYSE DES BIAIS ---
                 st.markdown("<br>", unsafe_allow_html=True)
