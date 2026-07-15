@@ -661,16 +661,27 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. Copie profonde et isolée du modèle de référence
+                # 1. NETTOYAGE GLOBAL DES WIDGETS ACTIFS EN MÉMOIRE
+                # On supprime toutes les clés de widgets en session (Data Collection, Process Map, Inputs, etc.) 
+                # pour que les formulaires repartent absolument vierges, sans impacter les anciens projets sauvegardés.
+                keys_to_purge = []
+                for k in list(st.session_state.keys()):
+                    if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
+                        continue
+                    keys_to_purge.append(k)
+                for k in keys_to_purge:
+                    del st.session_state[k]
+
+                # 2. Copie profonde et isolée du modèle de référence
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 
-                # 2. Attributs de base du projet
+                # 3. Attributs de base du projet
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # 3. VIDAGE RADICAL DE TOUTES LES DONNÉES INTERNES (pour garantir un projet 100% vide et indépendant)
+                # 4. VIDAGE RADICAL DE TOUTES LES DONNÉES INTERNES DU MODÈLE
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -692,7 +703,7 @@ if st.session_state.current_project_idx is None:
                             elif isinstance(new_p[phase_key][sub_k], dict):
                                 new_p[phase_key][sub_k] = {}
 
-                # 4. Ajout à la session et activation immédiate
+                # 5. Ajout à la session et activation immédiate
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                     
