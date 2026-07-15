@@ -672,7 +672,7 @@ if st.session_state.current_project_idx is None:
                     
                 for k in keys_to_delete:
                     del st.session_state[k]
-
+                
                 # 2. Copie profonde et isolée du modèle de référence unique
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 
@@ -681,6 +681,18 @@ if st.session_state.current_project_idx is None:
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
+
+                # Nettoyage spécifique de la phase Improve sur le nouveau projet
+                if "improve" in new_p:
+                    new_p["improve"] = {"strategies": []}
+                elif "dmaic" in new_p and isinstance(new_p["dmaic"], dict):
+                    if "improve" in new_p["dmaic"]:
+                        new_p["dmaic"]["improve"] = {"strategies": []}
+
+                # Nettoyage des globales Improve en session
+                for k_global in ["improve_strategies", "strategies_list", "solutions_data"]:
+                    if k_global in st.session_state:
+                        del st.session_state[k_global]
 
                 # 3. Ajout à la session et activation immédiate
                 if "projects" not in st.session_state:
