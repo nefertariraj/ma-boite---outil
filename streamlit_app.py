@@ -661,93 +661,53 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE CIBLÉE DES FORMULAIRES ACTIFS
+                # 1. PURGE RADICALE DE TOUTES LES CLÉS LIÉES AUX WIDGETS ET DONNÉES ACTIVES
+                # On nettoie tout ce qui peut contenir l'état d'un formulaire ou d'un tableau précédent
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
-                    if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker", "input_nouveau_projet_nom", "btn_creer_nouveau_projet"]:
+                    # On évite de supprimer les variables système globales comme 'projects', 'authenticated', etc.
+                    if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
                         continue
                     keys_to_delete.append(k)
-                
+                    
                 for k in keys_to_delete:
                     del st.session_state[k]
 
-                # Nettoyage des dataframes globaux temporaires
-                for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
-                    if k_global in st.session_state:
-                        del st.session_state[k_global]
-
-                # 2. Copie propre du modèle de référence avec toutes les clés sécurisées par défaut
+                # 2. Copie profonde et isolée du modèle de référence unique
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
+                
+                # Attributs spécifiques au nouveau projet
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
-                new_p["selected_ctq"] = ""  # Sécurité pour éviter le NameError plus bas
-                new_p["gantt_data"] = pd.DataFrame()
-                new_p["mesure_data"] = pd.DataFrame()
-                new_p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute"])
-            
-                new_p["master_dcp_table"] = []
-                new_p["msa_classification_table"] = []
-                new_p["rep_table_data"] = []
-                new_p["reprod_table_data"] = []
-                new_p["sipoc_data"] = []
-                new_p["voc_data"] = []
-                new_p["dmaic"] = {
-                    "define": {},
-                    "measure": {},
-                    "analyze": {},
-                    "improve": {"strategies": []},
-                    "innovate": {},
-                    "control": {}
-                }
 
-                if "projects" not in st.session_state or not isinstance(st.session_state.projects, list):
+                # 3. Ajout à la session et activation immédiate
+                if "projects" not in st.session_state:
                     st.session_state.projects = []
-                
+                    
                 st.session_state.projects.append(new_p)
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
-            
+                
                 st.success("Projet créé et initialisé à vide avec succès !")
                 st.rerun()
 
-    st.divider()
-    st.subheader("📂 Mes Projets Enregistrés")
-
-    # RÉCUPÉRATION ET NORMALISATION DE LA LISTE DES PROJETS (JSON ou Session)
-    if "projects" not in st.session_state:
-        st.session_state.projects = []
-
-    projets_a_afficher = st.session_state.projects
-
-    if isinstance(projets_a_afficher, dict):
-        projets_a_afficher = [projets_a_afficher]
-        st.session_state.projects = projets_a_afficher
-
-    if isinstance(projets_a_afficher, list) and len(projets_a_afficher) > 0:
+    # Affichage des cartes projets
+    if "projects" in st.session_state and len(st.session_state.projects) > 0:
         cols = st.columns(3)
-        for idx, proj in enumerate(projets_a_afficher):
+        for idx, proj in enumerate(st.session_state.projects):
             with cols[idx % 3]:
                 with st.container(border=True):
-                    nom_final = f"Projet #{idx + 1}"
-                    if isinstance(proj, dict):
-                        for cle_test in ["nom", "name", "nom_projet", "project_name"]:
-                            if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
-                                nom_final = str(proj[cle_test]).strip()
-                                break
-                
+                    nom_final = "Projet sans nom"
+                    for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                        if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                            nom_final = str(proj[cle_test]).strip()
+                            break
+                    
                     st.subheader(nom_final)
-                    if isinstance(proj, dict):
-                        st.caption(f"Statut : {proj.get('status', 'Define')}")
-                
-                    if st.button("Ouvrir", key=f"open_proj_safe_{idx}"):
-                        for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
-                            if k_global in st.session_state:
-                                del st.session_state[k_global]
+                    if st.button("Ouvrir", key=f"open_{idx}"):
                         st.session_state.current_project_idx = idx
                         st.rerun()
-    else:
-        st.info("💡 Aucun projet en mémoire. Créez-en un ou importez une sauvegarde JSON via la barre latérale.")
 
 else:
     # --- VUE PROJET (DMAIC) ---
