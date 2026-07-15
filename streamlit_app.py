@@ -662,29 +662,16 @@ if st.session_state.current_project_idx is None:
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
                 # 1. PURGE RADICALE DE TOUTES LES CLÉS LIÉES AUX WIDGETS ET DONNÉES ACTIVES
+                # On nettoie tout ce qui peut contenir l'état d'un formulaire ou d'un tableau précédent
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
+                    # On évite de supprimer les variables système globales comme 'projects', 'authenticated', etc.
                     if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
                         continue
                     keys_to_delete.append(k)
                 
                 for k in keys_to_delete:
                     del st.session_state[k]
-
-                # 1.bis PURGE EXPLICITE DES VARIABLES GLOBALES DE DONNÉES / PROCESS MAP
-                # (Ajoutez ici les noms exacts de vos variables globales d'import Excel ou de Process Map si elles diffèrent)
-                keys_globales_a_vider = [
-                    "dc_master_data", 
-                    "current_spc_data", 
-                    "improve_strategies", 
-                    "process_map_data", 
-                    "current_state_process_map",
-                    "excel_import_data",
-                    "master_dcp_table"
-                ]
-                for kg in keys_globales_a_vider:
-                    if kg in st.session_state:
-                        del st.session_state[kg]
 
                 # 2. Copie profonde et isolée du modèle de référence unique
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
@@ -696,7 +683,7 @@ if st.session_state.current_project_idx is None:
                 new_p["problem"] = ""
 
                 # 3. Ajout à la session et activation immédiate
-                if "projects" not in st.session_state:
+                if "projects" not in st.session_state or not isinstance(st.session_state.projects, list):
                     st.session_state.projects = []
                 
                 st.session_state.projects.append(new_p)
@@ -705,26 +692,28 @@ if st.session_state.current_project_idx is None:
                 st.success("Projet créé et initialisé à vide avec succès !")
                 st.rerun()
 
-        # Affichage des cartes projets
-        if "projects" in st.session_state and len(st.session_state.projects) > 0:
-            cols = st.columns(3)
-            for idx, proj in enumerate(st.session_state.projects):
-                with cols[idx % 3]:
-                    with st.container(border=True):
-                        nom_final = "Projet sans nom"
-                        for cle_test in ["nom", "name", "nom_projet", "project_name"]:
-                            if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
-                                nom_final = str(proj[cle_test]).strip()
-                                break
-                    
-                        st.subheader(nom_final)
-                        if st.button("Ouvrir", key=f"open_{idx}"):
-                            # On nettoie aussi les globales en changeant de projet pour éviter les mélanges
-                            for kg in ["dc_master_data", "current_spc_data", "improve_strategies", "process_map_data", "current_state_process_map", "excel_import_data", "master_dcp_table"]:
-                                if kg in st.session_state:
-                                    del st.session_state[kg]
-                            st.session_state.current_project_idx = idx
-                            st.rerun()
+        # Affichage des cartes projets (avec sécurisation du format pour les JSON importés)
+        if "projects" in st.session_state:
+            # Sécurité au cas où le JSON chargé mettrait un dict au lieu d'une liste
+            if isinstance(st.session_state.projects, dict):
+                st.session_state.projects = [st.session_state.projects]
+            
+            if isinstance(st.session_state.projects, list) and len(st.session_state.projects) > 0:
+                cols = st.columns(3)
+                for idx, proj in enumerate(st.session_state.projects):
+                    with cols[idx % 3]:
+                        with st.container(border=True):
+                            nom_final = "Projet sans nom"
+                            if isinstance(proj, dict):
+                                for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                                    if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                                        nom_final = str(proj[cle_test]).strip()
+                                        break
+                        
+                            st.subheader(nom_final)
+                            if st.button("Ouvrir", key=f"open_{idx}"):
+                                st.session_state.current_project_idx = idx
+                                st.rerun()
 
 else:
     # --- VUE PROJET (DMAIC) ---
