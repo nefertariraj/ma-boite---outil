@@ -661,6 +661,7 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
+                # 1. PURGE CIBLÉE DES FORMULAIRES ACTIFS
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker", "input_nouveau_projet_nom", "btn_creer_nouveau_projet"]:
@@ -670,15 +671,18 @@ if st.session_state.current_project_idx is None:
                 for k in keys_to_delete:
                     del st.session_state[k]
 
+                # Nettoyage des dataframes globaux temporaires
                 for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
                     if k_global in st.session_state:
                         del st.session_state[k_global]
 
+                # 2. Copie propre du modèle de référence avec toutes les clés sécurisées par défaut
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
+                new_p["selected_ctq"] = ""  # Sécurité pour éviter le NameError plus bas
                 new_p["gantt_data"] = pd.DataFrame()
                 new_p["mesure_data"] = pd.DataFrame()
                 new_p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute"])
@@ -710,7 +714,7 @@ if st.session_state.current_project_idx is None:
     st.divider()
     st.subheader("📂 Mes Projets Enregistrés")
 
-    # RÉCUPÉRATION ET NORMALISATION DIRECTE DE LA LISTE DES PROJETS (JSON ou Session)
+    # RÉCUPÉRATION ET NORMALISATION DE LA LISTE DES PROJETS (JSON ou Session)
     if "projects" not in st.session_state:
         st.session_state.projects = []
 
