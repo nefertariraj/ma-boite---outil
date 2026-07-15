@@ -657,7 +657,7 @@ with st.sidebar:
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
     
-   with st.expander("➕ Initialiser un nouveau projet"):
+    with st.expander("➕ Initialiser un nouveau projet"):
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
@@ -671,14 +671,12 @@ if st.session_state.current_project_idx is None:
                 new_p["problem"] = ""
 
                 # 3. VIDAGE RADICAL DE TOUTES LES DONNÉES INTERNES (pour garantir un projet 100% vide et indépendant)
-                # On parcourt ou réinitialise les clés typiques de données (Data Collection, Process Map, Improve, etc.)
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
                     "process_map_data", "current_state_process_map", "steps", "mapping_data"
                 ]
                 
-                # Nettoyage au niveau racine du dictionnaire projet s'ils y existent
                 for k in keys_to_reset:
                     if k in new_p:
                         if isinstance(new_p[k], list):
@@ -686,15 +684,12 @@ if st.session_state.current_project_idx is None:
                         elif isinstance(new_p[k], dict):
                             new_p[k] = {}
 
-                # Nettoyage ciblé à l'intérieur des sous-structures DMAIC si elles existent dans votre modèle
                 for phase_key in ["define", "measure", "analyze", "improve", "control", "dmaic"]:
                     if phase_key in new_p and isinstance(new_p[phase_key], dict):
                         for sub_k in list(new_p[phase_key].keys()):
-                            # Si c'est une liste de données, de stratégies ou d'étapes, on la vide
                             if isinstance(new_p[phase_key][sub_k], list):
                                 new_p[phase_key][sub_k] = []
                             elif isinstance(new_p[phase_key][sub_k], dict):
-                                # On vide ou on remet à plat selon les dictionnaires internes
                                 new_p[phase_key][sub_k] = {}
 
                 # 4. Ajout à la session et activation immédiate
