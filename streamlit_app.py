@@ -661,7 +661,6 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. On ne touche qu'aux widgets actifs de saisie, sans effacer la liste des projets
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker", "input_nouveau_projet_nom", "btn_creer_nouveau_projet"]:
@@ -675,7 +674,6 @@ if st.session_state.current_project_idx is None:
                     if k_global in st.session_state:
                         del st.session_state[k_global]
 
-                # 2. Copie propre du modèle de référence
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
@@ -709,38 +707,43 @@ if st.session_state.current_project_idx is None:
                 st.success("Projet créé et initialisé à vide avec succès !")
                 st.rerun()
 
-        # 3. AFFICHAGE ULTRA-ROBUSTE DES PROJETS (Gère les listes et les dictionnaires bruts issus des JSON)
-        projets_a_afficher = st.session_state.get("projects", [])
-    
-        # Sécurité de secours au cas où projects serait un dict ou mal formaté après un import
-        if isinstance(projets_a_afficher, dict):
-            projets_a_afficher = [projets_a_afficher]
-            st.session_state.projects = projets_a_afficher
+    st.divider()
+    st.subheader("📂 Mes Projets Enregistrés")
 
-        if isinstance(projets_a_afficher, list) and len(projets_a_afficher) > 0:
-            cols = st.columns(3)
-            for idx, proj in enumerate(projets_a_afficher):
-                with cols[idx % 3]:
-                    with st.container(border=True):
-                        nom_final = f"Projet #{idx + 1}"
-                        if isinstance(proj, dict):
-                            for cle_test in ["nom", "name", "nom_projet", "project_name"]:
-                                if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
-                                    nom_final = str(proj[cle_test]).strip()
-                                    break
-                    
-                        st.subheader(nom_final)
-                        if isinstance(proj, dict):
-                            st.caption(f"Statut : {proj.get('status', 'Define')}")
-                    
-                        if st.button("Ouvrir", key=f"open_proj_safe_{idx}"):
-                            for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
-                                if k_global in st.session_state:
-                                    del st.session_state[k_global]
-                            st.session_state.current_project_idx = idx
-                            st.rerun()
-        else:
-            st.info("💡 Aucun projet en mémoire. Créez-en un ou importez une sauvegarde JSON via la barre latérale.")
+    # RÉCUPÉRATION ET NORMALISATION DIRECTE DE LA LISTE DES PROJETS (JSON ou Session)
+    if "projects" not in st.session_state:
+        st.session_state.projects = []
+
+    projets_a_afficher = st.session_state.projects
+
+    if isinstance(projets_a_afficher, dict):
+        projets_a_afficher = [projets_a_afficher]
+        st.session_state.projects = projets_a_afficher
+
+    if isinstance(projets_a_afficher, list) and len(projets_a_afficher) > 0:
+        cols = st.columns(3)
+        for idx, proj in enumerate(projets_a_afficher):
+            with cols[idx % 3]:
+                with st.container(border=True):
+                    nom_final = f"Projet #{idx + 1}"
+                    if isinstance(proj, dict):
+                        for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                            if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                                nom_final = str(proj[cle_test]).strip()
+                                break
+                
+                    st.subheader(nom_final)
+                    if isinstance(proj, dict):
+                        st.caption(f"Statut : {proj.get('status', 'Define')}")
+                
+                    if st.button("Ouvrir", key=f"open_proj_safe_{idx}"):
+                        for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
+                            if k_global in st.session_state:
+                                del st.session_state[k_global]
+                        st.session_state.current_project_idx = idx
+                        st.rerun()
+    else:
+        st.info("💡 Aucun projet en mémoire. Créez-en un ou importez une sauvegarde JSON via la barre latérale.")
 
 else:
     # --- VUE PROJET (DMAIC) ---
