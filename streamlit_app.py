@@ -661,19 +661,18 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE CIBLÉE : On supprime uniquement les widgets et tables de l'ancienne session en cours, 
-                # sans toucher aux variables vitales ni à la liste des projets existants (`st.session_state.projects`)
+                # 1. PURGE DOUCE : On ne touche qu'aux widgets de formulaires actifs et aux variables de calcul temporaires, 
+                # en préservant ABSOLUMENT la liste `st.session_state.projects` et le système.
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker", "input_nouveau_projet_nom", "btn_creer_nouveau_projet"]:
                         continue
-                    # On cible les suffixes d'index ou les clés globales de calcul/tableaux
                     keys_to_delete.append(k)
                 
                 for k in keys_to_delete:
                     del st.session_state[k]
 
-                # On nettoie aussi explicitement les dataframes globaux temporaires
+                # Nettoyage des dataframes globaux temporaires
                 for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
                     if k_global in st.session_state:
                         del st.session_state[k_global]
@@ -681,7 +680,7 @@ if st.session_state.current_project_idx is None:
                 # 2. Copie profonde et isolée du modèle de référence unique
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
             
-                # Attributs spécifiques au nouveau projet et réinitialisation exhaustive
+                # Attributs spécifiques au nouveau projet et réinitialisation exhaustive à vide
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
@@ -706,8 +705,8 @@ if st.session_state.current_project_idx is None:
                     "control": {}
                 }
 
-                # 3. Ajout sécurisé à la liste des projets (sans écraser les précédents)
-                if "projects" not in st.session_state:
+                # 3. Sécurité : Initialisation de la liste si elle n'existe pas, puis ajout sans écraser le reste
+                if "projects" not in st.session_state or not isinstance(st.session_state.projects, list):
                     st.session_state.projects = []
                 
                 st.session_state.projects.append(new_p)
@@ -716,17 +715,18 @@ if st.session_state.current_project_idx is None:
                 st.success("Projet créé et initialisé à vide avec succès !")
                 st.rerun()
 
-        # Affichage des cartes projets
-        if "projects" in st.session_state and len(st.session_state.projects) > 0:
+        # Affichage des cartes projets (Garantit que les projets JSON chargés s'affichent correctement)
+        if "projects" in st.session_state and isinstance(st.session_state.projects, list) and len(st.session_state.projects) > 0:
             cols = st.columns(3)
             for idx, proj in enumerate(st.session_state.projects):
                 with cols[idx % 3]:
                     with st.container(border=True):
                         nom_final = "Projet sans nom"
-                        for cle_test in ["nom", "name", "nom_projet", "project_name"]:
-                            if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
-                                nom_final = str(proj[cle_test]).strip()
-                                break
+                        if isinstance(proj, dict):
+                            for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                                if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                                    nom_final = str(proj[cle_test]).strip()
+                                    break
                     
                         st.subheader(nom_final)
                         if st.button("Ouvrir", key=f"open_{idx}"):
