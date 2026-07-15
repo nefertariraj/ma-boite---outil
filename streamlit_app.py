@@ -657,7 +657,7 @@ with st.sidebar:
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
     
-   with st.expander("➕ Initialiser un nouveau projet"):
+    with st.expander("➕ Initialiser un nouveau projet"):
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
