@@ -770,7 +770,7 @@ else:
             if 'new_val' in locals() and new_val != p.get("selected_ctq", ""):
                 p["selected_ctq"] = new_val
                 st.rerun()
-            st.info(f"**CTQ validé :** {p['selected_ctq']}")
+            st.info(f"**CTQ validé :** {p.get('selected_ctq', 'Aucun')}")
 
         # 2. Équipe Projet
         st.divider()
