@@ -767,7 +767,7 @@ else:
                 st.write("✍️ **Ajustez votre CTQ final :**")
                 new_val = st.text_input("Libellé du CTQ", value=p["selected_ctq"], key=f"edit_ctq_{p_idx}")
             
-            if new_val != p["selected_ctq"]:
+            if 'new_val' in locals() and new_val != p.get("selected_ctq", ""):
                 p["selected_ctq"] = new_val
                 st.rerun()
             st.info(f"**CTQ validé :** {p['selected_ctq']}")
