@@ -661,21 +661,27 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE RADICALE : On supprime TOUTES les clés de session sauf les paramètres système vitaux
+                # 1. PURGE CIBLÉE : On supprime uniquement les widgets et tables de l'ancienne session en cours, 
+                # sans toucher aux variables vitales ni à la liste des projets existants (`st.session_state.projects`)
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
-                    # On protège uniquement le strict minimum technique
                     if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker", "input_nouveau_projet_nom", "btn_creer_nouveau_projet"]:
                         continue
+                    # On cible les suffixes d'index ou les clés globales de calcul/tableaux
                     keys_to_delete.append(k)
                 
                 for k in keys_to_delete:
                     del st.session_state[k]
 
+                # On nettoie aussi explicitement les dataframes globaux temporaires
+                for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
+                    if k_global in st.session_state:
+                        del st.session_state[k_global]
+
                 # 2. Copie profonde et isolée du modèle de référence unique
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
             
-                # Attributs spécifiques au nouveau projet et réinitialisation exhaustive des dataframes/phases
+                # Attributs spécifiques au nouveau projet et réinitialisation exhaustive
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
@@ -684,7 +690,7 @@ if st.session_state.current_project_idx is None:
                 new_p["mesure_data"] = pd.DataFrame()
                 new_p["voc_raw_data"] = pd.DataFrame(columns=["client", "question", "réponse brute"])
             
-                # Vidage explicite de TOUTES les structures de données susceptibles d'être affichées dans les autres phases
+                # Vidage explicite de TOUTES les structures des autres phases
                 new_p["master_dcp_table"] = []
                 new_p["msa_classification_table"] = []
                 new_p["rep_table_data"] = []
@@ -700,7 +706,7 @@ if st.session_state.current_project_idx is None:
                     "control": {}
                 }
 
-                # 3. Ajout à la session et activation immédiate
+                # 3. Ajout sécurisé à la liste des projets (sans écraser les précédents)
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                 
@@ -724,7 +730,6 @@ if st.session_state.current_project_idx is None:
                     
                         st.subheader(nom_final)
                         if st.button("Ouvrir", key=f"open_{idx}"):
-                            # On s'assure aussi de purger les dataframes globaux en ouvrant un autre projet
                             for k_global in ["dc_master_data", "current_spc_data", "improve_strategies"]:
                                 if k_global in st.session_state:
                                     del st.session_state[k_global]
