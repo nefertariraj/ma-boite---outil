@@ -661,19 +661,7 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE RADICALE DE TOUTES LES CLÉS LIÉES AUX WIDGETS ET DONNÉES ACTIVES
-                # On nettoie tout ce qui peut contenir l'état d'un formulaire ou d'un tableau précédent
-                keys_to_delete = []
-                for k in list(st.session_state.keys()):
-                    # On évite de supprimer les variables système globales comme 'projects', 'authenticated', etc.
-                    if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
-                        continue
-                    keys_to_delete.append(k)
-                    
-                for k in keys_to_delete:
-                    del st.session_state[k]
-                
-                # 2. Copie profonde et isolée du modèle de référence unique
+                # 1. Copie profonde et isolée du modèle de référence unique (qui est par définition vide)
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 
                 # Attributs spécifiques au nouveau projet
@@ -682,19 +670,14 @@ if st.session_state.current_project_idx is None:
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # Nettoyage spécifique de la phase Improve sur le nouveau projet
+                # S'assure que la section improve est explicitement vide pour ce nouveau projet
                 if "improve" in new_p:
                     new_p["improve"] = {"strategies": []}
                 elif "dmaic" in new_p and isinstance(new_p["dmaic"], dict):
                     if "improve" in new_p["dmaic"]:
                         new_p["dmaic"]["improve"] = {"strategies": []}
 
-                # Nettoyage des globales Improve en session
-                for k_global in ["improve_strategies", "strategies_list", "solutions_data"]:
-                    if k_global in st.session_state:
-                        del st.session_state[k_global]
-
-                # 3. Ajout à la session et activation immédiate
+                # 2. Ajout à la session et activation immédiate
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                     
