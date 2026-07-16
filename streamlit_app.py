@@ -700,6 +700,9 @@ if st.session_state.current_project_idx is None:
                 for k in keys_to_reset:
                     if k in new_p:
                         new_p[k] = [] if isinstance(new_p[k], list) else ({} if isinstance(new_p[k], dict) else None)
+                    # 🛡️ AJOUT DE SÉCURITÉ : On vide aussi immédiatement la session globale active
+                    if k in st.session_state:
+                        st.session_state[k] = pd.DataFrame() if isinstance(st.session_state.get(k), pd.DataFrame) else []
 
                 for phase_key in ["define", "measure", "analyze", "improve", "control", "dmaic"]:
                     if phase_key in new_p and isinstance(new_p[phase_key], dict):
@@ -752,13 +755,16 @@ if st.session_state.current_project_idx is None:
                         # D. Chargement propre et étanche des données du projet sélectionné vers les variables d'affichage
                         proj_cible = st.session_state.projects[idx]
     
-                        # Restauration de la phase Mesure / Data Collection
+                        # Restauration de la phase Mesure / Data Collection (avec réinitialisation forcée si vide)
                         for cle in ["master_dcp_table", "dc_master_data", "current_spc_data"]:
                             if cle in proj_cible and proj_cible[cle]:
                                 if isinstance(proj_cible[cle], list):
                                     st.session_state[cle] = pd.DataFrame(proj_cible[cle])
                                 elif isinstance(proj_cible[cle], pd.DataFrame):
                                     st.session_state[cle] = proj_cible[cle]
+                            else:
+                                # 🛡️ AJOUT DE SÉCURITÉ : Si le projet n'a pas de données, on force un DataFrame vide
+                                st.session_state[cle] = pd.DataFrame()
 
                         # Restauration de la phase Improve / Solutions
                         if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
