@@ -654,6 +654,34 @@ with st.sidebar:
     st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
     
 # --- NAVIGATION PRINCIPALE ---
+if st.session_state.get("current_project_idx") is not None:
+    # 🛡️ GARDIEN DE SESSION : Synchronisation automatique des données du projet actif
+    # Empêche la disparition des données (Improve) et la contamination entre projets (Process Map)
+    idx_actif = st.session_state.current_project_idx
+    if "projects" in st.session_state and idx_actif < len(st.session_state.projects):
+        _proj_courant = st.session_state.projects[idx_actif]
+        
+        # 1. Synchro de l'Improve / Strategies
+        _improve_ok = False
+        if "dmaic" in _proj_courant and isinstance(_proj_courant["dmaic"], dict):
+            _imp_dict = _proj_courant["dmaic"].get("improve", {})
+            if isinstance(_imp_dict, dict):
+                for _sk, _sv in _imp_dict.items():
+                    if _sv:
+                        st.session_state["improve_strategies"] = pd.DataFrame(_sv) if isinstance(_sv, list) else _sv
+                        _improve_ok = True
+                        break
+        if not _improve_ok and "improve_strategies" in _proj_courant and _proj_courant["improve_strategies"]:
+            _strat = _proj_courant["improve_strategies"]
+            st.session_state["improve_strategies"] = pd.DataFrame(_strat) if isinstance(_strat, list) else _strat
+        elif not _improve_ok:
+            st.session_state["improve_strategies"] = pd.DataFrame()
+
+        # 2. Synchro du Process Map / Current State (pour couper net la contamination)
+        for _cle_map in ["process_map_data", "current_state_process_map", "steps", "mapping_data"]:
+            if _cle_map in _proj_courant:
+                st.session_state[_cle_map] = _proj_courant[_cle_map]
+
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
     
@@ -661,7 +689,7 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE TOTALE DES CACHES DE WIDGETS POUR ÉVITER TOUTE CONTAMINATION
+               # 1. PURGE TOTALE DES CACHES DE WIDGETS
                 keys_to_preserve = [
                     "authenticated", "projects", "current_project_idx", 
                     "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
@@ -676,22 +704,16 @@ if st.session_state.current_project_idx is None:
                     except KeyError:
                         pass
 
-                # Purge explicite de TOUTES les variables globales d'interface (Process Map, SPC, Improve, etc.)
-                global_keys_to_nuke = [
-                    "master_dcp_table", "dc_master_data", "current_spc_data", 
-                    "improve_strategies", "strategies_list", "solutions_data",
-                    "process_map_data", "current_state_process_map", "steps", "mapping_data"
-                ]
-                for global_key in global_keys_to_nuke:
+                # Purge explicite des variables globales d'interface
+                for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data", "process_map_data", "current_state_process_map", "steps", "mapping_data"]:
                     if global_key in st.session_state:
                         del st.session_state[global_key]
-                    # On force aussi un DataFrame/liste vide pour contrer le cache persistant de Streamlit
                     st.session_state[global_key] = pd.DataFrame() if global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies"] else []
 
-                # 2. Copie profonde et sécurisée du modèle de référence
+                # 2. Copie du modèle de référence
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 
-                # 3. Attributs de base du projet
+                # 3. Attributs de base
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
@@ -716,7 +738,7 @@ if st.session_state.current_project_idx is None:
                             elif isinstance(new_p[phase_key][sub_k], dict):
                                 new_p[phase_key][sub_k] = {}
 
-                # 5. Ajout à la session et activation immédiate
+                # 5. Ajout à la session et activation
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                     
@@ -740,7 +762,7 @@ if st.session_state.current_project_idx is None:
                     
                     st.subheader(nom_final)
                     if st.button("Ouvrir", key=f"open_{idx}"):
-                        # A. Nettoyage des formulaires temporaires d'interface
+                        # A. Nettoyage des formulaires temporaires
                         for k in list(st.session_state.keys()):
                             if k.startswith("input_") or k.startswith("form_") or k.startswith("temp_"):
                                 try:
@@ -748,55 +770,39 @@ if st.session_state.current_project_idx is None:
                                 except KeyError:
                                     pass
                 
-                        # B. Nettoyage impératif des caches globaux pour éviter la fuite de données d'un autre projet
+                        # B. Nettoyage des caches globaux
                         for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data", "process_map_data", "current_state_process_map", "steps", "mapping_data"]:
                             if global_key in st.session_state:
                                 del st.session_state[global_key]
 
-                        # C. Activation de l'index du projet sélectionné
+                        # C. Activation de l'index du projet
                         st.session_state.current_project_idx = idx
 
-                        # D. RESTAURATION ROBUSTE ET COMPLÈTE DES DONNÉES DU PROJET SÉLECTIONNÉ
+                        # D. Chargement initial des données
                         proj_cible = st.session_state.projects[idx]
     
-                        # Restauration Mesure / Data Collection
                         for cle in ["master_dcp_table", "dc_master_data", "current_spc_data"]:
                             if cle in proj_cible and proj_cible[cle] is not None:
-                                if isinstance(proj_cible[cle], list):
-                                    st.session_state[cle] = pd.DataFrame(proj_cible[cle])
-                                elif isinstance(proj_cible[cle], pd.DataFrame):
-                                    st.session_state[cle] = proj_cible[cle]
+                                st.session_state[cle] = pd.DataFrame(proj_cible[cle]) if isinstance(proj_cible[cle], list) else proj_cible[cle]
 
-                        # Restauration Process Map & Étapes (pour régler le souci du Current State)
                         for cle_map in ["process_map_data", "current_state_process_map", "steps", "mapping_data"]:
                             if cle_map in proj_cible and proj_cible[cle_map] is not None:
                                 st.session_state[cle_map] = proj_cible[cle_map]
 
-                        # Restauration approfondie de la phase Improve / Strategies (Correction de la disparition des causes racines)
                         improve_data_loaded = False
                         if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
                             improve_dict = proj_cible["dmaic"].get("improve", {})
                             if isinstance(improve_dict, dict):
                                 for sub_k, sub_val in improve_dict.items():
                                     if sub_val:
-                                        if isinstance(sub_val, list):
-                                            st.session_state["improve_strategies"] = pd.DataFrame(sub_val)
-                                            improve_data_loaded = True
-                                            break
-                                        elif isinstance(sub_val, pd.DataFrame):
-                                            st.session_state["improve_strategies"] = sub_val
-                                            improve_data_loaded = True
-                                            break
+                                        st.session_state["improve_strategies"] = pd.DataFrame(sub_val) if isinstance(sub_val, list) else sub_val
+                                        improve_data_loaded = True
+                                        break
                         
                         if not improve_data_loaded and "improve_strategies" in proj_cible and proj_cible["improve_strategies"]:
                             strat = proj_cible["improve_strategies"]
-                            if isinstance(strat, list):
-                                st.session_state["improve_strategies"] = pd.DataFrame(strat)
-                            elif isinstance(strat, pd.DataFrame):
-                                st.session_state["improve_strategies"] = strat
-                            improve_data_loaded = True
-
-                        if not improve_data_loaded:
+                            st.session_state["improve_strategies"] = pd.DataFrame(strat) if isinstance(strat, list) else strat
+                        elif not improve_data_loaded:
                             st.session_state["improve_strategies"] = pd.DataFrame()
 
                         st.rerun()
