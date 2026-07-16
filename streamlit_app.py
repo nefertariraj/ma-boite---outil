@@ -661,7 +661,7 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE SÉCURISÉE DES WIDGETS LORS DE LA CRÉATION D'UN NOUVEAU PROJET
+                # 1. PURGE SÉCURISÉE DES WIDGETS
                 keys_to_preserve = [
                     "authenticated", "projects", "current_project_idx", 
                     "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
@@ -681,16 +681,16 @@ if st.session_state.current_project_idx is None:
                     if global_key in st.session_state:
                         del st.session_state[global_key]
 
-                # 2. Copie profonde et sécurisée du modèle de référence
+                # 2. Copie du modèle
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 
-                # 3. Attributs de base du projet
+                # 3. Attributs de base
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES DU NOUVEAU PROJET
+                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES INTERNES DU NOUVEAU PROJET
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -709,13 +709,12 @@ if st.session_state.current_project_idx is None:
                             elif isinstance(new_p[phase_key][sub_k], dict):
                                 new_p[phase_key][sub_k] = {}
 
-                # 🛡️ LA SÉCURITÉ ANTI-TÉLÉPORTATION : On force explicitement la session à None ou DataFrame vide 
-                # pour les clés globales, MAIS UNIQUEMENT pour ce nouveau projet, sans toucher aux autres.
+                # 🛡️ FORÇAGE DU VIDE POUR LE NOUVEAU PROJET DANS LA SESSION
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
 
-                # 5. Ajout à la session et activation immédiate
+                # 5. Ajout à la session et activation
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                     
@@ -755,10 +754,10 @@ if st.session_state.current_project_idx is None:
                         # C. Activation de l'index du projet sélectionné
                         st.session_state.current_project_idx = idx
 
-                        # D. Chargement propre et étanche des données du projet sélectionné vers les variables d'affichage
+                        # D. RESTAURATION SÉCURISÉE DES DONNÉES DU PROJET SÉLECTIONNÉ
                         proj_cible = st.session_state.projects[idx]
     
-                        # Restauration de la phase Mesure / Data Collection
+                        # Restauration Mesure / Data Collection
                         for cle in ["master_dcp_table", "dc_master_data", "current_spc_data"]:
                             if cle in proj_cible and proj_cible[cle]:
                                 if isinstance(proj_cible[cle], list):
@@ -766,7 +765,7 @@ if st.session_state.current_project_idx is None:
                                 elif isinstance(proj_cible[cle], pd.DataFrame):
                                     st.session_state[cle] = proj_cible[cle]
 
-                        # Restauration de la phase Improve / Solutions
+                        # Restauration robuste de la phase Improve / Solutions (Correction de la disparition)
                         if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
                             improve_dict = proj_cible["dmaic"].get("improve", {})
                             if isinstance(improve_dict, dict) and "strategies" in improve_dict:
@@ -776,6 +775,14 @@ if st.session_state.current_project_idx is None:
                                         st.session_state["improve_strategies"] = pd.DataFrame(strat)
                                     elif isinstance(strat, pd.DataFrame):
                                         st.session_state["improve_strategies"] = strat
+                        
+                        # Restauration alternative si "improve_strategies" est stocké directement au premier niveau du projet
+                        if "improve_strategies" in proj_cible and proj_cible["improve_strategies"]:
+                            strat_direct = proj_cible["improve_strategies"]
+                            if isinstance(strat_direct, list):
+                                st.session_state["improve_strategies"] = pd.DataFrame(strat_direct)
+                            elif isinstance(strat_direct, pd.DataFrame):
+                                st.session_state["improve_strategies"] = strat_direct
 
                         st.rerun()
 
