@@ -677,7 +677,7 @@ if st.session_state.current_project_idx is None:
                         pass
 
                 # Nettoyage explicite des variables globales d'interface pour qu'elles n'interfèrent pas avec le nouveau projet
-                for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data"]:
+                for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data", "current_state_process_map"]:
                     if global_key in st.session_state:
                         del st.session_state[global_key]
 
@@ -690,7 +690,10 @@ if st.session_state.current_project_idx is None:
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES (uniquement pour ce nouveau projet)
+                # 4. VIDAGE STRICT ET TOTAL DE TOUTES LES STRUCTURES (Correction du remplissage fantôme)
+                new_p["current_state_process_map"] = []
+                new_p["process_map_data"] = []
+                
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -742,7 +745,7 @@ if st.session_state.current_project_idx is None:
                                     pass
                 
                         # B. Nettoyage des anciennes variables globales d'interface des autres projets
-                        for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data"]:
+                        for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data", "current_state_process_map"]:
                             if global_key in st.session_state:
                                 del st.session_state[global_key]
 
@@ -752,24 +755,27 @@ if st.session_state.current_project_idx is None:
                         # D. Chargement propre et étanche des données du projet sélectionné vers les variables d'affichage
                         proj_cible = st.session_state.projects[idx]
     
-                        # Restauration de la phase Mesure / Data Collection
-                        for cle in ["master_dcp_table", "dc_master_data", "current_spc_data"]:
-                            if cle in proj_cible and proj_cible[cle]:
-                                if isinstance(proj_cible[cle], list):
-                                    st.session_state[cle] = pd.DataFrame(proj_cible[cle])
-                                elif isinstance(proj_cible[cle], pd.DataFrame):
-                                    st.session_state[cle] = proj_cible[cle]
+                        # Restauration de la phase Mesure / Data Collection / Process Map
+                        for cle in ["master_dcp_table", "dc_master_data", "current_spc_data", "current_state_process_map"]:
+                            if cle in proj_cible and proj_cible[cle] is not None:
+                                val_proj = proj_cible[cle]
+                                if isinstance(val_proj, list):
+                                    st.session_state[cle] = pd.DataFrame(val_proj)
+                                elif isinstance(val_proj, pd.DataFrame):
+                                    st.session_state[cle] = val_proj
+                            else:
+                                st.session_state[cle] = pd.DataFrame()
 
-                        # Restauration de la phase Improve / Solutions
+                        # Restauration robuste de la phase Improve / Solutions (Correction de la disparition des causes racines)
+                        strategies_recuperee = pd.DataFrame()
                         if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
                             improve_dict = proj_cible["dmaic"].get("improve", {})
                             if isinstance(improve_dict, dict) and "strategies" in improve_dict:
                                 strat = improve_dict["strategies"]
-                                if strat:
-                                    if isinstance(strat, list):
-                                        st.session_state["improve_strategies"] = pd.DataFrame(strat)
-                                    elif isinstance(strat, pd.DataFrame):
-                                        st.session_state["improve_strategies"] = strat
+                                if strat is not None:
+                                    strategies_recuperee = pd.DataFrame(strat) if isinstance(strat, list) else strat
+                        
+                        st.session_state["improve_strategies"] = strategies_recuperee
 
                         st.rerun()
 
