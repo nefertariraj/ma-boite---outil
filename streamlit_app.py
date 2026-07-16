@@ -659,45 +659,54 @@ if st.session_state.get("current_project_idx") is not None:
     if "projects" in st.session_state and idx_actif < len(st.session_state.projects):
         _proj_courant = st.session_state.projects[idx_actif]
         
-        # 🛡️ 1. AUTO-SAVE BIDIRECTIONNEL : On sauvegarde l'état actuel de l'interface dans le dictionnaire du projet
-        # (Empêche l'oubli des données lors des clics sur les onglets)
-        if "improve_strategies" in st.session_state and st.session_state["improve_strategies"] is not None:
+        # 🛡️ 1. SYNCHRONISATION BIDIRECTIONNELLE PAR INDEX DE PROJET
+        # Sauvegarde de l'état actuel vers le projet actif
+        if f"improve_strategies_{idx_actif}" in st.session_state:
+            _strat_actuelle = st.session_state[f"improve_strategies_{idx_actif}"]
             if "dmaic" not in _proj_courant or not isinstance(_proj_courant["dmaic"], dict):
                 _proj_courant["dmaic"] = {}
             if "improve" not in _proj_courant["dmaic"] or not isinstance(_proj_courant["dmaic"]["improve"], dict):
                 _proj_courant["dmaic"]["improve"] = {}
-            _proj_courant["dmaic"]["improve"]["strategies"] = st.session_state["improve_strategies"]
-            _proj_courant["improve_strategies"] = st.session_state["improve_strategies"]
+            _proj_courant["dmaic"]["improve"]["strategies"] = _strat_actuelle
+            _proj_courant["improve_strategies"] = _strat_actuelle
 
         for _cle_map in ["process_map_data", "current_state_process_map", "steps", "mapping_data"]:
-            if _cle_map in st.session_state and st.session_state[_cle_map] is not None:
-                _proj_courant[_cle_map] = st.session_state[_cle_map]
+            cle_specifique = f"{_cle_map}_{idx_actif}"
+            if cle_specifique in st.session_state:
+                _proj_courant[_cle_map] = st.session_state[cle_specifique]
 
-        # 🛡️ 2. CHARGEMENT ETANCHE : Restauration stricte depuis le dictionnaire du projet actif vers l'interface
-        # Restauration Improve / Strategies (Règle l'anomalie 1 : la disparition des causes racines)
+        # 🛡️ 2. RESTAURATION ÉTANCHÉISÉE DANS LA SESSION AVEC SUFFIXE D'INDEX
+        # Restauration Improve / Strategies (Règle la disparition des causes racines)
         _improve_ok = False
         if "dmaic" in _proj_courant and isinstance(_proj_courant["dmaic"], dict):
             _imp_dict = _proj_courant["dmaic"].get("improve", {})
             if isinstance(_imp_dict, dict):
                 for _sk, _sv in _imp_dict.items():
                     if _sv is not None:
-                        st.session_state["improve_strategies"] = pd.DataFrame(_sv) if isinstance(_sv, list) else _sv
+                        st.session_state[f"improve_strategies_{idx_actif}"] = pd.DataFrame(_sv) if isinstance(_sv, list) else _sv
+                        st.session_state["improve_strategies"] = st.session_state[f"improve_strategies_{idx_actif}"]
                         _improve_ok = True
                         break
         if not _improve_ok and "improve_strategies" in _proj_courant and _proj_courant["improve_strategies"] is not None:
             _strat = _proj_courant["improve_strategies"]
-            st.session_state["improve_strategies"] = pd.DataFrame(_strat) if isinstance(_strat, list) else _strat
+            st.session_state[f"improve_strategies_{idx_actif}"] = pd.DataFrame(_strat) if isinstance(_strat, list) else _strat
+            st.session_state["improve_strategies"] = st.session_state[f"improve_strategies_{idx_actif}"]
             _improve_ok = True
         
         if not _improve_ok:
+            st.session_state[f"improve_strategies_{idx_actif}"] = pd.DataFrame()
             st.session_state["improve_strategies"] = pd.DataFrame()
 
-        # Restauration Process Map / Current State (Règle l'anomalie 2 : la contamination entre projets)
+        # Restauration Process Map / Current State (Règle la contamination entre projets)
         for _cle_map in ["process_map_data", "current_state_process_map", "steps", "mapping_data"]:
-            if _cle_map in _proj_courant:
+            cle_specifique = f"{_cle_map}_{idx_actif}"
+            if _cle_map in _proj_courant and _proj_courant[_cle_map] is not None:
+                st.session_state[cle_specifique] = _proj_courant[_cle_map]
                 st.session_state[_cle_map] = _proj_courant[_cle_map]
             else:
-                st.session_state[_cle_map] = pd.DataFrame() if _cle_map in ["process_map_data", "current_state_process_map"] else []
+                val_vide = pd.DataFrame() if _cle_map in ["process_map_data", "current_state_process_map"] else []
+                st.session_state[cle_specifique] = val_vide
+                st.session_state[_cle_map] = val_vide
 
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
@@ -721,7 +730,7 @@ if st.session_state.current_project_idx is None:
                     except KeyError:
                         pass
 
-                # Purge explicite des variables globales d'interface pour repartir sur du 100% vide
+                # Purge explicite des variables globales d'interface
                 global_keys_to_nuke = [
                     "master_dcp_table", "dc_master_data", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -768,7 +777,13 @@ if st.session_state.current_project_idx is None:
                     st.session_state.projects = []
                     
                 st.session_state.projects.append(new_p)
-                st.session_state.current_project_idx = len(st.session_state.projects) - 1
+                new_idx = len(st.session_state.projects) - 1
+                st.session_state.current_project_idx = new_idx
+                
+                # Forçage des clés indicées à vide pour le nouveau projet
+                st.session_state[f"improve_strategies_{new_idx}"] = pd.DataFrame()
+                st.session_state[f"current_state_process_map_{new_idx}"] = pd.DataFrame()
+                st.session_state[f"process_map_data_{new_idx}"] = []
                 
                 st.success("Projet créé et initialisé à vide avec succès !")
                 st.rerun()
@@ -811,8 +826,14 @@ if st.session_state.current_project_idx is None:
                                 st.session_state[cle] = pd.DataFrame(proj_cible[cle]) if isinstance(proj_cible[cle], list) else proj_cible[cle]
 
                         for cle_map in ["process_map_data", "current_state_process_map", "steps", "mapping_data"]:
+                            cle_specifique = f"{cle_map}_{idx}"
                             if cle_map in proj_cible and proj_cible[cle_map] is not None:
+                                st.session_state[cle_specifique] = proj_cible[cle_map]
                                 st.session_state[cle_map] = proj_cible[cle_map]
+                            else:
+                                val_vide = pd.DataFrame() if cle_map in ["process_map_data", "current_state_process_map"] else []
+                                st.session_state[cle_specifique] = val_vide
+                                st.session_state[cle_map] = val_vide
 
                         improve_data_loaded = False
                         if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
@@ -820,14 +841,17 @@ if st.session_state.current_project_idx is None:
                             if isinstance(improve_dict, dict):
                                 for sub_k, sub_val in improve_dict.items():
                                     if sub_val is not None:
-                                        st.session_state["improve_strategies"] = pd.DataFrame(sub_val) if isinstance(sub_val, list) else sub_val
+                                        st.session_state[f"improve_strategies_{idx}"] = pd.DataFrame(sub_val) if isinstance(sub_val, list) else sub_val
+                                        st.session_state["improve_strategies"] = st.session_state[f"improve_strategies_{idx}"]
                                         improve_data_loaded = True
                                         break
                         
                         if not improve_data_loaded and "improve_strategies" in proj_cible and proj_cible["improve_strategies"] is not None:
                             strat = proj_cible["improve_strategies"]
-                            st.session_state["improve_strategies"] = pd.DataFrame(strat) if isinstance(strat, list) else strat
+                            st.session_state[f"improve_strategies_{idx}"] = pd.DataFrame(strat) if isinstance(strat, list) else strat
+                            st.session_state["improve_strategies"] = st.session_state[f"improve_strategies_{idx}"]
                         elif not improve_data_loaded:
+                            st.session_state[f"improve_strategies_{idx}"] = pd.DataFrame()
                             st.session_state["improve_strategies"] = pd.DataFrame()
 
                         st.rerun()
