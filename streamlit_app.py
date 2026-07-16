@@ -661,18 +661,17 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. NETTOYAGE GLOBAL DES WIDGETS ACTIFS EN MÉMOIRE
-                # On supprime toutes les clés de widgets en session (Data Collection, Process Map, Inputs, etc.) 
-                # pour que les formulaires repartent absolument vierges, sans impacter les anciens projets sauvegardés.
-                keys_to_purge = []
-                for k in list(st.session_state.keys()):
-                    if k in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
-                        continue
-                    keys_to_purge.append(k)
+                # 1. PURGE RADICALE DES WIDGETS EN MÉMOIRE
+                # On nettoie TOUT sauf les variables globales vitales du système
+                keys_to_preserve = [
+                    "authenticated", "projects", "current_project_idx", 
+                    "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
+                ]
+                keys_to_purge = [k for k in st.session_state.keys() if k not in keys_to_preserve]
                 for k in keys_to_purge:
                     del st.session_state[k]
 
-                # 2. Copie profonde et isolée du modèle de référence
+                # 2. Copie profonde et sécurisée du modèle de référence
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
                 
                 # 3. Attributs de base du projet
@@ -681,7 +680,8 @@ if st.session_state.current_project_idx is None:
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # 4. VIDAGE RADICAL DE TOUTES LES DONNÉES INTERNES DU MODÈLE
+                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES
+                # On s'assure que chaque module DMAIC repart sur une base 100% vierge
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -690,10 +690,7 @@ if st.session_state.current_project_idx is None:
                 
                 for k in keys_to_reset:
                     if k in new_p:
-                        if isinstance(new_p[k], list):
-                            new_p[k] = []
-                        elif isinstance(new_p[k], dict):
-                            new_p[k] = {}
+                        new_p[k] = [] if isinstance(new_p[k], list) else ({}` if isinstance(new_p[k], dict) else None)
 
                 for phase_key in ["define", "measure", "analyze", "improve", "control", "dmaic"]:
                     if phase_key in new_p and isinstance(new_p[phase_key], dict):
@@ -727,6 +724,12 @@ if st.session_state.current_project_idx is None:
                     
                     st.subheader(nom_final)
                     if st.button("Ouvrir", key=f"open_{idx}"):
+                        # ⚠️ IMPORTANT : Quand on change de projet, on nettoie les widgets 
+                        # pour forcer le rechargement des données propres au projet ouvert
+                        for k in list(st.session_state.keys()):
+                            if k not in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
+                                del st.session_state[k]
+                                
                         st.session_state.current_project_idx = idx
                         st.rerun()
 
