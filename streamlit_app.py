@@ -661,7 +661,7 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE SÉCURISÉE DES WIDGETS (Uniquement pour un nouveau projet)
+                # 1. PURGE SÉCURISÉE DES WIDGETS LORS DE LA CRÉATION D'UN NOUVEAU PROJET
                 keys_to_preserve = [
                     "authenticated", "projects", "current_project_idx", 
                     "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
@@ -675,6 +675,11 @@ if st.session_state.current_project_idx is None:
                         del st.session_state[k]
                     except KeyError:
                         pass
+
+                # Nettoyage explicite des variables globales d'interface pour qu'elles n'interfèrent pas avec le nouveau projet
+                for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data"]:
+                    if global_key in st.session_state:
+                        del st.session_state[global_key]
 
                 # 2. Copie profonde et sécurisée du modèle de référence
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
@@ -728,43 +733,42 @@ if st.session_state.current_project_idx is None:
                     
                     st.subheader(nom_final)
                     if st.button("Ouvrir", key=f"open_{idx}"):
-                        # 1. Nettoyage des formulaires temporaires
+                        # A. Nettoyage des formulaires temporaires d'interface
                         for k in list(st.session_state.keys()):
                             if k.startswith("input_") or k.startswith("form_") or k.startswith("temp_"):
                                 try:
                                     del st.session_state[k]
                                 except KeyError:
                                     pass
-                                    
-                        # 2. Activation de l'index du projet
+                
+                        # B. Nettoyage des anciennes variables globales d'interface des autres projets
+                        for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data"]:
+                            if global_key in st.session_state:
+                                del st.session_state[global_key]
+
+                        # C. Activation de l'index du projet sélectionné
                         st.session_state.current_project_idx = idx
 
-                        # 3. FORÇAGE PERMANENT DES DONNÉES DU PROJET DANS LA SESSION
-                        # On force l'injection immédiate pour que l'interface les trouve à coup sûr
-                        p_actif = st.session_state.projects[idx]
-                        
-                        # Data Collection / Mesure
-                        if "master_dcp_table" in p_actif and p_actif["master_dcp_table"]:
-                            if isinstance(p_actif["master_dcp_table"], list):
-                                st.session_state["master_dcp_table"] = pd.DataFrame(p_actif["master_dcp_table"])
-                            elif isinstance(p_actif["master_dcp_table"], pd.DataFrame):
-                                st.session_state["master_dcp_table"] = p_actif["master_dcp_table"]
-                                
-                        if "dc_master_data" in p_actif and p_actif["dc_master_data"]:
-                            if isinstance(p_actif["dc_master_data"], list):
-                                st.session_state["dc_master_data"] = pd.DataFrame(p_actif["dc_master_data"])
-                            elif isinstance(p_actif["dc_master_data"], pd.DataFrame):
-                                st.session_state["dc_master_data"] = p_actif["dc_master_data"]
+                        # D. Chargement propre et étanche des données du projet sélectionné vers les variables d'affichage
+                        proj_cible = st.session_state.projects[idx]
+    
+                        # Restauration de la phase Mesure / Data Collection
+                        for cle in ["master_dcp_table", "dc_master_data", "current_spc_data"]:
+                            if cle in proj_cible and proj_cible[cle]:
+                                if isinstance(proj_cible[cle], list):
+                                    st.session_state[cle] = pd.DataFrame(proj_cible[cle])
+                                elif isinstance(proj_cible[cle], pd.DataFrame):
+                                    st.session_state[cle] = proj_cible[cle]
 
-                        # Phase Improve (Solutions)
-                        if "dmaic" in p_actif and isinstance(p_actif["dmaic"], dict):
-                            improve_dict = p_actif["dmaic"].get("improve", {})
+                        # Restauration de la phase Improve / Solutions
+                        if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
+                            improve_dict = proj_cible["dmaic"].get("improve", {})
                             if isinstance(improve_dict, dict) and "strategies" in improve_dict:
                                 strat = improve_dict["strategies"]
                                 if strat:
                                     if isinstance(strat, list):
                                         st.session_state["improve_strategies"] = pd.DataFrame(strat)
-                                    else:
+                                    elif isinstance(strat, pd.DataFrame):
                                         st.session_state["improve_strategies"] = strat
 
                         st.rerun()
