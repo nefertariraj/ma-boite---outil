@@ -690,7 +690,7 @@ if st.session_state.current_project_idx is None:
                 
                 for k in keys_to_reset:
                     if k in new_p:
-                        new_p[k] = [] if isinstance(new_p[k], list) else ({}` if isinstance(new_p[k], dict) else None)
+                        new_p[k] = [] if isinstance(new_p[k], list) else ({} if isinstance(new_p[k], dict) else None)
 
                 for phase_key in ["define", "measure", "analyze", "improve", "control", "dmaic"]:
                     if phase_key in new_p and isinstance(new_p[phase_key], dict):
