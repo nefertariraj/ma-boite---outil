@@ -728,7 +728,7 @@ if st.session_state.current_project_idx is None:
                     
                     st.subheader(nom_final)
                     if st.button("Ouvrir", key=f"open_{idx}"):
-                        # 🛡️ On nettoie uniquement les widgets temporaires d'UI pour repartir sur une interface propre
+                        # 1. Nettoyage des formulaires temporaires
                         for k in list(st.session_state.keys()):
                             if k.startswith("input_") or k.startswith("form_") or k.startswith("temp_"):
                                 try:
@@ -736,8 +736,37 @@ if st.session_state.current_project_idx is None:
                                 except KeyError:
                                     pass
                                     
-                        # On active simplement le projet et on recharge la page
+                        # 2. Activation de l'index du projet
                         st.session_state.current_project_idx = idx
+
+                        # 3. FORÇAGE PERMANENT DES DONNÉES DU PROJET DANS LA SESSION
+                        # On force l'injection immédiate pour que l'interface les trouve à coup sûr
+                        p_actif = st.session_state.projects[idx]
+                        
+                        # Data Collection / Mesure
+                        if "master_dcp_table" in p_actif and p_actif["master_dcp_table"]:
+                            if isinstance(p_actif["master_dcp_table"], list):
+                                st.session_state["master_dcp_table"] = pd.DataFrame(p_actif["master_dcp_table"])
+                            elif isinstance(p_actif["master_dcp_table"], pd.DataFrame):
+                                st.session_state["master_dcp_table"] = p_actif["master_dcp_table"]
+                                
+                        if "dc_master_data" in p_actif and p_actif["dc_master_data"]:
+                            if isinstance(p_actif["dc_master_data"], list):
+                                st.session_state["dc_master_data"] = pd.DataFrame(p_actif["dc_master_data"])
+                            elif isinstance(p_actif["dc_master_data"], pd.DataFrame):
+                                st.session_state["dc_master_data"] = p_actif["dc_master_data"]
+
+                        # Phase Improve (Solutions)
+                        if "dmaic" in p_actif and isinstance(p_actif["dmaic"], dict):
+                            improve_dict = p_actif["dmaic"].get("improve", {})
+                            if isinstance(improve_dict, dict) and "strategies" in improve_dict:
+                                strat = improve_dict["strategies"]
+                                if strat:
+                                    if isinstance(strat, list):
+                                        st.session_state["improve_strategies"] = pd.DataFrame(strat)
+                                    else:
+                                        st.session_state["improve_strategies"] = strat
+
                         st.rerun()
 
 else:
