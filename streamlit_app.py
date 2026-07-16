@@ -700,8 +700,6 @@ if st.session_state.current_project_idx is None:
                 for k in keys_to_reset:
                     if k in new_p:
                         new_p[k] = [] if isinstance(new_p[k], list) else ({} if isinstance(new_p[k], dict) else None)
-                    if k in st.session_state:
-                        st.session_state[k] = pd.DataFrame() if isinstance(st.session_state.get(k), pd.DataFrame) else []
 
                 for phase_key in ["define", "measure", "analyze", "improve", "control", "dmaic"]:
                     if phase_key in new_p and isinstance(new_p[phase_key], dict):
@@ -711,7 +709,7 @@ if st.session_state.current_project_idx is None:
                             elif isinstance(new_p[phase_key][sub_k], dict):
                                 new_p[phase_key][sub_k] = {}
 
-                # 🛡️ FORÇAGE DU VIDE POUR LE NOUVEAU PROJET
+                # 🛡️ FORÇAGE DU VIDE POUR LE NOUVEAU PROJET DANS LA SESSION
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
@@ -756,46 +754,27 @@ if st.session_state.current_project_idx is None:
                         # C. Activation de l'index du projet sélectionné
                         st.session_state.current_project_idx = idx
 
-                        # D. Chargement propre et étanche des données du projet sélectionné vers les variables d'affichage
+                        # D. VOTRE CODE D'ORIGINE EXACT POUR LE CHARGEMENT (Intact pour ne rien perdre)
                         proj_cible = st.session_state.projects[idx]
     
-                        # Restauration de la phase Mesure / Data Collection (avec nettoyage si vide)
+                        # Restauration de la phase Mesure / Data Collection
                         for cle in ["master_dcp_table", "dc_master_data", "current_spc_data"]:
                             if cle in proj_cible and proj_cible[cle]:
                                 if isinstance(proj_cible[cle], list):
                                     st.session_state[cle] = pd.DataFrame(proj_cible[cle])
                                 elif isinstance(proj_cible[cle], pd.DataFrame):
                                     st.session_state[cle] = proj_cible[cle]
-                            else:
-                                st.session_state[cle] = pd.DataFrame()
 
-                        # Restauration robuste de la phase Improve / Solutions (pour éviter la disparition des données)
-                        improve_found = False
+                        # Restauration de la phase Improve / Solutions
                         if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
                             improve_dict = proj_cible["dmaic"].get("improve", {})
-                            if isinstance(improve_dict, dict):
-                                # Recherche dans toutes les clés possibles de improve (strategies, solutions, etc.)
-                                for sub_k, sub_val in improve_dict.items():
-                                    if sub_val:
-                                        if isinstance(sub_val, list):
-                                            st.session_state["improve_strategies"] = pd.DataFrame(sub_val)
-                                            improve_found = True
-                                            break
-                                        elif isinstance(sub_val, pd.DataFrame):
-                                            st.session_state["improve_strategies"] = sub_val
-                                            improve_found = True
-                                            break
-                        
-                        if not improve_found and "improve_strategies" in proj_cible and proj_cible["improve_strategies"]:
-                            strat = proj_cible["improve_strategies"]
-                            if isinstance(strat, list):
-                                st.session_state["improve_strategies"] = pd.DataFrame(strat)
-                            elif isinstance(strat, pd.DataFrame):
-                                st.session_state["improve_strategies"] = strat
-                            improve_found = True
-
-                        if not improve_found:
-                            st.session_state["improve_strategies"] = pd.DataFrame()
+                            if isinstance(improve_dict, dict) and "strategies" in improve_dict:
+                                strat = improve_dict["strategies"]
+                                if strat:
+                                    if isinstance(strat, list):
+                                        st.session_state["improve_strategies"] = pd.DataFrame(strat)
+                                    elif isinstance(strat, pd.DataFrame):
+                                        st.session_state["improve_strategies"] = strat
 
                         st.rerun()
 
