@@ -676,7 +676,7 @@ if st.session_state.current_project_idx is None:
                     except KeyError:
                         pass
 
-                # Nettoyage explicite des variables globales d'interface pour qu'elles n'interfèrent pas avec le nouveau projet
+                # Nettoyage explicite des variables globales d'interface
                 for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data"]:
                     if global_key in st.session_state:
                         del st.session_state[global_key]
@@ -690,7 +690,7 @@ if st.session_state.current_project_idx is None:
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES (uniquement pour ce nouveau projet)
+                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES DU NOUVEAU PROJET
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -700,9 +700,6 @@ if st.session_state.current_project_idx is None:
                 for k in keys_to_reset:
                     if k in new_p:
                         new_p[k] = [] if isinstance(new_p[k], list) else ({} if isinstance(new_p[k], dict) else None)
-                    # 🛡️ AJOUT DE SÉCURITÉ : On vide aussi immédiatement la session globale active
-                    if k in st.session_state:
-                        st.session_state[k] = pd.DataFrame() if isinstance(st.session_state.get(k), pd.DataFrame) else []
 
                 for phase_key in ["define", "measure", "analyze", "improve", "control", "dmaic"]:
                     if phase_key in new_p and isinstance(new_p[phase_key], dict):
@@ -711,6 +708,12 @@ if st.session_state.current_project_idx is None:
                                 new_p[phase_key][sub_k] = []
                             elif isinstance(new_p[phase_key][sub_k], dict):
                                 new_p[phase_key][sub_k] = {}
+
+                # 🛡️ LA SÉCURITÉ ANTI-TÉLÉPORTATION : On force explicitement la session à None ou DataFrame vide 
+                # pour les clés globales, MAIS UNIQUEMENT pour ce nouveau projet, sans toucher aux autres.
+                st.session_state["current_spc_data"] = pd.DataFrame()
+                st.session_state["master_dcp_table"] = pd.DataFrame()
+                st.session_state["improve_strategies"] = pd.DataFrame()
 
                 # 5. Ajout à la session et activation immédiate
                 if "projects" not in st.session_state:
