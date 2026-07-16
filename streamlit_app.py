@@ -728,9 +728,7 @@ if st.session_state.current_project_idx is None:
                     
                     st.subheader(nom_final)
                     if st.button("Ouvrir", key=f"open_{idx}"):
-                        # 🔒 PROTECTION ABSOLUE DES DONNÉES EXISTANTES :
-                        # Avant de changer de projet ou d'ouvrir un projet chargé par JSON, 
-                        # on nettoie uniquement les widgets d'interface temporaires, SANS toucher aux dictionnaires stockés.
+                        # 🛡️ On nettoie uniquement les widgets temporaires d'UI pour repartir sur une interface propre
                         for k in list(st.session_state.keys()):
                             if k.startswith("input_") or k.startswith("form_") or k.startswith("temp_"):
                                 try:
@@ -738,26 +736,8 @@ if st.session_state.current_project_idx is None:
                                 except KeyError:
                                     pass
                                     
-                        # On charge l'index du projet sélectionné
+                        # On active simplement le projet et on recharge la page
                         st.session_state.current_project_idx = idx
-
-                        # 🔄 RESTAURATION DE SÉCURITÉ : Si le projet ouvert contient des données (DataCollection, Improve...)
-                        # on les pousse explicitement dans les variables globales de l'UI pour qu'elles s'affichent instantanément sans se vider.
-                        p_actuel = st.session_state.projects[idx]
-                        
-                        # Restauration du Data Collection si présent dans le projet
-                        if "master_dcp_table" in p_actuel and p_actuel["master_dcp_table"]:
-                            if isinstance(p_actuel["master_dcp_table"], list):
-                                st.session_state["master_dcp_table"] = pd.DataFrame(p_actuel["master_dcp_table"])
-                        
-                        # Restauration de la phase Improve / Solutions si présente dans le projet
-                        if "dmaic" in p_actuel and isinstance(p_actuel["dmaic"], dict):
-                            improve_data = p_actuel["dmaic"].get("improve", {})
-                            if isinstance(improve_data, dict) and "strategies" in improve_data:
-                                strat = improve_data["strategies"]
-                                if isinstance(strat, list) and len(strat) > 0:
-                                    st.session_state["improve_strategies"] = pd.DataFrame(strat)
-                        
                         st.rerun()
 
 else:
