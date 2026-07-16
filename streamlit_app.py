@@ -661,15 +661,21 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE RADICALE DES WIDGETS EN MÉMOIRE
-                # On nettoie TOUT sauf les variables globales vitales du système
+                # 1. PURGE SÉCURISÉE DES WIDGETS (On ne touche qu'aux inputs de formulaires, pas aux données)
                 keys_to_preserve = [
                     "authenticated", "projects", "current_project_idx", 
                     "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
                 ]
-                keys_to_purge = [k for k in st.session_state.keys() if k not in keys_to_preserve]
+                # On évite de supprimer par erreur les clés fonctionnelles des projets
+                keys_to_purge = [
+                    k for k in st.session_state.keys() 
+                    if k not in keys_to_preserve and not k.startswith("proj_") and not k.startswith("dmaic_")
+                ]
                 for k in keys_to_purge:
-                    del st.session_state[k]
+                    try:
+                        del st.session_state[k]
+                    except KeyError:
+                        pass
 
                 # 2. Copie profonde et sécurisée du modèle de référence
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
@@ -680,8 +686,7 @@ if st.session_state.current_project_idx is None:
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES
-                # On s'assure que chaque module DMAIC repart sur une base 100% vierge
+                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES (uniquement pour un NOUVEAU projet)
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -724,12 +729,21 @@ if st.session_state.current_project_idx is None:
                     
                     st.subheader(nom_final)
                     if st.button("Ouvrir", key=f"open_{idx}"):
-                        # ⚠️ IMPORTANT : Quand on change de projet, on nettoie les widgets 
-                        # pour forcer le rechargement des données propres au projet ouvert
+                        # ⚠️ SÉCURISATION : Lors de l'ouverture, on ne supprime que les widgets temporaires d'UI, 
+                        # on ne touche JAMAIS aux structures de données globales ou aux projets.
                         for k in list(st.session_state.keys()):
-                            if k not in ["authenticated", "projects", "current_project_idx", "primary_color", "sidebar_uploader_file", "sidebar_color_picker"]:
-                                del st.session_state[k]
-                                
+                            if k not in [
+                                "authenticated", "projects", "current_project_idx", 
+                                "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
+                            ]:
+                                # Si ce n'est pas un widget éphémère, on le préserve
+                                if not (k.startswith("input_") or k.startswith("form_") or k.startswith("temp_")):
+                                    continue
+                                try:
+                                    del st.session_state[k]
+                                except KeyError:
+                                    pass
+                                    
                         st.session_state.current_project_idx = idx
                         st.rerun()
 
