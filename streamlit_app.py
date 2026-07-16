@@ -654,41 +654,6 @@ with st.sidebar:
     st.info("🛠️ Vos composants graphiques originaux (onglets DMAIC, diagrammes Plotly d'origine, formulaires de saisie, tableaux éditables st.data_editor) se ré-exécutent automatiquement en utilisant les données fidèlement restaurées ci-dessus.")
     
 # --- NAVIGATION PRINCIPALE ---
-if st.session_state.get("current_project_idx") is not None:
-    idx_actif = st.session_state.current_project_idx
-    if "projects" in st.session_state and idx_actif < len(st.session_state.projects):
-        _proj = st.session_state.projects[idx_actif]
-        
-        # 1. Blindage de la structure DMAIC pour éviter les KeyError
-        if "dmaic" not in _proj or not isinstance(_proj["dmaic"], dict):
-            _proj["dmaic"] = {}
-        for phase in ["define", "measure", "analyze", "improve", "control"]:
-            if phase not in _proj["dmaic"] or not isinstance(_proj["dmaic"][phase], dict):
-                _proj["dmaic"][phase] = {}
-        if "results" not in _proj["dmaic"]["analyze"]:
-            _proj["dmaic"]["analyze"]["results"] = []
-        if "strategies" not in _proj["dmaic"]["improve"]:
-            _proj["dmaic"]["improve"]["strategies"] = []
-
-        # 2. SAUVEGARDE PRÉVENTIVE : On capture l'écran actuel avant qu'il ne soit effacé
-        if "improve_strategies" in st.session_state:
-            val_strat = st.session_state["improve_strategies"]
-            _proj["dmaic"]["improve"]["strategies"] = val_strat.to_dict(orient="records") if isinstance(val_strat, pd.DataFrame) else val_strat
-
-        if "current_state_process_map" in st.session_state:
-            val_map = st.session_state["current_state_process_map"]
-            _proj["current_state_process_map"] = val_map.to_dict(orient="records") if isinstance(val_map, pd.DataFrame) else val_map
-
-        # 3. RESTAURATION PROpre : On injecte les données du projet dans la session pour l'affichage
-        strat_data = _proj["dmaic"]["improve"]["strategies"]
-        st.session_state["improve_strategies"] = pd.DataFrame(strat_data) if isinstance(strat_data, list) else strat_data
-
-        map_data = _proj.get("current_state_process_map", [])
-        st.session_state["current_state_process_map"] = pd.DataFrame(map_data) if isinstance(map_data, list) else map_data
-
-        # Variable sécurisée prête à l'emploi pour votre code
-        stored_results = _proj["dmaic"]["analyze"].get("results", [])
-
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
     
@@ -696,43 +661,116 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-               # Nettoyage strict des vieux états d'affichage
-                for k in ["improve_strategies", "current_state_process_map"]:
-                    if k in st.session_state:
+                # 1. PURGE SÉCURISÉE DES WIDGETS LORS DE LA CRÉATION D'UN NOUVEAU PROJET
+                keys_to_preserve = [
+                    "authenticated", "projects", "current_project_idx", 
+                    "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
+                ]
+                keys_to_purge = [
+                    k for k in st.session_state.keys() 
+                    if k not in keys_to_preserve and not k.startswith("proj_") and not k.startswith("dmaic_")
+                ]
+                for k in keys_to_purge:
+                    try:
                         del st.session_state[k]
+                    except KeyError:
+                        pass
 
-                # Création d'un projet complètement vide et isolé
+                # Nettoyage explicite des variables globales d'interface pour qu'elles n'interfèrent pas avec le nouveau projet
+                for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data"]:
+                    if global_key in st.session_state:
+                        del st.session_state[global_key]
+
+                # 2. Copie profonde et sécurisée du modèle de référence
                 new_p = copy.deepcopy(PROJET_MODELE_REFERENCE)
+                
+                # 3. Attributs de base du projet
                 new_p["nom"] = p_name
                 new_p["name"] = p_name
                 new_p["status"] = "Define"
-                new_p["current_state_process_map"] = []
-                new_p["dmaic"] = {"improve": {"strategies": []}}
+                new_p["problem"] = ""
 
+                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES (uniquement pour ce nouveau projet)
+                keys_to_reset = [
+                    "dc_master_data", "master_dcp_table", "current_spc_data", 
+                    "improve_strategies", "strategies_list", "solutions_data",
+                    "process_map_data", "current_state_process_map", "steps", "mapping_data"
+                ]
+                
+                for k in keys_to_reset:
+                    if k in new_p:
+                        new_p[k] = [] if isinstance(new_p[k], list) else ({} if isinstance(new_p[k], dict) else None)
+
+                for phase_key in ["define", "measure", "analyze", "improve", "control", "dmaic"]:
+                    if phase_key in new_p and isinstance(new_p[phase_key], dict):
+                        for sub_k in list(new_p[phase_key].keys()):
+                            if isinstance(new_p[phase_key][sub_k], list):
+                                new_p[phase_key][sub_k] = []
+                            elif isinstance(new_p[phase_key][sub_k], dict):
+                                new_p[phase_key][sub_k] = {}
+
+                # 5. Ajout à la session et activation immédiate
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                     
                 st.session_state.projects.append(new_p)
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
+                
+                st.success("Projet créé et initialisé à vide avec succès !")
                 st.rerun()
 
-    # Sélection des projets existants
+    # Affichage des cartes projets
     if "projects" in st.session_state and len(st.session_state.projects) > 0:
-        st.write("### Vos projets en cours :")
         cols = st.columns(3)
         for idx, proj in enumerate(st.session_state.projects):
             with cols[idx % 3]:
                 with st.container(border=True):
-                    nom = proj.get('nom', proj.get('name', 'Sans nom'))
-                    st.subheader(nom)
+                    nom_final = "Projet sans nom"
+                    for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                        if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                            nom_final = str(proj[cle_test]).strip()
+                            break
                     
-                    if st.button("Ouvrir", key=f"open_proj_{idx}"):
-                        # Purge des caches graphiques pour éviter toute fuite
-                        for k in ["improve_strategies", "current_state_process_map"]:
-                            if k in st.session_state:
-                                del st.session_state[k]
-                                
+                    st.subheader(nom_final)
+                    if st.button("Ouvrir", key=f"open_{idx}"):
+                        # A. Nettoyage des formulaires temporaires d'interface
+                        for k in list(st.session_state.keys()):
+                            if k.startswith("input_") or k.startswith("form_") or k.startswith("temp_"):
+                                try:
+                                    del st.session_state[k]
+                                except KeyError:
+                                    pass
+                
+                        # B. Nettoyage des anciennes variables globales d'interface des autres projets
+                        for global_key in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "strategies_list", "solutions_data"]:
+                            if global_key in st.session_state:
+                                del st.session_state[global_key]
+
+                        # C. Activation de l'index du projet sélectionné
                         st.session_state.current_project_idx = idx
+
+                        # D. Chargement propre et étanche des données du projet sélectionné vers les variables d'affichage
+                        proj_cible = st.session_state.projects[idx]
+    
+                        # Restauration de la phase Mesure / Data Collection
+                        for cle in ["master_dcp_table", "dc_master_data", "current_spc_data"]:
+                            if cle in proj_cible and proj_cible[cle]:
+                                if isinstance(proj_cible[cle], list):
+                                    st.session_state[cle] = pd.DataFrame(proj_cible[cle])
+                                elif isinstance(proj_cible[cle], pd.DataFrame):
+                                    st.session_state[cle] = proj_cible[cle]
+
+                        # Restauration de la phase Improve / Solutions
+                        if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
+                            improve_dict = proj_cible["dmaic"].get("improve", {})
+                            if isinstance(improve_dict, dict) and "strategies" in improve_dict:
+                                strat = improve_dict["strategies"]
+                                if strat:
+                                    if isinstance(strat, list):
+                                        st.session_state["improve_strategies"] = pd.DataFrame(strat)
+                                    elif isinstance(strat, pd.DataFrame):
+                                        st.session_state["improve_strategies"] = strat
+
                         st.rerun()
 
 else:
