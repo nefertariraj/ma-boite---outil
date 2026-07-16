@@ -661,12 +661,11 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # 1. PURGE SÉCURISÉE DES WIDGETS (On ne touche qu'aux inputs de formulaires, pas aux données)
+                # 1. PURGE SÉCURISÉE DES WIDGETS (Uniquement pour un nouveau projet)
                 keys_to_preserve = [
                     "authenticated", "projects", "current_project_idx", 
                     "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
                 ]
-                # On évite de supprimer par erreur les clés fonctionnelles des projets
                 keys_to_purge = [
                     k for k in st.session_state.keys() 
                     if k not in keys_to_preserve and not k.startswith("proj_") and not k.startswith("dmaic_")
@@ -686,7 +685,7 @@ if st.session_state.current_project_idx is None:
                 new_p["status"] = "Define"
                 new_p["problem"] = ""
 
-                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES (uniquement pour un NOUVEAU projet)
+                # 4. VIDAGE STRICT DE TOUTES LES STRUCTURES DE DONNÉES INTERNES (uniquement pour ce nouveau projet)
                 keys_to_reset = [
                     "dc_master_data", "master_dcp_table", "current_spc_data", 
                     "improve_strategies", "strategies_list", "solutions_data",
@@ -729,22 +728,36 @@ if st.session_state.current_project_idx is None:
                     
                     st.subheader(nom_final)
                     if st.button("Ouvrir", key=f"open_{idx}"):
-                        # ⚠️ SÉCURISATION : Lors de l'ouverture, on ne supprime que les widgets temporaires d'UI, 
-                        # on ne touche JAMAIS aux structures de données globales ou aux projets.
+                        # 🔒 PROTECTION ABSOLUE DES DONNÉES EXISTANTES :
+                        # Avant de changer de projet ou d'ouvrir un projet chargé par JSON, 
+                        # on nettoie uniquement les widgets d'interface temporaires, SANS toucher aux dictionnaires stockés.
                         for k in list(st.session_state.keys()):
-                            if k not in [
-                                "authenticated", "projects", "current_project_idx", 
-                                "primary_color", "sidebar_uploader_file", "sidebar_color_picker"
-                            ]:
-                                # Si ce n'est pas un widget éphémère, on le préserve
-                                if not (k.startswith("input_") or k.startswith("form_") or k.startswith("temp_")):
-                                    continue
+                            if k.startswith("input_") or k.startswith("form_") or k.startswith("temp_"):
                                 try:
                                     del st.session_state[k]
                                 except KeyError:
                                     pass
                                     
+                        # On charge l'index du projet sélectionné
                         st.session_state.current_project_idx = idx
+
+                        # 🔄 RESTAURATION DE SÉCURITÉ : Si le projet ouvert contient des données (DataCollection, Improve...)
+                        # on les pousse explicitement dans les variables globales de l'UI pour qu'elles s'affichent instantanément sans se vider.
+                        p_actuel = st.session_state.projects[idx]
+                        
+                        # Restauration du Data Collection si présent dans le projet
+                        if "master_dcp_table" in p_actuel and p_actuel["master_dcp_table"]:
+                            if isinstance(p_actuel["master_dcp_table"], list):
+                                st.session_state["master_dcp_table"] = pd.DataFrame(p_actuel["master_dcp_table"])
+                        
+                        # Restauration de la phase Improve / Solutions si présente dans le projet
+                        if "dmaic" in p_actuel and isinstance(p_actuel["dmaic"], dict):
+                            improve_data = p_actuel["dmaic"].get("improve", {})
+                            if isinstance(improve_data, dict) and "strategies" in improve_data:
+                                strat = improve_data["strategies"]
+                                if isinstance(strat, list) and len(strat) > 0:
+                                    st.session_state["improve_strategies"] = pd.DataFrame(strat)
+                        
                         st.rerun()
 
 else:
