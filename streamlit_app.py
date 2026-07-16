@@ -659,15 +659,35 @@ if st.session_state.get("current_project_idx") is not None:
     if "projects" in st.session_state and idx_actif < len(st.session_state.projects):
         _proj = st.session_state.projects[idx_actif]
         
-        # 1. Restauration ciblée et unique dans la session pour ce projet
-        if "dmaic" not in _proj:
+        # 1. Blindage de la structure DMAIC pour éviter les KeyError
+        if "dmaic" not in _proj or not isinstance(_proj["dmaic"], dict):
             _proj["dmaic"] = {}
-        if "improve" not in _proj["dmaic"]:
-            _proj["dmaic"]["improve"] = {"strategies": []}
-            
-        # On charge les données propres au projet dans les clés de session de l'éditeur
-        st.session_state["improve_strategies"] = pd.DataFrame(_proj["dmaic"]["improve"]["strategies"])
-        st.session_state["current_state_process_map"] = pd.DataFrame(_proj.get("current_state_process_map", []))
+        for phase in ["define", "measure", "analyze", "improve", "control"]:
+            if phase not in _proj["dmaic"] or not isinstance(_proj["dmaic"][phase], dict):
+                _proj["dmaic"][phase] = {}
+        if "results" not in _proj["dmaic"]["analyze"]:
+            _proj["dmaic"]["analyze"]["results"] = []
+        if "strategies" not in _proj["dmaic"]["improve"]:
+            _proj["dmaic"]["improve"]["strategies"] = []
+
+        # 2. SAUVEGARDE PRÉVENTIVE : On capture l'écran actuel avant qu'il ne soit effacé
+        if "improve_strategies" in st.session_state:
+            val_strat = st.session_state["improve_strategies"]
+            _proj["dmaic"]["improve"]["strategies"] = val_strat.to_dict(orient="records") if isinstance(val_strat, pd.DataFrame) else val_strat
+
+        if "current_state_process_map" in st.session_state:
+            val_map = st.session_state["current_state_process_map"]
+            _proj["current_state_process_map"] = val_map.to_dict(orient="records") if isinstance(val_map, pd.DataFrame) else val_map
+
+        # 3. RESTAURATION PROpre : On injecte les données du projet dans la session pour l'affichage
+        strat_data = _proj["dmaic"]["improve"]["strategies"]
+        st.session_state["improve_strategies"] = pd.DataFrame(strat_data) if isinstance(strat_data, list) else strat_data
+
+        map_data = _proj.get("current_state_process_map", [])
+        st.session_state["current_state_process_map"] = pd.DataFrame(map_data) if isinstance(map_data, list) else map_data
+
+        # Variable sécurisée prête à l'emploi pour votre code
+        stored_results = _proj["dmaic"]["analyze"].get("results", [])
 
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
