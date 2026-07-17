@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet neuf et strictement vide
+                # 1. Modèle de projet neuf, complet et strictement vide sur toutes les phases
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -676,6 +676,7 @@ if st.session_state.current_project_idx is None:
                     "current_state_process_map": pd.DataFrame(),
                     "dc_master_data": pd.DataFrame(),
                     "current_spc_data": pd.DataFrame(),
+                    "improvement_strategy": pd.DataFrame(), # Ajouté pour isoler Improve
                     "dmaic": {
                         "define": {},
                         "measure": {},
@@ -699,28 +700,30 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. CHARGEMENT EXPLICITE DU PROJET ACTIF DANS LES VARIABLES GLOBALES DU SESSION_STATE
-                # Au lieu de vider aveuglément avec des DataFrame vides, on charge les structures 
-                # vides du nouveau projet tout fraîchement créé pour alimenter les composants.
+                # 2. PURGE RADICALE DE TOUS LES CACHES DE WIDGETS DE L'APPLICATION
+                # C'est l'étape cruciale : on nettoie TOUTES les clés de formulaires et d'éditeurs 
+                # pour empêcher les anciens composants d'injecter leurs données dans le nouveau projet 
+                # ou de corrompre les projets sauvegardés.
+                keys_to_delete = []
+                for k in st.session_state.keys():
+                    if any(k.startswith(pfx) for pfx in [
+                        "process_map", "current_state", "dcp_", "master_dcp", 
+                        "editor_dcp", "mesure_", "detailed_process", "dc_master", 
+                        "spc_", "improve", "strategy", "data_editor"
+                    ]):
+                        keys_to_delete.append(k)
+            
+                for k in keys_to_delete:
+                    del st.session_state[k]
+
+                # 3. INITIALISATION PROPRE DES VARIABLES GLOBALES AVEC LE VIDE DU NOUVEAU PROJET
                 proj_actif = st.session_state.projects[new_idx]
                 st.session_state["current_state_process_map"] = proj_actif["current_state_process_map"].copy()
                 st.session_state["master_dcp_table"] = proj_actif["master_dcp_table"].copy()
                 st.session_state["mesure_data"] = proj_actif["mesure_data"].copy()
                 st.session_state["dc_master_data"] = proj_actif["dc_master_data"].copy()
                 st.session_state["current_spc_data"] = proj_actif["current_spc_data"].copy()
-            
-                # 3. PURGE RADICALE DES CACHES DE WIDGETS DE LA PHASE MESURE
-                # Cela force les st.data_editor à oublier l'ancien cache en mémoire
-                keys_to_delete = []
-                for k in st.session_state.keys():
-                    if any(k.startswith(pfx) for pfx in [
-                        "process_map", "current_state", "dcp_", "master_dcp", 
-                        "editor_dcp", "mesure_", "detailed_process", "dc_master", "spc_"
-                    ]):
-                        keys_to_delete.append(k)
-            
-                for k in keys_to_delete:
-                    del st.session_state[k]
+                st.session_state["improvement_strategy"] = proj_actif.get("improvement_strategy", pd.DataFrame()).copy()
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
