@@ -696,12 +696,16 @@ if st.session_state.current_project_idx is None:
                     st.session_state.projects = []
             
                 st.session_state.projects.append(copy.deepcopy(new_p))
-                new_index = len(st.session_state.projects) - 1
-                st.session_state.current_project_idx = new_index
+                st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # 2. PURGE CIBLÉE UNIQUEMENT DES WIDGETS DE L'ANCIEN PROJET
-                # On évite de toucher aux variables globales de manière aveugle, 
-                # on nettoie juste la mémoire cache des composants graphiques (data_editors, etc.)
+                # 2. INJECTION DES DATAFRAMES VIDES UNIQUEMENT POUR LES CLÉS GLOBALES DE LA PHASE MESURE
+                st.session_state["current_state_process_map"] = pd.DataFrame()
+                st.session_state["master_dcp_table"] = pd.DataFrame()
+                st.session_state["mesure_data"] = pd.DataFrame()
+                st.session_state["dc_master_data"] = pd.DataFrame()
+                st.session_state["current_spc_data"] = pd.DataFrame()
+            
+                # 3. PURGE RADICALE DES CACHES DE WIDGETS DE LA PHASE MESURE
                 keys_to_delete = []
                 for k in st.session_state.keys():
                     if any(k.startswith(pfx) for pfx in [
@@ -712,16 +716,6 @@ if st.session_state.current_project_idx is None:
             
                 for k in keys_to_delete:
                     del st.session_state[k]
-
-                # 3. SYNCHRONISATION AVEC LE PROJET ACTIF VIERGE
-                # On pousse explicitement les dataframes vides du nouveau projet 
-                # dans le session_state global pour alimenter les formulaires sans casser les autres projets.
-                proj_actif = st.session_state.projects[new_index]
-                st.session_state["current_state_process_map"] = proj_actif["current_state_process_map"].copy()
-                st.session_state["master_dcp_table"] = proj_actif["master_dcp_table"].copy()
-                st.session_state["mesure_data"] = proj_actif["mesure_data"].copy()
-                st.session_state["dc_master_data"] = proj_actif.get("dc_master_data", pd.DataFrame()).copy()
-                st.session_state["current_spc_data"] = proj_actif.get("current_spc_data", pd.DataFrame()).copy()
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
