@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet neuf et isolé
+                # 1. Modèle de projet neuf et strictement vide
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -674,6 +674,8 @@ if st.session_state.current_project_idx is None:
                     "mesure_data": pd.DataFrame(),
                     "master_dcp_table": pd.DataFrame(),
                     "current_state_process_map": pd.DataFrame(),
+                    "dc_master_data": pd.DataFrame(),
+                    "current_spc_data": pd.DataFrame(),
                     "dmaic": {
                         "define": {},
                         "measure": {},
@@ -692,29 +694,34 @@ if st.session_state.current_project_idx is None:
             
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
-                
+            
                 st.session_state.projects.append(copy.deepcopy(new_p))
-                st.session_state.current_project_idx = len(st.session_state.projects) - 1
+                new_index = len(st.session_state.projects) - 1
+                st.session_state.current_project_idx = new_index
             
-                # 2. INJECTION FORCÉE DE DATAFRAMES VIDES SUR TOUTES LES CLÉS GLOBALES DE LA PHASE MESURE
-                # C'est ce qui force l'affichage à se vider, peu importe comment l'onglet va les chercher
-                st.session_state["current_state_process_map"] = pd.DataFrame()
-                st.session_state["master_dcp_table"] = pd.DataFrame()
-                st.session_state["mesure_data"] = pd.DataFrame()
-                st.session_state["dc_master_data"] = pd.DataFrame()
-                st.session_state["current_spc_data"] = pd.DataFrame()
-            
-                # 3. PURGE RADICALE DES CACHES DE WIDGETS DE LA PHASE MESURE
+                # 2. PURGE CIBLÉE UNIQUEMENT DES WIDGETS DE L'ANCIEN PROJET
+                # On évite de toucher aux variables globales de manière aveugle, 
+                # on nettoie juste la mémoire cache des composants graphiques (data_editors, etc.)
                 keys_to_delete = []
                 for k in st.session_state.keys():
                     if any(k.startswith(pfx) for pfx in [
                         "process_map", "current_state", "dcp_", "master_dcp", 
-                        "editor_dcp", "mesure_", "detailed_process"
+                        "editor_dcp", "mesure_", "detailed_process", "dc_master", "spc_"
                     ]):
                         keys_to_delete.append(k)
             
                 for k in keys_to_delete:
                     del st.session_state[k]
+
+                # 3. SYNCHRONISATION AVEC LE PROJET ACTIF VIERGE
+                # On pousse explicitement les dataframes vides du nouveau projet 
+                # dans le session_state global pour alimenter les formulaires sans casser les autres projets.
+                proj_actif = st.session_state.projects[new_index]
+                st.session_state["current_state_process_map"] = proj_actif["current_state_process_map"].copy()
+                st.session_state["master_dcp_table"] = proj_actif["master_dcp_table"].copy()
+                st.session_state["mesure_data"] = proj_actif["mesure_data"].copy()
+                st.session_state["dc_master_data"] = proj_actif.get("dc_master_data", pd.DataFrame()).copy()
+                st.session_state["current_spc_data"] = proj_actif.get("current_spc_data", pd.DataFrame()).copy()
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
