@@ -676,7 +676,7 @@ if st.session_state.current_project_idx is None:
                     "current_state_process_map": pd.DataFrame(),
                     "dc_master_data": pd.DataFrame(),
                     "current_spc_data": pd.DataFrame(),
-                    "improvement_strategy": pd.DataFrame(), # Ajouté pour isoler Improve
+                    "improvement_strategy": pd.DataFrame(),
                     "dmaic": {
                         "define": {},
                         "measure": {},
@@ -700,23 +700,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. PURGE RADICALE DE TOUS LES CACHES DE WIDGETS DE L'APPLICATION
-                # C'est l'étape cruciale : on nettoie TOUTES les clés de formulaires et d'éditeurs 
-                # pour empêcher les anciens composants d'injecter leurs données dans le nouveau projet 
-                # ou de corrompre les projets sauvegardés.
-                keys_to_delete = []
-                for k in st.session_state.keys():
-                    if any(k.startswith(pfx) for pfx in [
-                        "process_map", "current_state", "dcp_", "master_dcp", 
-                        "editor_dcp", "mesure_", "detailed_process", "dc_master", 
-                        "spc_", "improve", "strategy", "data_editor"
-                    ]):
-                        keys_to_delete.append(k)
-            
-                for k in keys_to_delete:
-                    del st.session_state[k]
-
-                # 3. INITIALISATION PROPRE DES VARIABLES GLOBALES AVEC LE VIDE DU NOUVEAU PROJET
+                # 2. RÉINITIALISATION FORCÉE DES VARIABLES GLOBALES DU PROJET ACTIF
                 proj_actif = st.session_state.projects[new_idx]
                 st.session_state["current_state_process_map"] = proj_actif["current_state_process_map"].copy()
                 st.session_state["master_dcp_table"] = proj_actif["master_dcp_table"].copy()
@@ -724,6 +708,23 @@ if st.session_state.current_project_idx is None:
                 st.session_state["dc_master_data"] = proj_actif["dc_master_data"].copy()
                 st.session_state["current_spc_data"] = proj_actif["current_spc_data"].copy()
                 st.session_state["improvement_strategy"] = proj_actif.get("improvement_strategy", pd.DataFrame()).copy()
+            
+                # 3. PURGE RADICALE DE TOUTES LES CLÉS DE CACHE ET D'ÉDITEURS (Y COMPRIS LES OBJETS INTERNES STREAMLIT)
+                keys_to_delete = []
+                for k in list(st.session_state.keys()):
+                    # On cible tous les préfixes possibles liés aux process maps, data editors et formulaires
+                    if any(k.startswith(pfx) for pfx in [
+                        "process_map", "current_state", "dcp_", "master_dcp", 
+                        "editor_dcp", "mesure_", "detailed_process", "dc_master", 
+                        "spc_", "improve", "strategy", "$data_editor"
+                    ]):
+                        keys_to_delete.append(k)
+            
+                for k in keys_to_delete:
+                    try:
+                        del st.session_state[k]
+                    except Exception:
+                        pass
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
