@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Création d'un dictionnaire totalement neuf et isolé
+                # 1. Modèle de projet strictement neuf
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -693,15 +693,24 @@ if st.session_state.current_project_idx is None:
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                 
-                # On ajoute le nouveau projet
                 st.session_state.projects.append(copy.deepcopy(new_p))
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # 2. PURGE OBLIGATOIRE DES VARIABLES D'AFFICHAGE COURANTES 
-                # (Pour que l'écran n'affiche pas les restes de l'ancien projet)
-                for var_globale in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "current_state_process_map", "mesure_data"]:
-                    if var_globale in st.session_state:
-                        del st.session_state[var_globale]
+                # 2. RÉINITIALISATION STRICTE DES VARIABLES GLOBALES AVEC DES DATAFRAMES NEUFS
+                # (On ne fait pas de 'del', on assigne explicitement un DataFrame vide indépendant)
+                st.session_state["current_state_process_map"] = pd.DataFrame()
+                st.session_state["master_dcp_table"] = pd.DataFrame()
+                st.session_state["mesure_data"] = pd.DataFrame()
+                st.session_state["improve_strategies"] = pd.DataFrame()
+            
+                # 3. NETTOYAGE RADICAL DES WIDGETS DE LA PHASE MESURE EN CACHE
+                # C'est l'étape cruciale pour empêcher les "données fantômes" de s'afficher
+                for k in list(st.session_state.keys()):
+                    if any(k.startswith(pfx) for pfx in ["dcp_", "editor_", "strat_", "process_", "map_", "mesure_"]):
+                        try:
+                            del st.session_state[k]
+                        except KeyError:
+                            pass
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
