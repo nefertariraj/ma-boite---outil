@@ -658,95 +658,95 @@ if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
     
     with st.expander("➕ Initialiser un nouveau projet"):
-    p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
-    if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
-        if p_name:
-            # Modèle de référence propre (avec de vrais nouveaux objets DataFrame vides)
-            new_p = {
-                "nom": p_name,
-                "name": p_name,
-                "status": "Define",
-                "problem": "",
-                "gantt_data": pd.DataFrame(),
-                "mesure_data": pd.DataFrame(),
-                "master_dcp_table": pd.DataFrame(),
-                "current_state_process_map": pd.DataFrame(),
-                "dmaic": {
-                    "define": {},
-                    "measure": {},
-                    "analyze": {},
-                    "improve": {"strategies": []},
-                    "innovate": {},
-                    "control": {}
-                },
-                "sipoc_data": [{"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}],
-                "voc_data": [{"Client": "", "Verbatim": "", "Besoin": ""}],
-                "selected_ctq": "Qualité",
-                "team_data": [{"Poste": "", "Nom": ""}],
-                "parametres": {},
-                "progression": 0
-            }
+        p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
+        if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
+            if p_name:
+                # Modèle de référence propre (avec de vrais nouveaux objets DataFrame vides)
+                new_p = {
+                    "nom": p_name,
+                    "name": p_name,
+                    "status": "Define",
+                    "problem": "",
+                    "gantt_data": pd.DataFrame(),
+                    "mesure_data": pd.DataFrame(),
+                    "master_dcp_table": pd.DataFrame(),
+                    "current_state_process_map": pd.DataFrame(),
+                    "dmaic": {
+                        "define": {},
+                        "measure": {},
+                        "analyze": {},
+                        "improve": {"strategies": []},
+                        "innovate": {},
+                        "control": {}
+                    },
+                    "sipoc_data": [{"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}],
+                    "voc_data": [{"Client": "", "Verbatim": "", "Besoin": ""}],
+                    "selected_ctq": "Qualité",
+                    "team_data": [{"Poste": "", "Nom": ""}],
+                    "parametres": {},
+                    "progression": 0
+                }
             
-            if "projects" not in st.session_state:
-                st.session_state.projects = []
+                if "projects" not in st.session_state:
+                    st.session_state.projects = []
                 
-            st.session_state.projects.append(new_p)
-            st.session_state.current_project_idx = len(st.session_state.projects) - 1
+                st.session_state.projects.append(new_p)
+                st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-            # Nettoyage des variables d'affichage globales pour forcer le vide sur le nouveau projet
-            for var_globale in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "current_state_process_map", "mesure_data"]:
-                if var_globale in st.session_state:
-                    del st.session_state[var_globale]
+                # Nettoyage des variables d'affichage globales pour forcer le vide sur le nouveau projet
+                for var_globale in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "current_state_process_map", "mesure_data"]:
+                    if var_globale in st.session_state:
+                        del st.session_state[var_globale]
 
-            st.success("Projet créé et initialisé à vide !")
-            st.rerun()
+                st.success("Projet créé et initialisé à vide !")
+                st.rerun()
 
     # Affichage des cartes projets
-cols = st.columns(3)
-for idx, proj in enumerate(st.session_state.projects):
-    with cols[idx % 3]:
-        with st.container(border=True):
-            nom_final = "Projet sans nom"
-            for cle_test in ["nom", "name", "nom_projet", "project_name"]:
-                if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
-                    nom_final = str(proj[cle_test]).strip()
-                    break
+    cols = st.columns(3)
+    for idx, proj in enumerate(st.session_state.projects):
+        with cols[idx % 3]:
+            with st.container(border=True):
+                nom_final = "Projet sans nom"
+                for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                    if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                        nom_final = str(proj[cle_test]).strip()
+                        break
             
-            st.subheader(nom_final)
-            if st.button("Ouvrir", key=f"open_{idx}"):
-                st.session_state.current_project_idx = idx
-                proj_cible = st.session_state.projects[idx]
+                st.subheader(nom_final)
+                if st.button("Ouvrir", key=f"open_{idx}"):
+                    st.session_state.current_project_idx = idx
+                    proj_cible = st.session_state.projects[idx]
 
-                # Chargement sécurisé des données du projet dans les variables d'affichage de l'application
-                # Si le projet n'a pas la clé ou qu'elle est vide, on initialise un DataFrame vide
-                for cle_cible, cle_dict in [
-                    ("master_dcp_table", "master_dcp_table"),
-                    ("mesure_data", "mesure_data"),
-                    ("current_state_process_map", "current_state_process_map")
-                ]:
-                    val = proj_cible.get(cle_dict)
-                    if val is not None and isinstance(val, list) and len(val) > 0:
-                        st.session_state[cle_cible] = pd.DataFrame(val)
-                    elif isinstance(val, pd.DataFrame):
-                        st.session_state[cle_cible] = val.copy()
-                    else:
-                        st.session_state[cle_cible] = pd.DataFrame()
+                    # Chargement sécurisé des données du projet dans les variables d'affichage de l'application
+                    # Si le projet n'a pas la clé ou qu'elle est vide, on initialise un DataFrame vide
+                    for cle_cible, cle_dict in [
+                        ("master_dcp_table", "master_dcp_table"),
+                        ("mesure_data", "mesure_data"),
+                        ("current_state_process_map", "current_state_process_map")
+                    ]:
+                        val = proj_cible.get(cle_dict)
+                        if val is not None and isinstance(val, list) and len(val) > 0:
+                            st.session_state[cle_cible] = pd.DataFrame(val)
+                        elif isinstance(val, pd.DataFrame):
+                            st.session_state[cle_cible] = val.copy()
+                        else:
+                            st.session_state[cle_cible] = pd.DataFrame()
 
-                # Restauration spécifique de la phase Improve (Stratégies / Causes racines)
-                strategies_data = []
-                if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
-                    improve_sec = proj_cible["dmaic"].get("improve", {})
-                    if isinstance(improve_sec, dict):
-                        strategies_data = improve_sec.get("strategies", [])
+                    # Restauration spécifique de la phase Improve (Stratégies / Causes racines)
+                    strategies_data = []
+                    if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
+                        improve_sec = proj_cible["dmaic"].get("improve", {})
+                        if isinstance(improve_sec, dict):
+                            strategies_data = improve_sec.get("strategies", [])
                 
-                if isinstance(strategies_data, list) and len(strategies_data) > 0:
-                    st.session_state["improve_strategies"] = pd.DataFrame(strategies_data)
-                elif isinstance(strategies_data, pd.DataFrame):
-                    st.session_state["improve_strategies"] = strategies_data.copy()
-                else:
-                    st.session_state["improve_strategies"] = pd.DataFrame()
+                    if isinstance(strategies_data, list) and len(strategies_data) > 0:
+                        st.session_state["improve_strategies"] = pd.DataFrame(strategies_data)
+                    elif isinstance(strategies_data, pd.DataFrame):
+                        st.session_state["improve_strategies"] = strategies_data.copy()
+                    else:
+                        st.session_state["improve_strategies"] = pd.DataFrame()
 
-                st.rerun()
+                    st.rerun()
 
 else:
     # --- VUE PROJET (DMAIC) ---
