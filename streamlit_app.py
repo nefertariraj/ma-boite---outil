@@ -661,13 +661,18 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                new_p = {
+                import copy
+            
+                # 1. Modèle de référence de base strictement isolé par deepcopy
+                new_p = copy.deepcopy({
                     "nom": p_name,
                     "name": p_name,
                     "status": "Define",
                     "problem": "",
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
+                    "master_dcp_table": pd.DataFrame(),
+                    "current_state_process_map": pd.DataFrame(),
                     "dmaic": {
                         "define": {},
                         "measure": {},
@@ -682,27 +687,22 @@ if st.session_state.current_project_idx is None:
                     "team_data": [{"Poste": "", "Nom": ""}],
                     "parametres": {},
                     "progression": 0
-                }
+                })
             
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                 
                 st.session_state.projects.append(new_p)
+            
+                # 2. On bascule immédiatement l'index sur ce nouveau projet fraîchement créé
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # FORCER LE VIDAGE EXPLICITE EN SESSION POUR EFFACER LES DONNÉES FANTÔMES
+                # 3. On réinitialise l'affichage courant avec des DataFrames vides 
+                # (Cela n'affecte QUE l'affichage écran du nouveau projet, les anciens projets dans st.session_state.projects sont intacts)
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
-            
-                # Nettoyage des caches de widgets éditables associés
-                for k in list(st.session_state.keys()):
-                    if any(k.startswith(pfx) for pfx in ["dcp_", "editor_", "strat_", "process_", "map_"]):
-                        try:
-                            del st.session_state[k]
-                        except KeyError:
-                            pass
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
