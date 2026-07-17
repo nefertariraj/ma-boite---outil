@@ -661,7 +661,6 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # On reprend la structure de base exacte de votre dictionnaire d'origine
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -691,16 +690,13 @@ if st.session_state.current_project_idx is None:
                 st.session_state.projects.append(new_p)
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # NETTOYAGE CIBLÉ : Suppression des variables globales de mesure et des caches de widgets pour éviter les fantômes
-                keys_to_clear = [
-                    "master_dcp_table", "dc_master_data", "current_spc_data", 
-                    "improve_strategies", "current_state_process_map", "mesure_data"
-                ]
-                for var_globale in keys_to_clear:
-                    if var_globale in st.session_state:
-                        del st.session_state[var_globale]
+                # FORCER LE VIDAGE EXPLICITE EN SESSION POUR EFFACER LES DONNÉES FANTÔMES
+                st.session_state["current_state_process_map"] = pd.DataFrame()
+                st.session_state["master_dcp_table"] = pd.DataFrame()
+                st.session_state["mesure_data"] = pd.DataFrame()
+                st.session_state["improve_strategies"] = pd.DataFrame()
             
-                # Suppression des états en cache des éditeurs de tableaux (st.data_editor)
+                # Nettoyage des caches de widgets éditables associés
                 for k in list(st.session_state.keys()):
                     if any(k.startswith(pfx) for pfx in ["dcp_", "editor_", "strat_", "process_", "map_"]):
                         try:
