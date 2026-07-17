@@ -4048,12 +4048,12 @@ else:
                 cols_to_use = ["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]
         
                 edited_df = st.data_editor(
-                    # --- Sécurisation anti-plantage ---
-                    cols_manquantes = [col for col in cols_to_use if col not in df_future.columns]
-                    for col in cols_manquantes:
-                        df_future[col] = ""
+                # --- Sécurisation anti-plantage ---
+                cols_manquantes = [col for col in cols_to_use if col not in df_future.columns]
+                for col in cols_manquantes:
+                    df_future[col] = ""
 
-                    df_final_affiche = df_future[cols_to_use],
+                df_final_affiche = df_future[cols_to_use],
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_{step}"
