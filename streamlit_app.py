@@ -696,16 +696,21 @@ if st.session_state.current_project_idx is None:
                     st.session_state.projects = []
             
                 st.session_state.projects.append(copy.deepcopy(new_p))
-                st.session_state.current_project_idx = len(st.session_state.projects) - 1
+                new_idx = len(st.session_state.projects) - 1
+                st.session_state.current_project_idx = new_idx
             
-                # 2. INJECTION DES DATAFRAMES VIDES UNIQUEMENT POUR LES CLÉS GLOBALES DE LA PHASE MESURE
-                st.session_state["current_state_process_map"] = pd.DataFrame()
-                st.session_state["master_dcp_table"] = pd.DataFrame()
-                st.session_state["mesure_data"] = pd.DataFrame()
-                st.session_state["dc_master_data"] = pd.DataFrame()
-                st.session_state["current_spc_data"] = pd.DataFrame()
+                # 2. CHARGEMENT EXPLICITE DU PROJET ACTIF DANS LES VARIABLES GLOBALES DU SESSION_STATE
+                # Au lieu de vider aveuglément avec des DataFrame vides, on charge les structures 
+                # vides du nouveau projet tout fraîchement créé pour alimenter les composants.
+                proj_actif = st.session_state.projects[new_idx]
+                st.session_state["current_state_process_map"] = proj_actif["current_state_process_map"].copy()
+                st.session_state["master_dcp_table"] = proj_actif["master_dcp_table"].copy()
+                st.session_state["mesure_data"] = proj_actif["mesure_data"].copy()
+                st.session_state["dc_master_data"] = proj_actif["dc_master_data"].copy()
+                st.session_state["current_spc_data"] = proj_actif["current_spc_data"].copy()
             
                 # 3. PURGE RADICALE DES CACHES DE WIDGETS DE LA PHASE MESURE
+                # Cela force les st.data_editor à oublier l'ancien cache en mémoire
                 keys_to_delete = []
                 for k in st.session_state.keys():
                     if any(k.startswith(pfx) for pfx in [
