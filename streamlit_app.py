@@ -4046,7 +4046,12 @@ else:
                 if "Type d'activité" not in df_future.columns: df_future["Type d'activité"] = "VA (Valeur Ajoutée)"
 
                 cols_to_use = ["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]
-        
+
+                # SÉCURISATION : Crée les colonnes manquantes si le DataFrame est vide
+                for col in cols_to_use:
+                    if col not in df_future.columns:
+                        df_future[col] = ""
+                
                 edited_df = st.data_editor(
                     df_future[cols_to_use],
                     num_rows="dynamic",
