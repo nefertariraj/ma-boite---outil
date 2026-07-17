@@ -700,7 +700,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. RÉINITIALISATION FORCÉE DE TOUTES LES VARIABLES GLOBALES À VIDE
+                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES POUR LE NOUVEAU PROJET
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -709,13 +709,13 @@ if st.session_state.current_project_idx is None:
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
             
-                # 3. PURGE DU CACHE DES WIDGETS POUR ÉVITER LES RÉSIDUS DE L'ANCIEN PROJET
+                # 3. PURGE DU CACHE DES WIDGETS
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
-                        "mesure", "detailed", "spc", "editor", "strategy"
+                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor"
                     ]):
                         keys_to_delete.append(k)
             
@@ -746,24 +746,22 @@ if st.session_state.current_project_idx is None:
 
                     import pandas as pd
 
-                    # 4. RESTAURATION COMPLÈTE DE TOUTES LES TABLES DU PROJET SAUVEGARDÉ
-                    cles_a_restaurer = [
-                        "master_dcp_table", 
-                        "mesure_data", 
-                        "current_state_process_map", 
-                        "dc_master_data", 
-                        "current_spc_data", 
-                        "improvement_strategy"
-                    ]
-
-                    for cle in cles_a_restaurer:
-                        val = proj_cible.get(cle)
+                    # Restauration complète des données du projet dans les variables globales
+                    for cle_cible, cle_dict in [
+                        ("master_dcp_table", "master_dcp_table"),
+                        ("mesure_data", "mesure_data"),
+                        ("current_state_process_map", "current_state_process_map"),
+                        ("dc_master_data", "dc_master_data"),
+                        ("current_spc_data", "current_spc_data"),
+                        ("improvement_strategy", "improvement_strategy")
+                    ]:
+                        val = proj_cible.get(cle_dict)
                         if val is not None and isinstance(val, list) and len(val) > 0:
-                            st.session_state[cle] = pd.DataFrame(val)
+                            st.session_state[cle_cible] = pd.DataFrame(val)
                         elif isinstance(val, pd.DataFrame):
-                            st.session_state[cle] = val.copy()
+                            st.session_state[cle_cible] = val.copy()
                         else:
-                            st.session_state[cle] = pd.DataFrame()
+                            st.session_state[cle_cible] = pd.DataFrame()
 
                     # Restauration spécifique de la phase Improve
                     strategies_data = []
@@ -779,7 +777,7 @@ if st.session_state.current_project_idx is None:
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
 
-                    # 5. PURGE DES CACHES DE WIDGETS AVANT D'OUVRIR POUR ÉVITER LE KEYERROR
+                    # Purge des caches d'édition pour forcer le rechargement propre
                     for k in list(st.session_state.keys()):
                         k_lower = k.lower()
                         if any(term in k_lower for term in ["$data_editor", "editor", "process_map", "dc_master"]):
@@ -4050,7 +4048,12 @@ else:
                 cols_to_use = ["Détail de la tâche", "Délai à T0", "Unité", "Type d'activité", "Délai Actuel"]
         
                 edited_df = st.data_editor(
-                    df_future[cols_to_use],
+                    # --- Sécurisation anti-plantage ---
+                    cols_manquantes = [col for col in cols_to_use if col not in df_future.columns]
+                    for col in cols_manquantes:
+                        df_future[col] = ""
+
+                    df_final_affiche = df_future[cols_to_use],
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_{step}"
