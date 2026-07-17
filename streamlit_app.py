@@ -661,7 +661,7 @@ if st.session_state.current_project_idx is None:
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
-                # Modèle de référence complet et 100% vide pour éviter les manques dans les onglets
+                # On reprend la structure de base exacte de votre dictionnaire d'origine
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -669,18 +669,11 @@ if st.session_state.current_project_idx is None:
                     "problem": "",
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
-                    "master_dcp_table": pd.DataFrame(),
-                    "current_state_process_map": pd.DataFrame(),
                     "dmaic": {
                         "define": {},
-                        "measure": {
-                            "current_state_process_map": [],
-                            "master_dcp_table": []
-                        },
+                        "measure": {},
                         "analyze": {},
-                        "improve": {
-                            "strategies": []
-                        },
+                        "improve": {},
                         "innovate": {},
                         "control": {}
                     },
@@ -698,20 +691,12 @@ if st.session_state.current_project_idx is None:
                 st.session_state.projects.append(new_p)
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # PURGE TOTALE DES CACHES DE SESSION POUR ÉVITER LES DONNÉES FANTÔMES
+                # On vide juste les variables globales en session pour qu'elles n'affichent pas les données de l'ancien projet
                 for var_globale in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "current_state_process_map", "mesure_data"]:
                     if var_globale in st.session_state:
                         del st.session_state[var_globale]
             
-                # Purger aussi les éditeurs en cache
-                for k in list(st.session_state.keys()):
-                    if any(k.startswith(pfx) for pfx in ["dcp_", "editor_", "strat_", "process_"]):
-                        try:
-                            del st.session_state[k]
-                        except KeyError:
-                            pass
-
-                st.success("Projet créé et initialisé à vide avec succès !")
+                st.success("Projet créé !")
                 st.rerun()
 
     # Affichage des cartes projets
