@@ -662,9 +662,10 @@ if st.session_state.current_project_idx is None:
         if st.button("Créer le projet", key="btn_creer_nouveau_projet"):
             if p_name:
                 import copy
-            
-                # 1. Création d'un dictionnaire de projet 100% indépendant
-                new_p = copy.deepcopy({
+                import pandas as pd
+
+                # 1. Création d'un dictionnaire totalement neuf et isolé
+                new_p = {
                     "nom": p_name,
                     "name": p_name,
                     "status": "Define",
@@ -687,19 +688,17 @@ if st.session_state.current_project_idx is None:
                     "team_data": [{"Poste": "", "Nom": ""}],
                     "parametres": {},
                     "progression": 0
-                })
+                }
             
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
                 
-                st.session_state.projects.append(new_p)
+                # On ajoute le nouveau projet
+                st.session_state.projects.append(copy.deepcopy(new_p))
+                st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # 2. On pointe immédiatement sur le nouveau projet
-                new_idx = len(st.session_state.projects) - 1
-                st.session_state.current_project_idx = new_idx
-            
-                # 3. AU LIEU D'ÉCRASER LES VARIABLES GLOBALES (ce qui vidait les anciens projets par référence), 
-                # on supprime simplement les clés globales pour que l'interface se recalcule à vide sur le nouveau projet
+                # 2. PURGE OBLIGATOIRE DES VARIABLES D'AFFICHAGE COURANTES 
+                # (Pour que l'écran n'affiche pas les restes de l'ancien projet)
                 for var_globale in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "current_state_process_map", "mesure_data"]:
                     if var_globale in st.session_state:
                         del st.session_state[var_globale]
