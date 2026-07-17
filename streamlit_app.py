@@ -691,12 +691,24 @@ if st.session_state.current_project_idx is None:
                 st.session_state.projects.append(new_p)
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # On vide juste les variables globales en session pour qu'elles n'affichent pas les données de l'ancien projet
-                for var_globale in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "current_state_process_map", "mesure_data"]:
+                # NETTOYAGE CIBLÉ : Suppression des variables globales de mesure et des caches de widgets pour éviter les fantômes
+                keys_to_clear = [
+                    "master_dcp_table", "dc_master_data", "current_spc_data", 
+                    "improve_strategies", "current_state_process_map", "mesure_data"
+                ]
+                for var_globale in keys_to_clear:
                     if var_globale in st.session_state:
                         del st.session_state[var_globale]
             
-                st.success("Projet créé !")
+                # Suppression des états en cache des éditeurs de tableaux (st.data_editor)
+                for k in list(st.session_state.keys()):
+                    if any(k.startswith(pfx) for pfx in ["dcp_", "editor_", "strat_", "process_", "map_"]):
+                        try:
+                            del st.session_state[k]
+                        except KeyError:
+                            pass
+
+                st.success("Projet créé et initialisé à vide !")
                 st.rerun()
 
     # Affichage des cartes projets
