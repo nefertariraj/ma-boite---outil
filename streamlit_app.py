@@ -700,9 +700,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. NETTOYAGE IMPÉRATIF DES VARIABLES GLOBALES ACTIVES
-                # On force les variables globales utilisées par tes onglets à devenir vides 
-                # pour qu'aucun résidu de l'ancien projet ne s'affiche dans le nouveau.
+                # 2. RÉINITIALISATION FORCÉE DES VARIABLES GLOBALES À VIDE (UNIQUEMENT POUR LE NOUVEAU PROJET)
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -711,13 +709,13 @@ if st.session_state.current_project_idx is None:
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
             
-                # 3. PURGE DU CACHE DES WIDGETS DE SAISIE
+                # 3. PURGE DU CACHE DES WIDGETS POUR ÉVITER LES RÉSIDUS DE L'ANCIEN PROJET
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
-                    if any(k.startswith(pfx) for pfx in [
-                        "process_map", "current_state", "dcp_", "master_dcp", 
-                        "editor_dcp", "mesure_", "detailed_process", "dc_master", 
-                        "spc_", "improve", "strategy", "$data_editor"
+                    k_lower = k.lower()
+                    if any(term in k_lower for term in [
+                        "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
+                        "mesure", "detailed", "spc", "editor", "strategy"
                     ]):
                         keys_to_delete.append(k)
             
@@ -746,22 +744,28 @@ if st.session_state.current_project_idx is None:
                     st.session_state.current_project_idx = idx
                     proj_cible = st.session_state.projects[idx]
 
-                    # Chargement sécurisé des données du projet dans les variables d'affichage de l'application
-                    # Si le projet n'a pas la clé ou qu'elle est vide, on initialise un DataFrame vide
-                    for cle_cible, cle_dict in [
-                        ("master_dcp_table", "master_dcp_table"),
-                        ("mesure_data", "mesure_data"),
-                        ("current_state_process_map", "current_state_process_map")
-                    ]:
-                        val = proj_cible.get(cle_dict)
-                        if val is not None and isinstance(val, list) and len(val) > 0:
-                            st.session_state[cle_cible] = pd.DataFrame(val)
-                        elif isinstance(val, pd.DataFrame):
-                            st.session_state[cle_cible] = val.copy()
-                        else:
-                            st.session_state[cle_cible] = pd.DataFrame()
+                    import pandas as pd
 
-                    # Restauration spécifique de la phase Improve (Stratégies / Causes racines)
+                    # CHARGEMENT EXHAUSTIF DES DONNÉES DU PROJET SAUVEGARDÉ
+                    cles_a_restaurer = [
+                        "master_dcp_table", 
+                        "mesure_data", 
+                        "current_state_process_map", 
+                        "dc_master_data", 
+                        "current_spc_data", 
+                        "improvement_strategy"
+                    ]
+
+                    for cle in cles_a_restaurer:
+                        val = proj_cible.get(cle)
+                        if val is not None and isinstance(val, list) and len(val) > 0:
+                            st.session_state[cle] = pd.DataFrame(val)
+                        elif isinstance(val, pd.DataFrame):
+                            st.session_state[cle] = val.copy()
+                        else:
+                            st.session_state[cle] = pd.DataFrame()
+
+                    # Restauration spécifique de la phase Improve
                     strategies_data = []
                     if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
                         improve_sec = proj_cible["dmaic"].get("improve", {})
@@ -774,6 +778,14 @@ if st.session_state.current_project_idx is None:
                         st.session_state["improve_strategies"] = strategies_data.copy()
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
+
+                    # Nettoyage des vieux widgets en cache avant d'ouvrir le projet existant pour forcer l'affichage des vraies données
+                    for k in list(st.session_state.keys()):
+                        if any(k.startswith(pfx) for pfx in ["$data_editor", "editor_dcp"]):
+                            try:
+                                del st.session_state[k]
+                            except Exception:
+                                pass
 
                     st.rerun()
 
