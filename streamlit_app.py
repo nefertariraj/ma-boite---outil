@@ -4053,7 +4053,7 @@ else:
                     for col in cols_manquantes:
                         df_future[col] = ""
 
-                    df_final_affiche = df_future[cols_to_use]
+                    df_final_affiche = df_future[cols_to_use],
                     num_rows="dynamic",
                     use_container_width=True,
                     key=f"editor_{step}"
