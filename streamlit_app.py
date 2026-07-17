@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet neuf, complet et strictement vide sur toutes les phases
+                # 1. Modèle de projet neuf, complet et strictement vide
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -700,19 +700,20 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. RÉINITIALISATION FORCÉE DES VARIABLES GLOBALES DU PROJET ACTIF
-                proj_actif = st.session_state.projects[new_idx]
-                st.session_state["current_state_process_map"] = proj_actif["current_state_process_map"].copy()
-                st.session_state["master_dcp_table"] = proj_actif["master_dcp_table"].copy()
-                st.session_state["mesure_data"] = proj_actif["mesure_data"].copy()
-                st.session_state["dc_master_data"] = proj_actif["dc_master_data"].copy()
-                st.session_state["current_spc_data"] = proj_actif["current_spc_data"].copy()
-                st.session_state["improvement_strategy"] = proj_actif.get("improvement_strategy", pd.DataFrame()).copy()
+                # 2. NETTOYAGE IMPÉRATIF DES VARIABLES GLOBALES ACTIVES
+                # On force les variables globales utilisées par tes onglets à devenir vides 
+                # pour qu'aucun résidu de l'ancien projet ne s'affiche dans le nouveau.
+                st.session_state["current_state_process_map"] = pd.DataFrame()
+                st.session_state["master_dcp_table"] = pd.DataFrame()
+                st.session_state["mesure_data"] = pd.DataFrame()
+                st.session_state["dc_master_data"] = pd.DataFrame()
+                st.session_state["current_spc_data"] = pd.DataFrame()
+                st.session_state["improvement_strategy"] = pd.DataFrame()
+                st.session_state["improve_strategies"] = pd.DataFrame()
             
-                # 3. PURGE RADICALE DE TOUTES LES CLÉS DE CACHE ET D'ÉDITEURS (Y COMPRIS LES OBJETS INTERNES STREAMLIT)
+                # 3. PURGE DU CACHE DES WIDGETS DE SAISIE
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
-                    # On cible tous les préfixes possibles liés aux process maps, data editors et formulaires
                     if any(k.startswith(pfx) for pfx in [
                         "process_map", "current_state", "dcp_", "master_dcp", 
                         "editor_dcp", "mesure_", "detailed_process", "dc_master", 
