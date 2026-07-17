@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet strictement neuf et isolé
+                # 1. Modèle de projet neuf et isolé
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -696,19 +696,21 @@ if st.session_state.current_project_idx is None:
                 st.session_state.projects.append(copy.deepcopy(new_p))
                 st.session_state.current_project_idx = len(st.session_state.projects) - 1
             
-                # 2. Réinitialisation des variables globales d'affichage
+                # 2. INJECTION FORCÉE DE DATAFRAMES VIDES SUR TOUTES LES CLÉS GLOBALES DE LA PHASE MESURE
+                # C'est ce qui force l'affichage à se vider, peu importe comment l'onglet va les chercher
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
-                st.session_state["improve_strategies"] = pd.DataFrame()
+                st.session_state["dc_master_data"] = pd.DataFrame()
+                st.session_state["current_spc_data"] = pd.DataFrame()
             
-                # 3. NETTOYAGE CHIRURGICAL DES CACHES DE WIDGETS DE LA PHASE MESURE
-                # C'est cette boucle qui empêche les éditeurs (st.data_editor) de l'ancien projet 
-                # de polluer le nouveau ou d'écraser les données en mémoire.
+                # 3. PURGE RADICALE DES CACHES DE WIDGETS DE LA PHASE MESURE
                 keys_to_delete = []
                 for k in st.session_state.keys():
-                    # On cible précisément les préfixes liés au processus et au DCP de la phase mesure
-                    if any(k.startswith(pfx) for pfx in ["process_map", "current_state", "dcp_", "master_dcp", "editor_dcp"]):
+                    if any(k.startswith(pfx) for pfx in [
+                        "process_map", "current_state", "dcp_", "master_dcp", 
+                        "editor_dcp", "mesure_", "detailed_process"
+                    ]):
                         keys_to_delete.append(k)
             
                 for k in keys_to_delete:
