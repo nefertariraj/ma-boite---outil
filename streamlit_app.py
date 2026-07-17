@@ -663,7 +663,7 @@ if st.session_state.current_project_idx is None:
             if p_name:
                 import copy
             
-                # 1. Modèle de référence de base strictement isolé par deepcopy
+                # 1. Création d'un dictionnaire de projet 100% indépendant
                 new_p = copy.deepcopy({
                     "nom": p_name,
                     "name": p_name,
@@ -694,15 +694,15 @@ if st.session_state.current_project_idx is None:
                 
                 st.session_state.projects.append(new_p)
             
-                # 2. On bascule immédiatement l'index sur ce nouveau projet fraîchement créé
-                st.session_state.current_project_idx = len(st.session_state.projects) - 1
+                # 2. On pointe immédiatement sur le nouveau projet
+                new_idx = len(st.session_state.projects) - 1
+                st.session_state.current_project_idx = new_idx
             
-                # 3. On réinitialise l'affichage courant avec des DataFrames vides 
-                # (Cela n'affecte QUE l'affichage écran du nouveau projet, les anciens projets dans st.session_state.projects sont intacts)
-                st.session_state["current_state_process_map"] = pd.DataFrame()
-                st.session_state["master_dcp_table"] = pd.DataFrame()
-                st.session_state["mesure_data"] = pd.DataFrame()
-                st.session_state["improve_strategies"] = pd.DataFrame()
+                # 3. AU LIEU D'ÉCRASER LES VARIABLES GLOBALES (ce qui vidait les anciens projets par référence), 
+                # on supprime simplement les clés globales pour que l'interface se recalcule à vide sur le nouveau projet
+                for var_globale in ["master_dcp_table", "dc_master_data", "current_spc_data", "improve_strategies", "current_state_process_map", "mesure_data"]:
+                    if var_globale in st.session_state:
+                        del st.session_state[var_globale]
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
