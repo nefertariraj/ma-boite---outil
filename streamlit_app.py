@@ -1748,7 +1748,7 @@ else:
             # Restauration Partie 2 : DCP Officiel
             if dcp_table_key not in st.session_state:
                 saved_dcp = project_dict.get("master_dcp_table", [])
-                st.session_state[dcp_table_key] = pd.DataFrame(saved_dcp) if saved_dcp else pd.DataFrame()
+                st.session_state[dcp_table_key] = pd.DataFrame(saved_dcp) if (saved_dcp is not None and len(saved_dcp) > 0) else pd.DataFrame()
 
             # FIX PARTIE 2 : Force la restauration depuis le JSON même si la clé a été initialisée vide plus haut
             saved_msa = project_dict.get("msa_table_saved", [])
