@@ -758,7 +758,7 @@ if st.session_state.current_project_idx is None:
                         val = proj_cible.get(cle_dict)
                         if val is not None and isinstance(val, list) and len(val) > 0:
                             st.session_state[cle_cible] = pd.DataFrame(val)
-                        elif isinstance(val, pd.DataFrame):
+                        elif isinstance(val, pd.DataFrame) and not val.empty:
                             st.session_state[cle_cible] = val.copy()
                         else:
                             st.session_state[cle_cible] = pd.DataFrame()
