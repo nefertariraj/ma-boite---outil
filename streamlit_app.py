@@ -708,6 +708,13 @@ if st.session_state.current_project_idx is None:
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
+
+                # ---> AJOUT : Vidage direct des variables de calculs en mémoire vive (Analyse thématique & VSM)
+                # (Remplace ou complète par les noms exacts de tes variables de résultats si besoin)
+                for calc_key in list(st.session_state.keys()):
+                    calc_lower = calc_key.lower()
+                    if any(term in calc_lower for term in ["thematique", "analyse_thematique", "vsm", "calcul", "resultat"]):
+                        st.session_state[calc_key] = None
             
                 # 3. PURGE DU CACHE DES WIDGETS
                 keys_to_delete = []
@@ -729,67 +736,82 @@ if st.session_state.current_project_idx is None:
                 st.rerun()
 
     # Affichage des cartes projets
-    cols = st.columns(3)
-    for idx, proj in enumerate(st.session_state.projects):
-        with cols[idx % 3]:
-            with st.container(border=True):
-                nom_final = "Projet sans nom"
-                for cle_test in ["nom", "name", "nom_projet", "project_name"]:
-                    if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
-                        nom_final = str(proj[cle_test]).strip()
-                        break
+        cols = st.columns(3)
+        for idx, proj in enumerate(st.session_state.projects):
+            with cols[idx % 3]:
+                with st.container(border=True):
+                    nom_final = "Projet sans nom"
+                    for cle_test in ["nom", "name", "nom_projet", "project_name"]:
+                        if cle_test in proj and proj[cle_test] and not isinstance(proj[cle_test], dict):
+                            nom_final = str(proj[cle_test]).strip()
+                            break
             
-                st.subheader(nom_final)
-                if st.button("Ouvrir", key=f"open_{idx}"):
-                    st.session_state.current_project_idx = idx
-                    proj_cible = st.session_state.projects[idx]
+                    st.subheader(nom_final)
+                    if st.button("Ouvrir", key=f"open_{idx}"):
+                        st.session_state.current_project_idx = idx
+                        proj_cible = st.session_state.projects[idx]
 
-                    import pandas as pd
+                        import pandas as pd
 
-                    # Restauration complète des données du projet dans les variables globales
-                    for cle_cible, cle_dict in [
-                        ("master_dcp_table", "master_dcp_table"),
-                        ("mesure_data", "mesure_data"),
-                        ("current_state_process_map", "current_state_process_map"),
-                        ("dc_master_data", "dc_master_data"),
-                        ("current_spc_data", "current_spc_data"),
-                        ("improvement_strategy", "improvement_strategy")
-                    ]:
-                        val = proj_cible.get(cle_dict)
-                        if val is not None and isinstance(val, list) and len(val) > 0:
-                            st.session_state[cle_cible] = pd.DataFrame(val)
-                        elif isinstance(val, pd.DataFrame) and not val.empty:
-                            st.session_state[cle_cible] = val.copy()
-                        else:
-                            st.session_state[cle_cible] = pd.DataFrame()
+                        # Restauration complète des données du projet dans les variables globales
+                        for cle_cible, cle_dict in [
+                            ("master_dcp_table", "master_dcp_table"),
+                            ("mesure_data", "mesure_data"),
+                            ("current_state_process_map", "current_state_process_map"),
+                            ("dc_master_data", "dc_master_data"),
+                            ("current_spc_data", "current_spc_data"),
+                            ("improvement_strategy", "improvement_strategy")
+                        ]:
+                            val = proj_cible.get(cle_dict)
+                            if val is not None and isinstance(val, list) and len(val) > 0:
+                                st.session_state[cle_cible] = pd.DataFrame(val)
+                            elif isinstance(val, pd.DataFrame) and not val.empty:
+                                st.session_state[cle_cible] = val.copy()
+                            else:
+                                st.session_state[cle_cible] = pd.DataFrame()
 
-                    # Restauration spécifique de la phase Improve
-                    strategies_data = []
-                    if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
-                        improve_sec = proj_cible["dmaic"].get("improve", {})
-                        if isinstance(improve_sec, dict):
-                            strategies_data = improve_sec.get("strategies", [])
+                        # Restauration spécifique de la phase Improve
+                        strategies_data = []
+                        if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
+                            improve_sec = proj_cible["dmaic"].get("improve", {})
+                            if isinstance(improve_sec, dict):
+                                strategies_data = improve_sec.get("strategies", [])
                 
-                    if isinstance(strategies_data, list) and len(strategies_data) > 0:
-                        st.session_state["improve_strategies"] = pd.DataFrame(strategies_data)
-                    elif isinstance(strategies_data, pd.DataFrame):
-                        st.session_state["improve_strategies"] = strategies_data.copy()
-                    else:
-                        st.session_state["improve_strategies"] = pd.DataFrame()
+                        if isinstance(strategies_data, list) and len(strategies_data) > 0:
+                            st.session_state["improve_strategies"] = pd.DataFrame(strategies_data)
+                        elif isinstance(strategies_data, pd.DataFrame):
+                            st.session_state["improve_strategies"] = strategies_data.copy()
+                        else:
+                            st.session_state["improve_strategies"] = pd.DataFrame()
 
-                    # Purge élargie et agressive des caches d'édition pour forcer le rechargement propre
-                    for k in list(st.session_state.keys()):
-                        k_lower = k.lower()
-                        if any(term in k_lower for term in [
-                            "$data_editor", "editor", "process", "map", "dcp", "dc_", 
-                            "_dc", "mesure", "detailed", "spc", "strategy"
-                        ]):
-                            try:
-                                del st.session_state[k]
-                            except Exception:
-                                pass
+                        # ---> AJOUT : Restauration ou réinitialisation propre des résultats de calculs DMAIC (Define & Measure)
+                        dmaic_sec = proj_cible.get("dmaic", {})
+                    
+                        # 1. Analyse thématique (Define)
+                        define_sec = dmaic_sec.get("define", {}) if isinstance(dmaic_sec, dict) else {}
+                        res_thematique = define_sec.get("analyse_thematique_resultats", None)
+                        # Adapte "analyse_thematique_res" par le nom exact de ta variable de session pour l'analyse thématique
+                        st.session_state["analyse_thematique_res"] = res_thematique if res_thematique is not None else None
 
-                    st.rerun()
+                        # 2. Résultats VSM (Measure)
+                        measure_sec = dmaic_sec.get("measure", {}) if isinstance(dmaic_sec, dict) else {}
+                        res_vsm = measure_sec.get("vsm_resultats", None)
+                        # Adapte "vsm_res" par le nom exact de ta variable de session pour les calculs VSM
+                        st.session_state["vsm_res"] = res_vsm if res_vsm is not None else None
+
+                        # Purge élargie et agressive des caches d'édition pour forcer le rechargement propre
+                        for k in list(st.session_state.keys()):
+                            k_lower = k.lower()
+                            if any(term in k_lower for term in [
+                                "$data_editor", "editor", "process", "map", "dcp", "dc_", 
+                                "_dc", "mesure", "detailed", "spc", "strategy", "thematique", "vsm"
+                            ]):
+                                try:
+                                    del st.session_state[k]
+                                except Exception:
+                                    pass
+
+                        st.rerun()
 
 else:
     # --- VUE PROJET (DMAIC) ---
