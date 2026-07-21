@@ -777,10 +777,13 @@ if st.session_state.current_project_idx is None:
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
 
-                    # Purge des caches d'édition pour forcer le rechargement propre
+                    # Purge élargie et agressive des caches d'édition pour forcer le rechargement propre
                     for k in list(st.session_state.keys()):
                         k_lower = k.lower()
-                        if any(term in k_lower for term in ["$data_editor", "editor", "process_map", "dc_master"]):
+                        if any(term in k_lower for term in [
+                            "$data_editor", "editor", "process", "map", "dcp", "dc_", 
+                            "_dc", "mesure", "detailed", "spc", "strategy"
+                        ]):
                             try:
                                 del st.session_state[k]
                             except Exception:
