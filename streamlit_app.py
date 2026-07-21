@@ -725,6 +725,10 @@ if st.session_state.current_project_idx is None:
                     except Exception:
                         pass
 
+                # ---> AJOUT : Vidage direct des variables de calculs en mémoire
+                st.session_state["analyse_thematique_res"] = None
+                st.session_state["vsm_res"] = None
+
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
 
@@ -777,6 +781,12 @@ if st.session_state.current_project_idx is None:
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
 
+                    # ---> AJOUT : Réinitialisation propre des variables de calculs en mémoire lors de l'ouverture
+                    # (Si tu stockes les résultats dans le dictionnaire du projet à l'avenir, on pourra les lire ici, 
+                    # mais pour l'instant on les vide pour éviter qu'un ancien calcul ne "fuite" sur un autre projet)
+                    st.session_state["analyse_thematique_res"] = None
+                    st.session_state["vsm_res"] = None
+                    
                     # Purge élargie et agressive des caches d'édition pour forcer le rechargement propre
                     for k in list(st.session_state.keys()):
                         k_lower = k.lower()
