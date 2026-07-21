@@ -708,6 +708,10 @@ if st.session_state.current_project_idx is None:
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
+
+                # ---> AJOUT CIBLÉ (adapte les noms des clés si besoin selon ton code)
+                st.session_state["analyse_thematique_res"] = None
+                st.session_state["vsm_res"] = None
             
                 # 3. PURGE DU CACHE DES WIDGETS
                 keys_to_delete = []
