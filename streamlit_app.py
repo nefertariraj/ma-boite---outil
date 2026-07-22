@@ -723,8 +723,9 @@ if st.session_state.current_project_idx is None:
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
                         "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
-                        "sipoc", "voc", "team", "gantt", "calcul", "analyse", "result", "output", "chart"
-                    ]):
+                        "sipoc", "voc", "team", "gantt", "calcul", "analyse", "result", "output", "chart",
+                        "vsm"  
+                      ]):
                         keys_to_delete.append(k)
             
                 for k in keys_to_delete:
