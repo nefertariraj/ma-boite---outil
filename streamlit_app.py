@@ -1484,7 +1484,7 @@ else:
                 st.session_state["vsm_detailed_map"] = dict(p["vsm_detailed_map"])
             else:
                 st.session_state["vsm_detailed_map"] = {
-                    step: [{"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
+                    step: []
                     for step in st.session_state["vsm_macro_steps"]
                 }
                 
