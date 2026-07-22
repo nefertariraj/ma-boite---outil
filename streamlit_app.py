@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet neuf, complet et strictement vide
+                # 1. Modèle de projet entièrement purgé de tout résultat hérité
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -701,7 +701,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. VIDAGE STRICT ET TOTAL DE TOUTES LES VARIABLES GLOBALES DE CALCUL
+                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES DE SESSION
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -711,14 +711,14 @@ if st.session_state.current_project_idx is None:
                 st.session_state["improve_strategies"] = pd.DataFrame()
                 st.session_state["gantt_data"] = pd.DataFrame()
             
-                # 3. SUPPRESSION DE TOUS LES CACHES DE WIDGETS ET DE CALCULS EN MÉMOIRE
+                # 3. SUPPRESSION RADICALE DE TOUTES LES CLÉS EN CACHE QUI POURRAIENT CONTENIR DES RÉSULTATS DE CALCUL
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
                         "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
-                        "sipoc", "voc", "team", "gantt", "calcul", "analyse"
+                        "sipoc", "voc", "team", "gantt", "calcul", "analyse", "result", "output", "chart"
                     ]):
                         keys_to_delete.append(k)
             
