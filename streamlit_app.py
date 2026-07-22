@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-               # 1. Modèle de projet neuf, complet et strictement vide
+                # 1. Modèle de projet neuf, complet et strictement vide
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -681,7 +681,7 @@ if st.session_state.current_project_idx is None:
                         "define": {},
                         "measure": {},
                         "analyze": {},
-                        "improve": {},
+                        "improve": {"strategies": []},
                         "innovate": {},
                         "control": {}
                     },
@@ -700,7 +700,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES POUR LE NOUVEAU PROJET
+                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES POUR CE NOUVEAU PROJET
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -709,13 +709,14 @@ if st.session_state.current_project_idx is None:
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
             
-                # 3. PURGE DU CACHE DES WIDGETS
+                # 3. PURGE DU CACHE DES WIDGETS (supprime les mémoires tampons des data_editors)
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
-                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor"
+                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
+                        "sipoc", "voc", "team"
                     ]):
                         keys_to_delete.append(k)
             
