@@ -695,7 +695,7 @@ if st.session_state.current_project_idx is None:
                     "selected_ctq": "Qualité",
                     "team_data": pd.DataFrame(columns=["Poste", "Nom"]),
                     "parametres": {},
-                    "progression": 0
+                    "progression": 0,
                     "vsm_macro_steps": [],
                     "vsm_detailed_map": {}
                 }
