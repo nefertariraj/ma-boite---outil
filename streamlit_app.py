@@ -664,40 +664,33 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet entièrement vierge
+                # 1. Modèle de projet neuf, complet et strictement vide
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
                     "status": "Define",
                     "problem": "",
-                    "is_new_project": True,
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
                     "master_dcp_table": pd.DataFrame(),
-                    "current_state_process_map": pd.DataFrame(columns=["Process", "Lead Time", "Cycle Time"]), # Forcé vide avec les colonnes de base
-                    "detailed_process_map": pd.DataFrame(),
-                    "current_state_detailed_process_map": pd.DataFrame(),
+                    "current_state_process_map": pd.DataFrame(),
                     "dc_master_data": pd.DataFrame(),
                     "current_spc_data": pd.DataFrame(),
                     "improvement_strategy": pd.DataFrame(),
-                    "improve_strategies": pd.DataFrame(),
                     "dmaic": {
                         "define": {},
                         "measure": {},
                         "analyze": {},
-                        "improve": {"strategies": []},
+                        "improve": {},
                         "innovate": {},
                         "control": {}
                     },
-                    # SIPOC entièrement vide au départ (pas de ligne pré-remplie qui traîne)
-                    "sipoc_data": pd.DataFrame(columns=["Supplier", "Input", "Process", "Output", "Customer"]), 
-                    "voc_data": pd.DataFrame(columns=["Client", "Verbatim", "Besoin"]),
+                    "sipoc_data": [{"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}],
+                    "voc_data": [{"Client": "", "Verbatim": "", "Besoin": ""}],
                     "selected_ctq": "Qualité",
-                    "team_data": pd.DataFrame(columns=["Poste", "Nom"]),
+                    "team_data": [{"Poste": "", "Nom": ""}],
                     "parametres": {},
-                    "progression": 0,
-                    "vsm_macro_steps": [],
-                    "vsm_detailed_map": {}
+                    "progression": 0
                 }
             
                 if "projects" not in st.session_state:
@@ -707,7 +700,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES
+                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES POUR LE NOUVEAU PROJET
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -715,22 +708,15 @@ if st.session_state.current_project_idx is None:
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
-                st.session_state["gantt_data"] = pd.DataFrame()
-                st.session_state["detailed_process_map"] = pd.DataFrame()
-                st.session_state["current_state_detailed_process_map"] = pd.DataFrame()
-                st.session_state["vsm_macro_steps"] = []
-                st.session_state["vsm_detailed_map"] = {}
             
-                # 3. PURGE TOTALE DES CACHES DE FORMULAIRES
+                # 3. PURGE DU CACHE DES WIDGETS
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
-                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
-                        "sipoc", "voc", "team", "gantt", "calcul", "analyse", "result", "output", "chart",
-                        "vsm"  
-                      ]):
+                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor"
+                    ]):
                         keys_to_delete.append(k)
             
                 for k in keys_to_delete:
@@ -760,15 +746,14 @@ if st.session_state.current_project_idx is None:
 
                     import pandas as pd
 
-                    # Restauration propre des données du projet sélectionné
+                    # Restauration complète des données du projet dans les variables globales
                     for cle_cible, cle_dict in [
                         ("master_dcp_table", "master_dcp_table"),
                         ("mesure_data", "mesure_data"),
                         ("current_state_process_map", "current_state_process_map"),
                         ("dc_master_data", "dc_master_data"),
                         ("current_spc_data", "current_spc_data"),
-                        ("improvement_strategy", "improvement_strategy"),
-                        ("gantt_data", "gantt_data")
+                        ("improvement_strategy", "improvement_strategy")
                     ]:
                         val = proj_cible.get(cle_dict)
                         if val is not None and isinstance(val, list) and len(val) > 0:
@@ -792,12 +777,12 @@ if st.session_state.current_project_idx is None:
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
 
-                    # Purge des caches pour forcer le rechargement des données de ce projet spécifique
+                    # Purge élargie et agressive des caches d'édition pour forcer le rechargement propre
                     for k in list(st.session_state.keys()):
                         k_lower = k.lower()
                         if any(term in k_lower for term in [
                             "$data_editor", "editor", "process", "map", "dcp", "dc_", 
-                            "_dc", "mesure", "detailed", "spc", "strategy", "gantt"
+                            "_dc", "mesure", "detailed", "spc", "strategy"
                         ]):
                             try:
                                 del st.session_state[k]
