@@ -664,17 +664,17 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet entièrement vierge avec un indicateur de projet neuf
+                # 1. Modèle de projet entièrement vierge
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
                     "status": "Define",
                     "problem": "",
-                    "is_new_project": True, # Drapeau pour indiquer que ce projet n'a pas encore de sections figées
+                    "is_new_project": True,
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
                     "master_dcp_table": pd.DataFrame(),
-                    "current_state_process_map": pd.DataFrame(),
+                    "current_state_process_map": pd.DataFrame(columns=["Process", "Lead Time", "Cycle Time"]), # Forcé vide avec les colonnes de base
                     "detailed_process_map": pd.DataFrame(),
                     "current_state_detailed_process_map": pd.DataFrame(),
                     "dc_master_data": pd.DataFrame(),
@@ -689,10 +689,11 @@ if st.session_state.current_project_idx is None:
                         "innovate": {},
                         "control": {}
                     },
-                    "sipoc_data": [{"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}],
-                    "voc_data": [{"Client": "", "Verbatim": "", "Besoin": ""}],
+                    # SIPOC entièrement vide au départ (pas de ligne pré-remplie qui traîne)
+                    "sipoc_data": pd.DataFrame(columns=["Supplier", "Input", "Process", "Output", "Customer"]), 
+                    "voc_data": pd.DataFrame(columns=["Client", "Verbatim", "Besoin"]),
                     "selected_ctq": "Qualité",
-                    "team_data": [{"Poste": "", "Nom": ""}],
+                    "team_data": pd.DataFrame(columns=["Poste", "Nom"]),
                     "parametres": {},
                     "progression": 0
                 }
