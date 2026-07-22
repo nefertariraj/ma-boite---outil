@@ -664,17 +664,17 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet entièrement purgé et réinitialisé à zéro
+                # 1. Modèle de projet entièrement vierge avec un indicateur de projet neuf
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
                     "status": "Define",
                     "problem": "",
+                    "is_new_project": True, # Drapeau pour indiquer que ce projet n'a pas encore de sections figées
                     "gantt_data": pd.DataFrame(),
                     "mesure_data": pd.DataFrame(),
                     "master_dcp_table": pd.DataFrame(),
                     "current_state_process_map": pd.DataFrame(),
-                    # Vidage explicite des sections de la map détaillée pour éviter les vestiges de structure
                     "detailed_process_map": pd.DataFrame(),
                     "current_state_detailed_process_map": pd.DataFrame(),
                     "dc_master_data": pd.DataFrame(),
@@ -704,7 +704,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES DE TRAVAIL
+                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -716,7 +716,7 @@ if st.session_state.current_project_idx is None:
                 st.session_state["detailed_process_map"] = pd.DataFrame()
                 st.session_state["current_state_detailed_process_map"] = pd.DataFrame()
             
-                # 3. PURGE TOTALE DES CLÉS DE FORMULAIRES EN MÉMOIRE
+                # 3. PURGE TOTALE DES CACHES DE FORMULAIRES
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
@@ -1486,6 +1486,12 @@ else:
                     for step in st.session_state["vsm_macro_steps"]
                 }
 
+        # >>> LE CORRECTIF INDÉPENDANT JUSTE ICI <<<
+        # Si c'est un nouveau projet, on vient simplement vider ce que le code d'origine vient de remplir
+        if p.get("is_new_project", False):
+            st.session_state["vsm_macro_steps"] = []
+            st.session_state["vsm_detailed_map"] = {}
+                
         # 3. INITIALISATION DES METRICS CALCULÉES
         if "vsm_totals" not in st.session_state:
             st.session_state["vsm_totals"] = {
