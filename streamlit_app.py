@@ -1487,10 +1487,11 @@ else:
                 }
 
         # >>> LE CORRECTIF INDÉPENDANT JUSTE ICI <<<
-        # Si c'est un nouveau projet, on vient simplement vider ce que le code d'origine vient de remplir
-        if p.get("is_new_project", False):
-            st.session_state["vsm_macro_steps"] = []
-            st.session_state["vsm_detailed_map"] = {}
+        # SI C'EST UN NOUVEAU PROJET : on prend le SIPOC s'il y en a, sinon on laisse STRICTEMENT VIDE (pas de valeurs par défaut d'un ancien projet)
+        if not macro_steps and not p.get("is_new_project", False):
+            macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
+                
+        st.session_state["vsm_macro_steps"] = macro_steps
                 
         # 3. INITIALISATION DES METRICS CALCULÉES
         if "vsm_totals" not in st.session_state:
