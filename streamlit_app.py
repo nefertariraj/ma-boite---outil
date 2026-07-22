@@ -718,6 +718,8 @@ if st.session_state.current_project_idx is None:
                 st.session_state["gantt_data"] = pd.DataFrame()
                 st.session_state["detailed_process_map"] = pd.DataFrame()
                 st.session_state["current_state_detailed_process_map"] = pd.DataFrame()
+                st.session_state["vsm_macro_steps"] = []
+                st.session_state["vsm_detailed_map"] = {}
             
                 # 3. PURGE TOTALE DES CACHES DE FORMULAIRES
                 keys_to_delete = []
