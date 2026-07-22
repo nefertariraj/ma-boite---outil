@@ -1479,7 +1479,7 @@ else:
                 st.session_state["vsm_macro_steps"] = macro_steps
 
         # 2. INITIALISATION DU STOCKAGE DES DONNÉES DE TÂCHES (AVEC PRIORITÉ À L'IMPORT)
-        if "vsm_detailed_map" not in st.session_state or "vsm_detailed_map" in p:
+        if "vsm_detailed_map" not in st.session_state or ( "vsm_detailed_map" in p and not p.get("is_new_project", False) ):
             if "vsm_detailed_map" in p and isinstance(p["vsm_detailed_map"], dict):
                 st.session_state["vsm_detailed_map"] = dict(p["vsm_detailed_map"])
             else:
