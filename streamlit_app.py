@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # --- SQUELETTE VIDE STRICTEMENT IDENTIQUE AU MODELE DE BASE ---
+                # 1. Modèle de projet neuf, complet et strictement vide
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -697,12 +697,11 @@ if st.session_state.current_project_idx is None:
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
             
-                # Ajout du nouveau projet propre
                 st.session_state.projects.append(copy.deepcopy(new_p))
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # Réinitialisation immédiate des variables globales de travail pour vider l'écran
+                # 2. VIDAGE STRICT ET TOTAL DE TOUTES LES VARIABLES GLOBALES DE CALCUL
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -711,6 +710,23 @@ if st.session_state.current_project_idx is None:
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
                 st.session_state["gantt_data"] = pd.DataFrame()
+            
+                # 3. SUPPRESSION DE TOUS LES CACHES DE WIDGETS ET DE CALCULS EN MÉMOIRE
+                keys_to_delete = []
+                for k in list(st.session_state.keys()):
+                    k_lower = k.lower()
+                    if any(term in k_lower for term in [
+                        "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
+                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
+                        "sipoc", "voc", "team", "gantt", "calcul", "analyse"
+                    ]):
+                        keys_to_delete.append(k)
+            
+                for k in keys_to_delete:
+                    try:
+                        del st.session_state[k]
+                    except Exception:
+                        pass
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
@@ -733,14 +749,15 @@ if st.session_state.current_project_idx is None:
 
                     import pandas as pd
 
-                    # Restauration complète des données du projet dans les variables globales
+                    # Restauration propre des données du projet sélectionné
                     for cle_cible, cle_dict in [
                         ("master_dcp_table", "master_dcp_table"),
                         ("mesure_data", "mesure_data"),
                         ("current_state_process_map", "current_state_process_map"),
                         ("dc_master_data", "dc_master_data"),
                         ("current_spc_data", "current_spc_data"),
-                        ("improvement_strategy", "improvement_strategy")
+                        ("improvement_strategy", "improvement_strategy"),
+                        ("gantt_data", "gantt_data")
                     ]:
                         val = proj_cible.get(cle_dict)
                         if val is not None and isinstance(val, list) and len(val) > 0:
@@ -764,12 +781,12 @@ if st.session_state.current_project_idx is None:
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
 
-                    # Purge élargie et agressive des caches d'édition pour forcer le rechargement propre
+                    # Purge des caches pour forcer le rechargement des données de ce projet spécifique
                     for k in list(st.session_state.keys()):
                         k_lower = k.lower()
                         if any(term in k_lower for term in [
                             "$data_editor", "editor", "process", "map", "dcp", "dc_", 
-                            "_dc", "mesure", "detailed", "spc", "strategy"
+                            "_dc", "mesure", "detailed", "spc", "strategy", "gantt"
                         ]):
                             try:
                                 del st.session_state[k]
