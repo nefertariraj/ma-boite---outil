@@ -696,6 +696,8 @@ if st.session_state.current_project_idx is None:
                     "team_data": pd.DataFrame(columns=["Poste", "Nom"]),
                     "parametres": {},
                     "progression": 0
+                    "vsm_macro_steps": [],
+                    "vsm_detailed_map": {}
                 }
             
                 if "projects" not in st.session_state:
