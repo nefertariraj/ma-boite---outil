@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet neuf, complet et strictement vide
+                # --- SQUELETTE VIDE STRICTEMENT IDENTIQUE AU MODELE DE BASE ---
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -677,6 +677,7 @@ if st.session_state.current_project_idx is None:
                     "dc_master_data": pd.DataFrame(),
                     "current_spc_data": pd.DataFrame(),
                     "improvement_strategy": pd.DataFrame(),
+                    "improve_strategies": pd.DataFrame(),
                     "dmaic": {
                         "define": {},
                         "measure": {},
@@ -696,11 +697,12 @@ if st.session_state.current_project_idx is None:
                 if "projects" not in st.session_state:
                     st.session_state.projects = []
             
+                # Ajout du nouveau projet propre
                 st.session_state.projects.append(copy.deepcopy(new_p))
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES POUR CE NOUVEAU PROJET
+                # Réinitialisation immédiate des variables globales de travail pour vider l'écran
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -708,23 +710,7 @@ if st.session_state.current_project_idx is None:
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
-            
-                # 3. PURGE DU CACHE DES WIDGETS (supprime les mémoires tampons des data_editors)
-                keys_to_delete = []
-                for k in list(st.session_state.keys()):
-                    k_lower = k.lower()
-                    if any(term in k_lower for term in [
-                        "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
-                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
-                        "sipoc", "voc", "team"
-                    ]):
-                        keys_to_delete.append(k)
-            
-                for k in keys_to_delete:
-                    try:
-                        del st.session_state[k]
-                    except Exception:
-                        pass
+                st.session_state["gantt_data"] = pd.DataFrame()
 
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
