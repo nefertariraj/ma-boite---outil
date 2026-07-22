@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet entièrement vide
+                # 1. Modèle de projet entièrement purgé et réinitialisé à zéro
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -674,6 +674,9 @@ if st.session_state.current_project_idx is None:
                     "mesure_data": pd.DataFrame(),
                     "master_dcp_table": pd.DataFrame(),
                     "current_state_process_map": pd.DataFrame(),
+                    # Vidage explicite des sections de la map détaillée pour éviter les vestiges de structure
+                    "detailed_process_map": pd.DataFrame(),
+                    "current_state_detailed_process_map": pd.DataFrame(),
                     "dc_master_data": pd.DataFrame(),
                     "current_spc_data": pd.DataFrame(),
                     "improvement_strategy": pd.DataFrame(),
@@ -701,9 +704,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. ÉCRASEMENT FORCÉ DE TOUTES LES VARIABLES GLOBALES AVEC DES DATAFRAMES VIDES
-                # C'est cette étape qui coupe le lien avec l'ancien projet : 
-                # les variables globales pointent maintenant vers le vide de ce nouveau projet.
+                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES DE TRAVAIL
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -712,8 +713,10 @@ if st.session_state.current_project_idx is None:
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
                 st.session_state["gantt_data"] = pd.DataFrame()
+                st.session_state["detailed_process_map"] = pd.DataFrame()
+                st.session_state["current_state_detailed_process_map"] = pd.DataFrame()
             
-                # 3. PURGE TOTALE DES CACHES DE WIDGETS ET DE CALCULS EN MÉMOIRE
+                # 3. PURGE TOTALE DES CLÉS DE FORMULAIRES EN MÉMOIRE
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
