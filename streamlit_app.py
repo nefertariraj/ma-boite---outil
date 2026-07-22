@@ -1487,12 +1487,21 @@ else:
                 }
 
         # >>> LE CORRECTIF INDÉPENDANT JUSTE ICI <<<
-        # On vérifie si macro_steps existe et s'il est vide, tout en respectant le nouveau projet
-        if 'macro_steps' in locals() and not macro_steps and not p.get("is_new_project", False):
-            macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
-        
-        if 'macro_steps' in locals():
-            st.session_state["vsm_macro_steps"] = macro_steps
+        # Si le VSM est vide mais qu'un SIPOC vient d'être saisi en direct, on l'importe automatiquement
+        if not st.session_state.get("vsm_macro_steps") and "sipoc_data" in st.session_state:
+            live_sipoc = st.session_state["sipoc_data"]
+            if isinstance(live_sipoc, list) and len(live_sipoc) > 0:
+                macro_steps = []
+                for row in live_sipoc:
+                    step_name = row.get("Process") or row.get("process")
+                    if step_name and str(step_name).strip():
+                        macro_steps.append(str(step_name).strip())
+                if macro_steps:
+                    st.session_state["vsm_macro_steps"] = macro_steps
+                    st.session_state["vsm_detailed_map"] = {
+                        step: [{"Détail de la tâche": "Première tâche à définir", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
+                        for step in macro_steps
+                    }
                 
         # 3. INITIALISATION DES METRICS CALCULÉES
         if "vsm_totals" not in st.session_state:
