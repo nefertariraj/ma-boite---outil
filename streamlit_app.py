@@ -251,7 +251,7 @@ with st.sidebar:
     # ---------------------------------------------------------------------
     # 💾 MODULE D'EXPORTATION & POWERPOINT EXÉCUTIF (MULTI-PROJETS)
     # ---------------------------------------------------------------------
-    st.subheader("💾 Archivage & Exportation de la Présentation Exécutive")
+    st.subheader("💾 Exportation de la Présentation Exécutive")
 
     if "projects" in st.session_state and len(st.session_state.projects) > 0:
         indices_projets_tous = list(range(len(st.session_state.projects)))
@@ -280,128 +280,230 @@ with st.sidebar:
             from pptx import Presentation
             from pptx.util import Inches, Pt
             from pptx.dml.color import RGBColor
-            from pptx.enum.text import PP_ALIGN
+            from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+            from pptx.enum.shapes import MSO_SHAPE
 
-            st.markdown("### 🎨 Personnalisation de la présentation directionnelle")
-            
+            st.markdown("### 🎨 Personnalisation IA de la Présentation")
+    
             theme_choisi = st.selectbox(
-                "Sélectionnez le thème visuel du PowerPoint :",
+                "Sélectionnez le thème visuel :",
                 ["Corporate Bleu Marine (Standard Industrie)", "Moderne Teal & Gris (Lean & Clean)", "Énergique Bordeaux & Or (Excellence Opérationnelle)"],
-                key="select_theme_ppt"
+                key="select_theme_ppt_ai"
             )
 
-            # Définition des palettes de couleurs selon le thème
+            # Définition des palettes de couleurs avancées
             if "Bleu Marine" in theme_choisi:
-                c_primary = RGBColor(15, 23, 42)     # Fond sombre / Titres forts
-                c_accent = RGBColor(30, 58, 138)     # Bleu corporate
-                c_bg = RGBColor(248, 250, 252)       # Fond clair
+                c_primary = RGBColor(15, 23, 42)     # #0F172A
+                c_accent = RGBColor(30, 58, 138)     # #1E3A8A
+                c_card_bg = RGBColor(241, 245, 249)  # #F1F5F9
+                c_text = RGBColor(51, 65, 85)        # #334155
             elif "Teal" in theme_choisi:
-                c_primary = RGBColor(13, 148, 136)   # Teal moderne
-                c_accent = RGBColor(15, 118, 110)    # Teal foncé
-                c_bg = RGBColor(240, 253, 250)
+                c_primary = RGBColor(13, 148, 136)   # #0D9488
+                c_accent = RGBColor(15, 118, 110)    # #0F766E
+                c_card_bg = RGBColor(240, 253, 250)  # #F0FDFA
+                c_text = RGBColor(19, 78, 74)
             else:
-                c_primary = RGBColor(127, 29, 29)    # Bordeaux
-                c_accent = RGBColor(180, 83, 9)      # Or / Ambre
-                c_bg = RGBColor(255, 251, 235)
+                c_primary = RGBColor(127, 29, 29)    # #7F1D1D
+                c_accent = RGBColor(180, 83, 9)      # #B45309
+                c_card_bg = RGBColor(255, 251, 235)  # #FEF3C7
+                c_text = RGBColor(69, 26, 3)
 
-            if st.button("🚀 Générer la Présentation Exécutive DMAIC", use_container_width=True, key="btn_exec_ppt"):
+            if st.button("🚀 Générer la Présentation Exécutive Intelligente", use_container_width=True, key="btn_exec_ppt_ai"):
                 prs = Presentation()
-                
-                # --- SLIDE 1 : PAGE DE GARDE ---
-                slide_layout = prs.slide_layouts[6] # Page blanche personnalisable
-                slide = prs.slides.add_slide(slide_layout)
-                
-                txBox = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(11.3), Inches(2))
-                tf = txBox.text_frame
-                tf.word_wrap = True
-                p = tf.paragraphs[0]
-                p.text = f"REVUE DE DIRECTION : PROJET LEAN SIX SIGMA"
-                p.font.size = Pt(32)
-                p.font.bold = True
-                p.font.color.rgb = c_accent
-                
-                p2 = tf.add_paragraph()
-                p2.text = f"Projet : {project_name.upper()}"
-                p2.font.size = Pt(24)
-                p2.font.color.rgb = c_primary
-                
-                txBox_meta = slide.shapes.add_textbox(Inches(1), Inches(5), Inches(8), Inches(1.5))
-                tf_meta = txBox_meta.text_frame
-                tf_meta.text = f"Objectif : Restitution des résultats de la démarche DMAIC (Define, Measure, Analyze, Improve, Control)\nDate de restitution : {datetime.now().strftime('%d/%m/%Y')}\nStatut actuel : Phase {p_exp.get('status', 'Control')}"
+                prs.slide_width = Inches(13.33)
+                prs.slide_height = Inches(7.5)  # Format 16:9 moderne (style Gamma)
+        
+                blank_layout = prs.slide_layouts[6]
 
-                def ajouter_slide_contenu(titre_phase, texte_ou_donnee, graphique=None):
-                    slide_int = prs.slides.add_slide(prs.slide_layouts[6])
-                    
-                    tb_titre = slide_int.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(11.5), Inches(0.8))
-                    tf_t = tb_titre.text_frame
+                # --- 1. PAGE DE GARDE (COVER) ---
+                slide_cover = prs.slides.add_slide(blank_layout)
+        
+                # Fond coloré de couverture
+                bg_cover = slide_cover.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
+                bg_cover.fill.solid()
+                bg_cover.fill.fore_color.rgb = c_primary
+                bg_cover.line.fill.background()
+
+                # Boîte de texte principale de la couverture
+                tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(2.2), Inches(11), Inches(3.5))
+                tf_cov = tb_cov.text_frame
+                tf_cov.word_wrap = True
+        
+                p_c1 = tf_cov.paragraphs[0]
+                p_c1.text = "REVUE DE DIRECTION EXÉCUTIVE"
+                p_c1.font.size = Pt(14)
+                p_c1.font.bold = True
+                p_c1.font.color.rgb = c_accent
+        
+                p_c2 = tf_cov.add_paragraph()
+                p_c2.text = f"Projet Lean Six Sigma : {project_name.replace('_', ' ').title()}"
+                p_c2.font.size = Pt(36)
+                p_c2.font.bold = True
+                p_c2.font.color.rgb = RGBColor(255, 255, 255)
+        
+                p_c3 = tf_cov.add_paragraph()
+                p_c3.text = f"\nDémarche DMAIC Intégrale • Restitution Opérationnelle\nDate : {datetime.now().strftime('%d/%m/%Y')} • Statut : Phase {p_exp.get('status', 'Control')}"
+                p_c3.font.size = Pt(14)
+                p_c3.font.color.rgb = RGBColor(203, 213, 225)
+
+                # Fonction intelligente de génération de slides structurées (Style Layouts Gamme)
+                def ajouter_slide_intelligente(titre_phase, sous_titre_ia, texte_contenu, graphique=None, points_cles=None):
+                    slide = prs.slides.add_slide(blank_layout)
+            
+                    # En-tête de slide
+                    tb_t = slide.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(11.7), Inches(1.0))
+                    tf_t = tb_t.text_frame
+                    tf_t.word_wrap = True
+            
                     p_t = tf_t.paragraphs[0]
                     p_t.text = titre_phase
-                    p_t.font.size = Pt(22)
+                    p_t.font.size = Pt(24)
                     p_t.font.bold = True
-                    p_t.font.color.rgb = c_accent
-                    
+                    p_t.font.color.rgb = c_primary
+            
+                    if sous_titre_ia:
+                        p_sub = tf_t.add_paragraph()
+                        p_sub.text = sous_titre_ia
+                        p_sub.font.size = Pt(13)
+                        p_sub.font.color.rgb = c_accent
+
+                    # Disposition dynamique selon la présence d'un graphique Plotly
                     if graphique is not None:
+                        # Layout avec Graphique à gauche et Carte de Synthèse à droite
                         try:
                             img_buf = io.BytesIO()
-                            graphique.write_image(img_buf, format="png", width=1000, height=550)
+                            graphique.write_image(img_buf, format="png", width=1100, height=650)
                             img_buf.seek(0)
-                            slide_int.shapes.add_picture(img_buf, Inches(0.8), Inches(1.5), Inches(8), Inches(4.5))
+                            slide.shapes.add_picture(img_buf, Inches(0.8), Inches(1.6), Inches(7.2), Inches(5.2))
                         except Exception:
                             pass
-                    
-                    if texte_ou_donnee and isinstance(texte_ou_donnee, str):
-                        tb_txt = slide_int.shapes.add_textbox(Inches(9), Inches(1.5), Inches(3.5), Inches(4.5))
-                        tb_txt.text_frame.word_wrap = True
-                        p_txt = tb_txt.text_frame.paragraphs[0]
-                        p_txt.text = "Synthèse & Analyses :\n\n" + str(texte_ou_donnee)[:600]
-                        p_txt.font.size = Pt(12)
-
-                # --- SLIDES PAR PHASE DMAIC ---
-                ajouter_slide_contenu(
-                    "1. Phase DEFINE : Cadrage & Voix du Client (VOC)", 
-                    p_exp.get('define_summary', "Définition du problème, de la charte de projet et cartographie SIPOC validées pour cadrer le périmètre d'amélioration.")
-                )
                 
+                        # Panneau latéral de synthèse textuelle
+                        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(8.3), Inches(1.6), Inches(4.2), Inches(5.2))
+                        card.fill.solid()
+                        card.fill.fore_color.rgb = c_card_bg
+                        card.line.color.rgb = c_accent
+                
+                        tf_card = card.text_frame
+                        tf_card.word_wrap = True
+                        tf_card.vertical_anchor = MSO_ANCHOR.TOP
+                
+                        p_ch = tf_card.paragraphs[0]
+                        p_ch.text = "Insights & Analyse IA :"
+                        p_ch.font.size = Pt(14)
+                        p_ch.font.bold = True
+                        p_ch.font.color.rgb = c_primary
+                
+                        p_ctxt = tf_card.add_paragraph()
+                        p_ctxt.text = "\n" + str(texte_contenu)[:500] + ("..." if len(str(texte_contenu)) > 500 else "")
+                        p_ctxt.font.size = Pt(11)
+                        p_ctxt.font.color.rgb = c_text
+            
+                    else:
+                        # Layout en colonnes / blocs structurés si pas de graphique
+                        card_main = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.6), Inches(11.7), Inches(5.2))
+                        card_main.fill.solid()
+                        card_main.fill.fore_color.rgb = c_card_bg
+                        card_main.line.color.rgb = c_accent
+                
+                        tf_m = card_main.text_frame
+                        tf_m.word_wrap = True
+                        tf_m.vertical_anchor = MSO_ANCHOR.TOP
+                
+                        p_mh = tf_m.paragraphs[0]
+                        p_mh.text = "Synthèse & Synthétisation des Données du Projet :"
+                        p_mh.font.size = Pt(16)
+                        p_mh.font.bold = True
+                        p_mh.font.color.rgb = c_primary
+                
+                        p_mt = tf_m.add_paragraph()
+                        p_mt.text = "\n" + str(texte_contenu)
+                        p_mt.font.size = Pt(13)
+                        p_mt.font.color.rgb = c_text
+                
+                        if points_cles and isinstance(points_cles, list):
+                            for pt_txt in points_cles:
+                                p_bullet = tf_m.add_paragraph()
+                                p_bullet.text = f"• {pt_txt}"
+                                p_bullet.font.size = Pt(12)
+                                p_bullet.font.color.rgb = c_accent
+                                p_bullet.level = 0
+
+                # --- 2. RECUPÉRATION DES DONNÉES DU PROJET & DES GRAPHIQUES ACTIFS ---
+                # Définition dynamique des contenus basés sur ce qui a été saisi dans l'outil
+                define_text = p_exp.get('define_summary', 'Cadrage initial réalisé via la Charte de Projet et cartographie macro SIPOC validée.')
+        
                 fig_mesure = st.session_state.get('current_spc_figure') or p_exp.get('spc_figure')
-                ajouter_slide_contenu(
-                    "2. Phase MEASURE : Collecte de Données & Baseline", 
-                    p_exp.get('measure_summary', "Évaluation de la performance actuelle du processus et établissement de la baseline initiale (Capabilité / SPC)."),
+                measure_text = p_exp.get('measure_summary', 'Analyse quantitative de la performance baseline et vérification de la stabilité du processus.')
+        
+                fig_analyse = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure') or st.session_state.get('current_analysis_figure')
+                analyze_text = p_exp.get('analyze_summary', 'Identification des causes racines critiques via l’analyse croisée des diagrammes de Pareto et d’Ishikawa.')
+        
+                improve_text = p_exp.get('improve_summary', 'Déploiement des solutions d’optimisation validées par analyse des risques (FMEA / AMDEC) et plans d’actions.')
+                control_text = p_exp.get('control_summary', 'Mise en place du plan de surveillance permanent et des cartes de contrôle SPC pour ancrer les gains.')
+
+                # --- GÉNÉRATION DES SLIDES DE LA DÉMARCHE ---
+                ajouter_slide_intelligente(
+                    "1. Phase DEFINE : Cadrage & Voix du Client",
+                    "Alignement stratégique sur les exigences critiques (CTQ)",
+                    define_text,
+                    points_cles=[
+                        "Objectif : Résolution de la problématique qualité identifiée",
+                        "Périmètre : Processus opérationnel sous revue",
+                        "Livrables : SIPOC et Charte validés par le sponsor"
+                    ]
+                )
+
+                ajouter_slide_intelligente(
+                    "2. Phase MEASURE : État des lieux & Baseline",
+                    "Évaluation statistique de la performance actuelle du processus",
+                    measure_text,
                     graphique=fig_mesure
                 )
-                
-                fig_analyse = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure')
-                ajouter_slide_contenu(
-                    "3. Phase ANALYZE : Identification des Causes Racines", 
-                    p_exp.get('analyze_summary', "Analyse approfondie des causes de variabilité (Pareto, Ishikawa, 5 Pourquoi) pour identifier les facteurs influents."),
+
+                ajouter_slide_intelligente(
+                    "3. Phase ANALYZE : Hiérarchisation des Causes Racines",
+                    "Isolation des facteurs influents générateurs de non-conformités",
+                    analyze_text,
                     graphique=fig_analyse
                 )
-                
-                ajouter_slide_contenu(
-                    "4. Phase IMPROVE : Solutions & Plan d'Action", 
-                    p_exp.get('improve_summary', "Mise en place des solutions optimisées, analyse des risques (FMEA) et tests pilotes pour valider les gains.")
-                )
-                
-                ajouter_slide_contenu(
-                    "5. Phase CONTROL : Pérennisation & Suivi", 
-                    p_exp.get('control_summary', "Mise en place des cartes de contrôle permanentes, du plan de surveillance et transfert aux équipes opérationnelles.")
+
+                ajouter_slide_intelligente(
+                    "4. Phase IMPROVE : Optimisation & Plan d'Action",
+                    "Traitement des risques et mise en œuvre opérationnelle des solutions",
+                    improve_text,
+                    points_cles=[
+                        "Réduction documentée des causes majeures",
+                        "Évaluation de la criticité résiduelle (FMEA)",
+                        "Tests pilotes et validation terrain"
+                    ]
                 )
 
+                ajouter_slide_intelligente(
+                    "5. Phase CONTROL : Pérennisation & Pilotage",
+                    "Garantie du maintien des performances à long terme",
+                    control_text,
+                    points_cles=[
+                        "Mise sous contrôle statistique permanente",
+                        "Standardisation des modes opératoires",
+                        "Clôture et transfert du projet au propriétaire du processus"
+                    ]
+                )
+
+                # Export final du fichier PPTX
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
-                
-                st.success("✅ Présentation exécutive générée avec succès !")
+        
+                st.success("✨ Présentation exécutive intelligente générée avec succès !")
                 st.download_button(
-                    label="📥 Télécharger le PowerPoint Exécutif pour la Direction", 
+                    label="📥 Télécharger le Livrable Exécutif (Format IA / Gamme)", 
                     data=bytes(buffer_pptx.getvalue()), 
-                    file_name=f"Presentation_Direction_DMAIC_{project_name}.pptx", 
+                    file_name=f"Presentation_Executive_IA_{project_name}.pptx", 
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True
                 )
         except Exception as e:
-            st.error(f"Erreur lors de la génération de la présentation : {e}")
-
-    else:
-        st.info("ℹ️ Aucun projet enregistré pour le moment. Veuillez d'abord créer un projet dans l'application.")
+            st.error(f"Erreur lors de la génération de la présentation IA : {e}")
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
