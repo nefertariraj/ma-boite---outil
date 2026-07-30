@@ -1155,27 +1155,20 @@ else:
             else:
                 st.warning("⚠️ Le tableau est vide.")
 
-        if st.session_state.get("voc_results") is not None:
+        # On vérifie proprement que le DataFrame existe et n'est pas vide
+        if "voc_results" in st.session_state and not st.session_state.voc_results.empty:
             st.write("### 📊 Résultat de l'Analyse Thématique")
             st.table(st.session_state.voc_results)
             st.write("---")
             st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
-            res_voc = st.session_state.voc_results
-            
-        # On vérifie que le DataFrame existe et n'est pas vide
-        if "voc_results" in st.session_state and not st.session_state.voc_results.empty:
+        
             res_voc = st.session_state.voc_results
             top_theme = res_voc.iloc[0]["thème des irritants"]
             ctq_cible = res_voc.iloc[0]["CTQ"]
-        
+    
             st.markdown(f"### 🎯 Focus Prioritaire : **{top_theme}**")
             st.write(f"Sur la base de l'analyse des verbatims, voici les axes stratégiques pour impacter le CTQ : `{ctq_cible}`")
-            
-        else:
-            # Si le tableau est vide (nouveau projet), on affiche uniquement l'info et RIEN d'autre
-            st.info("💡 Cliquez sur le bouton 'Lancer l'Analyse' ci-dessus pour générer les résultats de ce projet.")
-            st.write(f"Sur la base de l'analyse des verbatims, voici les 4 axes stratégiques pour impacter le CTQ : `{ctq_cible}`")
-
+        
             plans_action = {
                 "Délais (Lead Time)": [
                     "**Standardisation des flux (Takt Time)** : Aligner la cadence de production sur la demande client pour éliminer les stocks tampons.",
@@ -1220,6 +1213,10 @@ else:
             with col_b:
                 st.info(f"🛠️ **Proposition 3**\n\n{propositions[2]}")
                 st.info(f"📊 **Proposition 4**\n\n{propositions[3]}")
+
+        else:
+            # Si le tableau est vide (nouveau projet), on affiche uniquement l'information propre
+            st.info("💡 Cliquez sur le bouton 'Lancer l'Analyse' ci-dessus pour générer les résultats de ce projet.")
                 
         # --- 7. PROJECT MILESTONE & TIMING ---
         st.divider()
