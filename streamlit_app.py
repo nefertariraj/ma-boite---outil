@@ -248,295 +248,160 @@ with st.sidebar:
     st.session_state.primary_color = color
     st.divider()
 
-   # ------------------------------------------------
-    # 💾 MODULE "ENREGISTRER SOUS" (INTEGRALITÉ DES PROJETS CORRIGÉE)
-    # ------------------------------------------------
-    st.subheader("💾 Archivage & Exportation Complète (Copie Conforme)")
+        # ---------------------------------------------------------------------
+        # 💾 MODULE D'EXPORTATION & POWERPOINT EXÉCUTIF (MULTI-PROJETS)
+        # ---------------------------------------------------------------------
+        st.subheader("💾 Archivage & Exportation de la Présentation Exécutive")
+
+        if "projects" in st.session_state and len(st.session_state.projects) > 0:
+            indices_projets_tous = list(range(len(st.session_state.projects)))
     
-    if "projects" in st.session_state and len(st.session_state.projects) > 0:
-        indices_projets_tous = list(range(len(st.session_state.projects)))
+            def formateur_liste_enregistrer(idx):
+                p_test = st.session_state.projects[idx]
+                return f"📁 {p_test.get('nom', 'Sans nom')} | Jalon: {p_test.get('status', 'Define')}"
         
-        def formateur_liste_enregistrer(idx):
-            p_test = st.session_state.projects[idx]
-            return f"📁 {p_test.get('nom', 'Sans nom')} | Jalon: {p_test.get('status', 'Define')}"
-            
-        proj_sel_idx = st.selectbox(
-            "Sélectionnez le projet à figer dans l'archive :",
-            options=indices_projets_tous,
-            format_func=formateur_liste_enregistrer,
-            key="sb_enregistrer_sous_selector"
-        )
-        
-        # Extraction du dictionnaire contenant l'INTÉGRALITÉ des données du projet
-        p_exp = st.session_state.projects[proj_sel_idx]
-        project_name = p_exp.get('nom', 'Projet_LSS').replace(" ", "_")
-        
-        import io
-        from datetime import datetime
-        import json
-
-        st.info("📊 **Contrôle Qualité :** L'exportation va inclure l'intégralité des formulaires, des structures de données (DataFrames) et des rendus graphiques rattachés à ce projet.")
-
-        # =====================================================================
-        # 📽️ 1. EXPORTATION POWERPOINT INTÉGRALE (Rapports, Visuels & Graphiques Plotly)
-        # =====================================================================
-        try:
-            from pptx import Presentation
-            from pptx.util import Inches, Pt
-            from pptx.dml.color import RGBColor
-            from pptx.enum.text import PP_ALIGN
-
-            st.markdown("### 🎨 Personnalisation de la présentation directionnelle")
-            
-            # Choix du thème visuel pour la direction
-            theme_choisi = st.selectbox(
-                "Sélectionnez le thème visuel du PowerPoint :",
-                ["Corporate Bleu Marine (Standard Industrie)", "Moderne Teal & Gris (Lean & Clean)", "Énergique Bordeaux & Or (Excellence Opérationnelle)"],
-                key="select_theme_ppt"
+            proj_sel_idx = st.selectbox(
+                "Sélectionnez le projet dont vous souhaitez générer la présentation :",
+                options=indices_projets_tous,
+                format_func=formateur_liste_enregistrer,
+                key="sb_enregistrer_sous_selector"
             )
+    
+            # Extraction du projet sélectionné
+            p_exp = st.session_state.projects[proj_sel_idx]
+            project_name = p_exp.get('nom', 'Projet_LSS').replace(" ", "_")
 
-            # Définition des palettes de couleurs selon le thème
-            if "Bleu Marine" in theme_choisi:
-                c_primary = RGBColor(15, 23, 42)     # Fond sombre / Titres forts
-                c_accent = RGBColor(30, 58, 138)     # Bleu corporate
-                c_bg = RGBColor(248, 250, 252)       # Fond clair
-            elif "Teal" in theme_choisi:
-                c_primary = RGBColor(13, 148, 136)   # Teal moderne
-                c_accent = RGBColor(15, 118, 110)    # Teal foncé
-                c_bg = RGBColor(240, 253, 250)
-            else:
-                c_primary = RGBColor(127, 29, 29)    # Bordeaux
-                c_accent = RGBColor(180, 83, 9)      # Or / Ambre
-                c_bg = RGBColor(255, 251, 235)
+            st.info("📊 **Contrôle Qualité :** L'exportation va inclure l'intégralité des synthèses, des structures et des graphiques rattachés à ce projet pour la direction.")
 
-            if st.button("🚀 Générer la Présentation Exécutive DMAIC", use_container_width=True, key="btn_exec_ppt"):
-                prs = Presentation()
-                
-                # --- SLIDE 1 : PAGE DE GARDE ---
-                slide_layout = prs.slide_layouts[6] # Page blanche personnalisable
-                slide = prs.slides.add_slide(slide_layout)
-                
-                # Titre de la présentation
-                txBox = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(11.3), Inches(2))
-                tf = txBox.text_frame
-                tf.word_wrap = True
-                p = tf.paragraphs[0]
-                p.text = f"REVUE DE DIRECTION : PROJET LEAN SIX SIGMA"
-                p.font.size = Pt(32)
-                p.font.bold = True
-                p.font.color.rgb = c_accent
-                
-                p2 = tf.add_paragraph()
-                p2.text = f"Projet : {project_name.upper()}"
-                p2.font.size = Pt(24)
-                p2.font.color.rgb = c_primary
-                
-                # Métadonnées bas de page
-                txBox_meta = slide.shapes.add_textbox(Inches(1), Inches(5), Inches(8), Inches(1.5))
-                tf_meta = txBox_meta.text_frame
-                tf_meta.text = f"Objectif : Restitution des résultats de la démarche DMAIC (Define, Measure, Analyze, Improve, Control)\nDate de restitution : {datetime.now().strftime('%d/%m/%Y')}\nStatut actuel : Phase {p_exp.get('status', 'Control')}"
+            # =====================================================================
+            # 📽️ EXPORTATION POWERPOINT INTÉGRALE (Rapports, Visuels & Graphiques Plotly)
+            # =====================================================================
+            try:
+                from pptx import Presentation
+                from pptx.util import Inches, Pt
+                from pptx.dml.color import RGBColor
+                from pptx.enum.text import PP_ALIGN
 
-                # --- FONCTION UTILITAIRE POUR CRÉER DES SLIDES PROPRES ---
-                def ajouter_slide_contenu(titre_phase, texte_ou_donnee, graphique=None):
-                    slide = prs.slides.add_slide(prs.slide_layouts[6])
-                    
-                    # En-tête de slide
-                    tb_titre = slide.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(11.5), Inches(0.8))
-                    tf_t = tb_titre.text_frame
-                    p_t = tf_t.paragraphs[0]
-                    p_t.text = titre_phase
-                    p_t.font.size = Pt(22)
-                    p_t.font.bold = True
-                    p_t.font.color.rgb = c_accent
-                    
-                    # Si on a un graphique Plotly à intégrer
-                    if graphique is not None:
-                        try:
-                            img_buf = io.BytesIO()
-                            graphique.write_image(img_buf, format="png", width=1000, height=550)
-                            img_buf.seek(0)
-                            # On place le graphique à gauche ou centré
-                            slide.shapes.add_picture(img_buf, Inches(0.8), Inches(1.5), Inches(8), Inches(4.5))
-                        except Exception as e:
-                            pass
-                    
-                    # Si on a du texte / synthèse
-                    if texte_ou_donnee and isinstance(texte_ou_donnee, str):
-                        tb_txt = slide.shapes.add_textbox(Inches(9), Inches(1.5), Inches(3.5), Inches(4.5))
-                        tb_txt.text_frame.word_wrap = True
-                        p_txt = tb_txt.text_frame.paragraphs[0]
-                        p_txt.text = "Synthèse & Analyses :\n\n" + str(texte_ou_donnee)[:600]
-                        p_txt.font.size = Pt(12)
-
-                # --- SLIDES PAR PHASE DMAIC ---
-                # 1. DEFINE
-                ajouter_slide_contenu(
-                    "1. Phase DEFINE : Cadrage & Voix du Client (VOC)", 
-                    p_exp.get('define_summary', "Définition du problème, de la charte de projet et cartographie SIPOC validées pour cadrer le périmètre d'amélioration.")
-                )
-                
-                # 2. MEASURE
-                fig_mesure = st.session_state.get('current_spc_figure') or p_exp.get('spc_figure')
-                ajouter_slide_contenu(
-                    "2. Phase MEASURE : Collecte de Données & Baseline", 
-                    p_exp.get('measure_summary', "Évaluation de la performance actuelle du processus et établissement de la baseline initiale (Capabilité / SPC)."),
-                    graphique=fig_mesure
-                )
-                
-                # 3. ANALYZE
-                fig_analyse = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure')
-                ajouter_slide_contenu(
-                    "3. Phase ANALYZE : Identification des Causes Raçines", 
-                    p_exp.get('analyze_summary', "Analyse approfondie des causes d'variabilité (Pareto, Ishikawa, 5 Pourquoi) pour identifier les facteurs influents."),
-                    graphique=fig_analyse
-                )
-                
-                # 4. IMPROVE
-                ajouter_slide_contenu(
-                    "4. Phase IMPROVE : Solutions & Plan d'Action", 
-                    p_exp.get('improve_summary', "Mise en place des solutions optimisées, analyse des risques (FMEA) et tests pilotes pour valider les gains.")
-                )
-                
-                # 5. CONTROL
-                ajouter_slide_contenu(
-                    "5. Phase CONTROL : Pérennisation & Suivi", 
-                    p_exp.get('control_summary', "Mise en place des cartes de contrôle permanentes, du plan de surveillance et transfert aux équipes opérationnelles.")
+                st.markdown("### 🎨 Personnalisation de la présentation directionnelle")
+        
+                theme_choisi = st.selectbox(
+                    "Sélectionnez le thème visuel du PowerPoint :",
+                    ["Corporate Bleu Marine (Standard Industrie)", "Moderne Teal & Gris (Lean & Clean)", "Énergique Bordeaux & Or (Excellence Opérationnelle)"],
+                    key="select_theme_ppt"
                 )
 
-                # Sauvegarde du fichier final
-                buffer_pptx = io.BytesIO()
-                prs.save(buffer_pptx)
-                
-                st.success("✅ Présentation exécutive générée avec succès !")
-                st.download_button(
-                    label="📥 Télécharger le PowerPoint Exécutif pour la Direction", 
-                    data=bytes(buffer_pptx.getvalue()), 
-                    file_name=f"Presentation_Direction_DMAIC_{project_name}.pptx", 
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
-                )
-        except Exception as e:
-            st.error(f"Erreur lors de la génération de la présentation : {e}")
+                # Définition des palettes de couleurs selon le thème
+                if "Bleu Marine" in theme_choisi:
+                    c_primary = RGBColor(15, 23, 42)     # Fond sombre / Titres forts
+                    c_accent = RGBColor(30, 58, 138)     # Bleu corporate
+                    c_bg = RGBColor(248, 250, 252)       # Fond clair
+                elif "Teal" in theme_choisi:
+                    c_primary = RGBColor(13, 148, 136)   # Teal moderne
+                    c_accent = RGBColor(15, 118, 110)    # Teal foncé
+                    c_bg = RGBColor(240, 253, 250)
+                else:
+                    c_primary = RGBColor(127, 29, 29)    # Bordeaux
+                    c_accent = RGBColor(180, 83, 9)      # Or / Ambre
+                    c_bg = RGBColor(255, 251, 235)
 
-
-        # =====================================================================
-        # 📄 2. EXPORTATION PDF DE TYPE ARCHIVE (Sécurisée contre l'ambiguïté)
-        # =====================================================================
-        try:
-            from fpdf import FPDF
+                if st.button("🚀 Générer la Présentation Exécutive DMAIC", use_container_width=True, key="btn_exec_ppt"):
+                    prs = Presentation()
             
-            class PDF(FPDF):
-                def header(self):
-                    self.set_font('Helvetica', 'B', 10)
-                    self.set_text_color(30, 58, 138)
-                    self.cell(0, 10, "RAPPORT OFFICIEL DMAIC - SYNTHÈSE & AUDIT", border=0, ln=1, align='L')
-                    self.line(10, 16, 200, 16)
-                    self.ln(4)
-                    
-                def footer(self):
-                    self.set_y(-15)
-                    self.set_font('Helvetica', 'I', 8)
-                    self.set_text_color(156, 163, 175)
-                    self.cell(0, 10, f'Livrable d\'archive autonome - Page {self.page_no()}', 0, 0, 'C')
-
-            def nettoyer_texte(texte):
-                if not isinstance(texte, str):
-                    texte = str(texte)
-                remplacements = {
-                    "≥": ">=", "≤": "<=", "≠": "!=", "±": "+/-", "µ": "u", "²": "2", "³": "3"
-                }
-                for carac, subst in remplacements.items():
-                    texte = texte.replace(carac, subst)
-                return texte.encode('latin-1', 'replace').decode('latin-1')
-
-            pdf = PDF()
-            pdf.add_page()
-            pdf.set_font("Helvetica", size=10)
+                    # --- SLIDE 1 : PAGE DE GARDE ---
+                    slide_layout = prs.slide_layouts[6] # Page blanche personnalisable
+                    slide = prs.slides.add_slide(slide_layout)
             
-            # En-tête de l'archive
-            pdf.set_font("Helvetica", 'B', 14)
-            pdf.set_text_color(13, 148, 136)
-            pdf.cell(0, 10, f"PROJET DMAIC : {nettoyer_texte(project_name.upper())}", ln=1)
-            pdf.set_font("Helvetica", size=10)
-            pdf.set_text_color(0, 0, 0)
-            pdf.cell(0, 6, f"Date de génération : {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1)
-            pdf.cell(0, 6, f"Phase cible enregistrée : {p_exp.get('status', 'Define')}", ln=1)
-            pdf.ln(6)
+                    txBox = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(11.3), Inches(2))
+                    tf = txBox.text_frame
+                    tf.word_wrap = True
+                    p = tf.paragraphs[0]
+                    p.text = f"REVUE DE DIRECTION : PROJET LEAN SIX SIGMA"
+                    p.font.size = Pt(32)
+                    p.font.bold = True
+                    p.font.color.rgb = c_accent
             
-            # Boucle d'extraction systématique du dictionnaire
-            for cle, valeur in p_exp.items():
-                if valeur is None:
-                    continue
-                
-                # CAS 1 : DataFrame brut
-                if isinstance(valeur, pd.DataFrame):
-                    if valeur.empty:
-                        continue
-                    pdf.set_font("Helvetica", 'B', 11)
-                    pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Tableau Associé - {nettoyer_texte(cle).upper()} :", ln=1)
-                    pdf.ln(2)
-                    
-                    pdf.set_font("Helvetica", 'B', 9)
-                    largeur_col = int(180 / max(len(valeur.columns), 1))
-                    for col in valeur.columns:
-                        pdf.cell(largeur_col, 7, nettoyer_texte(col)[:15], border=1)
-                    pdf.ln()
-                    
-                    pdf.set_font("Helvetica", size=9)
-                    for _, row in valeur.head(15).iterrows():
-                        for col in valeur.columns:
-                            cell_val = nettoyer_texte(row[col])
-                            pdf.cell(largeur_col, 6, cell_val[:15], border=1)
-                        pdf.ln()
-                    if len(valeur) > 15:
-                        pdf.cell(0, 6, nettoyer_texte(f"... (+ {len(valeur) - 15} lignes supplémentaires)"), ln=1)
-                    pdf.ln(4)
-                
-                # CAS 2 : Liste de dictionnaires
-                elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
-                    pdf.set_font("Helvetica", 'B', 11)
-                    pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Tableau de Structure - {nettoyer_texte(cle).upper()} :", ln=1)
-                    pdf.ln(2)
-                    
-                    df_t = pd.DataFrame(valeur)
-                    pdf.set_font("Helvetica", 'B', 9)
-                    largeur_col = int(180 / max(len(df_t.columns), 1))
-                    for col in df_t.columns:
-                        pdf.cell(largeur_col, 7, nettoyer_texte(col)[:15], border=1)
-                    pdf.ln()
-                    
-                    pdf.set_font("Helvetica", size=9)
-                    for _, row in df_t.iterrows():
-                        for col in df_t.columns:
-                            cell_val = nettoyer_texte(row[col])
-                            pdf.cell(largeur_col, 6, cell_val[:15], border=1)
-                        pdf.ln()
-                    pdf.ln(4)
-                
-                # CAS 3 : Chaîne de caractères
-                elif isinstance(valeur, str) and valeur != "":
-                    pdf.set_font("Helvetica", 'B', 11)
-                    pdf.set_text_color(30, 58, 138)
-                    pdf.cell(0, 8, f"Saisie / {nettoyer_texte(cle).upper()} :", ln=1)
-                    pdf.set_font("Helvetica", size=10)
-                    pdf.set_text_color(0, 0, 0)
-                    pdf.multi_cell(0, 6, nettoyer_texte(valeur))
-                    pdf.ln(3)
+                    p2 = tf.add_paragraph()
+                    p2.text = f"Projet : {project_name.upper()}"
+                    p2.font.size = Pt(24)
+                    p2.font.color.rgb = c_primary
+            
+                    txBox_meta = slide.shapes.add_textbox(Inches(1), Inches(5), Inches(8), Inches(1.5))
+                    tf_meta = txBox_meta.text_frame
+                    tf_meta.text = f"Objectif : Restitution des résultats de la démarche DMAIC (Define, Measure, Analyze, Improve, Control)\nDate de restitution : {datetime.now().strftime('%d/%m/%Y')}\nStatut actuel : Phase {p_exp.get('status', 'Control')}"
 
-            pdf_bytes = pdf.output()
+                    def ajouter_slide_contenu(titre_phase, texte_ou_donnee, graphique=None):
+                        slide = prs.slides.add_slide(prs.slide_layouts[6])
+                
+                        tb_titre = slide.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(11.5), Inches(0.8))
+                        tf_t = tb_titre.text_frame
+                        p_t = tf_t.paragraphs[0]
+                        p_t.text = titre_phase
+                        p_t.font.size = Pt(22)
+                        p_t.font.bold = True
+                        p_t.font.color.rgb = c_accent
+                
+                        if graphique is not None:
+                            try:
+                                img_buf = io.BytesIO()
+                                graphique.write_image(img_buf, format="png", width=1000, height=550)
+                                img_buf.seek(0)
+                                slide.shapes.add_picture(img_buf, Inches(0.8), Inches(1.5), Inches(8), Inches(4.5))
+                            except Exception:
+                                pass
+                
+                        if texte_ou_donnee and isinstance(texte_ou_donnee, str):
+                            tb_txt = slide.shapes.add_textbox(Inches(9), Inches(1.5), Inches(3.5), Inches(4.5))
+                            tb_txt.text_frame.word_wrap = True
+                            p_txt = tb_txt.text_frame.paragraphs[0]
+                            p_txt.text = "Synthèse & Analyses :\n\n" + str(texte_ou_donnee)[:600]
+                            p_txt.font.size = Pt(12)
+
+                    # --- SLIDES PAR PHASE DMAIC ---
+                    ajouter_slide_contenu(
+                        "1. Phase DEFINE : Cadrage & Voix du Client (VOC)", 
+                        p_exp.get('define_summary', "Définition du problème, de la charte de projet et cartographie SIPOC validées pour cadrer le périmètre d'amélioration.")
+                    )
             
-            st.download_button(
-                label="📄 Télécharger le PDF Intégral (Rapport Documentaire)",
-                data=bytes(pdf_bytes),
-                file_name=f"PDF_DMAIC_{project_name}.pdf",
-                mime="application/pdf",
-                use_container_width=True,
-                key="btn_pdf_full_zero_loss"
-            )
-        except Exception as e:
-            st.error(f"Erreur lors de l'extraction PDF : {e}")
+                    fig_mesure = st.session_state.get('current_spc_figure') or p_exp.get('spc_figure')
+                    ajouter_slide_contenu(
+                        "2. Phase MEASURE : Collecte de Données & Baseline", 
+                        p_exp.get('measure_summary', "Évaluation de la performance actuelle du processus et établissement de la baseline initiale (Capabilité / SPC)."),
+                        graphique=fig_mesure
+                    )
+            
+                    fig_analyse = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure')
+                    ajouter_slide_contenu(
+                        "3. Phase ANALYZE : Identification des Causes Racines", 
+                        p_exp.get('analyze_summary', "Analyse approfondie des causes de variabilité (Pareto, Ishikawa, 5 Pourquoi) pour identifier les facteurs influents."),
+                        graphique=fig_analyse
+                    )
+            
+                    ajouter_slide_contenu(
+                        "4. Phase IMPROVE : Solutions & Plan d'Action", 
+                        p_exp.get('improve_summary', "Mise en place des solutions optimisées, analyse des risques (FMEA) et tests pilotes pour valider les gains.")
+                    )
+            
+                    ajouter_slide_contenu(
+                        "5. Phase CONTROL : Pérennisation & Suivi", 
+                        p_exp.get('control_summary', "Mise en place des cartes de contrôle permanentes, du plan de surveillance et transfert aux équipes opérationnelles.")
+                    )
+
+                    buffer_pptx = io.BytesIO()
+                    prs.save(buffer_pptx)
+            
+                    st.success("✅ Présentation exécutive générée avec succès !")
+                    st.download_button(
+                        label="📥 Télécharger le PowerPoint Exécutif pour la Direction", 
+                        data=bytes(buffer_pptx.getvalue()), 
+                        file_name=f"Presentation_Direction_DMAIC_{project_name}.pptx", 
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        use_container_width=True
+                    )
+            except Exception as e:
+                st.error(f"Erreur lors de la génération de la présentation : {e}")
+
+        else:
+            st.info("ℹ️ Aucun projet enregistré pour le moment. Veuillez d'abord créer un projet dans l'application.")
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
