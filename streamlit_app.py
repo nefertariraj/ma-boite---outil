@@ -664,7 +664,7 @@ if st.session_state.current_project_idx is None:
                 import copy
                 import pandas as pd
 
-                # 1. Modèle de projet neuf, complet et strictement vide (AVEC LES CLÉS VSM)
+                # 1. Modèle de projet neuf, complet et strictement vide
                 new_p = {
                     "nom": p_name,
                     "name": p_name,
@@ -689,11 +689,6 @@ if st.session_state.current_project_idx is None:
                     "voc_data": [{"Client": "", "Verbatim": "", "Besoin": ""}],
                     "selected_ctq": "Qualité",
                     "team_data": [{"Poste": "", "Nom": ""}],
-                    # --- AJOUT DES CLÉS VSM VIDES POUR ÉVITER L'HÉRITAGE ---
-                    "vsm_macro_steps": [],
-                    "vsm_detailed_map": {},
-                    "saved_voc_results": [],
-                    # -------------------------------------------------------
                     "parametres": {},
                     "progression": 0
                 }
@@ -705,7 +700,7 @@ if st.session_state.current_project_idx is None:
                 new_idx = len(st.session_state.projects) - 1
                 st.session_state.current_project_idx = new_idx
             
-                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES
+                # 2. VIDAGE STRICT DE TOUTES LES VARIABLES GLOBALES POUR LE NOUVEAU PROJET
                 st.session_state["current_state_process_map"] = pd.DataFrame()
                 st.session_state["master_dcp_table"] = pd.DataFrame()
                 st.session_state["mesure_data"] = pd.DataFrame()
@@ -713,19 +708,14 @@ if st.session_state.current_project_idx is None:
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
-                # --- AJOUT DU VIDAGE VSM EN SESSION ---
-                st.session_state.pop("vsm_macro_steps", None)
-                st.session_state.pop("vsm_detailed_map", None)
-                # -------------------------------------
             
-                # 3. PURGE PROFONDE DU CACHE DES WIDGETS
+                # 3. PURGE DU CACHE DES WIDGETS
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
-                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
-                        "vsm_", "voc_"  # <--- Ajouté pour purger aussi les initialisations VSM/VOC
+                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor"
                     ]):
                         keys_to_delete.append(k)
             
