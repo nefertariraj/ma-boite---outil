@@ -1119,8 +1119,8 @@ else:
                 st.session_state.voc_results = pd.DataFrame(p["saved_voc_results"])
             else:
                 st.session_state.voc_results = pd.DataFrame()
-            st.session_state[f"voc_results_init_{p_idx}"] = Tru
-        
+            st.session_state[f"voc_results_init_{p_idx}"] = True  # <--- Correction ici (True au lieu de Tru)
+
         if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
             df_to_analyze = p["voc_raw_data"]
             if isinstance(df_to_analyze, pd.DataFrame) and not df_to_analyze.empty:
@@ -1144,9 +1144,11 @@ else:
                         "CTQ": m["ctq"],
                         "score": count
                     })
+                
+                # Calcul et tri des résultats
                 st.session_state.voc_results = pd.DataFrame(res_data).sort_values("score", ascending=False).drop(columns=["score"])
                 
-                # --- CORRECTION : Sauvegarde immédiate dans le dictionnaire du projet actif ---
+                # Sauvegarde immédiate dans le dictionnaire du projet actif
                 p["saved_voc_results"] = st.session_state.voc_results.to_dict('records')
                 
                 st.rerun()
