@@ -681,7 +681,7 @@ if st.session_state.current_project_idx is None:
                         "define": {},
                         "measure": {},
                         "analyze": {},
-                        "improve": {},
+                        "improve": {"strategies": []},
                         "innovate": {},
                         "control": {}
                     },
@@ -708,6 +708,10 @@ if st.session_state.current_project_idx is None:
                 st.session_state["current_spc_data"] = pd.DataFrame()
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
+                st.session_state["gantt_data"] = pd.DataFrame()
+                st.session_state["sipoc_data"] = [{"Supplier": "", "Input": "", "Process": "", "Output": "", "Customer": ""}]
+                st.session_state["voc_data"] = [{"Client": "", "Verbatim": "", "Besoin": ""}]
+                st.session_state["team_data"] = [{"Poste": "", "Nom": ""}]
             
                 # 3. PURGE DU CACHE DES WIDGETS
                 keys_to_delete = []
@@ -715,7 +719,8 @@ if st.session_state.current_project_idx is None:
                     k_lower = k.lower()
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
-                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor"
+                        "mesure", "detailed", "spc", "editor", "strategy", "$data_editor",
+                        "sipoc", "voc", "team", "gantt"
                     ]):
                         keys_to_delete.append(k)
             
@@ -753,7 +758,8 @@ if st.session_state.current_project_idx is None:
                         ("current_state_process_map", "current_state_process_map"),
                         ("dc_master_data", "dc_master_data"),
                         ("current_spc_data", "current_spc_data"),
-                        ("improvement_strategy", "improvement_strategy")
+                        ("improvement_strategy", "improvement_strategy"),
+                        ("gantt_data", "gantt_data")
                     ]:
                         val = proj_cible.get(cle_dict)
                         if val is not None and isinstance(val, list) and len(val) > 0:
@@ -763,16 +769,21 @@ if st.session_state.current_project_idx is None:
                         else:
                             st.session_state[cle_cible] = pd.DataFrame()
 
+                    # Restauration des données tabulaires simples (SIPOC, VOC, Team)
+                    for cle_simple in ["sipoc_data", "voc_data", "team_data"]:
+                        if cle_simple in proj_cible and isinstance(proj_cible[cle_simple], list):
+                            st.session_state[cle_simple] = copy.deepcopy(proj_cible[cle_simple])
+
                     # Restauration spécifique de la phase Improve
                     strategies_data = []
                     if "dmaic" in proj_cible and isinstance(proj_cible["dmaic"], dict):
                         improve_sec = proj_cible["dmaic"].get("improve", {})
                         if isinstance(improve_sec, dict):
                             strategies_data = improve_sec.get("strategies", [])
-                
+            
                     if isinstance(strategies_data, list) and len(strategies_data) > 0:
                         st.session_state["improve_strategies"] = pd.DataFrame(strategies_data)
-                    elif isinstance(strategies_data, pd.DataFrame):
+                    elif isinstance(strategies_data, pd.DataFrame) and not strategies_data.empty:
                         st.session_state["improve_strategies"] = strategies_data.copy()
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
@@ -782,7 +793,7 @@ if st.session_state.current_project_idx is None:
                         k_lower = k.lower()
                         if any(term in k_lower for term in [
                             "$data_editor", "editor", "process", "map", "dcp", "dc_", 
-                            "_dc", "mesure", "detailed", "spc", "strategy"
+                            "_dc", "mesure", "detailed", "spc", "strategy", "sipoc", "voc", "team"
                         ]):
                             try:
                                 del st.session_state[k]
