@@ -278,52 +278,7 @@ with st.sidebar:
         st.info("📊 **Contrôle Qualité :** L'exportation va inclure l'intégralité des formulaires, des structures de données (DataFrames) et des rendus graphiques rattachés à ce projet.")
 
         # =====================================================================
-        # 📊 1. EXPORTATION EXCEL SANS AUCUNE EXCLUSION (Toutes lignes, tous onglets)
-        # =====================================================================
-        try:
-            buffer_xlsx = io.BytesIO()
-            with pd.ExcelWriter(buffer_xlsx, engine='openpyxl') as writer:
-                
-                # Étape A : On isole toutes les variables simples (textes, inputs, KPIs)
-                parametres_projets = []
-                for cle, valeur in p_exp.items():
-                    if not isinstance(valeur, (pd.DataFrame, list, dict)) and valeur is not None:
-                        parametres_projets.append({"Composant / Formulaire": cle, "Valeur Saisie / Résultat": str(valeur)})
-                
-                if parametres_projets:
-                    pd.DataFrame(parametres_projets).to_excel(writer, sheet_name='Formulaires & Synthèse', index=False)
-                
-                # Étape B : On parcourt et on extrait TOUS les DataFrames du projet
-                df_trouves = 0
-                for cle, valeur in p_exp.items():
-                    if isinstance(valeur, pd.DataFrame):
-                        nom_onglet = str(cle)[:30] # Limite Excel de 31 caractères
-                        valeur.to_excel(writer, sheet_name=f"DF_{nom_onglet}", index=False)
-                        df_trouves += 1
-                    elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
-                        nom_onglet = str(cle)[:30]
-                        pd.DataFrame(valeur).to_excel(writer, sheet_name=f"LIST_{nom_onglet}", index=False)
-                        df_trouves += 1
-                        
-                if "dc_master_data" in st.session_state and isinstance(st.session_state.dc_master_data, pd.DataFrame):
-                    st.session_state.dc_master_data.to_excel(writer, sheet_name='Master_Data_Collecte_T0', index=False)
-                if "current_spc_data" in st.session_state and isinstance(st.session_state.current_spc_data, pd.DataFrame):
-                    st.session_state.current_spc_data.to_excel(writer, sheet_name='Calculs_Cartes_Controle', index=False)
-
-            st.download_button(
-                label="📊 Télécharger la base Excel Intégrale (Données & Calculs)", 
-                data=buffer_xlsx.getvalue(), 
-                file_name=f"EXCEL_COMPLET_{project_name}.xlsx", 
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
-                key="btn_excel_full_zero_loss"
-            )           
-        except Exception as e:
-            st.error(f"Erreur lors de l'extraction Excel : {e}")
-
-
-        # =====================================================================
-        # 📽️ 2. EXPORTATION POWERPOINT INTEGRALE (Sécurisée contre l'ambiguïté des DF)
+        # 📽️ 1. EXPORTATION POWERPOINT INTÉGRALE (Rapports, Visuels & Graphiques Plotly)
         # =====================================================================
         try:
             from pptx import Presentation
@@ -338,17 +293,17 @@ with st.sidebar:
             tf = txBox.text_frame
             tf.text = f"Génération système : {datetime.now().strftime('%Y-%m-%d %H:%M')}\nStatut : Validation finale DMAIC"
 
-            # Balayage du dictionnaire
+            # Balayage du dictionnaire pour les textes, listes et DataFrames
             for cle, valeur in p_exp.items():
                 if valeur is None:
                     continue
                     
-                # Protection : Si c'est un DataFrame, on gère son cas à part sans tester '== ""'
+                # Si c'est un DataFrame
                 if isinstance(valeur, pd.DataFrame):
                     if valeur.empty:
                         continue
                     slide = prs.slides.add_slide(prs.slide_layouts[5])
-                    slide.shapes.title.text = f"Tableau (DataFrame) : {str(cle).upper()}"
+                    slide.shapes.title.text = f"Tableau : {str(cle).upper()}"
                     
                     nb_rows = min(len(valeur) + 1, 8)
                     nb_cols = len(valeur.columns)
@@ -385,29 +340,34 @@ with st.sidebar:
                     body = slide.placeholders[1]
                     body.text = str(valeur)
 
-            # Traitement des graphiques Plotly
+            # Intégration systématique des graphiques Plotly (convertis en images PNG)
             figures_a_importer = []
-            if p_exp.get('spc_figure') is not None: figures_a_importer.append(("Carte SPC Projet", p_exp.get('spc_figure')))
-            if st.session_state.get('current_spc_figure') is not None: figures_a_importer.append(("Carte SPC active", st.session_state.get('current_spc_figure')))
-            if st.session_state.get('current_pareto_figure') is not None: figures_a_importer.append(("Analyse de Pareto", st.session_state.get('current_pareto_figure')))
+            if p_exp.get('spc_figure') is not None: 
+                figures_a_importer.append(("Carte SPC Projet", p_exp.get('spc_figure')))
+            if st.session_state.get('current_spc_figure') is not None: 
+                figures_a_importer.append(("Carte SPC Active", st.session_state.get('current_spc_figure')))
+            if st.session_state.get('current_pareto_figure') is not None: 
+                figures_a_importer.append(("Analyse de Pareto", st.session_state.get('current_pareto_figure')))
+            if st.session_state.get('current_ishikawa_figure') is not None: 
+                figures_a_importer.append(("Diagramme d'Ishikawa", st.session_state.get('current_ishikawa_figure')))
             
             for nom_fig, fig_obj in figures_a_importer:
                 try:
                     slide = prs.slides.add_slide(prs.slide_layouts[5])
-                    slide.shapes.title.text = f"Graphique Réel : {nom_fig}"
+                    slide.shapes.title.text = f"Graphique Analytique : {nom_fig}"
                     img_buf = io.BytesIO()
-                    fig_obj.write_image(img_buf, format="png", width=1000, height=600)
+                    fig_obj.write_image(img_buf, format="png", width=1200, height=700)
                     img_buf.seek(0)
                     slide.shapes.add_picture(img_buf, Inches(0.5), Inches(1.5), Inches(9), Inches(5))
-                except:
-                    pass
+                except Exception as img_err:
+                    st.warning(converting_error := f"Impossible d'importer le graphique {nom_fig} dans le PPT : {img_err}")
 
             buffer_pptx = io.BytesIO()
             prs.save(buffer_pptx)
             st.download_button(
-                label="📽️ Télécharger le PowerPoint Complet (Rapports & Visuels)", 
+                label="📽️ Télécharger le PowerPoint Exécutif (Rapports & Graphiques)", 
                 data=bytes(buffer_pptx.getvalue()), 
-                file_name=f"POWERPOINT_COMPLET_{project_name}.pptx", 
+                file_name=f"POWERPOINT_DMAIC_{project_name}.pptx", 
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 use_container_width=True,
                 key="btn_pptx_full_zero_loss"
@@ -417,7 +377,7 @@ with st.sidebar:
 
 
         # =====================================================================
-        # 📄 3. EXPORTATION PDF DE TYPE ARCHIVE (Sécurisée contre l'ambiguïté des DF et les caractères Unicode)
+        # 📄 2. EXPORTATION PDF DE TYPE ARCHIVE (Sécurisée contre l'ambiguïté)
         # =====================================================================
         try:
             from fpdf import FPDF
@@ -426,7 +386,7 @@ with st.sidebar:
                 def header(self):
                     self.set_font('Helvetica', 'B', 10)
                     self.set_text_color(30, 58, 138)
-                    self.cell(0, 10, "RAPPORT OFFICIEL DE CONFIGURATION ET D'AUDIT INTEGRAL", border=0, ln=1, align='L')
+                    self.cell(0, 10, "RAPPORT OFFICIEL DMAIC - SYNTHÈSE & AUDIT", border=0, ln=1, align='L')
                     self.line(10, 16, 200, 16)
                     self.ln(4)
                     
@@ -436,22 +396,14 @@ with st.sidebar:
                     self.set_text_color(156, 163, 175)
                     self.cell(0, 10, f'Livrable d\'archive autonome - Page {self.page_no()}', 0, 0, 'C')
 
-            # Fonction de sécurisation des caractères non supportés par Helvetica
             def nettoyer_texte(texte):
                 if not isinstance(texte, str):
                     texte = str(texte)
                 remplacements = {
-                    "≥": ">=",
-                    "≤": "<=",
-                    "≠": "!=",
-                    "±": "+/-",
-                    "µ": "u",
-                    "²": "2",
-                    "³": "3"
+                    "≥": ">=", "≤": "<=", "≠": "!=", "±": "+/-", "µ": "u", "²": "2", "³": "3"
                 }
                 for carac, subst in remplacements.items():
                     texte = texte.replace(carac, subst)
-                # Encodage de sécurité pour nettoyer les résidus bizarres
                 return texte.encode('latin-1', 'replace').decode('latin-1')
 
             pdf = PDF()
@@ -464,7 +416,7 @@ with st.sidebar:
             pdf.cell(0, 10, f"PROJET DMAIC : {nettoyer_texte(project_name.upper())}", ln=1)
             pdf.set_font("Helvetica", size=10)
             pdf.set_text_color(0, 0, 0)
-            pdf.cell(0, 6, f"Date de l'instantané d'impression : {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1)
+            pdf.cell(0, 6, f"Date de génération : {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=1)
             pdf.cell(0, 6, f"Phase cible enregistrée : {p_exp.get('status', 'Define')}", ln=1)
             pdf.ln(6)
             
@@ -473,7 +425,7 @@ with st.sidebar:
                 if valeur is None:
                     continue
                 
-                # CAS 1 : C'est un DataFrame brut (ex: calculs SPC, base de collecte interne)
+                # CAS 1 : DataFrame brut
                 if isinstance(valeur, pd.DataFrame):
                     if valeur.empty:
                         continue
@@ -495,10 +447,10 @@ with st.sidebar:
                             pdf.cell(largeur_col, 6, cell_val[:15], border=1)
                         pdf.ln()
                     if len(valeur) > 15:
-                        pdf.cell(0, 6, nettoyer_texte(f"... (+ {len(valeur) - 15} lignes archivées intégralement dans l'onglet Excel correspondant)"), ln=1)
+                        pdf.cell(0, 6, nettoyer_texte(f"... (+ {len(valeur) - 15} lignes supplémentaires)"), ln=1)
                     pdf.ln(4)
                 
-                # CAS 2 : C'est une liste de dictionnaires (SIPOC, etc.)
+                # CAS 2 : Liste de dictionnaires
                 elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
                     pdf.set_font("Helvetica", 'B', 11)
                     pdf.set_text_color(30, 58, 138)
@@ -520,7 +472,7 @@ with st.sidebar:
                         pdf.ln()
                     pdf.ln(4)
                 
-                # CAS 3 : C'est une chaîne de caractères (Commentaires, notes, Problem Statement)
+                # CAS 3 : Chaîne de caractères
                 elif isinstance(valeur, str) and valeur != "":
                     pdf.set_font("Helvetica", 'B', 11)
                     pdf.set_text_color(30, 58, 138)
@@ -533,9 +485,9 @@ with st.sidebar:
             pdf_bytes = pdf.output()
             
             st.download_button(
-                label="📄 Télécharger le PDF Intégral (Archive Documentaire)",
+                label="📄 Télécharger le PDF Intégral (Rapport Documentaire)",
                 data=bytes(pdf_bytes),
-                file_name=f"PDF_COMPLET_{project_name}.pdf",
+                file_name=f"PDF_DMAIC_{project_name}.pdf",
                 mime="application/pdf",
                 use_container_width=True,
                 key="btn_pdf_full_zero_loss"
