@@ -1479,8 +1479,7 @@ else:
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
-        # --- CORRECTION DÉFINITIVE : Isolation stricte des macro-étapes par projet ---
-        # 1. On cherche d'abord si le projet actif a déjà un VSM ou un SIPOC enregistré
+        # --- CORRECTION STRICTE : Le projet ne regarde QUE son propre SIPOC ---
         sipoc_data = p.get("sipoc_data", [])
         sipoc_macro_steps = []
         if isinstance(sipoc_data, list):
@@ -1489,16 +1488,30 @@ else:
                 if step_name:
                     sipoc_macro_steps.append(str(step_name).strip())
 
-        # 2. On affecte les étapes en vérifiant le projet actif (et non la session globale)
-        if "vsm_macro_steps" in p and isinstance(p["vsm_macro_steps"], list) and len(p["vsm_macro_steps"]) > 0:
-            st.session_state["vsm_macro_steps"] = copy.deepcopy(p["vsm_macro_steps"])
-        elif sipoc_macro_steps:
+        # 1. Les étapes viennent EXCLUSIVEMENT du SIPOC du projet actuel s'il existe
+        if sipoc_macro_steps:
             st.session_state["vsm_macro_steps"] = sipoc_macro_steps
         else:
-            # Projet totalement neuf sans SIPOC : liste par défaut vide ou standard
-            st.session_state["vsm_macro_steps"] = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
-
+            # Si le SIPOC du projet actuel est vide, les étapes sont vides
+            st.session_state["vsm_macro_steps"] = []
+            
         st.session_state[f"vsm_macro_steps_{p_idx}"] = True
+
+        # 2. Initialisation du dictionnaire des tâches
+        if f"vsm_map_init_{p_idx}" not in st.session_state:
+            # On vérifie si ce projet précis possède déjà un VSM sauvegardé en dur dans ses propres données
+            saved_map = p.get("vsm_detailed_map", {})
+            
+            # S'il y a un vrai VSM sauvegardé pour CE projet, on le charge, sinon on génère du VIDE
+            if isinstance(saved_map, dict) and len(saved_map) > 0:
+                st.session_state["vsm_detailed_map"] = copy.deepcopy(saved_map)
+            else:
+                # Nouveau projet ou projet sans VSM : tout est 100% vide et basé sur le SIPOC actuel
+                st.session_state["vsm_detailed_map"] = {
+                    step: [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
+                    for step in st.session_state["vsm_macro_steps"]
+                }
+            st.session_state[f"vsm_map_init_{p_idx}"] = True
 
         # 3. Initialisation sécurisée du dictionnaire des tâches pour ce projet précis
         if f"vsm_map_init_{p_idx}" not in st.session_state:
