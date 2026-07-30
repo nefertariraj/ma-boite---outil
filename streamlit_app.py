@@ -709,10 +709,11 @@ if st.session_state.current_project_idx is None:
                 st.session_state["improvement_strategy"] = pd.DataFrame()
                 st.session_state["improve_strategies"] = pd.DataFrame()
             
-                # 3. PURGE DU CACHE DES WIDGETS
+                # 3. PURGE PROFONDE DU CACHE DES WIDGETS (Règne total sur les restes du formulaire)
                 keys_to_delete = []
                 for k in list(st.session_state.keys()):
                     k_lower = k.lower()
+                    # On cible tout ce qui touche de près ou de loin à l'éditeur de la process map ou aux data_editors
                     if any(term in k_lower for term in [
                         "process", "map", "dcp", "dc_", "_dc", "master_dcp", 
                         "mesure", "detailed", "spc", "editor", "strategy", "$data_editor"
