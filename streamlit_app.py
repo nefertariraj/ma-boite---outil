@@ -1161,7 +1161,13 @@ else:
             st.write("---")
             st.subheader("4. Diagnostic Expert & Plan d'Action Black Belt")
             res_voc = st.session_state.voc_results
-            top_theme = res_voc.iloc[0]["thème des irritants"]
+            # On vérifie que le DataFrame existe et n'est pas vide avant d'y accéder
+            if "voc_results" in st.session_state and not st.session_state.voc_results.empty:
+                res_voc = st.session_state.voc_results
+                top_theme = res_voc.iloc[0]["thème des irritants"]
+                # ... tout votre code d'affichage des résultats graphiques / métriques ...
+            else:
+                st.info("💡 Cliquez sur le bouton 'Lancer l'Analyse' ci-dessus pour générer les résultats de ce projet.")
             ctq_cible = res_voc.iloc[0]["CTQ"]
         
             st.markdown(f"### 🎯 Focus Prioritaire : **{top_theme}**")
