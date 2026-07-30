@@ -1450,10 +1450,9 @@ else:
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
-        # 1. INITIALISATION STRICTE DE LA STRUCTURE DES MACRO-ÉTAPES (AVEC PRIORITÉ À L'IMPORT)
-        if "vsm_macro_steps" not in st.session_state or "vsm_macro_steps" in p:
-            # Si le projet contient des étapes (chargées depuis un JSON), on les prend en priorité
-            if "vsm_macro_steps" in p and isinstance(p["vsm_macro_steps"], list):
+        # 1. INITIALISATION DES MACRO-ÉTAPES PROPRE AU PROJET ACTIF
+        if f"vsm_macro_steps_{p_idx}" not in st.session_state:
+            if "vsm_macro_steps" in p and isinstance(p["vsm_macro_steps"], list) and len(p["vsm_macro_steps"]) > 0:
                 st.session_state["vsm_macro_steps"] = list(p["vsm_macro_steps"])
             else:
                 sipoc_data = p.get("sipoc_data", [])
@@ -1464,19 +1463,20 @@ else:
                         if step_name:
                             macro_steps.append(str(step_name))
                 
-                if not macro_steps:
-                    macro_steps = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
+                # Si le projet est complètement neuf et n'a pas de SIPOC, on laisse vide (ou vos défauts si souhaité)
                 st.session_state["vsm_macro_steps"] = macro_steps
+            st.session_state[f"vsm_macro_steps_{p_idx}"] = True
 
-        # 2. INITIALISATION DU STOCKAGE DES DONNÉES DE TÂCHES (AVEC PRIORITÉ À L'IMPORT)
-        if "vsm_detailed_map" not in st.session_state or "vsm_detailed_map" in p:
-            if "vsm_detailed_map" in p and isinstance(p["vsm_detailed_map"], dict):
+        # 2. INITIALISATION DU STOCKAGE DES TÂCHES PROPRE AU PROJET ACTIF
+        if f"vsm_detailed_map_{p_idx}" not in st.session_state:
+            if "vsm_detailed_map" in p and isinstance(p["vsm_detailed_map"], dict) and len(p["vsm_detailed_map"]) > 0:
                 st.session_state["vsm_detailed_map"] = dict(p["vsm_detailed_map"])
             else:
                 st.session_state["vsm_detailed_map"] = {
-                    step: [{"Détail de la tâche": "Sous-tâche initiale", "Valeur": 5.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
+                    step: [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
                     for step in st.session_state["vsm_macro_steps"]
                 }
+            st.session_state[f"vsm_detailed_map_{p_idx}"] = True
                 
         # 3. INITIALISATION DES METRICS CALCULÉES
         if "vsm_totals" not in st.session_state:
