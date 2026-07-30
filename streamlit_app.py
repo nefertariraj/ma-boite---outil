@@ -1113,6 +1113,14 @@ else:
         st.write("---")
         st.subheader("3. Analyse Thématique & CTQ")
     
+        # --- CORRECTION : Isolation et chargement de l'analyse propre au projet actif ---
+        if f"voc_results_init_{p_idx}" not in st.session_state:
+            if "saved_voc_results" in p and p["saved_voc_results"]:
+                st.session_state.voc_results = pd.DataFrame(p["saved_voc_results"])
+            else:
+                st.session_state.voc_results = pd.DataFrame()
+            st.session_state[f"voc_results_init_{p_idx}"] = Tru
+        
         if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
             df_to_analyze = p["voc_raw_data"]
             if isinstance(df_to_analyze, pd.DataFrame) and not df_to_analyze.empty:
@@ -1137,6 +1145,10 @@ else:
                         "score": count
                     })
                 st.session_state.voc_results = pd.DataFrame(res_data).sort_values("score", ascending=False).drop(columns=["score"])
+                
+                # --- CORRECTION : Sauvegarde immédiate dans le dictionnaire du projet actif ---
+                p["saved_voc_results"] = st.session_state.voc_results.to_dict('records')
+                
                 st.rerun()
             else:
                 st.warning("⚠️ Le tableau est vide.")
@@ -1450,33 +1462,35 @@ else:
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
-        # 1. INITIALISATION DES MACRO-ÉTAPES PROPRE AU PROJET ACTIF
-        if f"vsm_macro_steps_{p_idx}" not in st.session_state:
-            if "vsm_macro_steps" in p and isinstance(p["vsm_macro_steps"], list) and len(p["vsm_macro_steps"]) > 0:
-                st.session_state["vsm_macro_steps"] = list(p["vsm_macro_steps"])
-            else:
-                sipoc_data = p.get("sipoc_data", [])
-                macro_steps = []
-                if isinstance(sipoc_data, list) and len(sipoc_data) > 0:
-                    for row in sipoc_data:
-                        step_name = row.get("Process") or row.get("process")
-                        if step_name:
-                            macro_steps.append(str(step_name))
-                
-                # Si le projet est complètement neuf et n'a pas de SIPOC, on laisse vide (ou vos défauts si souhaité)
-                st.session_state["vsm_macro_steps"] = macro_steps
-            st.session_state[f"vsm_macro_steps_{p_idx}"] = True
+        # --- CORRECTION POINT 2 : Synchronisation automatique VSM <-> SIPOC du projet actif ---
+        sipoc_data = p.get("sipoc_data", [])
+        sipoc_macro_steps = []
+        if isinstance(sipoc_data, list):
+            for row in sipoc_data:
+                step_name = row.get("Process") or row.get("process")
+                if step_name:
+                    sipoc_macro_steps.append(str(step_name).strip())
 
-        # 2. INITIALISATION DU STOCKAGE DES TÂCHES PROPRE AU PROJET ACTIF
-        if f"vsm_detailed_map_{p_idx}" not in st.session_state:
+        # Si le projet a des étapes dans son projet/SIPOC ou si on change de projet, on met à jour
+        if sipoc_macro_steps:
+            st.session_state["vsm_macro_steps"] = sipoc_macro_steps
+        elif f"vsm_macro_steps_{p_idx}" not in st.session_state:
+            # Fallback si pas de SIPOC et projet vide
+            st.session_state["vsm_macro_steps"] = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
+            
+        st.session_state[f"vsm_macro_steps_{p_idx}"] = True
+
+        # Initialisation ou mise à jour sécurisée du dictionnaire des tâches pour chaque étape
+        if "vsm_detailed_map" not in st.session_state or f"vsm_map_init_{p_idx}" not in st.session_state:
             if "vsm_detailed_map" in p and isinstance(p["vsm_detailed_map"], dict) and len(p["vsm_detailed_map"]) > 0:
                 st.session_state["vsm_detailed_map"] = dict(p["vsm_detailed_map"])
             else:
+                # Génération automatique d'une ligne vide pour chaque étape du SIPOC récupéré
                 st.session_state["vsm_detailed_map"] = {
                     step: [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
                     for step in st.session_state["vsm_macro_steps"]
                 }
-            st.session_state[f"vsm_detailed_map_{p_idx}"] = True
+            st.session_state[f"vsm_map_init_{p_idx}"] = True
                 
         # 3. INITIALISATION DES METRICS CALCULÉES
         if "vsm_totals" not in st.session_state:
