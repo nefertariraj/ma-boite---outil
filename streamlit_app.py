@@ -283,97 +283,140 @@ with st.sidebar:
         try:
             from pptx import Presentation
             from pptx.util import Inches, Pt
-            
-            prs = Presentation()
-            
-            # Slide 1 : Titre / Garde
-            slide = prs.slides.add_slide(prs.slide_layouts[5])
-            slide.shapes.title.text = f"LIVRABLE EXHAUSTIF : {project_name.upper()}"
-            txBox = slide.shapes.add_textbox(Inches(0.5), Inches(3), Inches(9), Inches(2))
-            tf = txBox.text_frame
-            tf.text = f"Génération système : {datetime.now().strftime('%Y-%m-%d %H:%M')}\nStatut : Validation finale DMAIC"
+            from pptx.dml.color import RGBColor
+            from pptx.enum.text import PP_ALIGN
 
-            # Balayage du dictionnaire pour les textes, listes et DataFrames
-            for cle, valeur in p_exp.items():
-                if valeur is None:
-                    continue
-                    
-                # Si c'est un DataFrame
-                if isinstance(valeur, pd.DataFrame):
-                    if valeur.empty:
-                        continue
-                    slide = prs.slides.add_slide(prs.slide_layouts[5])
-                    slide.shapes.title.text = f"Tableau : {str(cle).upper()}"
-                    
-                    nb_rows = min(len(valeur) + 1, 8)
-                    nb_cols = len(valeur.columns)
-                    table_shape = slide.shapes.add_table(nb_rows, nb_cols, Inches(0.5), Inches(1.5), Inches(9), Inches(4.5))
-                    table = table_shape.table
-                    
-                    for c_idx, col_name in enumerate(valeur.columns):
-                        table.cell(0, c_idx).text = str(col_name)
-                    for r_idx in range(nb_rows - 1):
-                        for c_idx, col_name in enumerate(valeur.columns):
-                            table.cell(r_idx+1, c_idx).text = str(valeur.iloc[r_idx][col_name])
-                
-                # Si c'est une liste de dictionnaires (SIPOC, rôles...)
-                elif isinstance(valeur, list) and len(valeur) > 0 and isinstance(valeur[0], dict):
-                    slide = prs.slides.add_slide(prs.slide_layouts[5])
-                    slide.shapes.title.text = f"Tableau : {str(cle).upper()}"
-                    
-                    df_temp = pd.DataFrame(valeur)
-                    nb_rows = min(len(df_temp) + 1, 8)
-                    nb_cols = len(df_temp.columns)
-                    table_shape = slide.shapes.add_table(nb_rows, nb_cols, Inches(0.5), Inches(1.5), Inches(9), Inches(4.5))
-                    table = table_shape.table
-                    
-                    for c_idx, col_name in enumerate(df_temp.columns):
-                        table.cell(0, c_idx).text = str(col_name)
-                    for r_idx in range(nb_rows - 1):
-                        for c_idx, col_name in enumerate(df_temp.columns):
-                            table.cell(r_idx+1, c_idx).text = str(df_temp.iloc[r_idx][col_name])
-                
-                # Si c'est un texte long (saisie utilisateur standard)
-                elif isinstance(valeur, str) and valeur != "" and len(valeur) > 10 and cle not in ['nom', 'status', 'date_creation']:
-                    slide = prs.slides.add_slide(prs.slide_layouts[1])
-                    slide.shapes.title.text = f"Composant : {str(cle).upper()}"
-                    body = slide.placeholders[1]
-                    body.text = str(valeur)
-
-            # Intégration systématique des graphiques Plotly (convertis en images PNG)
-            figures_a_importer = []
-            if p_exp.get('spc_figure') is not None: 
-                figures_a_importer.append(("Carte SPC Projet", p_exp.get('spc_figure')))
-            if st.session_state.get('current_spc_figure') is not None: 
-                figures_a_importer.append(("Carte SPC Active", st.session_state.get('current_spc_figure')))
-            if st.session_state.get('current_pareto_figure') is not None: 
-                figures_a_importer.append(("Analyse de Pareto", st.session_state.get('current_pareto_figure')))
-            if st.session_state.get('current_ishikawa_figure') is not None: 
-                figures_a_importer.append(("Diagramme d'Ishikawa", st.session_state.get('current_ishikawa_figure')))
+            st.markdown("### 🎨 Personnalisation de la présentation directionnelle")
             
-            for nom_fig, fig_obj in figures_a_importer:
-                try:
-                    slide = prs.slides.add_slide(prs.slide_layouts[5])
-                    slide.shapes.title.text = f"Graphique Analytique : {nom_fig}"
-                    img_buf = io.BytesIO()
-                    fig_obj.write_image(img_buf, format="png", width=1200, height=700)
-                    img_buf.seek(0)
-                    slide.shapes.add_picture(img_buf, Inches(0.5), Inches(1.5), Inches(9), Inches(5))
-                except Exception as img_err:
-                    st.warning(converting_error := f"Impossible d'importer le graphique {nom_fig} dans le PPT : {img_err}")
-
-            buffer_pptx = io.BytesIO()
-            prs.save(buffer_pptx)
-            st.download_button(
-                label="📽️ Télécharger le PowerPoint Exécutif (Rapports & Graphiques)", 
-                data=bytes(buffer_pptx.getvalue()), 
-                file_name=f"POWERPOINT_DMAIC_{project_name}.pptx", 
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                use_container_width=True,
-                key="btn_pptx_full_zero_loss"
+            # Choix du thème visuel pour la direction
+            theme_choisi = st.selectbox(
+                "Sélectionnez le thème visuel du PowerPoint :",
+                ["Corporate Bleu Marine (Standard Industrie)", "Moderne Teal & Gris (Lean & Clean)", "Énergique Bordeaux & Or (Excellence Opérationnelle)"],
+                key="select_theme_ppt"
             )
+
+            # Définition des palettes de couleurs selon le thème
+            if "Bleu Marine" in theme_choisi:
+                c_primary = RGBColor(15, 23, 42)     # Fond sombre / Titres forts
+                c_accent = RGBColor(30, 58, 138)     # Bleu corporate
+                c_bg = RGBColor(248, 250, 252)       # Fond clair
+            elif "Teal" in theme_choisi:
+                c_primary = RGBColor(13, 148, 136)   # Teal moderne
+                c_accent = RGBColor(15, 118, 110)    # Teal foncé
+                c_bg = RGBColor(240, 253, 250)
+            else:
+                c_primary = RGBColor(127, 29, 29)    # Bordeaux
+                c_accent = RGBColor(180, 83, 9)      # Or / Ambre
+                c_bg = RGBColor(255, 251, 235)
+
+            if st.button("🚀 Générer la Présentation Exécutive DMAIC", use_container_width=True, key="btn_exec_ppt"):
+                prs = Presentation()
+                
+                # --- SLIDE 1 : PAGE DE GARDE ---
+                slide_layout = prs.slide_layouts[6] # Page blanche personnalisable
+                slide = prs.slides.add_slide(slide_layout)
+                
+                # Titre de la présentation
+                txBox = slide.shapes.add_textbox(Inches(1), Inches(2), Inches(11.3), Inches(2))
+                tf = txBox.text_frame
+                tf.word_wrap = True
+                p = tf.paragraphs[0]
+                p.text = f"REVUE DE DIRECTION : PROJET LEAN SIX SIGMA"
+                p.font.size = Pt(32)
+                p.font.bold = True
+                p.font.color.rgb = c_accent
+                
+                p2 = tf.add_paragraph()
+                p2.text = f"Projet : {project_name.upper()}"
+                p2.font.size = Pt(24)
+                p2.font.color.rgb = c_primary
+                
+                # Métadonnées bas de page
+                txBox_meta = slide.shapes.add_textbox(Inches(1), Inches(5), Inches(8), Inches(1.5))
+                tf_meta = txBox_meta.text_frame
+                tf_meta.text = f"Objectif : Restitution des résultats de la démarche DMAIC (Define, Measure, Analyze, Improve, Control)\nDate de restitution : {datetime.now().strftime('%d/%m/%Y')}\nStatut actuel : Phase {p_exp.get('status', 'Control')}"
+
+                # --- FONCTION UTILITAIRE POUR CRÉER DES SLIDES PROPRES ---
+                def ajouter_slide_contenu(titre_phase, texte_ou_donnee, graphique=None):
+                    slide = prs.slides.add_slide(prs.slide_layouts[6])
+                    
+                    # En-tête de slide
+                    tb_titre = slide.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(11.5), Inches(0.8))
+                    tf_t = tb_titre.text_frame
+                    p_t = tf_t.paragraphs[0]
+                    p_t.text = titre_phase
+                    p_t.font.size = Pt(22)
+                    p_t.font.bold = True
+                    p_t.font.color.rgb = c_accent
+                    
+                    # Si on a un graphique Plotly à intégrer
+                    if graphique is not None:
+                        try:
+                            img_buf = io.BytesIO()
+                            graphique.write_image(img_buf, format="png", width=1000, height=550)
+                            img_buf.seek(0)
+                            # On place le graphique à gauche ou centré
+                            slide.shapes.add_picture(img_buf, Inches(0.8), Inches(1.5), Inches(8), Inches(4.5))
+                        except Exception as e:
+                            pass
+                    
+                    # Si on a du texte / synthèse
+                    if texte_ou_donnee and isinstance(texte_ou_donnee, str):
+                        tb_txt = slide.shapes.add_textbox(Inches(9), Inches(1.5), Inches(3.5), Inches(4.5))
+                        tb_txt.text_frame.word_wrap = True
+                        p_txt = tb_txt.text_frame.paragraphs[0]
+                        p_txt.text = "Synthèse & Analyses :\n\n" + str(texte_ou_donnee)[:600]
+                        p_txt.font.size = Pt(12)
+
+                # --- SLIDES PAR PHASE DMAIC ---
+                # 1. DEFINE
+                ajouter_slide_contenu(
+                    "1. Phase DEFINE : Cadrage & Voix du Client (VOC)", 
+                    p_exp.get('define_summary', "Définition du problème, de la charte de projet et cartographie SIPOC validées pour cadrer le périmètre d'amélioration.")
+                )
+                
+                # 2. MEASURE
+                fig_mesure = st.session_state.get('current_spc_figure') or p_exp.get('spc_figure')
+                ajouter_slide_contenu(
+                    "2. Phase MEASURE : Collecte de Données & Baseline", 
+                    p_exp.get('measure_summary', "Évaluation de la performance actuelle du processus et établissement de la baseline initiale (Capabilité / SPC)."),
+                    graphique=fig_mesure
+                )
+                
+                # 3. ANALYZE
+                fig_analyse = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure')
+                ajouter_slide_contenu(
+                    "3. Phase ANALYZE : Identification des Causes Raçines", 
+                    p_exp.get('analyze_summary', "Analyse approfondie des causes d'variabilité (Pareto, Ishikawa, 5 Pourquoi) pour identifier les facteurs influents."),
+                    graphique=fig_analyse
+                )
+                
+                # 4. IMPROVE
+                ajouter_slide_contenu(
+                    "4. Phase IMPROVE : Solutions & Plan d'Action", 
+                    p_exp.get('improve_summary', "Mise en place des solutions optimisées, analyse des risques (FMEA) et tests pilotes pour valider les gains.")
+                )
+                
+                # 5. CONTROL
+                ajouter_slide_contenu(
+                    "5. Phase CONTROL : Pérennisation & Suivi", 
+                    p_exp.get('control_summary', "Mise en place des cartes de contrôle permanentes, du plan de surveillance et transfert aux équipes opérationnelles.")
+                )
+
+                # Sauvegarde du fichier final
+                buffer_pptx = io.BytesIO()
+                prs.save(buffer_pptx)
+                
+                st.success("✅ Présentation exécutive générée avec succès !")
+                st.download_button(
+                    label="📥 Télécharger le PowerPoint Exécutif pour la Direction", 
+                    data=bytes(buffer_pptx.getvalue()), 
+                    file_name=f"Presentation_Direction_DMAIC_{project_name}.pptx", 
+                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    use_container_width=True
+                )
         except Exception as e:
-            st.error(f"Erreur lors de l'extraction PowerPoint : {e}")
+            st.error(f"Erreur lors de la génération de la présentation : {e}")
 
 
         # =====================================================================
