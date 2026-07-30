@@ -1470,7 +1470,8 @@ else:
         if "saved_voc_dict" in p and "voc_raw_data" not in st.session_state:
             st.session_state["voc_raw_data"] = pd.DataFrame(p["saved_voc_dict"])
 
-        # --- CORRECTION POINT 2 : Synchronisation automatique VSM <-> SIPOC du projet actif ---
+        # --- CORRECTION DÉFINITIVE : Isolation stricte des macro-étapes par projet ---
+        # 1. On cherche d'abord si le projet actif a déjà un VSM ou un SIPOC enregistré
         sipoc_data = p.get("sipoc_data", [])
         sipoc_macro_steps = []
         if isinstance(sipoc_data, list):
@@ -1479,23 +1480,23 @@ else:
                 if step_name:
                     sipoc_macro_steps.append(str(step_name).strip())
 
-        # Si le projet a des étapes dans son SIPOC, on les utilise
-        if sipoc_macro_steps:
+        # 2. On affecte les étapes en vérifiant le projet actif (et non la session globale)
+        if "vsm_macro_steps" in p and isinstance(p["vsm_macro_steps"], list) and len(p["vsm_macro_steps"]) > 0:
+            st.session_state["vsm_macro_steps"] = copy.deepcopy(p["vsm_macro_steps"])
+        elif sipoc_macro_steps:
             st.session_state["vsm_macro_steps"] = sipoc_macro_steps
         else:
-            # Fallback si pas de SIPOC
+            # Projet totalement neuf sans SIPOC : liste par défaut vide ou standard
             st.session_state["vsm_macro_steps"] = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
-            
+
         st.session_state[f"vsm_macro_steps_{p_idx}"] = True
 
-        # --- CORRECTION MAGIE / FUITE DE DONNÉES ENTRE PROJETS ---
-        # On force la réinitialisation si on change de projet (p_idx change)
+        # 3. Initialisation sécurisée du dictionnaire des tâches pour ce projet précis
         if f"vsm_map_init_{p_idx}" not in st.session_state:
             if "vsm_detailed_map" in p and isinstance(p["vsm_detailed_map"], dict) and len(p["vsm_detailed_map"]) > 0:
-                # Utilisation de deepcopy pour isoler strictement les données du projet
                 st.session_state["vsm_detailed_map"] = copy.deepcopy(p["vsm_detailed_map"])
             else:
-                # Si le projet est nouveau/vierge, on génère des lignes 100% vides adaptées à SON SIPOC
+                # Génération d'un dictionnaire propre basé sur les macro-étapes de CE projet uniquement
                 st.session_state["vsm_detailed_map"] = {
                     step: [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
                     for step in st.session_state["vsm_macro_steps"]
