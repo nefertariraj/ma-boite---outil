@@ -1479,21 +1479,23 @@ else:
                 if step_name:
                     sipoc_macro_steps.append(str(step_name).strip())
 
-        # Si le projet a des étapes dans son projet/SIPOC ou si on change de projet, on met à jour
+        # Si le projet a des étapes dans son SIPOC, on les utilise
         if sipoc_macro_steps:
             st.session_state["vsm_macro_steps"] = sipoc_macro_steps
-        elif f"vsm_macro_steps_{p_idx}" not in st.session_state:
-            # Fallback si pas de SIPOC et projet vide
+        else:
+            # Fallback si pas de SIPOC
             st.session_state["vsm_macro_steps"] = ["1. Réception & Tri", "2. Saisie & Vérification", "3. Traitement & Analyse", "4. Validation & Approbation"]
             
         st.session_state[f"vsm_macro_steps_{p_idx}"] = True
 
-        # Initialisation ou mise à jour sécurisée du dictionnaire des tâches pour chaque étape
-        if "vsm_detailed_map" not in st.session_state or f"vsm_map_init_{p_idx}" not in st.session_state:
+        # --- CORRECTION MAGIE / FUITE DE DONNÉES ENTRE PROJETS ---
+        # On force la réinitialisation si on change de projet (p_idx change)
+        if f"vsm_map_init_{p_idx}" not in st.session_state:
             if "vsm_detailed_map" in p and isinstance(p["vsm_detailed_map"], dict) and len(p["vsm_detailed_map"]) > 0:
-                st.session_state["vsm_detailed_map"] = dict(p["vsm_detailed_map"])
+                # Utilisation de deepcopy pour isoler strictement les données du projet
+                st.session_state["vsm_detailed_map"] = copy.deepcopy(p["vsm_detailed_map"])
             else:
-                # Génération automatique d'une ligne vide pour chaque étape du SIPOC récupéré
+                # Si le projet est nouveau/vierge, on génère des lignes 100% vides adaptées à SON SIPOC
                 st.session_state["vsm_detailed_map"] = {
                     step: [{"Détail de la tâche": "", "Valeur": 0.0, "Unité": "Minutes", "Type d'activité": "VA (Valeur Ajoutée)"}]
                     for step in st.session_state["vsm_macro_steps"]
