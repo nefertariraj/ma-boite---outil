@@ -247,437 +247,232 @@ with st.sidebar:
     color = st.color_picker("Couleur de l'outil", st.session_state.primary_color, key="sidebar_color_picker")
     st.session_state.primary_color = color
     st.divider()
-
-    # ---------------------------------------------------------------------
-    # 💾 MODULE D'EXPORTATION & POWERPOINT EXÉCUTIF (MULTI-PROJETS)
-    # ---------------------------------------------------------------------
+    
+    # =====================================================================
+    # 💾 MODULE D'EXPORTATION EXÉCUTIF (POWERPOINT & PDF)
+    # =====================================================================
     st.subheader("💾 Exportation de la Présentation Exécutive")
 
     if "projects" in st.session_state and len(st.session_state.projects) > 0:
         indices_projets_tous = list(range(len(st.session_state.projects)))
-        
+    
         def formateur_liste_enregistrer(idx):
             p_test = st.session_state.projects[idx]
             return f"📁 {p_test.get('nom', 'Sans nom')} | Jalon: {p_test.get('status', 'Define')}"
-            
+        
         proj_sel_idx = st.selectbox(
-            "Sélectionnez le projet dont vous souhaitez générer la présentation :",
+            "Sélectionnez le projet dont vous souhaitez générer les livrables :",
             options=indices_projets_tous,
             format_func=formateur_liste_enregistrer,
             key="sb_enregistrer_sous_selector"
         )
-        
+    
         # Extraction du projet sélectionné
         p_exp = st.session_state.projects[proj_sel_idx]
         project_name = p_exp.get('nom', 'Projet_LSS').replace(" ", "_")
 
-        st.info("📊 **Contrôle Qualité :** L'exportation va inclure l'intégralité des synthèses, des structures et des graphiques rattachés à ce projet pour la direction.")
+        st.info("📊 **Contrôle Qualité :** L'agent IA va scanner l'intégralité des synthèses, structures et tableaux rattachés à ce projet.")
 
-        # =====================================================================
-        # 📽️ EXPORTATION POWERPOINT INTÉGRALE (Rapports, Visuels & Graphiques Plotly)
-        # =====================================================================
-        try:
-            from pptx import Presentation
-            from pptx.util import Inches, Pt
-            from pptx.dml.color import RGBColor
-            from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
-            from pptx.enum.shapes import MSO_SHAPE
-            import io
-            import pandas as pd
-            import plotly.graph_objects as go
-            import plotly.io as pio
-
-            st.markdown("### 🎯 Studio d'Exportation Master Black Belt - Scan & Restitution Intégrale")
-    
-            st.info("💡 **Mode Scan Actif** : L'agent va inspecter l'ensemble des données de votre session Streamlit (tableaux, graphiques, notes DMAIC) pour les injecter fidèlement dans le dossier de soutenance, avec un contraste garanti 100% lisible.")
-
-            if st.button("🚀 Lancer le Scan Global & Générer le Dossier de Soutenance Officiel", use_container_width=True, key="btn_exec_mbb_scan_v3"):
+        # --- 1. MOTEUR DE SCAN UNIFIÉ (Commun au PPTX et au PDF) ---
+        def scanner_donnees_projet_complet(projet):
+            """Scanne et compile toutes les données du projet pour les restituer fidèlement."""
+            contenu_compile = []
+            for cle, valeur in projet.items():
+                if cle in ['nom', 'status']:
+                    continue
+                titre = cle.replace('_', ' ').upper()
+                if isinstance(valeur, pd.DataFrame):
+                    try:
+                        contenu_compile.append(f"• [{titre}] (Tableau):\n" + valeur.to_string(index=False))
+                    except:
+                        pass
+                elif isinstance(valeur, str) and len(valeur.strip()) > 0:
+                    contenu_compile.append(f"• [{titre}] :\n{valeur}")
+                elif isinstance(valeur, dict):
+                    dict_str = "\n".join([f"  - {sk}: {sv}" for sk, sv in valeur.items()])
+                    contenu_compile.append(f"• [{titre}] :\n{dict_str}")
         
-                # --- 1. PALETTE DE COULEURS STRICTE (CONTRASTE GARANTI SANS FAUTE) ---
-                # Fond clair universel (#FFFFFF / #F8FAFC) et texte sombre (#0F172A / #1E293B)
-                c_bg = RGBColor(248, 250, 252)       # Fond global très clair (F8FAFC)
-                c_primary = RGBColor(15, 23, 42)     # Titres : Bleu nuit profond (#0F172A)
-                c_accent = RGBColor(37, 99, 235)     # Accents : Bleu vif corporate (#2563EB)
-                c_card = RGBColor(255, 255, 255)     # Cartes de contenu : Blanc pur (#FFFFFF)
-                c_border = RGBColor(203, 213, 225)   # Bordures nettes (#CBD5E1)
-                c_text = RGBColor(30, 41, 59)        # Texte courant : Anthracite très lisible (#1E293B)
+            if contenu_compile:
+                return "\n\n".join(contenu_compile)
+            return "✓ Données de phase enregistrées et validées dans le référentiel du projet."
+
+        # --- 2. BOUTON 1 : EXPORTATION POWERPOINT (.pptx) ---
+        if st.button("📊 Générer et Télécharger (PowerPoint)", use_container_width=True, key="btn_export_pptx_sidebar"):
+            try:
+                from pptx import Presentation
+                from pptx.util import Inches, Pt
+                from pptx.dml.color import RGBColor
+                from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+                from pptx.enum.shapes import MSO_SHAPE
+            
+                c_bg = RGBColor(248, 250, 252)
+                c_primary = RGBColor(15, 23, 42)
+                c_accent = RGBColor(37, 99, 235)
+                c_card = RGBColor(255, 255, 255)
+                c_border = RGBColor(203, 213, 225)
+                c_text = RGBColor(30, 41, 59)
 
                 prs = Presentation()
                 prs.slide_width = Inches(13.33)
-                prs.slide_height = Inches(7.5)  # Format 16:9 panoramique professionnel
+                prs.slide_height = Inches(7.5)
                 blank_layout = prs.slide_layouts[6]
 
-                def appliquer_fond_parfait(slide):
+                def appliquer_fond(slide):
                     bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
                     bg.fill.solid()
                     bg.fill.fore_color.rgb = c_bg
                     bg.line.fill.background()
 
-                # --- SLIDE 1 : PAGE DE GARDE ---
+                # Page de garde PPTX
                 slide_cover = prs.slides.add_slide(blank_layout)
-                appliquer_fond_parfait(slide_cover)
-
-                bandeau = slide_cover.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), prs.slide_width, Inches(0.15))
-                bandeau.fill.solid()
-                bandeau.fill.fore_color.rgb = c_accent
-                bandeau.line.fill.background()
-
-                proj_title = st.session_state.get('project_name', globals().get('project_name', 'Projet Lean Six Sigma'))
-        
+                appliquer_fond(slide_cover)
+            
                 tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(2.0), Inches(11), Inches(4.5))
                 tf_cov = tb_cov.text_frame
                 tf_cov.word_wrap = True
-        
                 p_c1 = tf_cov.paragraphs[0]
-                p_c1.text = "DOSSIER DE CERTIFICATION LEAN SIX SIGMA BLACK BELT • SOUTENANCE OFFICIELLE"
+                p_c1.text = "DOSSIER DE CERTIFICATION LEAN SIX SIGMA • SOUTENANCE OFFICIELLE"
                 p_c1.font.size = Pt(12)
                 p_c1.font.bold = True
                 p_c1.font.color.rgb = c_accent
-        
+            
                 p_c2 = tf_cov.add_paragraph()
-                p_c2.text = f"\nSoutenance d'Excellence Opérationnelle : {str(proj_title).replace('_', ' ').title()}"
+                p_c2.text = f"\nProjet : {project_name.replace('_', ' ').title()}"
                 p_c2.font.size = Pt(28)
                 p_c2.font.bold = True
                 p_c2.font.color.rgb = c_primary
-        
-                p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\n📄 Restitution exhaustive issue du scan en direct des travaux de l'application\n🔍 Traçabilité complète des phases DMAIC, tableaux de données et graphiques\n📅 Date : {datetime.now().strftime('%d/%m/%Y')} • Statut : Prêt pour le Jury d'Évaluation"
-                p_c3.font.size = Pt(12)
-                p_c3.font.color.rgb = c_text
 
-                # --- 2. FONCTION DE SCAN INTELLIGENT DE L'APPLICATION ---
-                def scanner_donnees_session(mots_cles):
-                    """Scanne tout le state et extrait du texte propre, des DataFrames ou des métriques"""
-                    extraits = []
-                    for k, v in st.session_state.items():
-                        if any(mc in k.lower() for mc in mots_cles):
-                            if isinstance(v, str) and len(v.strip()) > 1:
-                                extraits.append(f"• **{k.replace('_', ' ').title()}** :\n{v}")
-                            elif isinstance(v, (int, float)):
-                                extraits.append(f"• **{k.replace('_', ' ').title()}** : {v}")
-                            elif isinstance(v, pd.DataFrame):
-                                try:
-                                    extraits.append(f"• **Données Tabulaires ({k})** :\n{v.to_string(index=False)}")
-                                except:
-                                    pass
-            
-                    # Recherche élargie dans les variables globales potentielles
-                    try:
-                        for mc in mots_cles:
-                            val_g = globals().get(mc)
-                            if val_g is not None and str(val_g).strip() and str(val_g) not in str(extraits):
-                                if hasattr(val_g, "to_string"):
-                                    extraits.append(f"• **Registre Global ({mc})** :\n{val_g.to_string(index=False)}")
-                                else:
-                                    extraits.append(f"• **Registre Global ({mc})** :\n{str(val_g)}")
-                    except:
-                        pass
-
-                    if extraits:
-                        return "\n\n".join(extraits)
-            
-                    return f"✓ Éléments de la phase validés et enregistrés dans l'application pour les critères : {', '.join(mots_cles)}.\n✓ Les indicateurs de pilotage et les livrables associés ont été instanciés conformément aux exigences du référentiel Black Belt."
-
-                # --- 3. GÉNÉRATEURS DE SLIDES STRUCTURÉS HAUTEMENT LISIBLES ---
-                def creer_slide_transition(num, titre, desc):
+                # Génération d'une slide par phase scannée
+                for k, v in p_exp.items():
+                    if k in ['nom', 'status']:
+                        continue
                     slide = prs.slides.add_slide(blank_layout)
-                    appliquer_fond_parfait(slide)
+                    appliquer_fond(slide)
 
-                    card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.5), Inches(1.8), Inches(10.33), Inches(4.0))
-                    card.fill.solid()
-                    card.fill.fore_color.rgb = c_card
-                    card.line.color.rgb = c_accent
-                    card.line.width = Pt(1.5)
-
-                    tf = card.text_frame
-                    tf.word_wrap = True
-                    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-
-                    p1 = tf.paragraphs[0]
-                    p1.text = f"ÉTAPE DMAIC N°{num}"
-                    p1.font.size = Pt(12)
-                    p1.font.bold = True
-                    p1.font.color.rgb = c_accent
-                    p1.alignment = PP_ALIGN.CENTER
-
-                    p2 = tf.add_paragraph()
-                    p2.text = f"\n{titre}"
-                    p2.font.size = Pt(28)
-                    p2.font.bold = True
-                    p2.font.color.rgb = c_primary
-                    p2.alignment = PP_ALIGN.CENTER
-
-                    p3 = tf.add_paragraph()
-                    p3.text = f"\nObjectif méthodologique : {desc}"
-                    p3.font.size = Pt(13)
-                    p3.font.color.rgb = c_text
-                    p3.alignment = PP_ALIGN.CENTER
-
-                def creer_slide_bi_colonne(titre_slide, sous_titre, texte_scan, analyse_mbb):
-                    slide = prs.slides.add_slide(blank_layout)
-                    appliquer_fond_parfait(slide)
-
+                    # Titre de la slide
                     tb_t = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
                     tf_t = tb_t.text_frame
                     tf_t.word_wrap = True
                     p_t = tf_t.paragraphs[0]
-                    p_t.text = titre_slide
+                    p_t.text = f"Restitution Module : {k.replace('_', ' ').upper()}"
                     p_t.font.size = Pt(18)
                     p_t.font.bold = True
                     p_t.font.color.rgb = c_primary
-            
-                    p_sub = tf_t.add_paragraph()
-                    p_sub.text = sous_titre
-                    p_sub.font.size = Pt(11)
-                    p_sub.font.color.rgb = c_accent
 
-                    # Boîte Gauche (Données scannées)
-                    card_g = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.4), Inches(5.7), Inches(5.6))
-                    card_g.fill.solid()
-                    card_g.fill.fore_color.rgb = c_card
-                    card_g.line.color.rgb = c_border
-                    tf_g = card_g.text_frame
-                    tf_g.word_wrap = True
-                    tf_g.vertical_anchor = MSO_ANCHOR.TOP
-            
-                    p_gh = tf_g.paragraphs[0]
-                    p_gh.text = "📋 Données Scannées dans l'Application :"
-                    p_gh.font.size = Pt(11.5)
-                    p_gh.font.bold = True
-                    p_gh.font.color.rgb = c_primary
-            
-                    p_gt = tf_g.add_paragraph()
-                    p_gt.text = "\n" + str(texte_scan)[:1400]
-                    p_gt.font.size = Pt(9.5)
-                    p_gt.font.color.rgb = c_text
-
-                    # Boîte Droite (Regard Master Black Belt)
-                    card_d = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.4), Inches(5.7), Inches(5.6))
-                    card_d.fill.solid()
-                    card_d.fill.fore_color.rgb = c_card
-                    card_d.line.color.rgb = c_accent
-                    card_d.line.width = Pt(1.5)
-                    tf_d = card_d.text_frame
-                    tf_d.word_wrap = True
-                    tf_d.vertical_anchor = MSO_ANCHOR.TOP
-            
-                    p_dh = tf_d.paragraphs[0]
-                    p_dh.text = "⚖️ Audit & Validation Méthodologique Jury :"
-                    p_dh.font.size = Pt(11.5)
-                    p_dh.font.bold = True
-                    p_dh.font.color.rgb = c_accent
-            
-                    p_dt = tf_d.add_paragraph()
-                    p_dt.text = "\n" + str(analyse_mbb)[:1400]
-                    p_dt.font.size = Pt(9.5)
-                    p_dt.font.color.rgb = c_text
-
-                def creer_slide_graphique_ou_tableau(titre_slide, sous_titre, objet_visuel, commentaire_audit):
-                    slide = prs.slides.add_slide(blank_layout)
-                    appliquer_fond_parfait(slide)
-
-                    tb_t = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
-                    tf_t = tb_t.text_frame
-                    tf_t.word_wrap = True
-                    p_t = tf_t.paragraphs[0]
-                    p_t.text = titre_slide
-                    p_t.font.size = Pt(18)
-                    p_t.font.bold = True
-                    p_t.font.color.rgb = c_primary
-            
-                    p_sub = tf_t.add_paragraph()
-                    p_sub.text = sous_titre
-                    p_sub.font.size = Pt(11)
-                    p_sub.font.color.rgb = c_accent
-
-                    visuel_insere = False
-                    if objet_visuel is not None:
-                        try:
-                            # Si c'est une figure Plotly, on l'exporte en image PNG nette
-                            if hasattr(objet_visuel, "write_image"):
-                                img_buf = io.BytesIO()
-                                objet_visuel.write_image(img_buf, format="png", width=1050, height=600)
-                                img_buf.seek(0)
-                                slide.shapes.add_picture(img_buf, Inches(0.8), Inches(1.4), Inches(6.5), Inches(5.6))
-                                visuel_insere = True
-                            # Si c'est un DataFrame pandas, on le formate proprement en tableau lisible
-                            elif hasattr(objet_visuel, "to_string"):
-                                card_df = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.4), Inches(6.5), Inches(5.6))
-                                card_df.fill.solid()
-                                card_df.fill.fore_color.rgb = c_card
-                                card_df.line.color.rgb = c_border
-                                tf_df = card_df.text_frame
-                                tf_df.word_wrap = True
-                        
-                                p_dfh = tf_df.paragraphs[0]
-                                p_dfh.text = "📊 Tableau Structuré de l'Application :"
-                                p_dfh.font.size = Pt(11.5)
-                                p_dfh.font.bold = True
-                                p_dfh.font.color.rgb = c_primary
-                        
-                                p_dft = tf_df.add_paragraph()
-                                p_dft.text = "\n" + objet_visuel.head(12).to_string(index=False)
-                                p_dft.font.size = Pt(8.5)
-                                p_dft.font.color.rgb = c_text
-                                visuel_insere = True
-                        except Exception as ex:
-                            pass
-
-                    pos_x = Inches(7.5) if visuel_insere else Inches(0.8)
-                    largeur_card = Inches(5.0) if visuel_insere else Inches(11.7)
-
-                    card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, pos_x, Inches(1.4), largeur_card, Inches(5.6))
+                    # Contenu scanné dans une carte lisible
+                    card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.4), Inches(11.7), Inches(5.6))
                     card.fill.solid()
                     card.fill.fore_color.rgb = c_card
-                    card.line.color.rgb = c_accent
-                    card.line.width = Pt(1.5)
+                    card.line.color.rgb = c_border
                     tf_card = card.text_frame
                     tf_card.word_wrap = True
                     tf_card.vertical_anchor = MSO_ANCHOR.TOP
-            
+                
                     p_ch = tf_card.paragraphs[0]
-                    p_ch.text = "🔍 Analyse Critique & Preuve de Conformité :"
+                    p_ch.text = "📋 Données & Éléments Enregistrés :"
                     p_ch.font.size = Pt(11.5)
                     p_ch.font.bold = True
                     p_ch.font.color.rgb = c_accent
-            
+                
                     p_ctxt = tf_card.add_paragraph()
-                    p_ctxt.text = "\n" + str(commentaire_audit)[:1200]
-                    p_ctxt.font.size = Pt(9.5)
+                    texte_val = v.to_string(index=False) if isinstance(v, pd.DataFrame) else str(v)
+                    p_ctxt.text = "\n" + texte_val[:1500]
+                    p_ctxt.font.size = Pt(10)
                     p_ctxt.font.color.rgb = c_text
 
-                # =====================================================================
-                # 📂 CONSTRUCTION DES SLIDES DMAIC EXHAUSTIVES AVEC SCAN CIBLÉ
-                # =====================================================================
-
-                # ÉTAPE 1 : DEFINE
-                creer_slide_transition("1", "Phase DEFINE", "Cadrage du projet, Voix du Client (VOC), définition des CTQ et cartographie macro SIPOC.")
-        
-                creer_slide_bi_colonne(
-                    "1.1 DEFINE : Charte de Projet & Cadrage Stratégique",
-                    "Restitution officielle des objectifs, du périmètre et de l'alignement métier",
-                    scanner_donnees_session(['define', 'charte', 'projet', 'contexte', 'objectif', 'perimetre']),
-                    "Analyse Black Belt : La charte formalise le sponsor, les gains financiers visés et le périmètre. Le cadrage est validé selon les critères standard."
-                )
-
-                creer_slide_bi_colonne(
-                    "1.2 DEFINE : Voix du Client (VOC) & Arbre CTQ",
-                    "Traduction des exigences client en indicateurs de qualité mesurables",
-                    scanner_donnees_session(['voc', 'client', 'ctq', 'critere', 'exigence']),
-                    "Analyse Black Belt : La liaison rigoureuse entre la Voix du Client (VOC) et les Critical to Quality (CTQ) garantit l'orientation client absolue du projet."
-                )
-
-                creer_slide_bi_colonne(
-                    "1.3 DEFINE : Cartographie Macro SIPOC",
-                    "Modélisation des flux amont et aval du processus étudié",
-                    scanner_donnees_session(['sipoc', 'processus', 'fournisseur', 'entree', 'sortie']),
-                    "Analyse Black Belt : Le SIPOC permet de borner clairement les limites opérationnelles du processus et de structurer l'analyse métrologique à venir."
-                )
-
-                # ÉTAPE 2 : MEASURE
-                creer_slide_transition("2", "Phase MEASURE", "Plan de collecte de données, validation du système de mesure (MSA) et établissement de la baseline.")
-
-                creer_slide_bi_colonne(
-                    "2.1 MEASURE : Plan de Collecte & Système de Mesure (MSA)",
-                    "Validation de la fidélité, répétabilité et reproductibilité des données",
-                    scanner_donnees_session(['measure', 'mesure', 'msa', 'collecte', 'fidelite']),
-                    "Analyse Black Belt : La robustesse métrologique (MSA) est une condition sine qua non. Les erreurs de mesure sont isolées avant toute prise de décision statistique."
-                )
-
-                # Récupération dynamique du graphique ou tableau SPC si présent
-                fig_spc_scanned = st.session_state.get('current_spc_figure') or st.session_state.get('df_measure') or st.session_state.get('spc_figure')
-                creer_slide_graphique_ou_tableau(
-                    "2.2 MEASURE : Ligne de Base (Baseline) & Capabilité Initiale",
-                    "Évaluation chiffrée de la performance historique et de la stabilité",
-                    fig_spc_scanned,
-                    "Justification Jury : L'établissement de la ligne de base objective le niveau de défaillance initial du processus (Cp/Cpk ou DPMO), servant de référence incontestable."
-                )
-
-                # ÉTAPE 3 : ANALYZE
-                creer_slide_transition("3", "Phase ANALYZE", "Recherche des causes racines, diagramme d'Ishikawa, 5 Pourquoi et hiérarchisation par Pareto.")
-
-                creer_slide_bi_colonne(
-                    "3.1 ANALYZE : Diagramme d'Ishikawa (5M)",
-                    "Investigation structurée des causes potentielles de non-qualité",
-                    scanner_donnees_session(['ishikawa', '5m', 'cause', 'materiel', 'main', 'methode', 'milieu']),
-                    "Analyse Black Belt : L'utilisation de la grille des 5M garantit une approche exhaustive, évitant les biais cognitifs dans la recherche des causes racines."
-                )
-
-                creer_slide_bi_colonne(
-                    "3.2 ANALYZE : Analyse des 5 Pourquoi",
-                    "Descente causale rigoureuse jusqu'à l'origine fondamentale du dysfonctionnement",
-                    scanner_donnees_session(['pourquoi', 'why', 'racine', 'fondamentale']),
-                    "Analyse Black Belt : La méthode des 5 Pourquoi permet de s'affranchir des symptômes de surface pour traiter la cause profonde et éviter toute récurrence."
-                )
-
-                fig_pareto_scanned = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure') or st.session_state.get('current_analysis_figure')
-                creer_slide_graphique_ou_tableau(
-                    "3.3 ANALYZE : Diagramme de Pareto & Hiérarchisation",
-                    "Application du principe de Pareto (80/20) sur les facteurs d'influence",
-                    fig_pareto_scanned,
-                    "Justification Jury : Le Pareto quantifie l'impact respectif des causes identifiées, permettant au Black Belt de focaliser les ressources sur les causes vitales."
-                )
-
-                # ÉTAPE 4 : IMPROVE
-                creer_slide_transition("4", "Phase IMPROVE", "Développement des solutions, évaluation des risques (FMEA / AMDEC) et plan d'action correctif.")
-
-                creer_slide_bi_colonne(
-                    "4.1 IMPROVE : Sélection & Évaluation des Solutions",
-                    "Matrice de choix multicritère et arbitrage des contre-mesures",
-                    scanner_donnees_session(['improve', 'amelioration', 'solution', 'selection', 'matrice']),
-                    "Analyse Black Belt : L'évaluation multicritère des solutions (coût, délai, efficacité) garantit la pertinence industrielle et économique des choix retenus."
-                )
-
-                creer_slide_bi_colonne(
-                    "4.2 IMPROVE : Analyse des Modes de Défaillance (FMEA / AMDEC)",
-                    "Évaluation préventive de la Sévérité, de l'Occurrence et de la Détection (IPR)",
-                    scanner_donnees_session(['fmea', 'amdec', 'ipr', 'risque', 'criticite']),
-                    "Analyse Black Belt : L'AMDEC permet de s'assurer que les solutions déployées n'introduisent pas de nouveaux risques critiques dans le processus."
-                )
-
-                creer_slide_bi_colonne(
-                    "4.3 IMPROVE : Plan d'Action Opérationnel & Déploiement",
-                    "Pilotage des actions de transformation sur le terrain (5W1H)",
-                    scanner_donnees_session(['plan', 'action', 'pilote', 'echeance', 'deploiement']),
-                    "Analyse Black Belt : Le plan d'action formalise les responsabilités et les jalons temporels pour un déploiement fluide et sans rupture."
-                )
-
-                # ÉTAPE 5 : CONTROL
-                creer_slide_transition("5", "Phase CONTROL", "Mise en place du plan de surveillance, standardisation et pérennisation des gains financiers.")
-
-                creer_slide_bi_colonne(
-                    "5.1 CONTROL : Plan de Surveillance & SPC de Contrôle",
-                    "Maintien pérenne des réglages cibles et détection précoce des dérives",
-                    scanner_donnees_session(['control', 'controle', 'surveillance', 'standard', 'spc']),
-                    "Analyse Black Belt : Le plan de surveillance et les cartes de contrôle aux postes assurent que le processus ne présente pas de dérive vers l'état initial."
-                )
-
-                creer_slide_bi_colonne(
-                    "5.2 CONTROL : Bilan Financier, ROI & Clôture du Projet",
-                    "Validation des gains récurrents, capitalisation et retour d'expérience",
-                    scanner_donnees_session(['bilan', 'roi', 'gain', 'cloture', 'financier', 'capitalisation']),
-                    "Analyse Black Belt : La phase de clôture valide les gains financiers validés par la finance et la capitalisation des standards pour l'entreprise."
-                )
-
-                # Sauvegarde finale
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
-        
-                st.success("✨ Dossier de Soutenance Master Black Belt généré avec succès par l'agent IA !")
+                buffer_pptx.seek(0)
+            
+                st.success("✨ Présentation PowerPoint générée avec succès !")
                 st.download_button(
-                    label="📥 Télécharger le Dossier de Soutenance Intégral (.pptx)", 
-                    data=bytes(buffer_pptx.getvalue()), 
-                    file_name=f"Dossier_Soutenance_MasterBlackBelt_Exhaustif.pptx", 
+                    label="📥 Télécharger le fichier .pptx",
+                    data=buffer_pptx,
+                    file_name=f"Soutenance_MasterBlackBelt_{project_name}.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    use_container_width=True
+                    key="dl_pptx_file"
                 )
-        except Exception as e:
-            st.error(f"Erreur lors de la génération du dossier de soutenance : {e}")
+            except Exception as e:
+                st.error(f"Erreur lors de la génération PowerPoint : {e}")
 
-        # ---------------------------------------------------------------------
-        # MODULE D'EXPORTATION PDF
-        # ---------------------------------------------------------------------
-        st.subheader("💾 Exportation PDF")
+        # --- 3. BOUTON 2 : EXPORTATION PDF GLOBAL (.pdf) ---
+        if st.button("📄 Générer et Télécharger (Format PDF Global)", use_container_width=True, key="btn_export_pdf_sidebar"):
+            try:
+                from reportlab.lib.pagesizes import A4
+                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable
+                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                from reportlab.lib import colors
+
+                buffer_pdf = io.BytesIO()
+                doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=40, bottomMargin=40)
+                story = []
+            
+                primary_hex = st.session_state.get('primary_color', '#1E3A8A')
+                primary_color = colors.HexColor(primary_hex)
+
+                styles = getSampleStyleSheet()
+                title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=18, leading=22, textColor=primary_color, spaceAfter=4, alignment=1)
+                subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=10, leading=13, textColor=colors.HexColor('#64748B'), spaceAfter=12, alignment=1)
+                h1_style = ParagraphStyle('SecH1', parent=styles['Heading2'], fontSize=13, leading=16, textColor=colors.HexColor('#0F172A'), spaceBefore=12, spaceAfter=6, keepWithNext=True)
+                body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#334155'), spaceAfter=6)
+
+                # Entête PDF
+                story.append(Paragraph(f"<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
+                story.append(Paragraph(f"<b>{project_name.replace('_', ' ').title()}</b>", title_style))
+                story.append(Paragraph(f"Restitution intégrale issue du scan des données de l'application • Édité le {datetime.now().strftime('%d/%m/%Y')}", subtitle_style))
+                story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
+
+                # Boucle d'injection des données scannées dans le PDF
+                for cle, valeur in p_exp.items():
+                    if cle in ['nom', 'status']:
+                        continue
+                    section_elems = []
+                    section_elems.append(Paragraph(f"<b>Module / Phase : {cle.replace('_', ' ').upper()}</b>", h1_style))
+                
+                    if isinstance(valeur, pd.DataFrame):
+                        if not valeur.empty:
+                            df_data = [list(valeur.columns)] + valeur.astype(str).values.tolist()
+                            t = Table(df_data, colWidths=[110]*min(len(valeur.columns), 5))
+                            t.setStyle(TableStyle([
+                                ('BACKGROUND', (0,0), (-1,0), primary_color),
+                                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                                ('FONTSIZE', (0,0), (-1,-1), 8),
+                                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+                                ('TOPPADDING', (0,0), (-1,-1), 5),
+                                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
+                                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
+                            ]))
+                            section_elems.append(t)
+                        else:
+                            section_elems.append(Paragraph("<i>Aucune donnée tabulaire renseignée.</i>", body_style))
+                    elif isinstance(valeur, str):
+                        section_elems.append(Paragraph(valeur.replace('\n', '<br/>'), body_style))
+                    elif isinstance(valeur, dict):
+                        for sk, sv in valeur.items():
+                            section_elems.append(Paragraph(f"<b>• {sk} :</b> {sv}", body_style))
+                    else:
+                        section_elems.append(Paragraph(f"<b>Valeur :</b> {str(valeur)}", body_style))
+                
+                    section_elems.append(Spacer(1, 6))
+                    story.append(KeepTogether(section_elems))
+
+                doc.build(story)
+                buffer_pdf.seek(0)
+
+                st.success("✨ Rapport PDF global généré avec succès !")
+                st.download_button(
+                    label="📥 Télécharger le fichier .pdf",
+                    data=buffer_pdf,
+                    file_name=f"Soutenance_MasterBlackBelt_{project_name}.pdf",
+                    mime="application/pdf",
+                    key="dl_pdf_file"
+                )
+            except Exception as e:
+        st.error(f"Erreur lors de la génération PDF : {e}")
+    else:
+        st.warning("⚠️ Aucun projet enregistré dans l'application pour le moment.")
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
