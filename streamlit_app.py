@@ -293,6 +293,43 @@ with st.sidebar:
 
         st.info("🤖 **Générateur DMAIC :** Restitution complète, homogène et structurée selon le standard Black Belt.")
 
+        # Définition globale et partagée de la structure DMAIC
+        phases_dmaic = [
+            ("DEFINE", [
+                ("Énoncé du Problème & CTQ", 'define'), 
+                ("Équipe Projet", 'equipe'), 
+                ("Matrice Go / No Go", 'go_no_go'), 
+                ("Stakeholders", 'stakeholders'), 
+                ("SIPOC", 'sipoc'), 
+                ("Voice of Customer (VOC)", 'voc'), 
+                ("Gantt Projet", 'gantt')
+            ]),
+            ("MEASURE", [
+                ("Project Definition f(X)", 'measure_x'), 
+                ("Value Stream Mapping", 'vsm'), 
+                ("Validate Measurement System", 'msa'), 
+                ("Baseline & KPI", 'baseline'), 
+                ("Statistiques & Capabilité", 'capability')
+            ]),
+            ("ANALYZE", [
+                ("Tests X sur Y", 'tests_xy'), 
+                ("Causes Racines", 'causes_racines'), 
+                ("Current State FMEA", 'fmea_current'), 
+                ("Gemba Walk", 'gemba')
+            ]),
+            ("IMPROVE", [
+                ("Improvement Strategies", 'strategies'), 
+                ("Benefit / Effort Matrix", 'benefit_effort'), 
+                ("Action Plan", 'action_plan'), 
+                ("Future State Process & FMEA", 'future_state')
+            ]),
+            ("CONTROL", [
+                ("Data Control Plan", 'control_plan'), 
+                ("Stats Comparatives & Capabilité", 'stats_finales'), 
+                ("Maintien des Gains", 'maintien_gains')
+            ])
+        ]
+
         # ==========================================
         # 1. BOUTON POWERPOINT (.pptx)
         # ==========================================
@@ -382,28 +419,62 @@ with st.sidebar:
                 p_c3.text = f"\nAuteur : {auteur_nom}  |  Date : {date_soutenance}"
                 p_c3.font.size = Pt(14); p_c3.font.color.rgb = c_text
 
-                # Étapes DMAIC PowerPoint
-                phases_dmaic = [
-                    ("DEFINE", [("Énoncé du Problème & CTQ", 'define'), ("Équipe Projet", 'equipe'), ("Matrice Go / No Go", 'go_no_go'), ("Stakeholders", 'stakeholders'), ("SIPOC", 'sipoc'), ("Voice of Customer (VOC)", 'voc'), ("Gantt Projet", 'gantt')]),
-                    ("MEASURE", [("Project Definition f(X)", 'measure_x'), ("Value Stream Mapping", 'vsm'), ("Validate Measurement System", 'msa'), ("Baseline & KPI", 'baseline'), ("Statistiques & Capabilité", 'capability')]),
-                    ("ANALYZE", [("Tests X sur Y", 'tests_xy'), ("Causes Racines", 'causes_racines'), ("Current State FMEA", 'fmea_current'), ("Gemba Walk", 'gemba')]),
-                    ("IMPROVE", [("Improvement Strategies", 'strategies'), ("Benefit / Effort Matrix", 'benefit_effort'), ("Action Plan", 'action_plan'), ("Future State Process & FMEA", 'future_state')]),
-                    ("CONTROL", [("Data Control Plan", 'control_plan'), ("Stats Comparatives & Capabilité", 'stats_finales'), ("Maintien des Gains", 'maintien_gains')])
-                ]
-
+                # Boucle de génération des diapositives DMAIC avec injection de tableaux natifs
                 for nom_phase, modules in phases_dmaic:
                     ajouter_diapositive_titre_phase(nom_phase)
                     for titre_sec, cle_sec in modules:
                         slide = prs.slides.add_slide(blank_layout)
                         ajouter_en_tete(slide, nom_phase, titre_sec)
-                        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
-                        card.fill.solid(); card.fill.fore_color.rgb = c_card; card.line.color.rgb = c_border
-                        tf_card = card.text_frame; tf_card.word_wrap = True
-                        p_txt = tf_card.paragraphs[0]
-                        val_sec = p_exp.get(cle_sec, f"Restitution validée pour le module : {titre_sec}")
-                        txt_sec = val_sec.to_string(index=False) if isinstance(val_sec, pd.DataFrame) else str(val_sec)
-                        p_txt.text = txt_sec[:1500]
-                        p_txt.font.size = Pt(11); p_txt.font.color.rgb = c_text
+                        
+                        valeur = p_exp.get(cle_sec, None)
+                        
+                        # Si les données stockées sont un DataFrame Pandas, on crée un VRAI tableau PowerPoint éditable
+                        if isinstance(valeur, pd.DataFrame) and not valeur.empty:
+                            rows = len(valeur) + 1
+                            cols = len(valeur.columns)
+                            left = Inches(0.8)
+                            top = Inches(1.6)
+                            width = Inches(11.7)
+                            height = Inches(min(5.0, 0.6 * rows))
+                            
+                            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
+                            table = table_shape.table
+                            
+                            # En-têtes du tableau
+                            for col_idx, col_name in enumerate(valeur.columns):
+                                cell = table.cell(0, col_idx)
+                                cell.text = str(col_name)
+                                cell.fill.solid()
+                                cell.fill.fore_color.rgb = c_accent
+                                for p in cell.text_frame.paragraphs:
+                                    p.font.size = Pt(11)
+                                    p.font.bold = True
+                                    p.font.color.rgb = RGBColor(255, 255, 255)
+                                    p.alignment = PP_ALIGN.CENTER
+                                    
+                            # Lignes du tableau
+                            for row_idx, row in enumerate(valeur.values):
+                                for col_idx, val in enumerate(row):
+                                    cell = table.cell(row_idx + 1, col_idx)
+                                    cell.text = str(val) if pd.notna(val) else ""
+                                    cell.fill.solid()
+                                    cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
+                                    for p in cell.text_frame.paragraphs:
+                                        p.font.size = Pt(10)
+                                        p.font.color.rgb = c_text
+                        else:
+                            # Affichage standard sous forme de carte textuelle ou de contenu structuré
+                            card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
+                            card.fill.solid(); card.fill.fore_color.rgb = c_card; card.line.color.rgb = c_border
+                            tf_card = card.text_frame; tf_card.word_wrap = True
+                            p_txt = tf_card.paragraphs[0]
+                            
+                            txt_sec = str(valeur) if valeur is not None else f"Section {titre_sec} intégrée au référentiel."
+                            if isinstance(valeur, dict):
+                                txt_sec = "\n".join([f"• {k} : {v}" for k, v in valeur.items()])
+                            
+                            p_txt.text = txt_sec[:2000]
+                            p_txt.font.size = Pt(11); p_txt.font.color.rgb = c_text
 
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
@@ -452,9 +523,6 @@ with st.sidebar:
 
                 # Boucle d'intégration DMAIC pour le PDF
                 for nom_phase, modules in phases_dmaic:
-                    # Titre de phase dans le PDF
-                    phase_header = ParagraphStyle('PhaseHeader', parent=styles['Heading1'], fontSize=13, leading=16, textColor=colors.white, spaceBefore=12, spaceAfter=6)
-                    
                     story.append(Spacer(1, 6))
                     story.append(Paragraph(f"<b>--- PHASE : {nom_phase} ---</b>", ParagraphStyle('PHead', parent=styles['Heading2'], fontSize=11, leading=14, textColor=primary_color, spaceBefore=8, spaceAfter=4)))
                     
@@ -462,7 +530,7 @@ with st.sidebar:
                         section_elems = []
                         section_elems.append(Paragraph(f"<b>{titre_sec}</b>", h1_style))
                         
-                        valeur = p_exp.get(cle_sec, f"Données validées pour {titre_sec}.")
+                        valeur = p_exp.get(cle_sec, None)
                         if isinstance(valeur, pd.DataFrame):
                             if not valeur.empty:
                                 df_data = [list(valeur.columns)] + valeur.astype(str).values.tolist()
@@ -483,8 +551,11 @@ with st.sidebar:
                                 section_elems.append(Paragraph("<i>Aucune donnée tabulaire enregistrée.</i>", body_style))
                         elif isinstance(valeur, str):
                             section_elems.append(Paragraph(valeur.replace('\n', '<br/>'), body_style))
+                        elif isinstance(valeur, dict):
+                            for sk, sv in valeur.items():
+                                section_elems.append(Paragraph(f"<b>• {sk} :</b> {sv}", body_style))
                         else:
-                            section_elems.append(Paragraph(str(valeur), body_style))
+                            section_elems.append(Paragraph(str(valeur) if valeur else "Validé.", body_style))
                         
                         section_elems.append(Spacer(1, 4))
                         story.append(KeepTogether(section_elems))
