@@ -5,3 +5,4 @@ openpyxl
 fpdf2
 python-pptx
 scipy
+reportlab
