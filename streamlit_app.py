@@ -285,9 +285,9 @@ with st.sidebar:
         auteur_nom = st.text_input("Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom")
         date_projet = st.text_input("Date du projet", datetime.now().strftime('%d/%m/%Y'), key="lss_date_projet")
 
-        st.info("🤖 **Agent IA Actif :** Balayage profond et sécurisé de toutes les données du projet par phase DMAIC.")
+        st.info("🤖 **Agent IA Actif :** Balayage profond, sécurisé et typé de toutes les données du projet par phase DMAIC.")
 
-        # --- MOTEUR DE BALAYAGE PROFOND ET SÉCURISÉ ---
+        # --- MOTEUR DE BALAYAGE PROFOND ET SÉCURISÉ (ANTI-AMBIGUÏTÉ NUMPY) ---
         def agent_ia_recuperer_donnees_profondes(projet_dict):
             elements_analyses = []
             exclus = ['nom', 'status']
@@ -298,14 +298,18 @@ with st.sidebar:
                 
                 titre_propre = cle.replace('_', ' ').upper()
                 
+                # Gestion stricte des DataFrames (utilisation de .empty sans ambiguïté booléenne)
                 if isinstance(valeur, pd.DataFrame):
-                    if not valeur.empty:
-                        elements_analyses.append({
-                            "type": "dataframe",
-                            "titre": titre_propre,
-                            "data": valeur,
-                            "cle_origine": cle
-                        })
+                    try:
+                        if not valeur.empty:
+                            elements_analyses.append({
+                                "type": "dataframe",
+                                "titre": titre_propre,
+                                "data": valeur,
+                                "cle_origine": cle
+                            })
+                    except Exception:
+                        pass
                 elif isinstance(valeur, dict):
                     if len(valeur) > 0:
                         elements_analyses.append({
@@ -323,15 +327,18 @@ with st.sidebar:
                             "cle_origine": cle
                         })
                 else:
-                    # Conversion sécurisée en texte sans évaluation booléenne ambiguë
-                    val_str = str(valeur).strip()
-                    if val_str != "":
-                        elements_analyses.append({
-                            "type": "texte",
-                            "titre": titre_propre,
-                            "data": val_str,
-                            "cle_origine": cle
-                        })
+                    # Empêche tout passage direct de tableaux numpy non évalués
+                    try:
+                        val_str = str(valeur).strip()
+                        if val_str != "" and "array" not in val_str.lower():
+                            elements_analyses.append({
+                                "type": "texte",
+                                "titre": titre_propre,
+                                "data": val_str,
+                                "cle_origine": cle
+                            })
+                    except Exception:
+                        pass
             
             return elements_analyses
 
