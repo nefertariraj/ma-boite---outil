@@ -674,6 +674,11 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Erreur lors de la génération du dossier de soutenance : {e}")
 
+        # ---------------------------------------------------------------------
+        # MODULE D'EXPORTATION PDF
+        # ---------------------------------------------------------------------
+        st.subheader("💾 Exportation PDF")
+
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
     # ------------------------------------------------
