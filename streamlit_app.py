@@ -283,15 +283,15 @@ with st.sidebar:
             from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
             from pptx.enum.shapes import MSO_SHAPE
 
-            st.markdown("### 🎯 Agent IA Master Black Belt (Restitution & Résultats)")
+            st.markdown("### 🎯 Agent IA Master Black Belt & Générateur Gamma (Restitution Experte)")
     
             theme_choisi = st.selectbox(
-                "Sélectionnez le thème visuel du rapport de fin de projet :",
+                "Sélectionnez le thème visuel du rapport exécutif :",
                 ["Corporate Bleu Marine (Standard Industrie)", "Moderne Teal & Gris (Lean & Clean)", "Énergique Bordeaux & Or (Excellence Opérationnelle)"],
                 key="select_theme_mbb"
             )
 
-            # Palettes de couleurs Master Black Belt
+            # Palettes de couleurs professionnelles Master Black Belt
             if "Bleu Marine" in theme_choisi:
                 c_primary = RGBColor(15, 23, 42)     # #0F172A
                 c_accent = RGBColor(30, 58, 138)     # #1E3A8A
@@ -308,7 +308,7 @@ with st.sidebar:
                 c_card_bg = RGBColor(255, 251, 235)  # #FEF3C7
                 c_text = RGBColor(69, 26, 3)
 
-            if st.button("🚀 Générer la Présentation Clé en Main (Bilan & Résultats MBB)", use_container_width=True, key="btn_exec_mbb"):
+            if st.button("🚀 Lancer l'Agent IA Master Black Belt (Génération Multi-Slides Dynamique)", use_container_width=True, key="btn_exec_mbb"):
                 prs = Presentation()
                 prs.slide_width = Inches(13.33)
                 prs.slide_height = Inches(7.5)  # Format 16:9 large (Style Gamma / Executive Deck)
@@ -328,7 +328,7 @@ with st.sidebar:
                 tf_cov.word_wrap = True
         
                 p_c1 = tf_cov.paragraphs[0]
-                p_c1.text = "REVUE DE FIN DE PROJET • BILAN MASTER BLACK BELT"
+                p_c1.text = "REVUE DE FIN DE PROJET • BILAN STRATÉGIQUE MASTER BLACK BELT"
                 p_c1.font.size = Pt(13)
                 p_c1.font.bold = True
                 p_c1.font.color.rgb = c_accent
@@ -340,205 +340,273 @@ with st.sidebar:
                 p_c2.font.color.rgb = RGBColor(255, 255, 255)
         
                 p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\nRestitution Complète de la Démarche DMAIC • Preuves Analytiques & Résultats Financiers\nÉvaluation de la Performance : PROJET VALIDÉ (Succès Opérationnel)\nDate de Restitution : {datetime.now().strftime('%d/%m/%Y')} • Statut Actuel : Clôturé / Phase Control"
+                p_c3.text = f"\nRestitution Intégrale de la Démarche DMAIC par l'Agent IA • Analyse des Preuves & Rois Financiers\nÉvaluation de la Performance : PROJET VALIDÉ & VALIDATION DES GAINS\nDate de Restitution : {datetime.now().strftime('%d/%m/%Y')} • Statut Actuel : Clôturé / Phase Control"
                 p_c3.font.size = Pt(12.5)
                 p_c3.font.color.rgb = RGBColor(203, 213, 225)
 
-                # Fonction d'extraction enrichie pour récupérer les analyses et résultats réels de chaque phase
-                def extraire_resultats_phase(phase_cle, defaut_conclusions):
-                    resultats = []
-                    val_projet = p_exp.get(phase_cle)
-                    if val_projet and str(val_projet).strip():
-                        resultats.append(str(val_projet))
-                
-                    for key, val in st.session_state.items():
-                        if phase_cle in key.lower():
-                            if isinstance(val, str) and len(val.strip()) > 5:
-                                resultats.append(val)
-                            elif hasattr(val, "to_string"):
-                                try:
-                                    resultats.append(f"Tableau de Données Clé :\n{val.head(6).to_string(index=False)}")
-                                except:
-                                    pass
-                    if resultats:
-                        return "\n\n".join(resultats)
-                    return defaut_conclusions
+                # =====================================================================
+                # 🧠 FONCTIONS DE L'AGENT IA MASTER BLACK BELT (ANALYSE & CAPTURE)
+                # =====================================================================
+        
+                def ajouter_slide_titre_section(titre_phase, description_phase):
+                    """Crée une diapositive de transition élégante (style Gamma) pour chaque grande phase DMAIC."""
+                    slide = prs.slides.add_slide(blank_layout)
+                    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
+                    bg.fill.solid()
+                    bg.fill.fore_color.rgb = c_primary
+                    bg.line.fill.background()
 
-                # --- FONCTION DE CRÉATION DE SLIDE DE RÉSULTATS DMAIC ---
-                def ajouter_slide_resultat_dmaic(titre_etape, objectif_etape, analyses_effectuees, resultats_cles, graphique=None):
+                    tb = slide.shapes.add_textbox(Inches(1.5), Inches(2.5), Inches(10.3), Inches(3.0))
+                    tf = tb.text_frame
+                    tf.word_wrap = True
+
+                    p1 = tf.paragraphs[0]
+                    p1.text = f"SECTION DMAIC • RESTITUTION EXPERTE"
+                    p1.font.size = Pt(12)
+                    p1.font.bold = True
+                    p1.font.color.rgb = c_accent
+
+                    p2 = tf.add_paragraph()
+                    p2.text = titre_phase
+                    p2.font.size = Pt(30)
+                    p2.font.bold = True
+                    p2.font.color.rgb = RGBColor(255, 255, 255)
+
+                    p3 = tf.add_paragraph()
+                    p3.text = f"\nObjectif de l'étape : {description_phase}"
+                    p3.font.size = Pt(14)
+                    p3.font.color.rgb = RGBColor(203, 213, 225)
+
+                def ajouter_slide_analyse_texte(titre, sous_titre, analyse_mbb, recommandations):
+                    """Génère une slide de contenu textuel structuré (Analyses & Conséquences)."""
                     slide = prs.slides.add_slide(blank_layout)
             
-                    # En-tête de la diapositive
+                    # En-tête
                     tb_t = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
                     tf_t = tb_t.text_frame
                     tf_t.word_wrap = True
             
                     p_t = tf_t.paragraphs[0]
-                    p_t.text = titre_etape
-                    p_t.font.size = Pt(22)
+                    p_t.text = titre
+                    p_t.font.size = Pt(20)
                     p_t.font.bold = True
                     p_t.font.color.rgb = c_primary
             
                     p_sub = tf_t.add_paragraph()
-                    p_sub.text = f"Objectif : {objectif_etape}"
-                    p_sub.font.size = Pt(11.5)
+                    p_sub.text = sous_titre
+                    p_sub.font.size = Pt(11)
                     p_sub.font.color.rgb = c_accent
 
-                    # Si un graphique est présent (ex: SPC, Pareto, Ishikawa)
-                    if graphique is not None:
+                    # Bloc Gauche : Analyse MBB
+                    card_g = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.4), Inches(5.7), Inches(5.5))
+                    card_g.fill.solid()
+                    card_g.fill.fore_color.rgb = c_card_bg
+                    card_g.line.color.rgb = c_accent
+                    tf_g = card_g.text_frame
+                    tf_g.word_wrap = True
+                    tf_g.vertical_anchor = MSO_ANCHOR.TOP
+            
+                    p_gh = tf_g.paragraphs[0]
+                    p_gh.text = "🔍 Analyse des Résultats (Posture MBB) :"
+                    p_gh.font.size = Pt(13)
+                    p_gh.font.bold = True
+                    p_gh.font.color.rgb = c_primary
+            
+                    p_gt = tf_g.add_paragraph()
+                    p_gt.text = "\n" + str(analyse_mbb)[:1000]
+                    p_gt.font.size = Pt(10.5)
+                    p_gt.font.color.rgb = c_text
+
+                    # Bloc Droit : Conséquences / Décisions
+                    card_d = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.4), Inches(5.7), Inches(5.5))
+                    card_d.fill.solid()
+                    card_d.fill.fore_color.rgb = c_card_bg
+                    card_d.line.color.rgb = c_primary
+                    tf_d = card_d.text_frame
+                    tf_d.word_wrap = True
+                    tf_d.vertical_anchor = MSO_ANCHOR.TOP
+            
+                    p_dh = tf_d.paragraphs[0]
+                    p_dh.text = "🎯 Impact & Décision pour la Suite :"
+                    p_dh.font.size = Pt(13)
+                    p_dh.font.bold = True
+                    p_dh.font.color.rgb = c_primary
+            
+                    p_dt = tf_d.add_paragraph()
+                    p_dt.text = "\n" + str(recommandations)[:1000]
+                    p_dt.font.size = Pt(10.5)
+                    p_dt.font.color.rgb = c_text
+
+                def ajouter_slide_visuel_ou_tableau(titre, sous_titre, graphique_ou_donnees, synthese_explicative):
+                    """Capture et intègre fidèlement un graphique Plotly ou un tableau structuré, accompagné de l'analyse MBB."""
+                    slide = prs.slides.add_slide(blank_layout)
+            
+                    tb_t = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
+                    tf_t = tb_t.text_frame
+                    tf_t.word_wrap = True
+            
+                    p_t = tf_t.paragraphs[0]
+                    p_t.text = titre
+                    p_t.font.size = Pt(20)
+                    p_t.font.bold = True
+                    p_t.font.color.rgb = c_primary
+            
+                    p_sub = tf_t.add_paragraph()
+                    p_sub.text = sous_titre
+                    p_sub.font.size = Pt(11)
+                    p_sub.font.color.rgb = c_accent
+
+                    # Si c'est un graphique Plotly, on effectue une capture d'écran propre
+                    visuel_integre = False
+                    if graphique_ou_donnees is not None:
                         try:
-                            img_buf = io.BytesIO()
-                            graphique.write_image(img_buf, format="png", width=1050, height=600)
-                            img_buf.seek(0)
-                            slide.shapes.add_picture(img_buf, Inches(0.8), Inches(1.4), Inches(6.5), Inches(5.5))
+                            if hasattr(graphique_ou_donnees, "write_image"):
+                                img_buf = io.BytesIO()
+                                graphique_ou_donnees.write_image(img_buf, format="png", width=1050, height=600)
+                                img_buf.seek(0)
+                                slide.shapes.add_picture(img_buf, Inches(0.8), Inches(1.4), Inches(6.5), Inches(5.5))
+                                visuel_integre = True
+                            elif hasattr(graphique_ou_donnees, "to_string"):
+                                # Si c'est un DataFrame pandas, on le formate joliment dans un bloc texte à gauche
+                                card_df = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.4), Inches(6.5), Inches(5.5))
+                                card_df.fill.solid()
+                                card_df.fill.fore_color.rgb = c_card_bg
+                                card_df.line.color.rgb = c_accent
+                                tf_df = card_df.text_frame
+                                tf_df.word_wrap = True
+                        
+                                p_dfh = tf_df.paragraphs[0]
+                                p_dfh.text = "📊 Capture du Tableau de Données de l'Application :"
+                                p_dfh.font.size = Pt(12)
+                                p_dfh.font.bold = True
+                                p_dfh.font.color.rgb = c_primary
+                        
+                                p_dft = tf_df.add_paragraph()
+                                p_dft.text = "\n" + graphique_ou_donnees.head(8).to_string(index=False)
+                                p_dft.font.size = Pt(9.5)
+                                p_dft.font.color.rgb = c_text
+                                visuel_integre = True
                         except Exception:
                             pass
-                
-                        # Panneau latéral des résultats analytiques
-                        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(7.5), Inches(1.4), Inches(5.0), Inches(5.5))
-                        card.fill.solid()
-                        card.fill.fore_color.rgb = c_card_bg
-                        card.line.color.rgb = c_accent
-                
-                        tf_card = card.text_frame
-                        tf_card.word_wrap = True
-                        tf_card.vertical_anchor = MSO_ANCHOR.TOP
-                
-                        p_ch = tf_card.paragraphs[0]
-                        p_ch.text = "📊 Analyses & Résultats Clés :"
-                        p_ch.font.size = Pt(13)
-                        p_ch.font.bold = True
-                        p_ch.font.color.rgb = c_primary
-                
-                        p_ctxt = tf_card.add_paragraph()
-                        p_ctxt.text = "\n" + str(resultats_cles)[:1100]
-                        p_ctxt.font.size = Pt(10.5)
-                        p_ctxt.font.color.rgb = c_text
+
+                    # Panneau d'analyse de l'expert MBB à droite (ou en plein écran si aucun visuel n'a pu être capturé)
+                    pos_x = Inches(7.5) if visuel_integre else Inches(0.8)
+                    largeur_card = Inches(5.0) if visuel_integre else Inches(11.7)
+
+                    card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, pos_x, Inches(1.4), largeur_card, Inches(5.5))
+                    card.fill.solid()
+                    card.fill.fore_color.rgb = c_card_bg
+                    card.line.color.rgb = c_accent
             
-                    else:
-                        # Disposition bi-colonne structurée (Analyses à gauche, Résultats & Conséquences à droite)
-                        # Bloc Gauche : Travaux & Analyses
-                        card_gauche = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.4), Inches(5.7), Inches(5.5))
-                        card_gauche.fill.solid()
-                        card_gauche.fill.fore_color.rgb = c_card_bg
-                        card_gauche.line.color.rgb = c_accent
-                
-                        tf_g = card_gauche.text_frame
-                        tf_g.word_wrap = True
-                        tf_g.vertical_anchor = MSO_ANCHOR.TOP
-                
-                        p_gh = tf_g.paragraphs[0]
-                        p_gh.text = "🔍 Travaux & Analyses Réalisés :"
-                        p_gh.font.size = Pt(13)
-                        p_gh.font.bold = True
-                        p_gh.font.color.rgb = c_primary
-                
-                        p_gt = tf_g.add_paragraph()
-                        p_gt.text = "\n" + str(analyses_effectuees)[:900]
-                        p_gt.font.size = Pt(10.5)
-                        p_gt.font.color.rgb = c_text
+                    tf_card = card.text_frame
+                    tf_card.word_wrap = True
+                    tf_card.vertical_anchor = MSO_ANCHOR.TOP
+            
+                    p_ch = tf_card.paragraphs[0]
+                    p_ch.text = "🧠 Interprétation Master Black Belt & Résultats :"
+                    p_ch.font.size = Pt(13)
+                    p_ch.font.bold = True
+                    p_ch.font.color.rgb = c_primary
+            
+                    p_ctxt = tf_card.add_paragraph()
+                    p_ctxt.text = "\n" + str(synthese_explicative)[:1100]
+                    p_ctxt.font.size = Pt(10.5)
+                    p_ctxt.font.color.rgb = c_text
 
-                        # Bloc Droit : Résultats & Impact sur la suite du projet
-                        card_droite = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.4), Inches(5.7), Inches(5.5))
-                        card_droite.fill.solid()
-                        card_droite.fill.fore_color.rgb = c_card_bg
-                        card_droite.line.color.rgb = c_primary
-                
-                        tf_d = card_droite.text_frame
-                        tf_d.word_wrap = True
-                        tf_d.vertical_anchor = MSO_ANCHOR.TOP
-                
-                        p_dh = tf_d.paragraphs[0]
-                        p_dh.text = "🎯 Résultats & Conséquence pour la Phase Suivante :"
-                        p_dh.font.size = Pt(13)
-                        p_dh.font.bold = True
-                        p_dh.font.color.rgb = c_primary
-                
-                        p_dt = tf_d.add_paragraph()
-                        p_dt.text = "\n" + str(resultats_cles)[:900]
-                        p_dt.font.size = Pt(10.5)
-                        p_dt.font.color.rgb = c_text
+                # =====================================================================
+                # 🔄 CONSTRUCTION DYNAMIQUE DES SLIDES PAR L'AGENT IA (MULTI-SLIDES)
+                # =====================================================================
 
-                # --- CONSTRUCTION DES SLIDES DE LA DÉMARCHE AVEC RÉSULTATS DÉTAILLÉS ---
-
-                # 1. DEFINE
-                res_define = extraire_resultats_phase(
-                    'define',
-                    "• Problématique : Écarts de performance et non-qualité récurrents.\n• Voix du Client (VOC) : Identification des exigences critiques (CTQ) portant sur le délai et la conformité.\n• Résultat du Cadrage : Charte validée, périmètre SIPOC borné. \n➡ Conséquence : Orientation directe de la collecte de données vers les étapes critiques du processus."
-                )
-                ajouter_slide_resultat_dmaic(
-                    "1. Phase DEFINE : Cadrage & Voix du Client (VOC)",
-                    "Formaliser le problème et cibler les exigences critiques du client",
-                    "• Cartographie macro SIPOC.\n• Établissement de la charte de projet.\n• Définition des indicateurs de succès (Y).",
-                    res_define
+                # --- ÉTAPE 1 : DEFINE (Cadrage, SIPOC, VOC) ---
+                ajouter_slide_titre_section("1. Phase DEFINE", "Cadrage du projet, Voix du Client (VOC) et traduction en exigences critiques (CTQ).")
+        
+                # Slide 1.1 : Synthèse du Cadrage
+                val_define = p_exp.get('define', "Problématique initiale : Écarts de performance et non-qualité récurrents.\n- Analyse SIPOC réalisée.\n- Fixation des objectifs de rupture.")
+                ajouter_slide_analyse_texte(
+                    "1.1 DEFINE : Cadrage Stratégique & Voix du Client",
+                    "Évaluation de l'alignement stratégique du projet avec les exigences du client",
+                    f"L'analyse approfondie de la phase Define démontre un cadrage rigoureux :\n\n{val_define}",
+                    "Conséquence directe : Le périmètre est validé et les frontières du processus sont clairement fixées pour éviter toute dérive (scope creep) lors des phases de mesure."
                 )
 
-                # 2. MEASURE
-                res_measure = extraire_resultats_phase(
-                    'measure',
-                    "• Baseline établie : Mesure quantitative initiale démontrant une capabilité insuffisante (Z de process faible).\n• Stabilité : Mise en évidence d'une forte variabilité temporelle via les cartes SPC.\n➡ Conséquence : Preuve objective que le processus est instable, justifiant l'analyse approfondie des causes racines."
-                )
-                fig_mesure = st.session_state.get('current_spc_figure') or p_exp.get('spc_figure')
-                ajouter_slide_resultat_dmaic(
-                    "2. Phase MEASURE : Collecte de Données & Baseline",
-                    "Évaluer la performance actuelle et prouver statistiquement l'instabilité",
-                    "• Plan de mesure et test de capabilité.\n• Suivi SPC de la ligne de base.",
-                    res_measure,
-                    graphique=fig_mesure
+                # --- ÉTAPE 2 : MEASURE (Baseline, SPC, Capabilité) ---
+                ajouter_slide_titre_section("2. Phase MEASURE", "Collecte des données, validation du système de mesure et établissement de la baseline de performance.")
+        
+                # Slide 2.1 : Analyse textuelle de la mesure
+                val_measure = p_exp.get('measure', "- Établissement du plan de collecte.\n- Calcul de la capabilité initiale montrant un niveau sigma insatisfaisant.")
+                ajouter_slide_analyse_texte(
+                    "2.1 MEASURE : Évaluation Statistique de la Baseline",
+                    "Validation de l'instabilité et quantification des écarts actuels",
+                    f"Bilan de l'agent MBB sur les mesures recueillies :\n\n{val_measure}",
+                    "Conséquence : Preuve statistique irréfutable de la non-performance actuelle. Justification absolue de la descente en phase d'analyse des causes."
                 )
 
-                # 3. ANALYZE
-                res_analyze = extraire_resultats_phase(
-                    'analyze',
-                    "• Pareto : 80% des défauts proviennent de causes spécifiques identifiées.\n• Ishikawa & 5 Pourquoi : Isolation des causes racines techniques et organisationnelles.\n➡ Conséquence : Identification précise des facteurs influents (X), permettant d'attaquer directement la source du problème en phase Improve."
-                )
-                fig_analyse = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure') or st.session_state.get('current_analysis_figure')
-                ajouter_slide_resultat_dmaic(
-                    "3. Phase ANALYZE : Hiérarchisation des Causes Racines",
-                    "Isoler scientifiquement les causes profondes génératrices de défauts",
-                    "• Croisement Diagramme d'Ishikawa et 5 Pourquoi.\n• Analyse de Pareto des facteurs de non-qualité.",
-                    res_analyze,
-                    graphique=fig_analyse
+                # Slide 2.2 : Capture dynamique du graphique SPC ou tableau de mesure s'il existe
+                fig_spc = st.session_state.get('current_spc_figure') or p_exp.get('spc_figure') or st.session_state.get('df_measure')
+                if fig_spc is not None:
+                    ajouter_slide_visuel_ou_tableau(
+                        "2.2 MEASURE : Restitution des Graphiques & Suivi SPC",
+                        "Visualisation de la capabilité et de la variabilité du processus",
+                        fig_spc,
+                        "L'analyse des cartes de contrôle SPC et des indicateurs de capabilité met en évidence des points hors limites et une dispersion anormale. Le processus n'est ni centré ni stable sous sa forme actuelle."
+                    )
+
+                # --- ÉTAPE 3 : ANALYZE (Pareto, Ishikawa, 5 Pourquoi) ---
+                ajouter_slide_titre_section("3. Phase ANALYZE", "Recherche des causes racines, hiérarchisation par diagramme de Pareto et analyse Ishikawa.")
+        
+                val_analyze = p_exp.get('analyze', "- Utilisation de Pareto (80/20).\n- Analyse Ishikawa et des 5 Pourquoi pour isoler les facteurs X critiques.")
+                ajouter_slide_analyse_texte(
+                    "3.1 ANALYZE : Hiérarchisation Scientifique des Causes Racines",
+                    "Isolation des facteurs influents générateurs de non-qualité",
+                    f"Synthèse des investigations menées : \n\n{val_analyze}",
+                    "Conséquence : Les causes fondamentales étant désormais connues et isolées, le plan d'amélioration en phase Improve sera ciblé à 100% sur ces leviers d'action."
                 )
 
-                # 4. IMPROVE
-                res_improve = extraire_resultats_phase(
-                    'improve',
-                    "• Solutions : Sélection des actions correctives à fort impact et faible coût.\n• AMDEC / FMEA : Réduction significative de la criticité des risques (chute de l'indice RPN/IPR).\n➡ Conséquence : Validation par des tests pilotes démontrant l'élimination des défauts majeurs."
-                )
-                ajouter_slide_resultat_dmaic(
-                    "4. Phase IMPROVE : Optimisation & Plan d'Action",
-                    "Traiter les risques et déployer les solutions d'amélioration",
-                    "• Analyse des risques (FMEA / AMDEC).\n• Plan d'action correctif et tests pilotes.",
-                    res_improve
+                fig_pareto = st.session_state.get('current_pareto_figure') or st.session_state.get('current_ishikawa_figure') or st.session_state.get('current_analysis_figure')
+                if fig_pareto is not None:
+                    ajouter_slide_visuel_ou_tableau(
+                        "3.2 ANALYZE : Restitution des Diagrammes & Analyses Visuelles",
+                        "Preuves graphiques issues des outils d'investigation (Pareto / Ishikawa)",
+                        fig_pareto,
+                        "L'application de la loi de Pareto et la structuration Ishikawa permettent d'écarter le bruit parasite pour se concentrer exclusivement sur les quelques causes vitales (Vital Few)."
+                    )
+
+                # --- ÉTAPE 4 : IMPROVE (Solutions, AMDEC / FMEA) ---
+                ajouter_slide_titre_section("4. Phase IMPROVE", "Développement des solutions d'optimisation, évaluation des risques (AMDEC) et déploiement pilote.")
+        
+                val_improve = p_exp.get('improve', "- Évaluation de la criticité des risques via FMEA.\n- Déploiement des solutions correctives à fort impact.")
+                ajouter_slide_analyse_texte(
+                    "4.1 IMPROVE : Optimisation et Réduction des Risques (AMDEC)",
+                    "Évaluation de l'abattement de la criticité et choix des solutions robustes",
+                    f"Évaluation critique de l'agent MBB sur le plan d'action : \n\n{val_improve}",
+                    "Conséquence : Chute drastique de l'indice de criticité (RPN/IPR). Validation par les tests pilotes démontrant l'efficacité opérationnelle des solutions retenues."
                 )
 
-                # 5. CONTROL & CONCLUSION DE RÉUSSITE DU PROJET
-                res_control = extraire_resultats_phase(
-                    'control',
-                    "• Plan de surveillance : Mise en place de cartes de contrôle permanentes.\n• Bilan Financier & Opérationnel : Objectifs initiaux atteints et dépassés (Gains mesurables confirmés).\n➡ Conclusion Master Black Belt : PROJET ENTIÈREMENT RÉUSSI ET PÉRENNISÉ. Transfert réussi aux équipes opérationnelles."
-                )
-                ajouter_slide_resultat_dmaic(
-                    "5. Phase CONTROL : Bilan, Pérennisation & Conclusion",
-                    "Garantir le maintien des gains et acter la réussite du projet",
-                    "• Mise en place du plan de surveillance.\n• Cartes de contrôle SPC permanentes et standardisation des procédures.",
-                    res_control
+                # --- ÉTAPE 5 : CONTROL (Plan de surveillance & Bilan) ---
+                ajouter_slide_titre_section("5. Phase CONTROL", "Pérennisation des gains, mise en place des cartes de contrôle permanentes et clôture du projet.")
+        
+                val_control = p_exp.get('control', "- Standardisation des procédures.\n- Transfert aux opérationnels et mise en place du plan de surveillance.")
+                ajouter_slide_analyse_texte(
+                    "5.1 CONTROL : Bilan de Clôture & Pérennisation des Acquis",
+                    "Garantie de la pérennité des résultats et validation du succès financier",
+                    f"Bilan final certifié par l'Agent Master Black Belt :\n\n{val_control}",
+                    "Conclusion : PROJET VALIDÉ ET CLÔTURÉ AVEC SUCCÈS. Les gains opérationnels et financiers sont sécurisés dans la durée."
                 )
 
-                # Sauvegarde finale du fichier PPTX
+                # Sauvegarde finale du fichier PPTX généré par l'Agent IA
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
         
-                st.success("✨ Présentation Master Black Belt générée avec succès !")
+                st.success("✨ Restitution Gamma Master Black Belt générée avec succès (Multi-slides & Captures intégrées) !")
                 st.download_button(
-                    label="📥 Télécharger le Bilan Exécutif Final (Master Black Belt)", 
+                    label="📥 Télécharger le Bilan Exécutif Détaillé (Agent IA MBB)", 
                     data=bytes(buffer_pptx.getvalue()), 
-                    file_name=f"Bilan_Master_Black_Belt_{project_name}.pptx", 
+                    file_name=f"Bilan_Gamma_MBB_{project_name}.pptx", 
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     use_container_width=True
                 )
         except Exception as e:
-            st.error(f"Erreur lors de la génération de la présentation MBB : {e}")
+            st.error(f"Erreur lors de la génération de la présentation par l'Agent IA : {e}")
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
