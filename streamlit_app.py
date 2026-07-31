@@ -315,28 +315,6 @@ with st.sidebar:
             if txt_str.lower() in textes_parasites or len(txt_str) < 3:
                 return "Saisie en cours de validation opérationnelle."
 
-            # Exemple d'intégration d'appel LLM (ex: OpenAI / Claude / Ollama)
-            # Si vous avez configuré votre API Key, vous pouvez décommenter la partie suivante :
-            """
-            try:
-                import openai
-                prompt = f'''
-                En tant qu'expert Lean Six Sigma Master Black Belt, reformule et synthétise le contenu suivant 
-                pour une présentation de soutenance. Élimine tout jargon technique inutile ou bruit de saisie.
-                Phase: {phase} | Sujet: {titre}
-                Données brutes: {txt_str}
-                Fournis un texte concis, percutant et professionnel (maximum 3 puces).
-                '''
-                response = openai.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": prompt}],
-                    max_tokens=200
-                )
-                return response.choices[0].message.content.strip()
-            except Exception:
-                pass
-            """
-
             # Nettoyage secours si l'API IA n'est pas connectée
             if isinstance(contenu_brut, dict):
                 lignes = [f"• {k.replace('_', ' ').title()} : {v}" for k, v in contenu_brut.items() if str(v).lower() not in textes_parasites]
