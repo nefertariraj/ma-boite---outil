@@ -285,47 +285,110 @@ with st.sidebar:
         auteur_nom = st.text_input("Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom")
         date_projet = st.text_input("Date du projet", datetime.now().strftime('%d/%m/%Y'), key="lss_date_projet")
 
-        st.info("🤖 **Agent IA Actif :** Restructuration DMAIC pas à pas, intégration des résultats, tableaux et schémas graphiques.")
+        st.info("🤖 **Agent IA Actif :** Balayage profond et exhaustif de toutes les clés, dictionnaires, tableaux et résultats du projet par phase DMAIC.")
 
-        # --- CARTOGRAPHIE DMAIC OFFICIELLE & UNIFORMISÉE ---
+        # --- MOTEUR DE BALAYAGE PROFOND ET UNIFIÉ DE L'AGENT IA ---
+        # Mappe chaque phase DMAIC à une liste de mots-clés de recherche, mais extrait AUSSI l'intégralité 
+        # de tout contenu utile présent dans le dictionnaire du projet pour ne rien perdre.
         phases_dmaic_structure = [
-            ("DEFINE", [
-                ("Énoncé du Problème & CTQ", ['define', 'problem_statement', 'ctq']),
-                ("Équipe Projet", ['equipe', 'team']),
-                ("Diagnostic Go / No Go", ['go_no_go', 'gono_go']),
-                ("Stakeholder Analysis", ['stakeholders', 'stakeholder']),
-                ("SIPOC", ['sipoc']),
-                ("Voice of Customer (VOC)", ['voc']),
-                ("Planning & Jalons (Gantt)", ['gantt'])
-            ]),
-            ("MEASURE", [
-                ("Project Definition f(X)", ['measure_x', 'project_definition']),
-                ("Value Stream Mapping (VSM)", ['vsm']),
-                ("Validate Measurement System (MSA)", ['msa']),
-                ("Baseline & KPI", ['baseline', 'kpi']),
-                ("Statistiques Descriptives", ['stats', 'statistiques', 'capability'])
-            ]),
-            ("ANALYZE", [
-                ("Tests X sur Y", ['tests_xy', 'tests']),
-                ("Analyse des Causes Racines", ['causes_racines', 'ishikawa', 'five_whys']),
-                ("Current State FMEA", ['fmea_current', 'fmea']),
-                ("Gemba Walk", ['gemba'])
-            ]),
-            ("IMPROVE", [
-                ("Improvement Strategies", ['strategies']),
-                ("Benefit / Effort Matrix", ['benefit_effort']),
-                ("Solution Action Plan", ['action_plan']),
-                ("Future State Process & FMEA", ['future_state'])
-            ]),
-            ("CONTROL", [
-                ("Data Control Plan", ['control_plan']),
-                ("Statistiques Comparatives", ['stats_comparatives']),
-                ("Maintien des Gains", ['maintien_gains'])
-            ])
+            ("DEFINE", ['define', 'problem_statement', 'ctq', 'equipe', 'team', 'go_no_go', 'gono_go', 'stakeholders', 'stakeholder', 'sipoc', 'voc', 'gantt']),
+            ("MEASURE", ['measure_x', 'project_definition', 'vsm', 'msa', 'baseline', 'kpi', 'stats', 'statistiques', 'capability', 'mesure']),
+            ("ANALYZE", ['tests_xy', 'tests', 'causes_racines', 'ishikawa', 'five_whys', 'fmea_current', 'fmea', 'gemba', 'analyse']),
+            ("IMPROVE", ['strategies', 'benefit_effort', 'action_plan', 'future_state', 'innove', 'amelioration']),
+            ("CONTROL", ['control_plan', 'stats_comparatives', 'maintien_gains', 'control', 'controle'])
         ]
 
+        def agent_ia_recuperer_donnees_profondes(projet_dict):
+            """L'agent IA analyse dynamiquement tout le dictionnaire du projet pour extraire TOUTES les données existantes,
+            qu'elles soient sous forme de DataFrames, dictionnaires détaillés, listes ou textes."""
+            elements_analyses = []
+            exclus = ['nom', 'status']
+            
+            # 1. Extraction exhaustive et intelligente par balayage direct de toutes les clés du projet
+            for cle, valeur in projet_dict.items():
+                if cle in exclus or valeur is None:
+                    continue
+                
+                # Nettoyage et normalisation du titre de la section
+                titre_propre = cle.replace('_', ' ').upper()
+                
+                if isinstance(valeur, pd.DataFrame):
+                    if not valeur.empty:
+                        elements_analyses.append({
+                            "type": "dataframe",
+                            "titre": titre_propre,
+                            "data": valeur,
+                            "cle_origine": cle
+                        })
+                elif isinstance(valeur, dict):
+                    if len(valeur) > 0:
+                        elements_analyses.append({
+                            "type": "dict",
+                            "titre": titre_propre,
+                            "data": valeur,
+                            "cle_origine": cle
+                        })
+                elif isinstance(valeur, list):
+                    if len(valeur) > 0:
+                        elements_analyses.append({
+                            "type": "list",
+                            "titre": titre_propre,
+                            "data": valeur,
+                            "cle_origine": cle
+                        })
+                elif str(valeur).strip() != "":
+                    elements_analyses.append({
+                        "type": "texte",
+                        "titre": titre_propre,
+                        "data": str(valeur),
+                        "cle_origine": cle
+                    })
+            
+            return elements_analyses
+
+        donnees_completes_projet = agent_ia_recuperer_donnees_profondes(p_exp)
+
+        # Fonction d'association intelligente des éléments trouvés aux phases DMAIC
+        def classifier_par_phase_dmaic(elements):
+            mapping = {
+                "DEFINE": [],
+                "MEASURE": [],
+                "ANALYZE": [],
+                "IMPROVE": [],
+                "CONTROL": []
+            }
+            
+            mots_cles_phase = {
+                "DEFINE": ['define', 'problem', 'ctq', 'equipe', 'team', 'go_no_go', 'stakeholder', 'sipoc', 'voc', 'gantt'],
+                "MEASURE": ['measure', 'vsm', 'msa', 'baseline', 'kpi', 'stat', 'capab', 'mesure'],
+                "ANALYZE": ['test', 'cause', 'ishikawa', 'five', 'fmea', 'gemba', 'analys'],
+                "IMPROVE": ['strateg', 'benefit', 'effort', 'action', 'future', 'innov', 'amelior'],
+                "CONTROL": ['control', 'compar', 'gains', 'pilot']
+            }
+            
+            # Suivi des clés déjà assignées pour éviter les doublons
+            attribues = set()
+            
+            for phase, mots in mots_cles_phase.items():
+                for elem in elements:
+                    if elem['cle_origine'] in attribues:
+                        continue
+                    if any(m in elem['cle_origine'].lower() for m in mots):
+                        mapping[phase].append(elem)
+                        attribues.add(elem['cle_origine'])
+            
+            # S'il reste des éléments non assignés, les répartir équitablement ou les mettre dans Define/Measure par défaut
+            for elem in elements:
+                if elem['cle_origine'] not in attribues:
+                    mapping["DEFINE"].append(elem)
+                    attribues.add(elem['cle_origine'])
+                    
+            return mapping
+
+        elements_dmaic_organises = classifier_par_phase_dmaic(donnees_completes_projet)
+
         # ==========================================
-        # 1. BOUTON POWERPOINT (.pptx)
+        # 1. BOUTON POWERPOINT (.pptx) - EXHAUSTIF & MODIFIABLE
         # ==========================================
         if st.button("📊 Agent IA : Générer PowerPoint Complet", use_container_width=True, key="btn_export_pptx_lss"):
             try:
@@ -394,7 +457,7 @@ with st.sidebar:
                     p_sub.font.color.rgb = RGBColor(203, 213, 225)
                     p_sub.alignment = PP_ALIGN.CENTER
 
-                # Page de couverture PPTX avec le Nom du Projet en Titre
+                # Page de couverture PPTX
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
                 tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
@@ -413,23 +476,21 @@ with st.sidebar:
                 p_c3.text = f"\nAuteur : {auteur_nom}  |  Date du projet : {date_projet}"
                 p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
-                # Boucle structurée DMAIC
-                for nom_phase, modules in phases_dmaic_structure:
+                # Génération des diapositives par phase DMAIC avec intégration fidèle des données
+                for nom_phase, liste_elements in elements_dmaic_organises.items():
+                    if not liste_elements:
+                        continue
+                    
                     ajouter_diapositive_titre_phase(nom_phase)
-                    for titre_sec, cles in modules:
-                        # Recherche des données correspondant aux clés possibles
-                        valeur = None
-                        for c in cles:
-                            if c in p_exp and p_exp[c] is not None:
-                                valeur = p_exp[c]
-                                break
-                        
+                    
+                    for elem in liste_elements:
                         slide = prs.slides.add_slide(blank_layout)
-                        ajouter_en_tete(slide, nom_phase, titre_sec)
+                        ajouter_en_tete(slide, nom_phase, elem["titre"])
                         
-                        if isinstance(valeur, pd.DataFrame) and not valeur.empty:
-                            rows = min(len(valeur) + 1, 12)
-                            cols = len(valeur.columns)
+                        if elem["type"] == "dataframe":
+                            valeur_df = elem["data"]
+                            rows = min(len(valeur_df) + 1, 12)
+                            cols = len(valeur_df.columns)
                             left = Inches(0.8)
                             top = Inches(1.5)
                             width = Inches(11.7)
@@ -438,7 +499,7 @@ with st.sidebar:
                             table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
                             table = table_shape.table
                             
-                            for col_idx, col_name in enumerate(valeur.columns):
+                            for col_idx, col_name in enumerate(valeur_df.columns):
                                 cell = table.cell(0, col_idx)
                                 cell.text = str(col_name)
                                 cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
@@ -447,7 +508,7 @@ with st.sidebar:
                                     p.font.color.rgb = RGBColor(255, 255, 255)
                                     p.alignment = PP_ALIGN.CENTER
                                     
-                            for row_idx, row in enumerate(valeur.values[:11]):
+                            for row_idx, row in enumerate(valeur_df.values[:11]):
                                 for col_idx, val in enumerate(row):
                                     cell = table.cell(row_idx + 1, col_idx)
                                     cell.text = str(val) if pd.notna(val) else ""
@@ -455,24 +516,60 @@ with st.sidebar:
                                     cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
                                     for p in cell.text_frame.paragraphs:
                                         p.font.size = Pt(9.5); p.font.color.rgb = c_text
+                        
+                        elif elem["type"] == "dict":
+                            # Transformation intelligente d'un dictionnaire en un tableau modifiable
+                            dict_data = elem["data"]
+                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre / Indicateur", "Valeur / Résultat"])
+                            
+                            rows = min(len(df_dict) + 1, 12)
+                            cols = 2
+                            left = Inches(0.8)
+                            top = Inches(1.5)
+                            width = Inches(11.7)
+                            height = Inches(min(5.2, 0.5 * rows))
+                            
+                            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
+                            table = table_shape.table
+                            
+                            for col_idx, col_name in enumerate(df_dict.columns):
+                                cell = table.cell(0, col_idx)
+                                cell.text = str(col_name)
+                                cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
+                                for p in cell.text_frame.paragraphs:
+                                    p.font.size = Pt(10); p.font.bold = True
+                                    p.font.color.rgb = RGBColor(255, 255, 255)
+                                    p.alignment = PP_ALIGN.CENTER
+                                    
+                            for row_idx, row in enumerate(df_dict.values[:11]):
+                                for col_idx, val in enumerate(row):
+                                    cell = table.cell(row_idx + 1, col_idx)
+                                    cell.text = str(val) if pd.notna(val) else ""
+                                    cell.fill.solid()
+                                    cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
+                                    for p in cell.text_frame.paragraphs:
+                                        p.font.size = Pt(9.5); p.font.color.rgb = c_text
+                        
                         else:
                             card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
                             card.fill.solid(); card.fill.fore_color.rgb = c_card; card.line.color.rgb = c_border
                             tf_card = card.text_frame; tf_card.word_wrap = True
                             p_txt = tf_card.paragraphs[0]
                             
-                            txt_res = str(valeur) if valeur is not None else f"Résultats synthétisés et validés pour : {titre_sec}"
-                            if isinstance(valeur, dict):
-                                txt_res = "\n".join([f"• {k} : {v}" for k, v in valeur.items()])
-                            
-                            p_txt.text = txt_res[:2500]
+                            valeur_brute = elem["data"]
+                            if isinstance(valeur_brute, list):
+                                texte_affiche = "\n".join([f"• {item}" for item in valeur_brute])
+                            else:
+                                texte_affiche = str(valeur_brute)
+                                
+                            p_txt.text = texte_affiche[:2500]
                             p_txt.font.size = Pt(11); p_txt.font.color.rgb = c_text
 
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
             
-                st.success("✨ Présentation PowerPoint structurée générée avec succès !")
+                st.success("✨ Présentation PowerPoint exhaustive générée avec succès !")
                 st.download_button(
                     label="📥 Télécharger (.pptx)",
                     data=buffer_pptx,
@@ -486,7 +583,7 @@ with st.sidebar:
         st.markdown("---")
 
         # ==========================================
-        # 2. BOUTON PDF (.pdf)
+        # 2. BOUTON PDF (.pdf) - EXHAUSTIF & STRUCTURÉ
         # ==========================================
         if st.button("📄 Agent IA : Générer Rapport PDF Complet", use_container_width=True, key="btn_export_pdf_lss"):
             try:
@@ -508,29 +605,44 @@ with st.sidebar:
                 h1_style = ParagraphStyle('SecH1', parent=styles['Heading3'], fontSize=10.5, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=8, spaceAfter=4, keepWithNext=True)
                 body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
 
-                # Page de garde / Entête PDF avec le Nom du Projet en Titre
+                # Page de garde / Entête PDF
                 story.append(Paragraph(f"<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
                 story.append(Paragraph(f"<b>{project_name}</b>", title_style))
                 story.append(Paragraph(f"Candidat : {auteur_nom}  |  Date du projet : {date_projet}", subtitle_style))
                 story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
 
-                # Restitution structurée par phase DMAIC
-                for nom_phase, modules in phases_dmaic_structure:
+                # Restitution exhaustive et structurée par phase DMAIC
+                for nom_phase, liste_elements in elements_dmaic_organises.items():
+                    if not liste_elements:
+                        continue
+                        
                     story.append(Paragraph(f"<b>--- PHASE DMAIC : {nom_phase} ---</b>", phase_title_style))
                     
-                    for titre_sec, cles in modules:
-                        valeur = None
-                        for c in cles:
-                            if c in p_exp and p_exp[c] is not None:
-                                valeur = p_exp[c]
-                                break
-
+                    for elem in liste_elements:
                         section_elems = []
-                        section_elems.append(Paragraph(f"<b>{titre_sec}</b>", h1_style))
+                        section_elems.append(Paragraph(f"<b>{elem['titre']}</b>", h1_style))
                         
-                        if isinstance(valeur, pd.DataFrame) and not valeur.empty:
-                            df_data = [list(valeur.columns)] + valeur.astype(str).values.tolist()
-                            t = Table(df_data, colWidths=[100]*min(len(valeur.columns), 5))
+                        if elem["type"] == "dataframe":
+                            valeur_df = elem["data"]
+                            df_data = [list(valeur_df.columns)] + valeur_df.astype(str).values.tolist()
+                            t = Table(df_data, colWidths=[100]*min(len(valeur_df.columns), 5))
+                            t.setStyle(TableStyle([
+                                ('BACKGROUND', (0,0), (-1,0), primary_color),
+                                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                                ('FONTSIZE', (0,0), (-1,-1), 8),
+                                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                                ('TOPPADDING', (0,0), (-1,-1), 4),
+                                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
+                                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
+                            ]))
+                            section_elems.append(t)
+                        elif elem["type"] == "dict":
+                            dict_data = elem["data"]
+                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre", "Valeur"])
+                            df_data = [list(df_dict.columns)] + df_dict.astype(str).values.tolist()
+                            t = Table(df_data, colWidths=[200, 300])
                             t.setStyle(TableStyle([
                                 ('BACKGROUND', (0,0), (-1,0), primary_color),
                                 ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -544,10 +656,12 @@ with st.sidebar:
                             ]))
                             section_elems.append(t)
                         else:
-                            txt_res = str(valeur) if valeur is not None else "Résultats validés."
-                            if isinstance(valeur, dict):
-                                txt_res = "<br/>".join([f"<b>• {k} :</b> {v}" for k, v in valeur.items()])
-                            section_elems.append(Paragraph(txt_res.replace('\n', '<br/>'), body_style))
+                            valeur_brute = elem["data"]
+                            if isinstance(valeur_brute, list):
+                                texte_affiche = "<br/>".join([f"• {item}" for item in valeur_brute])
+                            else:
+                                texte_affiche = str(valeur_brute).replace('\n', '<br/>')
+                            section_elems.append(Paragraph(texte_affiche, body_style))
                         
                         section_elems.append(Spacer(1, 6))
                         story.append(KeepTogether(section_elems))
