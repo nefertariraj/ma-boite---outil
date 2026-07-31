@@ -285,9 +285,9 @@ with st.sidebar:
         auteur_nom = st.text_input("Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom")
         date_projet = st.text_input("Date du projet", datetime.now().strftime('%d/%m/%Y'), key="lss_date_projet")
 
-        st.info("🤖 **Agent IA Actif :** Balayage profond, sécurisé et typé de toutes les données du projet par phase DMAIC.")
+        st.info("🤖 **Agent IA Actif :** Alignement strict des onglets DMAIC (Define, Measure, Analyze, Improve, Control) et intégration fidèle des tableaux, graphiques et diagrammes.")
 
-        # --- MOTEUR DE BALAYAGE PROFOND ET SÉCURISÉ (ANTI-AMBIGUÏTÉ NUMPY) ---
+        # --- MOTEUR DE BALAYAGE ET CLASSIFICATION DMAIC STRICTE ---
         def agent_ia_recuperer_donnees_profondes(projet_dict):
             elements_analyses = []
             exclus = ['nom', 'status']
@@ -296,9 +296,34 @@ with st.sidebar:
                 if cle in exclus or valeur is None:
                     continue
                 
+                cle_str = str(cle).strip().lower()
                 titre_propre = str(cle).replace('_', ' ').upper()
                 
-                # Vérification sécurisée anti-numpy / anti-ambiguïté booléenne
+                # Exclusion stricte du VOC data brut selon les consignes
+                if 'voc' in cle_str and 'data' in cle_str:
+                    continue
+                
+                # Identification de la phase DMAIC exacte par correspondance stricte de clé
+                phase_cible = "DEFINE" # Par défaut
+                
+                mots_define = ['define', 'problem', 'ctq', 'equipe', 'team', 'go_no_go', 'stakeholder', 'sipoc', 'gantt', 'planning', 'themat']
+                mots_measure = ['measure', 'vsm', 'msa', 'baseline', 'kpi', 'stat', 'capab', 'mesure', 'process']
+                mots_analyze = ['test', 'cause', 'ishikawa', 'five', '5whys', 'fmea', 'gemba', 'analys', 'mouca']
+                mots_improve = ['improve', 'innov', 'amelior', 'strateg', 'benefit', 'effort', 'action', 'future', 'pilote_solution']
+                mots_control = ['control', 'compar', 'gains', 'pilot', 'suivi', 'standard']
+                
+                if any(m in cle_str for m in mots_control):
+                    phase_cible = "CONTROL"
+                elif any(m in cle_str for m in mots_improve):
+                    phase_cible = "IMPROVE"
+                elif any(m in cle_str for m in mots_analyze):
+                    phase_cible = "ANALYZE"
+                elif any(m in cle_str for m in mots_measure):
+                    phase_cible = "MEASURE"
+                elif any(m in cle_str for m in mots_define):
+                    phase_cible = "DEFINE"
+                
+                # Vérification sécurisée du type de données
                 if isinstance(valeur, pd.DataFrame):
                     try:
                         if hasattr(valeur, 'empty') and not valeur.empty:
@@ -306,7 +331,8 @@ with st.sidebar:
                                 "type": "dataframe",
                                 "titre": titre_propre,
                                 "data": valeur,
-                                "cle_origine": str(cle)
+                                "cle_origine": str(cle),
+                                "phase": phase_cible
                             })
                     except Exception:
                         pass
@@ -317,7 +343,8 @@ with st.sidebar:
                                 "type": "dict",
                                 "titre": titre_propre,
                                 "data": valeur,
-                                "cle_origine": str(cle)
+                                "cle_origine": str(cle),
+                                "phase": phase_cible
                             })
                     except Exception:
                         pass
@@ -328,20 +355,21 @@ with st.sidebar:
                                 "type": "list",
                                 "titre": titre_propre,
                                 "data": valeur,
-                                "cle_origine": str(cle)
+                                "cle_origine": str(cle),
+                                "phase": phase_cible
                             })
                     except Exception:
                         pass
                 else:
                     try:
-                        # Éviter l'évaluation directe de tableaux numpy / objets complexes
                         val_str = str(valeur).strip()
                         if val_str != "" and "array" not in val_str.lower() and "object at" not in val_str.lower():
                             elements_analyses.append({
                                 "type": "texte",
                                 "titre": titre_propre,
                                 "data": val_str,
-                                "cle_origine": str(cle)
+                                "cle_origine": str(cle),
+                                "phase": phase_cible
                             })
                     except Exception:
                         pass
@@ -350,7 +378,7 @@ with st.sidebar:
 
         donnees_completes_projet = agent_ia_recuperer_donnees_profondes(p_exp)
 
-        def classifier_par_phase_dmaic(elements):
+        def regrouper_par_phase_stricte(elements):
             mapping = {
                 "DEFINE": [],
                 "MEASURE": [],
@@ -358,33 +386,15 @@ with st.sidebar:
                 "IMPROVE": [],
                 "CONTROL": []
             }
-            
-            mots_cles_phase = {
-                "DEFINE": ['define', 'problem', 'ctq', 'equipe', 'team', 'go_no_go', 'stakeholder', 'sipoc', 'voc', 'gantt'],
-                "MEASURE": ['measure', 'vsm', 'msa', 'baseline', 'kpi', 'stat', 'capab', 'mesure'],
-                "ANALYZE": ['test', 'cause', 'ishikawa', 'five', 'fmea', 'gemba', 'analys'],
-                "IMPROVE": ['strateg', 'benefit', 'effort', 'action', 'future', 'innov', 'amelior'],
-                "CONTROL": ['control', 'compar', 'gains', 'pilot']
-            }
-            
-            attribues = set()
-            
-            for phase, mots in mots_cles_phase.items():
-                for elem in elements:
-                    if elem['cle_origine'] in attribues:
-                        continue
-                    if any(m in elem['cle_origine'].lower() for m in mots):
-                        mapping[phase].append(elem)
-                        attribues.add(elem['cle_origine'])
-            
             for elem in elements:
-                if elem['cle_origine'] not in attribues:
+                ph = elem.get("phase", "DEFINE")
+                if ph in mapping:
+                    mapping[ph].append(elem)
+                else:
                     mapping["DEFINE"].append(elem)
-                    attribues.add(elem['cle_origine'])
-                    
             return mapping
 
-        elements_dmaic_organises = classifier_par_phase_dmaic(donnees_completes_projet)
+        elements_dmaic_organises = regrouper_par_phase_stricte(donnees_completes_projet)
 
         # ==========================================
         # 1. BOUTON POWERPOINT (.pptx)
@@ -486,11 +496,9 @@ with st.sidebar:
                         ajouter_en_tete(slide, nom_phase, elem["titre"])
                         
                         if elem["type"] == "dataframe":
-                            valeur_df = elem["data"]
-                            # Conversion sécurisée de tout le dataframe en string pour éviter les conflits numpy
-                            valeur_df_str = valeur_df.astype(str)
-                            rows = min(len(valeur_df_str) + 1, 12)
-                            cols = len(valeur_df_str.columns)
+                            valeur_df = elem["data"].astype(str)
+                            rows = min(len(valeur_df) + 1, 12)
+                            cols = len(valeur_df.columns)
                             left = Inches(0.8)
                             top = Inches(1.5)
                             width = Inches(11.7)
@@ -499,7 +507,7 @@ with st.sidebar:
                             table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
                             table = table_shape.table
                             
-                            for col_idx, col_name in enumerate(valeur_df_str.columns):
+                            for col_idx, col_name in enumerate(valeur_df.columns):
                                 cell = table.cell(0, col_idx)
                                 cell.text = str(col_name)
                                 cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
@@ -508,7 +516,7 @@ with st.sidebar:
                                     p.font.color.rgb = RGBColor(255, 255, 255)
                                     p.alignment = PP_ALIGN.CENTER
                                     
-                            for row_idx, row in enumerate(valeur_df_str.values[:11]):
+                            for row_idx, row in enumerate(valeur_df.values[:11]):
                                 for col_idx, val in enumerate(row):
                                     cell = table.cell(row_idx + 1, col_idx)
                                     cell.text = str(val) if val != "nan" else ""
@@ -568,7 +576,7 @@ with st.sidebar:
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
             
-                st.success("✨ Présentation PowerPoint exhaustive générée avec succès !")
+                st.success("✨ Présentation PowerPoint structurée par onglets DMAIC générée avec succès !")
                 st.download_button(
                     label="📥 Télécharger (.pptx)",
                     data=buffer_pptx,
