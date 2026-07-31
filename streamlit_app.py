@@ -470,7 +470,7 @@ with st.sidebar:
                     key="dl_pdf_file"
                 )
             except Exception as e:
-        st.error(f"Erreur lors de la génération PDF : {e}")
+                st.error(f"Erreur lors de la génération PDF : {e}")
     else:
         st.warning("⚠️ Aucun projet enregistré dans l'application pour le moment.")
 
