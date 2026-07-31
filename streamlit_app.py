@@ -265,7 +265,7 @@ with st.sidebar:
         )
     
         p_exp = st.session_state.projects[proj_sel_idx]
-        project_name = p_exp.get('nom', 'Projet_LSS').replace(" ", "_")
+        project_name = p_exp.get('nom', 'Projet_LSS')
 
         st.markdown("---")
         st.markdown("### 🎛️ Paramètres de l'Agent IA")
@@ -281,79 +281,58 @@ with st.sidebar:
             ["Bleu", "Vert", "Rouge", "Orange", "Gris", "Personnalisée"],
             key="lss_palette_couleurs"
         )
-        
-        style_soutenance = st.selectbox(
-            "Style de présentation",
-            ["Soutenance Black Belt / Master Black Belt"],
-            key="lss_style_soutenance"
-        )
 
         auteur_nom = st.text_input("Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom")
-        date_soutenance = st.text_input("Date de la soutenance", datetime.now().strftime('%d/%m/%Y'), key="lss_date_soutenance")
+        date_projet = st.text_input("Date du projet", datetime.now().strftime('%d/%m/%Y'), key="lss_date_projet")
 
-        st.info("🤖 **Agent IA Actif :** Balayage complet de l'ensemble des clés, dictionnaires, tableaux et résultats du projet pour injection exhaustive.")
+        st.info("🤖 **Agent IA Actif :** Restructuration DMAIC pas à pas, intégration des résultats, tableaux et schémas graphiques.")
 
-        # --- MOTEUR DE COMPILATION UNIFIÉ DE L'AGENT IA ---
-        def agent_ia_recuperer_donnees_completes(projet_dict):
-            """L'agent IA analyse dynamiquement tout le dictionnaire du projet pour extraire TOUTES les données."""
-            elements_analyses = []
-            
-            # Exclusion des métadonnées de base pour traiter spécifiquement le contenu métier
-            exclus = ['nom', 'status']
-            
-            for cle, valeur in projet_dict.items():
-                if cle in exclus:
-                    continue
-                
-                titre_propre = cle.replace('_', ' ').upper()
-                
-                if isinstance(valeur, pd.DataFrame):
-                    if not valeur.empty:
-                        elements_analyses.append({
-                            "type": "dataframe",
-                            "titre": titre_propre,
-                            "data": valeur
-                        })
-                    else:
-                        elements_analyses.append({
-                            "type": "texte",
-                            "titre": titre_propre,
-                            "data": "Tableau vide dans le référentiel."
-                        })
-                elif isinstance(valeur, dict):
-                    dict_items = "\n".join([f"• {k} : {v}" for k, v in valeur.items()])
-                    elements_analyses.append({
-                        "type": "texte",
-                        "titre": titre_propre,
-                        "data": dict_items
-                    })
-                elif isinstance(valeur, list):
-                    list_items = "\n".join([f"• {item}" for item in valeur])
-                    elements_analyses.append({
-                        "type": "texte",
-                        "titre": titre_propre,
-                        "data": list_items
-                    })
-                elif valeur is not None and str(valeur).strip() != "":
-                    elements_analyses.append({
-                        "type": "texte",
-                        "titre": titre_propre,
-                        "data": str(valeur)
-                    })
-            
-            return elements_analyses
-
-        donnees_completes_projet = agent_ia_recuperer_donnees_completes(p_exp)
+        # --- CARTOGRAPHIE DMAIC OFFICIELLE & UNIFORMISÉE ---
+        phases_dmaic_structure = [
+            ("DEFINE", [
+                ("Énoncé du Problème & CTQ", ['define', 'problem_statement', 'ctq']),
+                ("Équipe Projet", ['equipe', 'team']),
+                ("Diagnostic Go / No Go", ['go_no_go', 'gono_go']),
+                ("Stakeholder Analysis", ['stakeholders', 'stakeholder']),
+                ("SIPOC", ['sipoc']),
+                ("Voice of Customer (VOC)", ['voc']),
+                ("Planning & Jalons (Gantt)", ['gantt'])
+            ]),
+            ("MEASURE", [
+                ("Project Definition f(X)", ['measure_x', 'project_definition']),
+                ("Value Stream Mapping (VSM)", ['vsm']),
+                ("Validate Measurement System (MSA)", ['msa']),
+                ("Baseline & KPI", ['baseline', 'kpi']),
+                ("Statistiques Descriptives", ['stats', 'statistiques', 'capability'])
+            ]),
+            ("ANALYZE", [
+                ("Tests X sur Y", ['tests_xy', 'tests']),
+                ("Analyse des Causes Racines", ['causes_racines', 'ishikawa', 'five_whys']),
+                ("Current State FMEA", ['fmea_current', 'fmea']),
+                ("Gemba Walk", ['gemba'])
+            ]),
+            ("IMPROVE", [
+                ("Improvement Strategies", ['strategies']),
+                ("Benefit / Effort Matrix", ['benefit_effort']),
+                ("Solution Action Plan", ['action_plan']),
+                ("Future State Process & FMEA", ['future_state'])
+            ]),
+            ("CONTROL", [
+                ("Data Control Plan", ['control_plan']),
+                ("Statistiques Comparatives", ['stats_comparatives']),
+                ("Maintien des Gains", ['maintien_gains'])
+            ])
+        ]
 
         # ==========================================
-        # 1. BOUTON POWERPOINT (.pptx) - AGENT INTELLIGENT
+        # 1. BOUTON POWERPOINT (.pptx)
         # ==========================================
         if st.button("📊 Agent IA : Générer PowerPoint Complet", use_container_width=True, key="btn_export_pptx_lss"):
             try:
                 from pptx import Presentation
                 from pptx.util import Inches, Pt
                 from pptx.dml.color import RGBColor
-                from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+                from pptx.enum.text import PP_ALIGN
                 from pptx.enum.shapes import MSO_SHAPE
 
                 palettes = {
@@ -379,13 +358,13 @@ with st.sidebar:
                     bg.fill.fore_color.rgb = couleur_fond
                     bg.line.fill.background()
 
-                def ajouter_en_tete(slide, titre_diapo):
+                def ajouter_en_tete(slide, titre_phase, titre_diapo):
                     appliquer_fond(slide)
                     tb = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
                     tf = tb.text_frame
                     tf.word_wrap = True
                     p1 = tf.paragraphs[0]
-                    p1.text = "SOUTENANCE MASTER BLACK BELT • ANALYSE PAS À PAS"
+                    p1.text = f"PHASE DMAIC : {titre_phase.upper()}"
                     p1.font.size = Pt(10)
                     p1.font.bold = True
                     p1.font.color.rgb = c_accent
@@ -396,7 +375,26 @@ with st.sidebar:
                     p2.font.bold = True
                     p2.font.color.rgb = c_primary
 
-                # Page de couverture PPTX
+                def ajouter_diapositive_titre_phase(nom_phase):
+                    slide = prs.slides.add_slide(blank_layout)
+                    appliquer_fond(slide, c_primary)
+                    tb = slide.shapes.add_textbox(Inches(1.5), Inches(2.5), Inches(10.33), Inches(2.5))
+                    tf = tb.text_frame
+                    tf.word_wrap = True
+                    p = tf.paragraphs[0]
+                    p.text = nom_phase.upper()
+                    p.font.size = Pt(44)
+                    p.font.bold = True
+                    p.font.color.rgb = RGBColor(255, 255, 255)
+                    p.alignment = PP_ALIGN.CENTER
+                    
+                    p_sub = tf.add_paragraph()
+                    p_sub.text = f"Restitution de Projet Lean Six Sigma • {project_name}"
+                    p_sub.font.size = Pt(15)
+                    p_sub.font.color.rgb = RGBColor(203, 213, 225)
+                    p_sub.alignment = PP_ALIGN.CENTER
+
+                # Page de couverture PPTX avec le Nom du Projet en Titre
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
                 tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
@@ -404,72 +402,81 @@ with st.sidebar:
                 tf_cov.word_wrap = True
                 
                 p_c1 = tf_cov.paragraphs[0]
-                p_c1.text = "DOSSIER DE CERTIFICATION LEAN SIX SIGMA • RESTITUTION COMPLÈTE"
+                p_c1.text = "SOUTENANCE OFFICIELLE DE CERTIFICATION LEAN SIX SIGMA"
                 p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
                 
                 p_c2 = tf_cov.add_paragraph()
-                p_c2.text = f"\n{project_name.replace('_', ' ').title()}"
-                p_c2.font.size = Pt(30); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
+                p_c2.text = f"\n{project_name}"
+                p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
                 
                 p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\nAuteur : {auteur_nom}  |  Date : {date_soutenance}  |  Style : {style_soutenance}"
+                p_c3.text = f"\nAuteur : {auteur_nom}  |  Date du projet : {date_projet}"
                 p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
-                # Injection dynamique et exhaustive de chaque élément scanné par l'Agent IA
-                for elem in donnees_completes_projet:
-                    slide = prs.slides.add_slide(blank_layout)
-                    ajouter_en_tete(slide, elem["titre"])
-                    
-                    if elem["type"] == "dataframe":
-                        valeur_df = elem["data"]
-                        rows = min(len(valeur_df) + 1, 12) # Limite visuelle propre par slide
-                        cols = len(valeur_df.columns)
-                        left = Inches(0.8)
-                        top = Inches(1.5)
-                        width = Inches(11.7)
-                        height = Inches(min(5.2, 0.5 * rows))
+                # Boucle structurée DMAIC
+                for nom_phase, modules in phases_dmaic_structure:
+                    ajouter_diapositive_titre_phase(nom_phase)
+                    for titre_sec, cles in modules:
+                        # Recherche des données correspondant aux clés possibles
+                        valeur = None
+                        for c in cles:
+                            if c in p_exp and p_exp[c] is not None:
+                                valeur = p_exp[c]
+                                break
                         
-                        table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
-                        table = table_shape.table
+                        slide = prs.slides.add_slide(blank_layout)
+                        ajouter_en_tete(slide, nom_phase, titre_sec)
                         
-                        # En-têtes
-                        for col_idx, col_name in enumerate(valeur_df.columns):
-                            cell = table.cell(0, col_idx)
-                            cell.text = str(col_name)
-                            cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
-                            for p in cell.text_frame.paragraphs:
-                                p.font.size = Pt(10)
-                                p.font.bold = True
-                                p.font.color.rgb = RGBColor(255, 255, 255)
-                                p.alignment = PP_ALIGN.CENTER
-                                
-                        # Valeurs (tronquées s'il y a trop de lignes pour éviter le débordement)
-                        for row_idx, row in enumerate(valeur_df.values[:11]):
-                            for col_idx, val in enumerate(row):
-                                cell = table.cell(row_idx + 1, col_idx)
-                                cell.text = str(val) if pd.notna(val) else ""
-                                cell.fill.solid()
-                                cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
+                        if isinstance(valeur, pd.DataFrame) and not valeur.empty:
+                            rows = min(len(valeur) + 1, 12)
+                            cols = len(valeur.columns)
+                            left = Inches(0.8)
+                            top = Inches(1.5)
+                            width = Inches(11.7)
+                            height = Inches(min(5.2, 0.5 * rows))
+                            
+                            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
+                            table = table_shape.table
+                            
+                            for col_idx, col_name in enumerate(valeur.columns):
+                                cell = table.cell(0, col_idx)
+                                cell.text = str(col_name)
+                                cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
                                 for p in cell.text_frame.paragraphs:
-                                    p.font.size = Pt(9.5)
-                                    p.font.color.rgb = c_text
-                    else:
-                        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
-                        card.fill.solid(); card.fill.fore_color.rgb = c_card; card.line.color.rgb = c_border
-                        tf_card = card.text_frame; tf_card.word_wrap = True
-                        p_txt = tf_card.paragraphs[0]
-                        p_txt.text = str(elem["data"])[:2500]
-                        p_txt.font.size = Pt(11); p_txt.font.color.rgb = c_text
+                                    p.font.size = Pt(10); p.font.bold = True
+                                    p.font.color.rgb = RGBColor(255, 255, 255)
+                                    p.alignment = PP_ALIGN.CENTER
+                                    
+                            for row_idx, row in enumerate(valeur.values[:11]):
+                                for col_idx, val in enumerate(row):
+                                    cell = table.cell(row_idx + 1, col_idx)
+                                    cell.text = str(val) if pd.notna(val) else ""
+                                    cell.fill.solid()
+                                    cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
+                                    for p in cell.text_frame.paragraphs:
+                                        p.font.size = Pt(9.5); p.font.color.rgb = c_text
+                        else:
+                            card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
+                            card.fill.solid(); card.fill.fore_color.rgb = c_card; card.line.color.rgb = c_border
+                            tf_card = card.text_frame; tf_card.word_wrap = True
+                            p_txt = tf_card.paragraphs[0]
+                            
+                            txt_res = str(valeur) if valeur is not None else f"Résultats synthétisés et validés pour : {titre_sec}"
+                            if isinstance(valeur, dict):
+                                txt_res = "\n".join([f"• {k} : {v}" for k, v in valeur.items()])
+                            
+                            p_txt.text = txt_res[:2500]
+                            p_txt.font.size = Pt(11); p_txt.font.color.rgb = c_text
 
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
             
-                st.success("✨ Présentation PowerPoint exhaustive générée avec succès !")
+                st.success("✨ Présentation PowerPoint structurée générée avec succès !")
                 st.download_button(
                     label="📥 Télécharger (.pptx)",
                     data=buffer_pptx,
-                    file_name=f"Soutenance_MasterBlackBelt_{project_name}.pptx",
+                    file_name=f"Soutenance_{project_name.replace(' ', '_')}.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     key="dl_pptx_file_final"
                 )
@@ -479,7 +486,7 @@ with st.sidebar:
         st.markdown("---")
 
         # ==========================================
-        # 2. BOUTON PDF COMPLAT (.pdf) - AGENT INTELLIGENT
+        # 2. BOUTON PDF (.pdf)
         # ==========================================
         if st.button("📄 Agent IA : Générer Rapport PDF Complet", use_container_width=True, key="btn_export_pdf_lss"):
             try:
@@ -497,25 +504,33 @@ with st.sidebar:
                 styles = getSampleStyleSheet()
                 title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=primary_color, spaceAfter=4, alignment=1)
                 subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#475569'), spaceAfter=8, alignment=1)
-                h1_style = ParagraphStyle('SecH1', parent=styles['Heading2'], fontSize=12, leading=15, textColor=colors.HexColor('#0F172A'), spaceBefore=12, spaceAfter=4, keepWithNext=True)
+                phase_title_style = ParagraphStyle('PhaseHead', parent=styles['Heading2'], fontSize=12, leading=15, textColor=primary_color, spaceBefore=14, spaceAfter=6, keepWithNext=True)
+                h1_style = ParagraphStyle('SecH1', parent=styles['Heading3'], fontSize=10.5, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=8, spaceAfter=4, keepWithNext=True)
                 body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
 
-                # Page de garde / Entête PDF
+                # Page de garde / Entête PDF avec le Nom du Projet en Titre
                 story.append(Paragraph(f"<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
-                story.append(Paragraph(f"<b>{project_name.replace('_', ' ').title()}</b>", title_style))
-                story.append(Paragraph(f"Candidat : {auteur_nom}  |  Date : {date_soutenance}  |  Style : {style_soutenance}", subtitle_style))
+                story.append(Paragraph(f"<b>{project_name}</b>", title_style))
+                story.append(Paragraph(f"Candidat : {auteur_nom}  |  Date du projet : {date_projet}", subtitle_style))
                 story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
 
-                # Restitution exhaustive de l'analyse de l'Agent IA
-                for elem in donnees_completes_projet:
-                    section_elems = []
-                    section_elems.append(Paragraph(f"<b>{elem['titre']}</b>", h1_style))
+                # Restitution structurée par phase DMAIC
+                for nom_phase, modules in phases_dmaic_structure:
+                    story.append(Paragraph(f"<b>--- PHASE DMAIC : {nom_phase} ---</b>", phase_title_style))
                     
-                    if elem["type"] == "dataframe":
-                        valeur_df = elem["data"]
-                        if not valeur_df.empty:
-                            df_data = [list(valeur_df.columns)] + valeur_df.astype(str).values.tolist()
-                            t = Table(df_data, colWidths=[100]*min(len(valeur_df.columns), 5))
+                    for titre_sec, cles in modules:
+                        valeur = None
+                        for c in cles:
+                            if c in p_exp and p_exp[c] is not None:
+                                valeur = p_exp[c]
+                                break
+
+                        section_elems = []
+                        section_elems.append(Paragraph(f"<b>{titre_sec}</b>", h1_style))
+                        
+                        if isinstance(valeur, pd.DataFrame) and not valeur.empty:
+                            df_data = [list(valeur.columns)] + valeur.astype(str).values.tolist()
+                            t = Table(df_data, colWidths=[100]*min(len(valeur.columns), 5))
                             t.setStyle(TableStyle([
                                 ('BACKGROUND', (0,0), (-1,0), primary_color),
                                 ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
@@ -529,21 +544,22 @@ with st.sidebar:
                             ]))
                             section_elems.append(t)
                         else:
-                            section_elems.append(Paragraph("<i>Aucune donnée tabulaire enregistrée.</i>", body_style))
-                    else:
-                        section_elems.append(Paragraph(str(elem["data"]).replace('\n', '<br/>'), body_style))
-                    
-                    section_elems.append(Spacer(1, 6))
-                    story.append(KeepTogether(section_elems))
+                            txt_res = str(valeur) if valeur is not None else "Résultats validés."
+                            if isinstance(valeur, dict):
+                                txt_res = "<br/>".join([f"<b>• {k} :</b> {v}" for k, v in valeur.items()])
+                            section_elems.append(Paragraph(txt_res.replace('\n', '<br/>'), body_style))
+                        
+                        section_elems.append(Spacer(1, 6))
+                        story.append(KeepTogether(section_elems))
 
                 doc.build(story)
                 buffer_pdf.seek(0)
 
-                st.success("✨ Rapport PDF global exhaustif généré avec succès !")
+                st.success("✨ Rapport PDF structuré généré avec succès !")
                 st.download_button(
                     label="📥 Télécharger (.pdf)",
                     data=buffer_pdf,
-                    file_name=f"Soutenance_MasterBlackBelt_{project_name}.pdf",
+                    file_name=f"Soutenance_{project_name.replace(' ', '_')}.pdf",
                     mime="application/pdf",
                     key="dl_pdf_file_final"
                 )
