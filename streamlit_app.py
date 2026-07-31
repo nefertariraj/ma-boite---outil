@@ -296,46 +296,52 @@ with st.sidebar:
                 if cle in exclus or valeur is None:
                     continue
                 
-                titre_propre = cle.replace('_', ' ').upper()
+                titre_propre = str(cle).replace('_', ' ').upper()
                 
-                # Gestion stricte des DataFrames (utilisation de .empty sans ambiguïté booléenne)
+                # Vérification sécurisée anti-numpy / anti-ambiguïté booléenne
                 if isinstance(valeur, pd.DataFrame):
                     try:
-                        if not valeur.empty:
+                        if hasattr(valeur, 'empty') and not valeur.empty:
                             elements_analyses.append({
                                 "type": "dataframe",
                                 "titre": titre_propre,
                                 "data": valeur,
-                                "cle_origine": cle
+                                "cle_origine": str(cle)
                             })
                     except Exception:
                         pass
                 elif isinstance(valeur, dict):
-                    if len(valeur) > 0:
-                        elements_analyses.append({
-                            "type": "dict",
-                            "titre": titre_propre,
-                            "data": valeur,
-                            "cle_origine": cle
-                        })
-                elif isinstance(valeur, list):
-                    if len(valeur) > 0:
-                        elements_analyses.append({
-                            "type": "list",
-                            "titre": titre_propre,
-                            "data": valeur,
-                            "cle_origine": cle
-                        })
-                else:
-                    # Empêche tout passage direct de tableaux numpy non évalués
                     try:
+                        if len(valeur) > 0:
+                            elements_analyses.append({
+                                "type": "dict",
+                                "titre": titre_propre,
+                                "data": valeur,
+                                "cle_origine": str(cle)
+                            })
+                    except Exception:
+                        pass
+                elif isinstance(valeur, list):
+                    try:
+                        if len(valeur) > 0:
+                            elements_analyses.append({
+                                "type": "list",
+                                "titre": titre_propre,
+                                "data": valeur,
+                                "cle_origine": str(cle)
+                            })
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        # Éviter l'évaluation directe de tableaux numpy / objets complexes
                         val_str = str(valeur).strip()
-                        if val_str != "" and "array" not in val_str.lower():
+                        if val_str != "" and "array" not in val_str.lower() and "object at" not in val_str.lower():
                             elements_analyses.append({
                                 "type": "texte",
                                 "titre": titre_propre,
                                 "data": val_str,
-                                "cle_origine": cle
+                                "cle_origine": str(cle)
                             })
                     except Exception:
                         pass
@@ -420,13 +426,13 @@ with st.sidebar:
                     tf = tb.text_frame
                     tf.word_wrap = True
                     p1 = tf.paragraphs[0]
-                    p1.text = f"PHASE DMAIC : {titre_phase.upper()}"
+                    p1.text = f"PHASE DMAIC : {str(titre_phase).upper()}"
                     p1.font.size = Pt(10)
                     p1.font.bold = True
                     p1.font.color.rgb = c_accent
                     
                     p2 = tf.add_paragraph()
-                    p2.text = titre_diapo
+                    p2.text = str(titre_diapo)
                     p2.font.size = Pt(18)
                     p2.font.bold = True
                     p2.font.color.rgb = c_primary
@@ -438,14 +444,14 @@ with st.sidebar:
                     tf = tb.text_frame
                     tf.word_wrap = True
                     p = tf.paragraphs[0]
-                    p.text = nom_phase.upper()
+                    p.text = str(nom_phase).upper()
                     p.font.size = Pt(44)
                     p.font.bold = True
                     p.font.color.rgb = RGBColor(255, 255, 255)
                     p.alignment = PP_ALIGN.CENTER
                     
                     p_sub = tf.add_paragraph()
-                    p_sub.text = f"Restitution de Projet Lean Six Sigma • {project_name}"
+                    p_sub.text = f"Restitution de Projet Lean Six Sigma • {str(project_name)}"
                     p_sub.font.size = Pt(15)
                     p_sub.font.color.rgb = RGBColor(203, 213, 225)
                     p_sub.alignment = PP_ALIGN.CENTER
@@ -462,11 +468,11 @@ with st.sidebar:
                 p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
                 
                 p_c2 = tf_cov.add_paragraph()
-                p_c2.text = f"\n{project_name}"
+                p_c2.text = f"\n{str(project_name)}"
                 p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
                 
                 p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\nAuteur : {auteur_nom}  |  Date du projet : {date_projet}"
+                p_c3.text = f"\nAuteur : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}"
                 p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
@@ -481,8 +487,10 @@ with st.sidebar:
                         
                         if elem["type"] == "dataframe":
                             valeur_df = elem["data"]
-                            rows = min(len(valeur_df) + 1, 12)
-                            cols = len(valeur_df.columns)
+                            # Conversion sécurisée de tout le dataframe en string pour éviter les conflits numpy
+                            valeur_df_str = valeur_df.astype(str)
+                            rows = min(len(valeur_df_str) + 1, 12)
+                            cols = len(valeur_df_str.columns)
                             left = Inches(0.8)
                             top = Inches(1.5)
                             width = Inches(11.7)
@@ -491,7 +499,7 @@ with st.sidebar:
                             table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
                             table = table_shape.table
                             
-                            for col_idx, col_name in enumerate(valeur_df.columns):
+                            for col_idx, col_name in enumerate(valeur_df_str.columns):
                                 cell = table.cell(0, col_idx)
                                 cell.text = str(col_name)
                                 cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
@@ -500,10 +508,10 @@ with st.sidebar:
                                     p.font.color.rgb = RGBColor(255, 255, 255)
                                     p.alignment = PP_ALIGN.CENTER
                                     
-                            for row_idx, row in enumerate(valeur_df.values[:11]):
+                            for row_idx, row in enumerate(valeur_df_str.values[:11]):
                                 for col_idx, val in enumerate(row):
                                     cell = table.cell(row_idx + 1, col_idx)
-                                    cell.text = str(val) if pd.notna(val) else ""
+                                    cell.text = str(val) if val != "nan" else ""
                                     cell.fill.solid()
                                     cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
                                     for p in cell.text_frame.paragraphs:
@@ -511,7 +519,7 @@ with st.sidebar:
                         
                         elif elem["type"] == "dict":
                             dict_data = elem["data"]
-                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre / Indicateur", "Valeur / Résultat"])
+                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre / Indicateur", "Valeur / Résultat"]).astype(str)
                             
                             rows = min(len(df_dict) + 1, 12)
                             cols = 2
@@ -535,7 +543,7 @@ with st.sidebar:
                             for row_idx, row in enumerate(df_dict.values[:11]):
                                 for col_idx, val in enumerate(row):
                                     cell = table.cell(row_idx + 1, col_idx)
-                                    cell.text = str(val) if pd.notna(val) else ""
+                                    cell.text = str(val) if val != "nan" else ""
                                     cell.fill.solid()
                                     cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
                                     for p in cell.text_frame.paragraphs:
@@ -549,7 +557,7 @@ with st.sidebar:
                             
                             valeur_brute = elem["data"]
                             if isinstance(valeur_brute, list):
-                                texte_affiche = "\n".join([f"• {item}" for item in valeur_brute])
+                                texte_affiche = "\n".join([str(item) for item in valeur_brute])
                             else:
                                 texte_affiche = str(valeur_brute)
                                 
@@ -564,7 +572,7 @@ with st.sidebar:
                 st.download_button(
                     label="📥 Télécharger (.pptx)",
                     data=buffer_pptx,
-                    file_name=f"Soutenance_{project_name.replace(' ', '_')}.pptx",
+                    file_name=f"Soutenance_{str(project_name).replace(' ', '_')}.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     key="dl_pptx_file_final"
                 )
@@ -597,23 +605,23 @@ with st.sidebar:
                 body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
 
                 story.append(Paragraph(f"<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
-                story.append(Paragraph(f"<b>{project_name}</b>", title_style))
-                story.append(Paragraph(f"Candidat : {auteur_nom}  |  Date du projet : {date_projet}", subtitle_style))
+                story.append(Paragraph(f"<b>{str(project_name)}</b>", title_style))
+                story.append(Paragraph(f"Candidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}", subtitle_style))
                 story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
 
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
                     if not liste_elements:
                         continue
                         
-                    story.append(Paragraph(f"<b>--- PHASE DMAIC : {nom_phase} ---</b>", phase_title_style))
+                    story.append(Paragraph(f"<b>--- PHASE DMAIC : {str(nom_phase)} ---</b>", phase_title_style))
                     
                     for elem in liste_elements:
                         section_elems = []
-                        section_elems.append(Paragraph(f"<b>{elem['titre']}</b>", h1_style))
+                        section_elems.append(Paragraph(f"<b>{str(elem['titre'])}</b>", h1_style))
                         
                         if elem["type"] == "dataframe":
-                            valeur_df = elem["data"]
-                            df_data = [list(valeur_df.columns)] + valeur_df.astype(str).values.tolist()
+                            valeur_df = elem["data"].astype(str)
+                            df_data = [list(valeur_df.columns)] + valeur_df.values.tolist()
                             t = Table(df_data, colWidths=[100]*min(len(valeur_df.columns), 5))
                             t.setStyle(TableStyle([
                                 ('BACKGROUND', (0,0), (-1,0), primary_color),
@@ -629,8 +637,8 @@ with st.sidebar:
                             section_elems.append(t)
                         elif elem["type"] == "dict":
                             dict_data = elem["data"]
-                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre", "Valeur"])
-                            df_data = [list(df_dict.columns)] + df_dict.astype(str).values.tolist()
+                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre", "Valeur"]).astype(str)
+                            df_data = [list(df_dict.columns)] + df_dict.values.tolist()
                             t = Table(df_data, colWidths=[200, 300])
                             t.setStyle(TableStyle([
                                 ('BACKGROUND', (0,0), (-1,0), primary_color),
@@ -647,7 +655,7 @@ with st.sidebar:
                         else:
                             valeur_brute = elem["data"]
                             if isinstance(valeur_brute, list):
-                                texte_affiche = "<br/>".join([f"• {item}" for item in valeur_brute])
+                                texte_affiche = "<br/>".join([str(item) for item in valeur_brute])
                             else:
                                 texte_affiche = str(valeur_brute).replace('\n', '<br/>')
                             section_elems.append(Paragraph(texte_affiche, body_style))
@@ -662,7 +670,7 @@ with st.sidebar:
                 st.download_button(
                     label="📥 Télécharger (.pdf)",
                     data=buffer_pdf,
-                    file_name=f"Soutenance_{project_name.replace(' ', '_')}.pdf",
+                    file_name=f"Soutenance_{str(project_name).replace(' ', '_')}.pdf",
                     mime="application/pdf",
                     key="dl_pdf_file_final"
                 )
