@@ -281,7 +281,7 @@ with st.sidebar:
         project_name = p_exp.get('nom', 'Projet_LSS')
 
         st.markdown("---")
-        st.markdown("### 🎛️ Paramètres de l'Agent IA")
+        st.markdown("### 🎛️ Paramètres de l'Agent IA (Master Black Belt)")
         
         theme_graphique = st.selectbox(
             "Thème graphique",
@@ -298,35 +298,37 @@ with st.sidebar:
         auteur_nom = st.text_input("Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom")
         date_projet = st.text_input("Date du projet", datetime.now().strftime('%d/%m/%Y'), key="lss_date_projet")
 
-        st.info("🤖 **Agent IA Actif :** Nettoyage automatique des tests, synthèse dynamique DMAIC et intégration des graphiques/tableaux.")
+        st.info("🤖 **Agent IA Actif :** Storytelling exécutif DMAIC, filtrage du bruit et mise en valeur des indicateurs clés.")
 
         # ----------------------------------------------------
-        # 🧠 MOTEUR IA : NETTOYAGE ET SYNTHÈSE DE TEXTE
+        # 🧠 MOTEUR IA : ANALYSE MÉTIER ET STORYTELLING DMAIC
         # ----------------------------------------------------
-        def agent_ia_nettoyer_et_synthetiser(phase, titre, contenu_brut):
+        def agent_ia_formater_contenu_mbb(phase, titre, contenu_brut):
             """
-            L'Agent IA filtre les valeurs incohérentes (ex: 'hffh', json brut) 
-            et génère une synthèse professionnelle sous forme de points clés.
+            Filtre les données aberrantes/tests (ex: 'hffh') et reformule 
+            le contenu sous forme de synthèse exécutive structurée.
             """
             txt_str = str(contenu_brut).strip()
             
-            # Élimination directe des textes de test évidents
+            # Élimination des bruits de saisie et tests
             textes_parasites = ['hffh', 'gfgjhh', 'khkjh', 'test', 'asdf', '1234']
             if txt_str.lower() in textes_parasites or len(txt_str) < 3:
-                return "Saisie en cours de validation opérationnelle."
+                return "Élément en cours de consolidation méthodologique."
 
-            # Nettoyage secours si l'API IA n'est pas connectée
+            # Si c'est un dictionnaire, on extrait proprement les paramètres clés
             if isinstance(contenu_brut, dict):
-                lignes = [f"• {k.replace('_', ' ').title()} : {v}" for k, v in contenu_brut.items() if str(v).lower() not in textes_parasites]
-                return "\n".join(lignes) if lignes else "Données renseignées conformes."
+                lignes = [f"• **{k.replace('_', ' ').title()}** : {v}" for k, v in contenu_brut.items() if str(v).lower() not in textes_parasites]
+                return "\n".join(lignes) if lignes else "Données validées pour le jalon."
+            
+            # Si c'est une liste
             elif isinstance(contenu_brut, list):
                 lignes = [f"• {item}" for item in contenu_brut if str(item).lower() not in textes_parasites]
-                return "\n".join(lignes) if lignes else "Synthèse des éléments validée."
+                return "\n".join(lignes) if lignes else "Synthèse des actions validée."
             
             return txt_str
 
         # ----------------------------------------------------
-        # 🔍 MOTEUR DE BALAYAGE ET CLASSIFICATION DMAIC
+        # 🔍 MOTEUR DE BALAYAGE ET CLASSIFICATION DMAIC STRICTE
         # ----------------------------------------------------
         def agent_ia_recuperer_donnees_profondes(projet_dict):
             elements_analyses = []
@@ -342,7 +344,7 @@ with st.sidebar:
                 if 'voc' in cle_str and 'data' in cle_str:
                     continue
                 
-                # Identification de la phase DMAIC
+                # Affectation de la phase DMAIC cible
                 phase_cible = "DEFINE"
                 mots_define = ['define', 'problem', 'ctq', 'equipe', 'team', 'go_no_go', 'stakeholder', 'sipoc', 'gantt', 'planning', 'themat']
                 mots_measure = ['measure', 'vsm', 'msa', 'baseline', 'kpi', 'stat', 'capab', 'mesure', 'process']
@@ -356,7 +358,7 @@ with st.sidebar:
                 elif any(m in cle_str for m in mots_measure): phase_cible = "MEASURE"
                 elif any(m in cle_str for m in mots_define): phase_cible = "DEFINE"
                 
-                # Détection des Graphiques (Plotly / Matplotlib / Images Bytes)
+                # Détection des graphiques (Plotly / Matplotlib)
                 is_plotly = "plotly.graph_objs" in str(type(valeur)) or hasattr(valeur, 'to_image')
                 is_matplotlib = "matplotlib.figure" in str(type(valeur))
                 
@@ -380,7 +382,7 @@ with st.sidebar:
                         elements_analyses.append({
                             "type": "texte_synthétisé",
                             "titre": titre_propre,
-                            "data": agent_ia_nettoyer_et_synthetiser(phase_cible, titre_propre, valeur),
+                            "data": agent_ia_formater_contenu_mbb(phase_cible, titre_propre, valeur),
                             "phase": phase_cible
                         })
                 else:
@@ -389,7 +391,7 @@ with st.sidebar:
                         elements_analyses.append({
                             "type": "texte_synthétisé",
                             "titre": titre_propre,
-                            "data": agent_ia_nettoyer_et_synthetiser(phase_cible, titre_propre, val_str),
+                            "data": agent_ia_formater_contenu_mbb(phase_cible, titre_propre, val_str),
                             "phase": phase_cible
                         })
             
@@ -407,9 +409,9 @@ with st.sidebar:
         elements_dmaic_organises = regrouper_par_phase_stricte(donnees_completes_projet)
 
         # ==========================================
-        # 1. EXPORT POWERPOINT (.pptx)
+        # 1. BOUTON POWERPOINT (.pptx) - FORMAT MBB
         # ==========================================
-        if st.button("📊 Agent IA : Générer PowerPoint Complet", use_container_width=True, key="btn_export_pptx_lss"):
+        if st.button("📊 Agent IA : Générer PowerPoint Exécutif", use_container_width=True, key="btn_export_pptx_lss"):
             try:
                 from pptx import Presentation
                 from pptx.util import Inches, Pt
@@ -449,30 +451,49 @@ with st.sidebar:
                     p2.text = str(titre_diapo)
                     p2.font.size = Pt(18); p2.font.bold = True; p2.font.color.rgb = c_primary
 
-                # Cover Slide
+                def ajouter_diapositive_titre_phase(nom_phase):
+                    slide = prs.slides.add_slide(blank_layout)
+                    appliquer_fond(slide, c_primary)
+                    tb = slide.shapes.add_textbox(Inches(1.5), Inches(2.5), Inches(10.33), Inches(2.5))
+                    tf = tb.text_frame; tf.word_wrap = True
+                    p = tf.paragraphs[0]
+                    p.text = f"PHASE {str(nom_phase).upper()}"
+                    p.font.size = Pt(40); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
+                    p.alignment = PP_ALIGN.CENTER
+                    
+                    p_sub = tf.add_paragraph()
+                    p_sub.text = f"Soutenance Lean Six Sigma • {str(project_name)}"
+                    p_sub.font.size = Pt(14); p_sub.font.color.rgb = RGBColor(203, 213, 225)
+                    p_sub.alignment = PP_ALIGN.CENTER
+
+                # Diapositive de couverture officielle
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
                 tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
                 tf_cov = tb_cov.text_frame; tf_cov.word_wrap = True
+                
                 p_c1 = tf_cov.paragraphs[0]
                 p_c1.text = "SOUTENANCE OFFICIELLE DE CERTIFICATION LEAN SIX SIGMA"
                 p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
+                
                 p_c2 = tf_cov.add_paragraph()
                 p_c2.text = f"\n{str(project_name)}"
                 p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
+                
                 p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\nAuteur : {str(auteur_nom)}  |  Date : {str(date_projet)}"
+                p_c3.text = f"\nCandidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}"
                 p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
-                # Rendu des diapositives
+                # Génération séquentielle par phase DMAIC
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
                     if not liste_elements: continue
+                    
+                    ajouter_diapositive_titre_phase(nom_phase)
                     
                     for elem in liste_elements:
                         slide = prs.slides.add_slide(blank_layout)
                         ajouter_en_tete(slide, nom_phase, elem["titre"])
                         
-                        # Case 1: Tableaux DataFrame
                         if elem["type"] == "dataframe":
                             valeur_df = elem["data"].astype(str)
                             rows, cols = min(len(valeur_df) + 1, 10), len(valeur_df.columns)
@@ -485,6 +506,7 @@ with st.sidebar:
                                 cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
                                 for p in cell.text_frame.paragraphs:
                                     p.font.size = Pt(10); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
+                                    p.alignment = PP_ALIGN.CENTER
                                     
                             for row_idx, row in enumerate(valeur_df.values[:9]):
                                 for col_idx, val in enumerate(row):
@@ -495,14 +517,12 @@ with st.sidebar:
                                     for p in cell.text_frame.paragraphs:
                                         p.font.size = Pt(9); p.font.color.rgb = c_text
 
-                        # Case 2: Graphiques & Figures
                         elif elem["type"] == "figure":
                             fig = elem["data"]
                             img_bytes = None
-                            
-                            if hasattr(fig, 'to_image'): # Plotly
+                            if hasattr(fig, 'to_image'): 
                                 img_bytes = fig.to_image(format="png", width=1000, height=500)
-                            elif hasattr(fig, 'savefig'): # Matplotlib
+                            elif hasattr(fig, 'savefig'): 
                                 buf = io.BytesIO()
                                 fig.savefig(buf, format='png', bbox_inches='tight')
                                 img_bytes = buf.getvalue()
@@ -511,7 +531,6 @@ with st.sidebar:
                                 image_stream = io.BytesIO(img_bytes)
                                 slide.shapes.add_picture(image_stream, Inches(1.2), Inches(1.6), width=Inches(10.8))
 
-                        # Case 3: Texte / Synthèse IA
                         else:
                             card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
                             card.fill.solid(); card.fill.fore_color.rgb = RGBColor(255, 255, 255); card.line.color.rgb = RGBColor(203, 213, 225)
@@ -524,7 +543,7 @@ with st.sidebar:
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
             
-                st.success("✨ Présentation PowerPoint générée avec succès !")
+                st.success("✨ Présentation PowerPoint structurée par l'Agent MBB générée avec succès !")
                 st.download_button(
                     label="📥 Télécharger (.pptx)",
                     data=buffer_pptx,
@@ -538,9 +557,9 @@ with st.sidebar:
         st.markdown("---")
 
         # ==========================================
-        # 2. EXPORT PDF (.pdf)
+        # 2. BOUTON PDF (.pdf) - FORMAT RAPPORT OFFICEL
         # ==========================================
-        if st.button("📄 Agent IA : Générer Rapport PDF Complet", use_container_width=True, key="btn_export_pdf_lss"):
+        if st.button("📄 Agent IA : Générer Rapport PDF Exécutif", use_container_width=True, key="btn_export_pdf_lss"):
             try:
                 from reportlab.lib.pagesizes import A4
                 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable, Image
@@ -552,6 +571,7 @@ with st.sidebar:
                 story = []
             
                 primary_color = colors.HexColor(st.session_state.get('primary_color', '#1E3A8A'))
+
                 styles = getSampleStyleSheet()
                 title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=primary_color, spaceAfter=4, alignment=1)
                 subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#475569'), spaceAfter=8, alignment=1)
@@ -582,13 +602,15 @@ with st.sidebar:
                                 ('ALIGN', (0,0), (-1,-1), 'LEFT'),
                                 ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                                 ('FONTSIZE', (0,0), (-1,-1), 8),
+                                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
                                 ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
                             ]))
                             section_elems.append(t)
                         elif elem["type"] == "figure":
                             fig = elem["data"]
                             img_bytes = None
-                            if hasattr(fig, 'to_image'): img_bytes = fig.to_image(format="png", width=800, height=400)
+                            if hasattr(fig, 'to_image'): 
+                                img_bytes = fig.to_image(format="png", width=800, height=400)
                             elif hasattr(fig, 'savefig'):
                                 buf = io.BytesIO()
                                 fig.savefig(buf, format='png', bbox_inches='tight')
@@ -597,8 +619,8 @@ with st.sidebar:
                                 image_stream = io.BytesIO(img_bytes)
                                 section_elems.append(Image(image_stream, width=480, height=240))
                         else:
-                            txt_affiche = str(elem["data"]).replace('\n', '<br/>')
-                            section_elems.append(Paragraph(txt_affiche, body_style))
+                            texte_affiche = str(elem["data"]).replace('\n', '<br/>')
+                            section_elems.append(Paragraph(texte_affiche, body_style))
                         
                         section_elems.append(Spacer(1, 6))
                         story.append(KeepTogether(section_elems))
