@@ -239,8 +239,21 @@ if not st.session_state.authenticated:
                 st.rerun()
     st.stop()
 
+import io
+import os
+import pandas as pd
+from datetime import datetime
+import streamlit as st
+
+# Dépendances Graphiques / Export
+try:
+    import plotly.graph_objects as go
+    import matplotlib.pyplot as plt
+except ImportError:
+    pass
+
 # ==========================================
-# ⚙️ BARRE LATÉRALE MOTEUR
+# ⚙️ BARRE LATÉRALE MOTEUR & AGENT IA EXPORT
 # ==========================================
 with st.sidebar:
     st.title("⚙️ Paramètres & Sauvegarde")
@@ -285,9 +298,58 @@ with st.sidebar:
         auteur_nom = st.text_input("Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom")
         date_projet = st.text_input("Date du projet", datetime.now().strftime('%d/%m/%Y'), key="lss_date_projet")
 
-        st.info("🤖 **Agent IA Actif :** Alignement strict des onglets DMAIC (Define, Measure, Analyze, Improve, Control) et intégration fidèle des tableaux, graphiques et diagrammes.")
+        st.info("🤖 **Agent IA Actif :** Nettoyage automatique des tests, synthèse dynamique DMAIC et intégration des graphiques/tableaux.")
 
-        # --- MOTEUR DE BALAYAGE ET CLASSIFICATION DMAIC STRICTE ---
+        # ----------------------------------------------------
+        # 🧠 MOTEUR IA : NETTOYAGE ET SYNTHÈSE DE TEXTE
+        # ----------------------------------------------------
+        def agent_ia_nettoyer_et_synthetiser(phase, titre, contenu_brut):
+            """
+            L'Agent IA filtre les valeurs incohérentes (ex: 'hffh', json brut) 
+            et génère une synthèse professionnelle sous forme de points clés.
+            """
+            txt_str = str(contenu_brut).strip()
+            
+            # Élimination directe des textes de test évidents
+            textes_parasites = ['hffh', 'gfgjhh', 'khkjh', 'test', 'asdf', '1234']
+            if txt_str.lower() in textes_parasites or len(txt_str) < 3:
+                return "Saisie en cours de validation opérationnelle."
+
+            # Exemple d'intégration d'appel LLM (ex: OpenAI / Claude / Ollama)
+            # Si vous avez configuré votre API Key, vous pouvez décommenter la partie suivante :
+            """
+            try:
+                import openai
+                prompt = f'''
+                En tant qu'expert Lean Six Sigma Master Black Belt, reformule et synthétise le contenu suivant 
+                pour une présentation de soutenance. Élimine tout jargon technique inutile ou bruit de saisie.
+                Phase: {phase} | Sujet: {titre}
+                Données brutes: {txt_str}
+                Fournis un texte concis, percutant et professionnel (maximum 3 puces).
+                '''
+                response = openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=200
+                )
+                return response.choices[0].message.content.strip()
+            except Exception:
+                pass
+            """
+
+            # Nettoyage secours si l'API IA n'est pas connectée
+            if isinstance(contenu_brut, dict):
+                lignes = [f"• {k.replace('_', ' ').title()} : {v}" for k, v in contenu_brut.items() if str(v).lower() not in textes_parasites]
+                return "\n".join(lignes) if lignes else "Données renseignées conformes."
+            elif isinstance(contenu_brut, list):
+                lignes = [f"• {item}" for item in contenu_brut if str(item).lower() not in textes_parasites]
+                return "\n".join(lignes) if lignes else "Synthèse des éléments validée."
+            
+            return txt_str
+
+        # ----------------------------------------------------
+        # 🔍 MOTEUR DE BALAYAGE ET CLASSIFICATION DMAIC
+        # ----------------------------------------------------
         def agent_ia_recuperer_donnees_profondes(projet_dict):
             elements_analyses = []
             exclus = ['nom', 'status']
@@ -299,105 +361,75 @@ with st.sidebar:
                 cle_str = str(cle).strip().lower()
                 titre_propre = str(cle).replace('_', ' ').upper()
                 
-                # Exclusion stricte du VOC data brut selon les consignes
                 if 'voc' in cle_str and 'data' in cle_str:
                     continue
                 
-                # Identification de la phase DMAIC exacte par correspondance stricte de clé
-                phase_cible = "DEFINE" # Par défaut
-                
+                # Identification de la phase DMAIC
+                phase_cible = "DEFINE"
                 mots_define = ['define', 'problem', 'ctq', 'equipe', 'team', 'go_no_go', 'stakeholder', 'sipoc', 'gantt', 'planning', 'themat']
                 mots_measure = ['measure', 'vsm', 'msa', 'baseline', 'kpi', 'stat', 'capab', 'mesure', 'process']
                 mots_analyze = ['test', 'cause', 'ishikawa', 'five', '5whys', 'fmea', 'gemba', 'analys', 'mouca']
                 mots_improve = ['improve', 'innov', 'amelior', 'strateg', 'benefit', 'effort', 'action', 'future', 'pilote_solution']
                 mots_control = ['control', 'compar', 'gains', 'pilot', 'suivi', 'standard']
                 
-                if any(m in cle_str for m in mots_control):
-                    phase_cible = "CONTROL"
-                elif any(m in cle_str for m in mots_improve):
-                    phase_cible = "IMPROVE"
-                elif any(m in cle_str for m in mots_analyze):
-                    phase_cible = "ANALYZE"
-                elif any(m in cle_str for m in mots_measure):
-                    phase_cible = "MEASURE"
-                elif any(m in cle_str for m in mots_define):
-                    phase_cible = "DEFINE"
+                if any(m in cle_str for m in mots_control): phase_cible = "CONTROL"
+                elif any(m in cle_str for m in mots_improve): phase_cible = "IMPROVE"
+                elif any(m in cle_str for m in mots_analyze): phase_cible = "ANALYZE"
+                elif any(m in cle_str for m in mots_measure): phase_cible = "MEASURE"
+                elif any(m in cle_str for m in mots_define): phase_cible = "DEFINE"
                 
-                # Vérification sécurisée du type de données
-                if isinstance(valeur, pd.DataFrame):
-                    try:
-                        if hasattr(valeur, 'empty') and not valeur.empty:
-                            elements_analyses.append({
-                                "type": "dataframe",
-                                "titre": titre_propre,
-                                "data": valeur,
-                                "cle_origine": str(cle),
-                                "phase": phase_cible
-                            })
-                    except Exception:
-                        pass
-                elif isinstance(valeur, dict):
-                    try:
-                        if len(valeur) > 0:
-                            elements_analyses.append({
-                                "type": "dict",
-                                "titre": titre_propre,
-                                "data": valeur,
-                                "cle_origine": str(cle),
-                                "phase": phase_cible
-                            })
-                    except Exception:
-                        pass
-                elif isinstance(valeur, list):
-                    try:
-                        if len(valeur) > 0:
-                            elements_analyses.append({
-                                "type": "list",
-                                "titre": titre_propre,
-                                "data": valeur,
-                                "cle_origine": str(cle),
-                                "phase": phase_cible
-                            })
-                    except Exception:
-                        pass
+                # Détection des Graphiques (Plotly / Matplotlib / Images Bytes)
+                is_plotly = "plotly.graph_objs" in str(type(valeur)) or hasattr(valeur, 'to_image')
+                is_matplotlib = "matplotlib.figure" in str(type(valeur))
+                
+                if is_plotly or is_matplotlib:
+                    elements_analyses.append({
+                        "type": "figure",
+                        "titre": titre_propre,
+                        "data": valeur,
+                        "phase": phase_cible
+                    })
+                elif isinstance(valeur, pd.DataFrame):
+                    if hasattr(valeur, 'empty') and not valeur.empty:
+                        elements_analyses.append({
+                            "type": "dataframe",
+                            "titre": titre_propre,
+                            "data": valeur,
+                            "phase": phase_cible
+                        })
+                elif isinstance(valeur, (dict, list)):
+                    if len(valeur) > 0:
+                        elements_analyses.append({
+                            "type": "texte_synthétisé",
+                            "titre": titre_propre,
+                            "data": agent_ia_nettoyer_et_synthetiser(phase_cible, titre_propre, valeur),
+                            "phase": phase_cible
+                        })
                 else:
-                    try:
-                        val_str = str(valeur).strip()
-                        if val_str != "" and "array" not in val_str.lower() and "object at" not in val_str.lower():
-                            elements_analyses.append({
-                                "type": "texte",
-                                "titre": titre_propre,
-                                "data": val_str,
-                                "cle_origine": str(cle),
-                                "phase": phase_cible
-                            })
-                    except Exception:
-                        pass
+                    val_str = str(valeur).strip()
+                    if val_str != "" and "array" not in val_str.lower() and "object at" not in val_str.lower():
+                        elements_analyses.append({
+                            "type": "texte_synthétisé",
+                            "titre": titre_propre,
+                            "data": agent_ia_nettoyer_et_synthetiser(phase_cible, titre_propre, val_str),
+                            "phase": phase_cible
+                        })
             
             return elements_analyses
 
         donnees_completes_projet = agent_ia_recuperer_donnees_profondes(p_exp)
 
         def regrouper_par_phase_stricte(elements):
-            mapping = {
-                "DEFINE": [],
-                "MEASURE": [],
-                "ANALYZE": [],
-                "IMPROVE": [],
-                "CONTROL": []
-            }
+            mapping = {"DEFINE": [], "MEASURE": [], "ANALYZE": [], "IMPROVE": [], "CONTROL": []}
             for elem in elements:
                 ph = elem.get("phase", "DEFINE")
-                if ph in mapping:
-                    mapping[ph].append(elem)
-                else:
-                    mapping["DEFINE"].append(elem)
+                mapping[ph if ph in mapping else "DEFINE"].append(elem)
             return mapping
 
         elements_dmaic_organises = regrouper_par_phase_stricte(donnees_completes_projet)
 
         # ==========================================
-        # 1. BOUTON POWERPOINT (.pptx)
+        # 1. EXPORT POWERPOINT (.pptx)
         # ==========================================
         if st.button("📊 Agent IA : Générer PowerPoint Complet", use_container_width=True, key="btn_export_pptx_lss"):
             try:
@@ -416,8 +448,6 @@ with st.sidebar:
                     "Personnalisée": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59))
                 }
                 c_primary, c_accent, c_bg, c_text = palettes.get(palette_couleurs, palettes["Bleu"])
-                c_card = RGBColor(255, 255, 255)
-                c_border = RGBColor(203, 213, 225)
 
                 prs = Presentation()
                 prs.slide_width = Inches(13.33)
@@ -426,85 +456,49 @@ with st.sidebar:
 
                 def appliquer_fond(slide, couleur_fond=c_bg):
                     bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
-                    bg.fill.solid()
-                    bg.fill.fore_color.rgb = couleur_fond
+                    bg.fill.solid(); bg.fill.fore_color.rgb = couleur_fond
                     bg.line.fill.background()
 
                 def ajouter_en_tete(slide, titre_phase, titre_diapo):
                     appliquer_fond(slide)
                     tb = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
-                    tf = tb.text_frame
-                    tf.word_wrap = True
+                    tf = tb.text_frame; tf.word_wrap = True
                     p1 = tf.paragraphs[0]
                     p1.text = f"PHASE DMAIC : {str(titre_phase).upper()}"
-                    p1.font.size = Pt(10)
-                    p1.font.bold = True
-                    p1.font.color.rgb = c_accent
+                    p1.font.size = Pt(10); p1.font.bold = True; p1.font.color.rgb = c_accent
                     
                     p2 = tf.add_paragraph()
                     p2.text = str(titre_diapo)
-                    p2.font.size = Pt(18)
-                    p2.font.bold = True
-                    p2.font.color.rgb = c_primary
+                    p2.font.size = Pt(18); p2.font.bold = True; p2.font.color.rgb = c_primary
 
-                def ajouter_diapositive_titre_phase(nom_phase):
-                    slide = prs.slides.add_slide(blank_layout)
-                    appliquer_fond(slide, c_primary)
-                    tb = slide.shapes.add_textbox(Inches(1.5), Inches(2.5), Inches(10.33), Inches(2.5))
-                    tf = tb.text_frame
-                    tf.word_wrap = True
-                    p = tf.paragraphs[0]
-                    p.text = str(nom_phase).upper()
-                    p.font.size = Pt(44)
-                    p.font.bold = True
-                    p.font.color.rgb = RGBColor(255, 255, 255)
-                    p.alignment = PP_ALIGN.CENTER
-                    
-                    p_sub = tf.add_paragraph()
-                    p_sub.text = f"Restitution de Projet Lean Six Sigma • {str(project_name)}"
-                    p_sub.font.size = Pt(15)
-                    p_sub.font.color.rgb = RGBColor(203, 213, 225)
-                    p_sub.alignment = PP_ALIGN.CENTER
-
-                # Page de couverture PPTX
+                # Cover Slide
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
                 tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
-                tf_cov = tb_cov.text_frame
-                tf_cov.word_wrap = True
-                
+                tf_cov = tb_cov.text_frame; tf_cov.word_wrap = True
                 p_c1 = tf_cov.paragraphs[0]
                 p_c1.text = "SOUTENANCE OFFICIELLE DE CERTIFICATION LEAN SIX SIGMA"
                 p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
-                
                 p_c2 = tf_cov.add_paragraph()
                 p_c2.text = f"\n{str(project_name)}"
                 p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
-                
                 p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\nAuteur : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}"
+                p_c3.text = f"\nAuteur : {str(auteur_nom)}  |  Date : {str(date_projet)}"
                 p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
+                # Rendu des diapositives
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
-                    if not liste_elements:
-                        continue
-                    
-                    ajouter_diapositive_titre_phase(nom_phase)
+                    if not liste_elements: continue
                     
                     for elem in liste_elements:
                         slide = prs.slides.add_slide(blank_layout)
                         ajouter_en_tete(slide, nom_phase, elem["titre"])
                         
+                        # Case 1: Tableaux DataFrame
                         if elem["type"] == "dataframe":
                             valeur_df = elem["data"].astype(str)
-                            rows = min(len(valeur_df) + 1, 12)
-                            cols = len(valeur_df.columns)
-                            left = Inches(0.8)
-                            top = Inches(1.5)
-                            width = Inches(11.7)
-                            height = Inches(min(5.2, 0.5 * rows))
-                            
-                            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
+                            rows, cols = min(len(valeur_df) + 1, 10), len(valeur_df.columns)
+                            table_shape = slide.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.7), Inches(min(5.2, 0.5 * rows)))
                             table = table_shape.table
                             
                             for col_idx, col_name in enumerate(valeur_df.columns):
@@ -512,71 +506,47 @@ with st.sidebar:
                                 cell.text = str(col_name)
                                 cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
                                 for p in cell.text_frame.paragraphs:
-                                    p.font.size = Pt(10); p.font.bold = True
-                                    p.font.color.rgb = RGBColor(255, 255, 255)
-                                    p.alignment = PP_ALIGN.CENTER
+                                    p.font.size = Pt(10); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
                                     
-                            for row_idx, row in enumerate(valeur_df.values[:11]):
+                            for row_idx, row in enumerate(valeur_df.values[:9]):
                                 for col_idx, val in enumerate(row):
                                     cell = table.cell(row_idx + 1, col_idx)
                                     cell.text = str(val) if val != "nan" else ""
                                     cell.fill.solid()
                                     cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
                                     for p in cell.text_frame.paragraphs:
-                                        p.font.size = Pt(9.5); p.font.color.rgb = c_text
-                        
-                        elif elem["type"] == "dict":
-                            dict_data = elem["data"]
-                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre / Indicateur", "Valeur / Résultat"]).astype(str)
+                                        p.font.size = Pt(9); p.font.color.rgb = c_text
+
+                        # Case 2: Graphiques & Figures
+                        elif elem["type"] == "figure":
+                            fig = elem["data"]
+                            img_bytes = None
                             
-                            rows = min(len(df_dict) + 1, 12)
-                            cols = 2
-                            left = Inches(0.8)
-                            top = Inches(1.5)
-                            width = Inches(11.7)
-                            height = Inches(min(5.2, 0.5 * rows))
-                            
-                            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
-                            table = table_shape.table
-                            
-                            for col_idx, col_name in enumerate(df_dict.columns):
-                                cell = table.cell(0, col_idx)
-                                cell.text = str(col_name)
-                                cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
-                                for p in cell.text_frame.paragraphs:
-                                    p.font.size = Pt(10); p.font.bold = True
-                                    p.font.color.rgb = RGBColor(255, 255, 255)
-                                    p.alignment = PP_ALIGN.CENTER
-                                    
-                            for row_idx, row in enumerate(df_dict.values[:11]):
-                                for col_idx, val in enumerate(row):
-                                    cell = table.cell(row_idx + 1, col_idx)
-                                    cell.text = str(val) if val != "nan" else ""
-                                    cell.fill.solid()
-                                    cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
-                                    for p in cell.text_frame.paragraphs:
-                                        p.font.size = Pt(9.5); p.font.color.rgb = c_text
-                        
+                            if hasattr(fig, 'to_image'): # Plotly
+                                img_bytes = fig.to_image(format="png", width=1000, height=500)
+                            elif hasattr(fig, 'savefig'): # Matplotlib
+                                buf = io.BytesIO()
+                                fig.savefig(buf, format='png', bbox_inches='tight')
+                                img_bytes = buf.getvalue()
+                                
+                            if img_bytes:
+                                image_stream = io.BytesIO(img_bytes)
+                                slide.shapes.add_picture(image_stream, Inches(1.2), Inches(1.6), width=Inches(10.8))
+
+                        # Case 3: Texte / Synthèse IA
                         else:
                             card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
-                            card.fill.solid(); card.fill.fore_color.rgb = c_card; card.line.color.rgb = c_border
+                            card.fill.solid(); card.fill.fore_color.rgb = RGBColor(255, 255, 255); card.line.color.rgb = RGBColor(203, 213, 225)
                             tf_card = card.text_frame; tf_card.word_wrap = True
                             p_txt = tf_card.paragraphs[0]
-                            
-                            valeur_brute = elem["data"]
-                            if isinstance(valeur_brute, list):
-                                texte_affiche = "\n".join([str(item) for item in valeur_brute])
-                            else:
-                                texte_affiche = str(valeur_brute)
-                                
-                            p_txt.text = texte_affiche[:2500]
-                            p_txt.font.size = Pt(11); p_txt.font.color.rgb = c_text
+                            p_txt.text = str(elem["data"])
+                            p_txt.font.size = Pt(12); p_txt.font.color.rgb = c_text
 
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
             
-                st.success("✨ Présentation PowerPoint structurée par onglets DMAIC générée avec succès !")
+                st.success("✨ Présentation PowerPoint générée avec succès !")
                 st.download_button(
                     label="📥 Télécharger (.pptx)",
                     data=buffer_pptx,
@@ -590,12 +560,12 @@ with st.sidebar:
         st.markdown("---")
 
         # ==========================================
-        # 2. BOUTON PDF (.pdf)
+        # 2. EXPORT PDF (.pdf)
         # ==========================================
         if st.button("📄 Agent IA : Générer Rapport PDF Complet", use_container_width=True, key="btn_export_pdf_lss"):
             try:
                 from reportlab.lib.pagesizes import A4
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable
+                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable, Image
                 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
                 from reportlab.lib import colors
 
@@ -604,28 +574,25 @@ with st.sidebar:
                 story = []
             
                 primary_color = colors.HexColor(st.session_state.get('primary_color', '#1E3A8A'))
-
                 styles = getSampleStyleSheet()
                 title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=primary_color, spaceAfter=4, alignment=1)
                 subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#475569'), spaceAfter=8, alignment=1)
                 phase_title_style = ParagraphStyle('PhaseHead', parent=styles['Heading2'], fontSize=12, leading=15, textColor=primary_color, spaceBefore=14, spaceAfter=6, keepWithNext=True)
                 h1_style = ParagraphStyle('SecH1', parent=styles['Heading3'], fontSize=10.5, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=8, spaceAfter=4, keepWithNext=True)
-                body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
+                body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=13, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
 
-                story.append(Paragraph(f"<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
+                story.append(Paragraph("<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
                 story.append(Paragraph(f"<b>{str(project_name)}</b>", title_style))
                 story.append(Paragraph(f"Candidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}", subtitle_style))
                 story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
 
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
-                    if not liste_elements:
-                        continue
+                    if not liste_elements: continue
                         
                     story.append(Paragraph(f"<b>--- PHASE DMAIC : {str(nom_phase)} ---</b>", phase_title_style))
                     
                     for elem in liste_elements:
-                        section_elems = []
-                        section_elems.append(Paragraph(f"<b>{str(elem['titre'])}</b>", h1_style))
+                        section_elems = [Paragraph(f"<b>{str(elem['titre'])}</b>", h1_style)]
                         
                         if elem["type"] == "dataframe":
                             valeur_df = elem["data"].astype(str)
@@ -637,36 +604,23 @@ with st.sidebar:
                                 ('ALIGN', (0,0), (-1,-1), 'LEFT'),
                                 ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                                 ('FONTSIZE', (0,0), (-1,-1), 8),
-                                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-                                ('TOPPADDING', (0,0), (-1,-1), 4),
-                                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
                                 ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
                             ]))
                             section_elems.append(t)
-                        elif elem["type"] == "dict":
-                            dict_data = elem["data"]
-                            df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre", "Valeur"]).astype(str)
-                            df_data = [list(df_dict.columns)] + df_dict.values.tolist()
-                            t = Table(df_data, colWidths=[200, 300])
-                            t.setStyle(TableStyle([
-                                ('BACKGROUND', (0,0), (-1,0), primary_color),
-                                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-                                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                                ('FONTSIZE', (0,0), (-1,-1), 8),
-                                ('BOTTOMPADDING', (0,0), (-1,-1), 4),
-                                ('TOPPADDING', (0,0), (-1,-1), 4),
-                                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
-                                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
-                            ]))
-                            section_elems.append(t)
+                        elif elem["type"] == "figure":
+                            fig = elem["data"]
+                            img_bytes = None
+                            if hasattr(fig, 'to_image'): img_bytes = fig.to_image(format="png", width=800, height=400)
+                            elif hasattr(fig, 'savefig'):
+                                buf = io.BytesIO()
+                                fig.savefig(buf, format='png', bbox_inches='tight')
+                                img_bytes = buf.getvalue()
+                            if img_bytes:
+                                image_stream = io.BytesIO(img_bytes)
+                                section_elems.append(Image(image_stream, width=480, height=240))
                         else:
-                            valeur_brute = elem["data"]
-                            if isinstance(valeur_brute, list):
-                                texte_affiche = "<br/>".join([str(item) for item in valeur_brute])
-                            else:
-                                texte_affiche = str(valeur_brute).replace('\n', '<br/>')
-                            section_elems.append(Paragraph(texte_affiche, body_style))
+                            txt_affiche = str(elem["data"]).replace('\n', '<br/>')
+                            section_elems.append(Paragraph(txt_affiche, body_style))
                         
                         section_elems.append(Spacer(1, 6))
                         story.append(KeepTogether(section_elems))
