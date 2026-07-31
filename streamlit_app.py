@@ -285,31 +285,17 @@ with st.sidebar:
         auteur_nom = st.text_input("Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom")
         date_projet = st.text_input("Date du projet", datetime.now().strftime('%d/%m/%Y'), key="lss_date_projet")
 
-        st.info("🤖 **Agent IA Actif :** Balayage profond et exhaustif de toutes les clés, dictionnaires, tableaux et résultats du projet par phase DMAIC.")
+        st.info("🤖 **Agent IA Actif :** Balayage profond et sécurisé de toutes les données du projet par phase DMAIC.")
 
-        # --- MOTEUR DE BALAYAGE PROFOND ET UNIFIÉ DE L'AGENT IA ---
-        # Mappe chaque phase DMAIC à une liste de mots-clés de recherche, mais extrait AUSSI l'intégralité 
-        # de tout contenu utile présent dans le dictionnaire du projet pour ne rien perdre.
-        phases_dmaic_structure = [
-            ("DEFINE", ['define', 'problem_statement', 'ctq', 'equipe', 'team', 'go_no_go', 'gono_go', 'stakeholders', 'stakeholder', 'sipoc', 'voc', 'gantt']),
-            ("MEASURE", ['measure_x', 'project_definition', 'vsm', 'msa', 'baseline', 'kpi', 'stats', 'statistiques', 'capability', 'mesure']),
-            ("ANALYZE", ['tests_xy', 'tests', 'causes_racines', 'ishikawa', 'five_whys', 'fmea_current', 'fmea', 'gemba', 'analyse']),
-            ("IMPROVE", ['strategies', 'benefit_effort', 'action_plan', 'future_state', 'innove', 'amelioration']),
-            ("CONTROL", ['control_plan', 'stats_comparatives', 'maintien_gains', 'control', 'controle'])
-        ]
-
+        # --- MOTEUR DE BALAYAGE PROFOND ET SÉCURISÉ ---
         def agent_ia_recuperer_donnees_profondes(projet_dict):
-            """L'agent IA analyse dynamiquement tout le dictionnaire du projet pour extraire TOUTES les données existantes,
-            qu'elles soient sous forme de DataFrames, dictionnaires détaillés, listes ou textes."""
             elements_analyses = []
             exclus = ['nom', 'status']
             
-            # 1. Extraction exhaustive et intelligente par balayage direct de toutes les clés du projet
             for cle, valeur in projet_dict.items():
                 if cle in exclus or valeur is None:
                     continue
                 
-                # Nettoyage et normalisation du titre de la section
                 titre_propre = cle.replace('_', ' ').upper()
                 
                 if isinstance(valeur, pd.DataFrame):
@@ -336,19 +322,21 @@ with st.sidebar:
                             "data": valeur,
                             "cle_origine": cle
                         })
-                elif str(valeur).strip() != "":
-                    elements_analyses.append({
-                        "type": "texte",
-                        "titre": titre_propre,
-                        "data": str(valeur),
-                        "cle_origine": cle
-                    })
+                else:
+                    # Conversion sécurisée en texte sans évaluation booléenne ambiguë
+                    val_str = str(valeur).strip()
+                    if val_str != "":
+                        elements_analyses.append({
+                            "type": "texte",
+                            "titre": titre_propre,
+                            "data": val_str,
+                            "cle_origine": cle
+                        })
             
             return elements_analyses
 
         donnees_completes_projet = agent_ia_recuperer_donnees_profondes(p_exp)
 
-        # Fonction d'association intelligente des éléments trouvés aux phases DMAIC
         def classifier_par_phase_dmaic(elements):
             mapping = {
                 "DEFINE": [],
@@ -366,7 +354,6 @@ with st.sidebar:
                 "CONTROL": ['control', 'compar', 'gains', 'pilot']
             }
             
-            # Suivi des clés déjà assignées pour éviter les doublons
             attribues = set()
             
             for phase, mots in mots_cles_phase.items():
@@ -377,7 +364,6 @@ with st.sidebar:
                         mapping[phase].append(elem)
                         attribues.add(elem['cle_origine'])
             
-            # S'il reste des éléments non assignés, les répartir équitablement ou les mettre dans Define/Measure par défaut
             for elem in elements:
                 if elem['cle_origine'] not in attribues:
                     mapping["DEFINE"].append(elem)
@@ -388,7 +374,7 @@ with st.sidebar:
         elements_dmaic_organises = classifier_par_phase_dmaic(donnees_completes_projet)
 
         # ==========================================
-        # 1. BOUTON POWERPOINT (.pptx) - EXHAUSTIF & MODIFIABLE
+        # 1. BOUTON POWERPOINT (.pptx)
         # ==========================================
         if st.button("📊 Agent IA : Générer PowerPoint Complet", use_container_width=True, key="btn_export_pptx_lss"):
             try:
@@ -476,7 +462,6 @@ with st.sidebar:
                 p_c3.text = f"\nAuteur : {auteur_nom}  |  Date du projet : {date_projet}"
                 p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
-                # Génération des diapositives par phase DMAIC avec intégration fidèle des données
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
                     if not liste_elements:
                         continue
@@ -518,7 +503,6 @@ with st.sidebar:
                                         p.font.size = Pt(9.5); p.font.color.rgb = c_text
                         
                         elif elem["type"] == "dict":
-                            # Transformation intelligente d'un dictionnaire en un tableau modifiable
                             dict_data = elem["data"]
                             df_dict = pd.DataFrame(list(dict_data.items()), columns=["Paramètre / Indicateur", "Valeur / Résultat"])
                             
@@ -583,7 +567,7 @@ with st.sidebar:
         st.markdown("---")
 
         # ==========================================
-        # 2. BOUTON PDF (.pdf) - EXHAUSTIF & STRUCTURÉ
+        # 2. BOUTON PDF (.pdf)
         # ==========================================
         if st.button("📄 Agent IA : Générer Rapport PDF Complet", use_container_width=True, key="btn_export_pdf_lss"):
             try:
@@ -605,13 +589,11 @@ with st.sidebar:
                 h1_style = ParagraphStyle('SecH1', parent=styles['Heading3'], fontSize=10.5, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=8, spaceAfter=4, keepWithNext=True)
                 body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
 
-                # Page de garde / Entête PDF
                 story.append(Paragraph(f"<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
                 story.append(Paragraph(f"<b>{project_name}</b>", title_style))
                 story.append(Paragraph(f"Candidat : {auteur_nom}  |  Date du projet : {date_projet}", subtitle_style))
                 story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
 
-                # Restitution exhaustive et structurée par phase DMAIC
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
                     if not liste_elements:
                         continue
