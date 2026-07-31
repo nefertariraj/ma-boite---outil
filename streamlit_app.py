@@ -248,10 +248,7 @@ with st.sidebar:
     st.session_state.primary_color = color
     st.divider()
     
-    # =====================================================================
-    # 💾 MODULE D'EXPORTATION EXÉCUTIF (POWERPOINT & PDF)
-    # =====================================================================
-    st.subheader("💾 Exportation de la Présentation Exécutive")
+    st.subheader("💾 Générateur Soutenance Master Black Belt")
 
     if "projects" in st.session_state and len(st.session_state.projects) > 0:
         indices_projets_tous = list(range(len(st.session_state.projects)))
@@ -261,124 +258,152 @@ with st.sidebar:
             return f"📁 {p_test.get('nom', 'Sans nom')} | Jalon: {p_test.get('status', 'Define')}"
         
         proj_sel_idx = st.selectbox(
-            "Sélectionnez le projet dont vous souhaitez générer les livrables :",
+            "Sélectionnez le projet à exporter :",
             options=indices_projets_tous,
             format_func=formateur_liste_enregistrer,
             key="sb_enregistrer_sous_selector"
         )
     
-        # Extraction du projet sélectionné
         p_exp = st.session_state.projects[proj_sel_idx]
         project_name = p_exp.get('nom', 'Projet_LSS').replace(" ", "_")
 
-        st.info("📊 **Contrôle Qualité :** L'agent IA va scanner l'intégralité des synthèses, structures et tableaux rattachés à ce projet.")
-
-        # --- 1. MOTEUR DE SCAN UNIFIÉ (Commun au PPTX et au PDF) ---
-        def scanner_donnees_projet_complet(projet):
-            """Scanne et compile toutes les données du projet pour les restituer fidèlement."""
-            contenu_compile = []
-            for cle, valeur in projet.items():
-                if cle in ['nom', 'status']:
-                    continue
-                titre = cle.replace('_', ' ').upper()
-                if isinstance(valeur, pd.DataFrame):
-                    try:
-                        contenu_compile.append(f"• [{titre}] (Tableau):\n" + valeur.to_string(index=False))
-                    except:
-                        pass
-                elif isinstance(valeur, str) and len(valeur.strip()) > 0:
-                    contenu_compile.append(f"• [{titre}] :\n{valeur}")
-                elif isinstance(valeur, dict):
-                    dict_str = "\n".join([f"  - {sk}: {sv}" for sk, sv in valeur.items()])
-                    contenu_compile.append(f"• [{titre}] :\n{dict_str}")
+        st.markdown("---")
+        st.markdown("### 🎛️ Paramètres de génération")
         
-            if contenu_compile:
-                return "\n\n".join(contenu_compile)
-            return "✓ Données de phase enregistrées et validées dans le référentiel du projet."
+        theme_graphique = st.selectbox(
+            "Thème graphique",
+            ["Professionnel", "Épuré", "Corporate", "Moderne", "Minimaliste", "Exécutif", "Académique"],
+            key="lss_theme_graphique"
+        )
+        
+        palette_couleurs = st.selectbox(
+            "Palette de couleurs",
+            ["Bleu", "Vert", "Rouge", "Orange", "Gris", "Personnalisée"],
+            key="lss_palette_couleurs"
+        )
+        
+        style_soutenance = st.selectbox(
+            "Style de présentation",
+            ["Soutenance Black Belt / Master Black Belt"],
+            key="lss_style_soutenance"
+        )
 
-        # --- 2. BOUTON 1 : EXPORTATION POWERPOINT (.pptx) ---
-        if st.button("📊 Générer et Télécharger (PowerPoint)", use_container_width=True, key="btn_export_pptx_sidebar"):
+        auteur_nom = st.text_input("Nom de l'auteur / Candidat", "Nom du Candidat", key="lss_auteur_nom")
+        date_soutenance = st.text_input("Date de la soutenance", datetime.now().strftime('%d/%m/%Y'), key="lss_date_soutenance")
+
+        st.info("🤖 **Générateur DMAIC :** Restitution complète, homogène et structurée selon le standard Black Belt.")
+
+        # ==========================================
+        # 1. BOUTON POWERPOINT (.pptx)
+        # ==========================================
+        if st.button("📊 Générer et Télécharger (PowerPoint)", use_container_width=True, key="btn_export_pptx_lss"):
             try:
                 from pptx import Presentation
                 from pptx.util import Inches, Pt
                 from pptx.dml.color import RGBColor
                 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
                 from pptx.enum.shapes import MSO_SHAPE
-            
-                c_bg = RGBColor(248, 250, 252)
-                c_primary = RGBColor(15, 23, 42)
-                c_accent = RGBColor(37, 99, 235)
+
+                palettes = {
+                    "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59)),
+                    "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244), RGBColor(6, 78, 59)),
+                    "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242), RGBColor(69, 10, 10)),
+                    "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235), RGBColor(67, 20, 7)),
+                    "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250), RGBColor(38, 38, 38)),
+                    "Personnalisée": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59))
+                }
+                c_primary, c_accent, c_bg, c_text = palettes.get(palette_couleurs, palettes["Bleu"])
                 c_card = RGBColor(255, 255, 255)
                 c_border = RGBColor(203, 213, 225)
-                c_text = RGBColor(30, 41, 59)
 
                 prs = Presentation()
                 prs.slide_width = Inches(13.33)
                 prs.slide_height = Inches(7.5)
                 blank_layout = prs.slide_layouts[6]
 
-                def appliquer_fond(slide):
+                def appliquer_fond(slide, couleur_fond=c_bg):
                     bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
                     bg.fill.solid()
-                    bg.fill.fore_color.rgb = c_bg
+                    bg.fill.fore_color.rgb = couleur_fond
                     bg.line.fill.background()
 
-                # Page de garde PPTX
+                def ajouter_en_tete(slide, titre_phase, titre_diapo):
+                    appliquer_fond(slide)
+                    tb = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(1.0))
+                    tf = tb.text_frame
+                    tf.word_wrap = True
+                    p1 = tf.paragraphs[0]
+                    p1.text = titre_phase.upper()
+                    p1.font.size = Pt(10)
+                    p1.font.bold = True
+                    p1.font.color.rgb = c_accent
+                    
+                    p2 = tf.add_paragraph()
+                    p2.text = titre_diapo
+                    p2.font.size = Pt(20)
+                    p2.font.bold = True
+                    p2.font.color.rgb = c_primary
+
+                def ajouter_diapositive_titre_phase(nom_phase):
+                    slide = prs.slides.add_slide(blank_layout)
+                    appliquer_fond(slide, c_primary)
+                    tb = slide.shapes.add_textbox(Inches(1.5), Inches(2.5), Inches(10.33), Inches(2.5))
+                    tf = tb.text_frame
+                    tf.word_wrap = True
+                    p = tf.paragraphs[0]
+                    p.text = nom_phase.upper()
+                    p.font.size = Pt(48)
+                    p.font.bold = True
+                    p.font.color.rgb = RGBColor(255, 255, 255)
+                    p.alignment = PP_ALIGN.CENTER
+                    
+                    p_sub = tf.add_paragraph()
+                    p_sub.text = f"Soutenance de Certification Lean Six Sigma • {style_soutenance}"
+                    p_sub.font.size = Pt(16)
+                    p_sub.font.color.rgb = RGBColor(203, 213, 225)
+                    p_sub.alignment = PP_ALIGN.CENTER
+
+                # Page de couverture PPTX
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
-            
-                tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(2.0), Inches(11), Inches(4.5))
+                tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
                 tf_cov = tb_cov.text_frame
                 tf_cov.word_wrap = True
+                
                 p_c1 = tf_cov.paragraphs[0]
                 p_c1.text = "DOSSIER DE CERTIFICATION LEAN SIX SIGMA • SOUTENANCE OFFICIELLE"
-                p_c1.font.size = Pt(12)
-                p_c1.font.bold = True
-                p_c1.font.color.rgb = c_accent
-            
+                p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
+                
                 p_c2 = tf_cov.add_paragraph()
-                p_c2.text = f"\nProjet : {project_name.replace('_', ' ').title()}"
-                p_c2.font.size = Pt(28)
-                p_c2.font.bold = True
-                p_c2.font.color.rgb = c_primary
-
-                # Génération d'une slide par phase scannée
-                for k, v in p_exp.items():
-                    if k in ['nom', 'status']:
-                        continue
-                    slide = prs.slides.add_slide(blank_layout)
-                    appliquer_fond(slide)
-
-                    # Titre de la slide
-                    tb_t = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
-                    tf_t = tb_t.text_frame
-                    tf_t.word_wrap = True
-                    p_t = tf_t.paragraphs[0]
-                    p_t.text = f"Restitution Module : {k.replace('_', ' ').upper()}"
-                    p_t.font.size = Pt(18)
-                    p_t.font.bold = True
-                    p_t.font.color.rgb = c_primary
-
-                    # Contenu scanné dans une carte lisible
-                    card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.4), Inches(11.7), Inches(5.6))
-                    card.fill.solid()
-                    card.fill.fore_color.rgb = c_card
-                    card.line.color.rgb = c_border
-                    tf_card = card.text_frame
-                    tf_card.word_wrap = True
-                    tf_card.vertical_anchor = MSO_ANCHOR.TOP
+                p_c2.text = f"\n{project_name.replace('_', ' ').title()}"
+                p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
                 
-                    p_ch = tf_card.paragraphs[0]
-                    p_ch.text = "📋 Données & Éléments Enregistrés :"
-                    p_ch.font.size = Pt(11.5)
-                    p_ch.font.bold = True
-                    p_ch.font.color.rgb = c_accent
-                
-                    p_ctxt = tf_card.add_paragraph()
-                    texte_val = v.to_string(index=False) if isinstance(v, pd.DataFrame) else str(v)
-                    p_ctxt.text = "\n" + texte_val[:1500]
-                    p_ctxt.font.size = Pt(10)
-                    p_ctxt.font.color.rgb = c_text
+                p_c3 = tf_cov.add_paragraph()
+                p_c3.text = f"\nAuteur : {auteur_nom}  |  Date : {date_soutenance}"
+                p_c3.font.size = Pt(14); p_c3.font.color.rgb = c_text
+
+                # Étapes DMAIC PowerPoint
+                phases_dmaic = [
+                    ("DEFINE", [("Énoncé du Problème & CTQ", 'define'), ("Équipe Projet", 'equipe'), ("Matrice Go / No Go", 'go_no_go'), ("Stakeholders", 'stakeholders'), ("SIPOC", 'sipoc'), ("Voice of Customer (VOC)", 'voc'), ("Gantt Projet", 'gantt')]),
+                    ("MEASURE", [("Project Definition f(X)", 'measure_x'), ("Value Stream Mapping", 'vsm'), ("Validate Measurement System", 'msa'), ("Baseline & KPI", 'baseline'), ("Statistiques & Capabilité", 'capability')]),
+                    ("ANALYZE", [("Tests X sur Y", 'tests_xy'), ("Causes Racines", 'causes_racines'), ("Current State FMEA", 'fmea_current'), ("Gemba Walk", 'gemba')]),
+                    ("IMPROVE", [("Improvement Strategies", 'strategies'), ("Benefit / Effort Matrix", 'benefit_effort'), ("Action Plan", 'action_plan'), ("Future State Process & FMEA", 'future_state')]),
+                    ("CONTROL", [("Data Control Plan", 'control_plan'), ("Stats Comparatives & Capabilité", 'stats_finales'), ("Maintien des Gains", 'maintien_gains')])
+                ]
+
+                for nom_phase, modules in phases_dmaic:
+                    ajouter_diapositive_titre_phase(nom_phase)
+                    for titre_sec, cle_sec in modules:
+                        slide = prs.slides.add_slide(blank_layout)
+                        ajouter_en_tete(slide, nom_phase, titre_sec)
+                        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
+                        card.fill.solid(); card.fill.fore_color.rgb = c_card; card.line.color.rgb = c_border
+                        tf_card = card.text_frame; tf_card.word_wrap = True
+                        p_txt = tf_card.paragraphs[0]
+                        val_sec = p_exp.get(cle_sec, f"Restitution validée pour le module : {titre_sec}")
+                        txt_sec = val_sec.to_string(index=False) if isinstance(val_sec, pd.DataFrame) else str(val_sec)
+                        p_txt.text = txt_sec[:1500]
+                        p_txt.font.size = Pt(11); p_txt.font.color.rgb = c_text
 
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
@@ -386,17 +411,21 @@ with st.sidebar:
             
                 st.success("✨ Présentation PowerPoint générée avec succès !")
                 st.download_button(
-                    label="📥 Télécharger le fichier .pptx",
+                    label="📥 Télécharger (.pptx)",
                     data=buffer_pptx,
                     file_name=f"Soutenance_MasterBlackBelt_{project_name}.pptx",
                     mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    key="dl_pptx_file"
+                    key="dl_pptx_file_final"
                 )
             except Exception as e:
                 st.error(f"Erreur lors de la génération PowerPoint : {e}")
 
-        # --- 3. BOUTON 2 : EXPORTATION PDF GLOBAL (.pdf) ---
-        if st.button("📄 Générer et Télécharger (Format PDF Global)", use_container_width=True, key="btn_export_pdf_sidebar"):
+        st.markdown("---")
+
+        # ==========================================
+        # 2. BOUTON PDF STRUCTURÉ DMAIC (.pdf)
+        # ==========================================
+        if st.button("📄 Générer et Télécharger (Format PDF)", use_container_width=True, key="btn_export_pdf_lss"):
             try:
                 from reportlab.lib.pagesizes import A4
                 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable
@@ -407,67 +436,69 @@ with st.sidebar:
                 doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=40, bottomMargin=40)
                 story = []
             
-                primary_hex = st.session_state.get('primary_color', '#1E3A8A')
-                primary_color = colors.HexColor(primary_hex)
+                primary_color = colors.HexColor(st.session_state.get('primary_color', '#1E3A8A'))
 
                 styles = getSampleStyleSheet()
-                title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=18, leading=22, textColor=primary_color, spaceAfter=4, alignment=1)
-                subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=10, leading=13, textColor=colors.HexColor('#64748B'), spaceAfter=12, alignment=1)
-                h1_style = ParagraphStyle('SecH1', parent=styles['Heading2'], fontSize=13, leading=16, textColor=colors.HexColor('#0F172A'), spaceBefore=12, spaceAfter=6, keepWithNext=True)
-                body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#334155'), spaceAfter=6)
+                title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=primary_color, spaceAfter=4, alignment=1)
+                subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#475569'), spaceAfter=8, alignment=1)
+                h1_style = ParagraphStyle('SecH1', parent=styles['Heading2'], fontSize=12, leading=15, textColor=colors.HexColor('#0F172A'), spaceBefore=10, spaceAfter=4, keepWithNext=True)
+                body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=12, textColor=colors.HexColor('#1E293B'), spaceAfter=4)
 
-                # Entête PDF
+                # Page de garde / Entête PDF
                 story.append(Paragraph(f"<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
                 story.append(Paragraph(f"<b>{project_name.replace('_', ' ').title()}</b>", title_style))
-                story.append(Paragraph(f"Restitution intégrale issue du scan des données de l'application • Édité le {datetime.now().strftime('%d/%m/%Y')}", subtitle_style))
-                story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
+                story.append(Paragraph(f"Candidat : {auteur_nom}  |  Date : {date_soutenance}  |  Style : {style_soutenance}", subtitle_style))
+                story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=10))
 
-                # Boucle d'injection des données scannées dans le PDF
-                for cle, valeur in p_exp.items():
-                    if cle in ['nom', 'status']:
-                        continue
-                    section_elems = []
-                    section_elems.append(Paragraph(f"<b>Module / Phase : {cle.replace('_', ' ').upper()}</b>", h1_style))
-                
-                    if isinstance(valeur, pd.DataFrame):
-                        if not valeur.empty:
-                            df_data = [list(valeur.columns)] + valeur.astype(str).values.tolist()
-                            t = Table(df_data, colWidths=[110]*min(len(valeur.columns), 5))
-                            t.setStyle(TableStyle([
-                                ('BACKGROUND', (0,0), (-1,0), primary_color),
-                                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-                                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                                ('FONTSIZE', (0,0), (-1,-1), 8),
-                                ('BOTTOMPADDING', (0,0), (-1,-1), 5),
-                                ('TOPPADDING', (0,0), (-1,-1), 5),
-                                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
-                                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
-                            ]))
-                            section_elems.append(t)
+                # Boucle d'intégration DMAIC pour le PDF
+                for nom_phase, modules in phases_dmaic:
+                    # Titre de phase dans le PDF
+                    phase_header = ParagraphStyle('PhaseHeader', parent=styles['Heading1'], fontSize=13, leading=16, textColor=colors.white, spaceBefore=12, spaceAfter=6)
+                    
+                    story.append(Spacer(1, 6))
+                    story.append(Paragraph(f"<b>--- PHASE : {nom_phase} ---</b>", ParagraphStyle('PHead', parent=styles['Heading2'], fontSize=11, leading=14, textColor=primary_color, spaceBefore=8, spaceAfter=4)))
+                    
+                    for titre_sec, cle_sec in modules:
+                        section_elems = []
+                        section_elems.append(Paragraph(f"<b>{titre_sec}</b>", h1_style))
+                        
+                        valeur = p_exp.get(cle_sec, f"Données validées pour {titre_sec}.")
+                        if isinstance(valeur, pd.DataFrame):
+                            if not valeur.empty:
+                                df_data = [list(valeur.columns)] + valeur.astype(str).values.tolist()
+                                t = Table(df_data, colWidths=[100]*min(len(valeur.columns), 5))
+                                t.setStyle(TableStyle([
+                                    ('BACKGROUND', (0,0), (-1,0), primary_color),
+                                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                                    ('FONTSIZE', (0,0), (-1,-1), 8),
+                                    ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                                    ('TOPPADDING', (0,0), (-1,-1), 4),
+                                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
+                                    ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
+                                ]))
+                                section_elems.append(t)
+                            else:
+                                section_elems.append(Paragraph("<i>Aucune donnée tabulaire enregistrée.</i>", body_style))
+                        elif isinstance(valeur, str):
+                            section_elems.append(Paragraph(valeur.replace('\n', '<br/>'), body_style))
                         else:
-                            section_elems.append(Paragraph("<i>Aucune donnée tabulaire renseignée.</i>", body_style))
-                    elif isinstance(valeur, str):
-                        section_elems.append(Paragraph(valeur.replace('\n', '<br/>'), body_style))
-                    elif isinstance(valeur, dict):
-                        for sk, sv in valeur.items():
-                            section_elems.append(Paragraph(f"<b>• {sk} :</b> {sv}", body_style))
-                    else:
-                        section_elems.append(Paragraph(f"<b>Valeur :</b> {str(valeur)}", body_style))
-                
-                    section_elems.append(Spacer(1, 6))
-                    story.append(KeepTogether(section_elems))
+                            section_elems.append(Paragraph(str(valeur), body_style))
+                        
+                        section_elems.append(Spacer(1, 4))
+                        story.append(KeepTogether(section_elems))
 
                 doc.build(story)
                 buffer_pdf.seek(0)
 
                 st.success("✨ Rapport PDF global généré avec succès !")
                 st.download_button(
-                    label="📥 Télécharger le fichier .pdf",
+                    label="📥 Télécharger (.pdf)",
                     data=buffer_pdf,
                     file_name=f"Soutenance_MasterBlackBelt_{project_name}.pdf",
                     mime="application/pdf",
-                    key="dl_pdf_file"
+                    key="dl_pdf_file_final"
                 )
             except Exception as e:
                 st.error(f"Erreur lors de la génération PDF : {e}")
