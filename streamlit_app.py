@@ -282,13 +282,13 @@ with st.sidebar:
 
         st.markdown("---")
         st.markdown("### 🎛️ Paramètres de l'Agent IA (Master Black Belt)")
-        
+    
         theme_graphique = st.selectbox(
             "Thème graphique",
             ["Professionnel", "Épuré", "Corporate", "Moderne", "Minimaliste", "Exécutif", "Académique"],
             key="lss_theme_graphique"
         )
-        
+    
         palette_couleurs = st.selectbox(
             "Palette de couleurs",
             ["Bleu", "Vert", "Rouge", "Orange", "Gris", "Personnalisée"],
@@ -305,26 +305,23 @@ with st.sidebar:
         # ----------------------------------------------------
         def agent_ia_formater_contenu_mbb(phase, titre, contenu_brut):
             """
-            Filtre les données aberrantes/tests (ex: 'hffh') et reformule 
+            Filtre les données aberrantes/tests et reformule 
             le contenu sous forme de synthèse exécutive structurée.
             """
             txt_str = str(contenu_brut).strip()
-            
-            # Élimination des bruits de saisie et tests
+        
             textes_parasites = ['hffh', 'gfgjhh', 'khkjh', 'test', 'asdf', '1234']
             if txt_str.lower() in textes_parasites or len(txt_str) < 3:
                 return "Élément en cours de consolidation méthodologique."
 
-            # Si c'est un dictionnaire, on extrait proprement les paramètres clés
             if isinstance(contenu_brut, dict):
                 lignes = [f"• **{k.replace('_', ' ').title()}** : {v}" for k, v in contenu_brut.items() if str(v).lower() not in textes_parasites]
                 return "\n".join(lignes) if lignes else "Données validées pour le jalon."
-            
-            # Si c'est une liste
+        
             elif isinstance(contenu_brut, list):
                 lignes = [f"• {item}" for item in contenu_brut if str(item).lower() not in textes_parasites]
                 return "\n".join(lignes) if lignes else "Synthèse des actions validée."
-            
+        
             return txt_str
 
         # ----------------------------------------------------
@@ -333,35 +330,33 @@ with st.sidebar:
         def agent_ia_recuperer_donnees_profondes(projet_dict):
             elements_analyses = []
             exclus = ['nom', 'status']
-            
+        
             for cle, valeur in projet_dict.items():
                 if cle in exclus or valeur is None:
                     continue
-                
+            
                 cle_str = str(cle).strip().lower()
                 titre_propre = str(cle).replace('_', ' ').upper()
-                
+            
                 if 'voc' in cle_str and 'data' in cle_str:
                     continue
-                
-                # Affectation de la phase DMAIC cible
+            
                 phase_cible = "DEFINE"
                 mots_define = ['define', 'problem', 'ctq', 'equipe', 'team', 'go_no_go', 'stakeholder', 'sipoc', 'gantt', 'planning', 'themat']
                 mots_measure = ['measure', 'vsm', 'msa', 'baseline', 'kpi', 'stat', 'capab', 'mesure', 'process']
                 mots_analyze = ['test', 'cause', 'ishikawa', 'five', '5whys', 'fmea', 'gemba', 'analys', 'mouca']
                 mots_improve = ['improve', 'innov', 'amelior', 'strateg', 'benefit', 'effort', 'action', 'future', 'pilote_solution']
                 mots_control = ['control', 'compar', 'gains', 'pilot', 'suivi', 'standard']
-                
+            
                 if any(m in cle_str for m in mots_control): phase_cible = "CONTROL"
                 elif any(m in cle_str for m in mots_improve): phase_cible = "IMPROVE"
                 elif any(m in cle_str for m in mots_analyze): phase_cible = "ANALYZE"
                 elif any(m in cle_str for m in mots_measure): phase_cible = "MEASURE"
                 elif any(m in cle_str for m in mots_define): phase_cible = "DEFINE"
-                
-                # Détection des graphiques (Plotly / Matplotlib)
+            
                 is_plotly = "plotly.graph_objs" in str(type(valeur)) or hasattr(valeur, 'to_image')
                 is_matplotlib = "matplotlib.figure" in str(type(valeur))
-                
+            
                 if is_plotly or is_matplotlib:
                     elements_analyses.append({
                         "type": "figure",
@@ -394,9 +389,16 @@ with st.sidebar:
                             "data": agent_ia_formater_contenu_mbb(phase_cible, titre_propre, val_str),
                             "phase": phase_cible
                         })
-            
+        
             return elements_analyses
 
+        # ====================================================
+        # 🔄 ARCHITECTURE EN DEUX TEMPS (Extraction & Structuration)
+        # ====================================================
+        st.markdown("---")
+        st.markdown("### 📋 Étape 1 : Audit et Validation du Plan d'Extraction DMAIC")
+    
+        # Temps 1 : Extraction brute et structuration intermédiaire affichée à l'écran
         donnees_completes_projet = agent_ia_recuperer_donnees_profondes(p_exp)
 
         def regrouper_par_phase_stricte(elements):
@@ -407,6 +409,20 @@ with st.sidebar:
             return mapping
 
         elements_dmaic_organises = regrouper_par_phase_stricte(donnees_completes_projet)
+
+        # Affichage du résumé de l'extraction en temps réel pour l'utilisateur
+        total_elements = len(donnees_completes_projet)
+        st.success(f"🎯 **Audit Master Black Belt terminé :** {total_elements} éléments exploitables cartographiés à travers le cycle DMAIC.")
+    
+        with st.expander("🔍 Voir le détail du plan d'extraction validé par l'Agent IA"):
+            for ph_nom, elems in elements_dmaic_organises.items():
+                if elems:
+                    st.markdown(f"**Phase {ph_nom}** ({len(elems)} livrables détectés)")
+                    for e in elems:
+                        st.text(f"  • [{e['type'].upper()}] {e['titre']}")
+
+        st.markdown("---")
+        st.markdown("### 🚀 Étape 2 : Génération des Livrables Exécutifs")
 
         # ==========================================
         # 1. BOUTON POWERPOINT (.pptx) - FORMAT MBB
@@ -446,7 +462,7 @@ with st.sidebar:
                     p1 = tf.paragraphs[0]
                     p1.text = f"PHASE DMAIC : {str(titre_phase).upper()}"
                     p1.font.size = Pt(10); p1.font.bold = True; p1.font.color.rgb = c_accent
-                    
+                
                     p2 = tf.add_paragraph()
                     p2.text = str(titre_diapo)
                     p2.font.size = Pt(18); p2.font.bold = True; p2.font.color.rgb = c_primary
@@ -460,46 +476,44 @@ with st.sidebar:
                     p.text = f"PHASE {str(nom_phase).upper()}"
                     p.font.size = Pt(40); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
                     p.alignment = PP_ALIGN.CENTER
-                    
+                
                     p_sub = tf.add_paragraph()
                     p_sub.text = f"Soutenance Lean Six Sigma • {str(project_name)}"
                     p_sub.font.size = Pt(14); p_sub.font.color.rgb = RGBColor(203, 213, 225)
                     p_sub.alignment = PP_ALIGN.CENTER
 
-                # Diapositive de couverture officielle
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
                 tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
                 tf_cov = tb_cov.text_frame; tf_cov.word_wrap = True
-                
+            
                 p_c1 = tf_cov.paragraphs[0]
                 p_c1.text = "SOUTENANCE OFFICIELLE DE CERTIFICATION LEAN SIX SIGMA"
                 p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
-                
+            
                 p_c2 = tf_cov.add_paragraph()
                 p_c2.text = f"\n{str(project_name)}"
                 p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
-                
+            
                 p_c3 = tf_cov.add_paragraph()
                 p_c3.text = f"\nCandidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}"
                 p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
-                # Génération séquentielle par phase DMAIC
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
                     if not liste_elements: continue
-                    
+                
                     ajouter_diapositive_titre_phase(nom_phase)
-                    
+                
                     for elem in liste_elements:
                         slide = prs.slides.add_slide(blank_layout)
                         ajouter_en_tete(slide, nom_phase, elem["titre"])
-                        
+                    
                         if elem["type"] == "dataframe":
                             valeur_df = elem["data"].astype(str)
                             rows, cols = min(len(valeur_df) + 1, 10), len(valeur_df.columns)
                             table_shape = slide.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.7), Inches(min(5.2, 0.5 * rows)))
                             table = table_shape.table
-                            
+                        
                             for col_idx, col_name in enumerate(valeur_df.columns):
                                 cell = table.cell(0, col_idx)
                                 cell.text = str(col_name)
@@ -507,7 +521,7 @@ with st.sidebar:
                                 for p in cell.text_frame.paragraphs:
                                     p.font.size = Pt(10); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
                                     p.alignment = PP_ALIGN.CENTER
-                                    
+                                
                             for row_idx, row in enumerate(valeur_df.values[:9]):
                                 for col_idx, val in enumerate(row):
                                     cell = table.cell(row_idx + 1, col_idx)
@@ -526,7 +540,7 @@ with st.sidebar:
                                 buf = io.BytesIO()
                                 fig.savefig(buf, format='png', bbox_inches='tight')
                                 img_bytes = buf.getvalue()
-                                
+                            
                             if img_bytes:
                                 image_stream = io.BytesIO(img_bytes)
                                 slide.shapes.add_picture(image_stream, Inches(1.2), Inches(1.6), width=Inches(10.8))
@@ -542,7 +556,7 @@ with st.sidebar:
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
-            
+        
                 st.success("✨ Présentation PowerPoint structurée par l'Agent MBB générée avec succès !")
                 st.download_button(
                     label="📥 Télécharger (.pptx)",
@@ -557,7 +571,7 @@ with st.sidebar:
         st.markdown("---")
 
         # ==========================================
-        # 2. BOUTON PDF (.pdf) - FORMAT RAPPORT OFFICEL
+        # 2. BOUTON PDF (.pdf) - FORMAT RAPPORT OFFICIEL
         # ==========================================
         if st.button("📄 Agent IA : Générer Rapport PDF Exécutif", use_container_width=True, key="btn_export_pdf_lss"):
             try:
@@ -569,7 +583,7 @@ with st.sidebar:
                 buffer_pdf = io.BytesIO()
                 doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=40, bottomMargin=40)
                 story = []
-            
+        
                 primary_color = colors.HexColor(st.session_state.get('primary_color', '#1E3A8A'))
 
                 styles = getSampleStyleSheet()
@@ -586,12 +600,12 @@ with st.sidebar:
 
                 for nom_phase, liste_elements in elements_dmaic_organises.items():
                     if not liste_elements: continue
-                        
-                    story.append(Paragraph(f"<b>--- PHASE DMAIC : {str(nom_phase)} ---</b>", phase_title_style))
                     
+                    story.append(Paragraph(f"<b>--- PHASE DMAIC : {str(nom_phase)} ---</b>", phase_title_style))
+                
                     for elem in liste_elements:
                         section_elems = [Paragraph(f"<b>{str(elem['titre'])}</b>", h1_style)]
-                        
+                    
                         if elem["type"] == "dataframe":
                             valeur_df = elem["data"].astype(str)
                             df_data = [list(valeur_df.columns)] + valeur_df.values.tolist()
@@ -621,7 +635,7 @@ with st.sidebar:
                         else:
                             texte_affiche = str(elem["data"]).replace('\n', '<br/>')
                             section_elems.append(Paragraph(texte_affiche, body_style))
-                        
+                    
                         section_elems.append(Spacer(1, 6))
                         story.append(KeepTogether(section_elems))
 
