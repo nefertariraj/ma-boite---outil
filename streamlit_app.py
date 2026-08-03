@@ -374,22 +374,137 @@ with st.sidebar:
         # ==========================================================
         # 2. BOUTON 1 : "Organiser présentation" (Cadrage Master Black Belt)
         # ==========================================================
-        if st.button("🧠 1. Agent IA : Organiser la présentation", use_container_width=True, key="btn_organiser_mbb"):
-            st.session_state["mbb_plan_organise"] = True
-            st.success("🎯 Analyse Master Black Belt effectuée : la structure méthodologique et les correspondances de la sauvegarde JSON ont été cartographiées avec succès !")
+        projet = st.session_state.get("projet_actuel", {})
 
-        # Vérification si l'étape 2 a été exécutée pour débloquer la suite
-        if st.session_state.get("mbb_plan_organise", False):
-            st.info("💡 **Cadrage MBB validé :** L'agent est prêt à structurer les livrables pour la soutenance.")
-        
-            with st.expander("📜 Voir la consigne textuelle générée par l'Agent MBB pour la structuration"):
-                st.markdown("""
-                * **Rôle assigné :** Master Black Belt Lean Six Sigma.
-                * **Objectif de restitution :** Traduire chaque jalon de la structure DMAIC issue de la sauvegarde JSON en un storytelling exécutif rigoureux.
-                * **Lignes directrices :** Mettre en valeur la voix du client (VOC/CTQ), valider la robustesse statistique des mesures (MSA/Capabilités), structurer les causes racines (Ishikawa/5 Whys/FMEA), et prouver l'efficience financière des gains (Control).
-                """)
+        if st.button("🎤 Organiser la présentation du projet (Prêt pour Gamma / Agent IA)"):
+          st.markdown("---")
+          st.subheader(
+              "🤖 Cahier des Charges & Prompt Master Class pour l'Agent de Présentation"
+          )
+          st.info(
+              "Ce script génère un plan slide par slide structuré, conçu pour que"
+              " l'agent IA (ex: Gamma) reproduise fidèlement l'application avec"
+              " graphiques, tableaux et logique DMAIC."
+          )
 
-            st.markdown("---")
+          # Extraction des données de base
+          nom_projet = projet.get("nom", projet.get("name", "Projet Lean Six Sigma"))
+          status_projet = projet.get("status", "Define")
+          progression = projet.get("progression", 0)
+          dmaic = projet.get("dmaic", {})
+
+          # Fonction de conversion sécurisée pour les DataFrames
+          def extraire_df(cle):
+            val = projet.get(cle, {})
+            if isinstance(val, dict) and val.get("_type_df_"):
+              return pd.DataFrame(val.get("data", []))
+            elif isinstance(val, pd.DataFrame):
+              return val
+            return pd.DataFrame()
+
+          df_gantt = extraire_df("gantt_data")
+          df_mesure = extraire_df("mesure_data")
+          df_voc = extraire_df("voc_raw_data")
+          voc_questions = projet.get("voc_questions", [])
+
+          # Éléments DMAIC
+          charte = dmaic.get("define", {}).get("projet_charter", "Non renseigné")
+          msa_notes = dmaic.get("measure", {}).get("msa_notes", "Non renseigné")
+          ishikawa_notes = dmaic.get("analyze", {}).get("ishikawa_notes", "Non renseigné")
+          strategies = dmaic.get("improve", {}).get("strategies", [])
+          gains = dmaic.get("control", {}).get("gains_financiers", "Non chiffré")
+
+          # CONSTRUCTION DU PROMPT ULTRA-DÉTAILLÉ SLIDE PAR SLIDE (GAMMA / AGENT IA READY)
+          prompt_ia = f"""
+        [INSTRUCTIONS STRICTES POUR L'AGENT DE PRÉSENTATION / GAMMA]
+        Agis en tant qu'expert Master Black Belt Lean Six Sigma et Directeur de Programme. Ta mission est de générer une présentation PowerPoint / Web (style deck exécutif moderne, épuré, professionnel) basée sur l'intégralité des données structurées du projet ci-dessous. 
+
+        Tu dois suivre rigoureusement la structure slide par slide définie ci-dessous pour que la présentation reflète exactement l'application de pilotage.
+
+        ---
+        ### SLIDE 1 : TITRE & SYNTHÈSE GLOBALE DU PROJET
+        - **Layout suggéré :** Carte de couverture moderne avec indicateurs clés (KPI cards).
+        - **Titre du Projet :** {nom_projet}
+        - **Statut / Jalon DMAIC actuel :** {status_projet}
+        - **Progression globale :** {progression}%
+        - **Sous-titre :** Pilotage par la démarche Lean Six Sigma (DMAIC).
+
+        ---
+        ### SLIDE 2 : PLANNING & JALONS DU PROJET (GANTT)
+        - **Layout suggéré :** Tableau chronologique ou frise chronologique (Timeline).
+        - **Contenu à intégrer :**
+        {df_gantt.to_markdown(index=False) if not df_gantt.empty else 'Aucun jalon de planning enregistré.'}
+
+        ---
+        ### SLIDE 3 : PHASE DEFINE - CHARTE PROJET
+        - **Layout suggéré :** Grille à 2 colonnes (Problématique / Objectifs & Périmètre).
+        - **Détails de la Charte :**
+        {charte}
+
+        ---
+        ### SLIDE 4 : PHASE DEFINE - VOIX DU CLIENT (VOC)
+        - **Layout suggéré :** Liste à puces avec icônes + Tableau de synthèse.
+        - **Questions clés posées :** {', '.join(voc_questions) if voc_questions else 'N/A'}
+        - **Retours clients bruts enregistrés :**
+        {df_voc.to_markdown(index=False) if not df_voc.empty else 'Aucune donnée VOC brute.'}
+
+        ---
+        ### SLIDE 5 : PHASE MEASURE - PLAN DE COLLECTE & MSA
+        - **Layout suggéré :** Bloc de texte structuré + encadré de validation statistique.
+        - **Notes d'analyse MSA & Baseline :**
+        {msa_notes}
+
+        - **Aperçu des Données de Mesure :**
+        {df_mesure.head(5).to_markdown(index=False) if not df_mesure.empty else 'Données de mesure standard.'}
+
+        ---
+        ### SLIDE 6 : PHASE ANALYZE - DIAGRAMME D'ISHIKAWA & CAUSES RACINES
+        - **Layout suggéré :** Schéma en arêtes de poisson (ou tableau synthétique par branches 5M).
+        - **Analyse des Causes Racines :**
+        {ishikawa_notes}
+
+        ---
+        ### SLIDE 7 : PHASE IMPROVE - STRATÉGIES & SOLUTIONS SÉLECTIONNÉES
+        - **Layout suggéré :** Matrice Impact/Effort ou Tableau comparatif structuré.
+        - **Solutions identifiées :**
+        """
+
+          if strategies:
+            for idx, s in enumerate(strategies, 1):
+              prompt_ia += f"• **Solution {idx} :** {s.get('Solution', 'N/A')} | **Impact :** {s.get('Impact', 'N/A')} | **Effort :** {s.get('Effort', 'N/A')}\n"
+          else:
+            prompt_ia += "Aucune stratégie d'amélioration enregistrée.\n"
+
+          prompt_ia += f"""
+
+        ---
+        ### SLIDE 8 : PHASE CONTROL - GAINS FINANCIERS & PÉRENNITÉ
+        - **Layout suggéré :** Chiffres clés grands formats (Big Numbers) + Plan de surveillance.
+        - **Gains Financiers / Opérationnels :** {gains}
+        - **Conclusion :** Clôture du projet et transfert des responsabilités au propriétaire du processus (Process Owner).
+
+        [FIN DU CAHIER DES CHARGES]
+        """
+
+          # Affichage dans l'application
+          st.text_area(
+              "📦 Cahier des charges complet pour Gamma / Agent IA :",
+              value=prompt_ia,
+              height=450,
+              help="Copiez ce texte et collez-le directement dans Gamma ou votre agent IA.",
+          )
+
+          st.download_button(
+              label=(
+                  "📥 Télécharger le cahier des charges de présentation (.txt pour"
+                  " l'IA)"
+              ),
+              data=prompt_ia,
+              file_name=(
+                  f"cahier_des_charges_{nom_projet.lower().replace(' ', '_')}.txt"
+              ),
+              mime="text/plain",
+          )
 
             # ==========================================================
             # 3. BOUTON 2 : "Générer présentation PowerPoint" (Style Gamma / Exécutif)
