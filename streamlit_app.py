@@ -304,12 +304,7 @@ with st.sidebar:
         # 🧠 MOTEUR IA : ANALYSE MÉTIER ET STORYTELLING DMAIC
         # ----------------------------------------------------
         def agent_ia_formater_contenu_mbb(phase, titre, contenu_brut):
-            """
-            Filtre les données aberrantes/tests et reformule 
-            le contenu sous forme de synthèse exécutive structurée.
-            """
             txt_str = str(contenu_brut).strip()
-        
             textes_parasites = ['hffh', 'gfgjhh', 'khkjh', 'test', 'asdf', '1234']
             if txt_str.lower() in textes_parasites or len(txt_str) < 3:
                 return "Élément en cours de consolidation méthodologique."
@@ -317,27 +312,19 @@ with st.sidebar:
             if isinstance(contenu_brut, dict):
                 lignes = [f"• **{k.replace('_', ' ').title()}** : {v}" for k, v in contenu_brut.items() if str(v).lower() not in textes_parasites]
                 return "\n".join(lignes) if lignes else "Données validées pour le jalon."
-        
             elif isinstance(contenu_brut, list):
                 lignes = [f"• {item}" for item in contenu_brut if str(item).lower() not in textes_parasites]
                 return "\n".join(lignes) if lignes else "Synthèse des actions validée."
-        
             return txt_str
 
-        # ----------------------------------------------------
-        # 🔍 MOTEUR DE BALAYAGE ET CLASSIFICATION DMAIC STRICTE
-        # ----------------------------------------------------
         def agent_ia_recuperer_donnees_profondes(projet_dict):
             elements_analyses = []
             exclus = ['nom', 'status']
-        
             for cle, valeur in projet_dict.items():
                 if cle in exclus or valeur is None:
                     continue
-            
                 cle_str = str(cle).strip().lower()
                 titre_propre = str(cle).replace('_', ' ').upper()
-            
                 if 'voc' in cle_str and 'data' in cle_str:
                     continue
             
@@ -358,47 +345,19 @@ with st.sidebar:
                 is_matplotlib = "matplotlib.figure" in str(type(valeur))
             
                 if is_plotly or is_matplotlib:
-                    elements_analyses.append({
-                        "type": "figure",
-                        "titre": titre_propre,
-                        "data": valeur,
-                        "phase": phase_cible
-                    })
+                    elements_analyses.append({"type": "figure", "titre": titre_propre, "data": valeur, "phase": phase_cible})
                 elif isinstance(valeur, pd.DataFrame):
                     if hasattr(valeur, 'empty') and not valeur.empty:
-                        elements_analyses.append({
-                            "type": "dataframe",
-                            "titre": titre_propre,
-                            "data": valeur,
-                            "phase": phase_cible
-                        })
+                        elements_analyses.append({"type": "dataframe", "titre": titre_propre, "data": valeur, "phase": phase_cible})
                 elif isinstance(valeur, (dict, list)):
                     if len(valeur) > 0:
-                        elements_analyses.append({
-                            "type": "texte_synthétisé",
-                            "titre": titre_propre,
-                            "data": agent_ia_formater_contenu_mbb(phase_cible, titre_propre, valeur),
-                            "phase": phase_cible
-                        })
+                        elements_analyses.append({"type": "texte_synthétisé", "titre": titre_propre, "data": agent_ia_formater_contenu_mbb(phase_cible, titre_propre, valeur), "phase": phase_cible})
                 else:
                     val_str = str(valeur).strip()
                     if val_str != "" and "array" not in val_str.lower() and "object at" not in val_str.lower():
-                        elements_analyses.append({
-                            "type": "texte_synthétisé",
-                            "titre": titre_propre,
-                            "data": agent_ia_formater_contenu_mbb(phase_cible, titre_propre, val_str),
-                            "phase": phase_cible
-                        })
-        
+                        elements_analyses.append({"type": "texte_synthétisé", "titre": titre_propre, "data": agent_ia_formater_contenu_mbb(phase_cible, titre_propre, val_str), "phase": phase_cible})
             return elements_analyses
 
-        # ====================================================
-        # 🔄 ARCHITECTURE EN DEUX TEMPS (Extraction & Structuration)
-        # ====================================================
-        st.markdown("---")
-        st.markdown("### 📋 Étape 1 : Audit et Validation du Plan d'Extraction DMAIC")
-    
-        # Temps 1 : Extraction brute et structuration intermédiaire affichée à l'écran
         donnees_completes_projet = agent_ia_recuperer_donnees_profondes(p_exp)
 
         def regrouper_par_phase_stricte(elements):
@@ -410,248 +369,255 @@ with st.sidebar:
 
         elements_dmaic_organises = regrouper_par_phase_stricte(donnees_completes_projet)
 
-        # Affichage du résumé de l'extraction en temps réel pour l'utilisateur
-        total_elements = len(donnees_completes_projet)
-        st.success(f"🎯 **Audit Master Black Belt terminé :** {total_elements} éléments exploitables cartographiés à travers le cycle DMAIC.")
-    
-        with st.expander("🔍 Voir le détail du plan d'extraction validé par l'Agent IA"):
-            for ph_nom, elems in elements_dmaic_organises.items():
-                if elems:
-                    st.markdown(f"**Phase {ph_nom}** ({len(elems)} livrables détectés)")
-                    for e in elems:
-                        st.text(f"  • [{e['type'].upper()}] {e['titre']}")
-
         st.markdown("---")
-        st.markdown("### 🚀 Étape 2 : Génération des Livrables Exécutifs")
 
-        # ==========================================
-        # 1. BOUTON POWERPOINT (.pptx) - FORMAT MBB
-        # ==========================================
-        if st.button("📊 Agent IA : Générer PowerPoint Exécutif", use_container_width=True, key="btn_export_pptx_lss"):
-            try:
-                from pptx import Presentation
-                from pptx.util import Inches, Pt
-                from pptx.dml.color import RGBColor
-                from pptx.enum.text import PP_ALIGN
-                from pptx.enum.shapes import MSO_SHAPE
+        # ==========================================================
+        # 2. BOUTON 1 : "Organiser présentation" (Cadrage Master Black Belt)
+        # ==========================================================
+        if st.button("🧠 1. Agent IA : Organiser la présentation", use_container_width=True, key="btn_organiser_mbb"):
+            st.session_state["mbb_plan_organise"] = True
+            st.success("🎯 Analyse Master Black Belt effectuée : la structure méthodologique et les correspondances de la sauvegarde JSON ont été cartographiées avec succès !")
 
-                palettes = {
-                    "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59)),
-                    "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244), RGBColor(6, 78, 59)),
-                    "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242), RGBColor(69, 10, 10)),
-                    "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235), RGBColor(67, 20, 7)),
-                    "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250), RGBColor(38, 38, 38)),
-                    "Personnalisée": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59))
-                }
-                c_primary, c_accent, c_bg, c_text = palettes.get(palette_couleurs, palettes["Bleu"])
+        # Vérification si l'étape 2 a été exécutée pour débloquer la suite
+        if st.session_state.get("mbb_plan_organise", False):
+            st.info("💡 **Cadrage MBB validé :** L'agent est prêt à structurer les livrables pour la soutenance.")
+        
+            with st.expander("📜 Voir la consigne textuelle générée par l'Agent MBB pour la structuration"):
+                st.markdown("""
+                * **Rôle assigné :** Master Black Belt Lean Six Sigma.
+                * **Objectif de restitution :** Traduire chaque jalon de la structure DMAIC issue de la sauvegarde JSON en un storytelling exécutif rigoureux.
+                * **Lignes directrices :** Mettre en valeur la voix du client (VOC/CTQ), valider la robustesse statistique des mesures (MSA/Capabilités), structurer les causes racines (Ishikawa/5 Whys/FMEA), et prouver l'efficience financière des gains (Control).
+                """)
 
-                prs = Presentation()
-                prs.slide_width = Inches(13.33)
-                prs.slide_height = Inches(7.5)
-                blank_layout = prs.slide_layouts[6]
+            st.markdown("---")
 
-                def appliquer_fond(slide, couleur_fond=c_bg):
-                    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
-                    bg.fill.solid(); bg.fill.fore_color.rgb = couleur_fond
-                    bg.line.fill.background()
+            # ==========================================================
+            # 3. BOUTON 2 : "Générer présentation PowerPoint" (Style Gamma / Exécutif)
+            # ==========================================================
+            if st.button("📊 2. Générer présentation PowerPoint", use_container_width=True, key="btn_export_pptx_lss"):
+                try:
+                    from pptx import Presentation
+                    from pptx.util import Inches, Pt
+                    from pptx.dml.color import RGBColor
+                    from pptx.enum.text import PP_ALIGN
+                    from pptx.enum.shapes import MSO_SHAPE
 
-                def ajouter_en_tete(slide, titre_phase, titre_diapo):
-                    appliquer_fond(slide)
-                    tb = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
-                    tf = tb.text_frame; tf.word_wrap = True
-                    p1 = tf.paragraphs[0]
-                    p1.text = f"PHASE DMAIC : {str(titre_phase).upper()}"
-                    p1.font.size = Pt(10); p1.font.bold = True; p1.font.color.rgb = c_accent
-                
-                    p2 = tf.add_paragraph()
-                    p2.text = str(titre_diapo)
-                    p2.font.size = Pt(18); p2.font.bold = True; p2.font.color.rgb = c_primary
+                    palettes = {
+                        "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59)),
+                        "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244), RGBColor(6, 78, 59)),
+                        "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242), RGBColor(69, 10, 10)),
+                        "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235), RGBColor(67, 20, 7)),
+                        "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250), RGBColor(38, 38, 38)),
+                        "Personnalisée": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59))
+                    }
+                    c_primary, c_accent, c_bg, c_text = palettes.get(palette_couleurs, palettes["Bleu"])
 
-                def ajouter_diapositive_titre_phase(nom_phase):
-                    slide = prs.slides.add_slide(blank_layout)
-                    appliquer_fond(slide, c_primary)
-                    tb = slide.shapes.add_textbox(Inches(1.5), Inches(2.5), Inches(10.33), Inches(2.5))
-                    tf = tb.text_frame; tf.word_wrap = True
-                    p = tf.paragraphs[0]
-                    p.text = f"PHASE {str(nom_phase).upper()}"
-                    p.font.size = Pt(40); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
-                    p.alignment = PP_ALIGN.CENTER
-                
-                    p_sub = tf.add_paragraph()
-                    p_sub.text = f"Soutenance Lean Six Sigma • {str(project_name)}"
-                    p_sub.font.size = Pt(14); p_sub.font.color.rgb = RGBColor(203, 213, 225)
-                    p_sub.alignment = PP_ALIGN.CENTER
+                    prs = Presentation()
+                    prs.slide_width = Inches(13.33)
+                    prs.slide_height = Inches(7.5)
+                    blank_layout = prs.slide_layouts[6]
 
-                slide_cover = prs.slides.add_slide(blank_layout)
-                appliquer_fond(slide_cover)
-                tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
-                tf_cov = tb_cov.text_frame; tf_cov.word_wrap = True
-            
-                p_c1 = tf_cov.paragraphs[0]
-                p_c1.text = "SOUTENANCE OFFICIELLE DE CERTIFICATION LEAN SIX SIGMA"
-                p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
-            
-                p_c2 = tf_cov.add_paragraph()
-                p_c2.text = f"\n{str(project_name)}"
-                p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
-            
-                p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\nCandidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}"
-                p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
+                    def appliquer_fond(slide, couleur_fond=c_bg):
+                        bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
+                        bg.fill.solid(); bg.fill.fore_color.rgb = couleur_fond
+                        bg.line.fill.background()
 
-                for nom_phase, liste_elements in elements_dmaic_organises.items():
-                    if not liste_elements: continue
-                
-                    ajouter_diapositive_titre_phase(nom_phase)
-                
-                    for elem in liste_elements:
+                    def ajouter_en_tete(slide, titre_phase, titre_diapo):
+                        appliquer_fond(slide)
+                        tb = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
+                        tf = tb.text_frame; tf.word_wrap = True
+                        p1 = tf.paragraphs[0]
+                        p1.text = f"PHASE DMAIC : {str(titre_phase).upper()}"
+                        p1.font.size = Pt(10); p1.font.bold = True; p1.font.color.rgb = c_accent
+                    
+                        p2 = tf.add_paragraph()
+                        p2.text = str(titre_diapo)
+                        p2.font.size = Pt(18); p2.font.bold = True; p2.font.color.rgb = c_primary
+
+                    def ajouter_diapositive_titre_phase(nom_phase):
                         slide = prs.slides.add_slide(blank_layout)
-                        ajouter_en_tete(slide, nom_phase, elem["titre"])
+                        appliquer_fond(slide, c_primary)
+                        tb = slide.shapes.add_textbox(Inches(1.5), Inches(2.5), Inches(10.33), Inches(2.5))
+                        tf = tb.text_frame; tf.word_wrap = True
+                        p = tf.paragraphs[0]
+                        p.text = f"PHASE {str(nom_phase).upper()}"
+                        p.font.size = Pt(40); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
+                        p.alignment = PP_ALIGN.CENTER
                     
-                        if elem["type"] == "dataframe":
-                            valeur_df = elem["data"].astype(str)
-                            rows, cols = min(len(valeur_df) + 1, 10), len(valeur_df.columns)
-                            table_shape = slide.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.7), Inches(min(5.2, 0.5 * rows)))
-                            table = table_shape.table
-                        
-                            for col_idx, col_name in enumerate(valeur_df.columns):
-                                cell = table.cell(0, col_idx)
-                                cell.text = str(col_name)
-                                cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
-                                for p in cell.text_frame.paragraphs:
-                                    p.font.size = Pt(10); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
-                                    p.alignment = PP_ALIGN.CENTER
-                                
-                            for row_idx, row in enumerate(valeur_df.values[:9]):
-                                for col_idx, val in enumerate(row):
-                                    cell = table.cell(row_idx + 1, col_idx)
-                                    cell.text = str(val) if val != "nan" else ""
-                                    cell.fill.solid()
-                                    cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
-                                    for p in cell.text_frame.paragraphs:
-                                        p.font.size = Pt(9); p.font.color.rgb = c_text
+                        p_sub = tf.add_paragraph()
+                        p_sub.text = f"Soutenance Lean Six Sigma • {str(project_name)}"
+                        p_sub.font.size = Pt(14); p_sub.font.color.rgb = RGBColor(203, 213, 225)
+                        p_sub.alignment = PP_ALIGN.CENTER
 
-                        elif elem["type"] == "figure":
-                            fig = elem["data"]
-                            img_bytes = None
-                            if hasattr(fig, 'to_image'): 
-                                img_bytes = fig.to_image(format="png", width=1000, height=500)
-                            elif hasattr(fig, 'savefig'): 
-                                buf = io.BytesIO()
-                                fig.savefig(buf, format='png', bbox_inches='tight')
-                                img_bytes = buf.getvalue()
-                            
-                            if img_bytes:
-                                image_stream = io.BytesIO(img_bytes)
-                                slide.shapes.add_picture(image_stream, Inches(1.2), Inches(1.6), width=Inches(10.8))
-
-                        else:
-                            card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
-                            card.fill.solid(); card.fill.fore_color.rgb = RGBColor(255, 255, 255); card.line.color.rgb = RGBColor(203, 213, 225)
-                            tf_card = card.text_frame; tf_card.word_wrap = True
-                            p_txt = tf_card.paragraphs[0]
-                            p_txt.text = str(elem["data"])
-                            p_txt.font.size = Pt(12); p_txt.font.color.rgb = c_text
-
-                buffer_pptx = io.BytesIO()
-                prs.save(buffer_pptx)
-                buffer_pptx.seek(0)
-        
-                st.success("✨ Présentation PowerPoint structurée par l'Agent MBB générée avec succès !")
-                st.download_button(
-                    label="📥 Télécharger (.pptx)",
-                    data=buffer_pptx,
-                    file_name=f"Soutenance_{str(project_name).replace(' ', '_')}.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    key="dl_pptx_file_final"
-                )
-            except Exception as e:
-                st.error(f"Erreur lors de la génération PowerPoint : {e}")
-
-        st.markdown("---")
-
-        # ==========================================
-        # 2. BOUTON PDF (.pdf) - FORMAT RAPPORT OFFICIEL
-        # ==========================================
-        if st.button("📄 Agent IA : Générer Rapport PDF Exécutif", use_container_width=True, key="btn_export_pdf_lss"):
-            try:
-                from reportlab.lib.pagesizes import A4
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable, Image
-                from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-                from reportlab.lib import colors
-
-                buffer_pdf = io.BytesIO()
-                doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=40, bottomMargin=40)
-                story = []
-        
-                primary_color = colors.HexColor(st.session_state.get('primary_color', '#1E3A8A'))
-
-                styles = getSampleStyleSheet()
-                title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=primary_color, spaceAfter=4, alignment=1)
-                subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#475569'), spaceAfter=8, alignment=1)
-                phase_title_style = ParagraphStyle('PhaseHead', parent=styles['Heading2'], fontSize=12, leading=15, textColor=primary_color, spaceBefore=14, spaceAfter=6, keepWithNext=True)
-                h1_style = ParagraphStyle('SecH1', parent=styles['Heading3'], fontSize=10.5, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=8, spaceAfter=4, keepWithNext=True)
-                body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=13, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
-
-                story.append(Paragraph("<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
-                story.append(Paragraph(f"<b>{str(project_name)}</b>", title_style))
-                story.append(Paragraph(f"Candidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}", subtitle_style))
-                story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
-
-                for nom_phase, liste_elements in elements_dmaic_organises.items():
-                    if not liste_elements: continue
-                    
-                    story.append(Paragraph(f"<b>--- PHASE DMAIC : {str(nom_phase)} ---</b>", phase_title_style))
+                    slide_cover = prs.slides.add_slide(blank_layout)
+                    appliquer_fond(slide_cover)
+                    tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
+                    tf_cov = tb_cov.text_frame; tf_cov.word_wrap = True
                 
-                    for elem in liste_elements:
-                        section_elems = [Paragraph(f"<b>{str(elem['titre'])}</b>", h1_style)]
-                    
-                        if elem["type"] == "dataframe":
-                            valeur_df = elem["data"].astype(str)
-                            df_data = [list(valeur_df.columns)] + valeur_df.values.tolist()
-                            t = Table(df_data, colWidths=[100]*min(len(valeur_df.columns), 5))
-                            t.setStyle(TableStyle([
-                                ('BACKGROUND', (0,0), (-1,0), primary_color),
-                                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-                                ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-                                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-                                ('FONTSIZE', (0,0), (-1,-1), 8),
-                                ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
-                                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
-                            ]))
-                            section_elems.append(t)
-                        elif elem["type"] == "figure":
-                            fig = elem["data"]
-                            img_bytes = None
-                            if hasattr(fig, 'to_image'): 
-                                img_bytes = fig.to_image(format="png", width=800, height=400)
-                            elif hasattr(fig, 'savefig'):
-                                buf = io.BytesIO()
-                                fig.savefig(buf, format='png', bbox_inches='tight')
-                                img_bytes = buf.getvalue()
-                            if img_bytes:
-                                image_stream = io.BytesIO(img_bytes)
-                                section_elems.append(Image(image_stream, width=480, height=240))
-                        else:
-                            texte_affiche = str(elem["data"]).replace('\n', '<br/>')
-                            section_elems.append(Paragraph(texte_affiche, body_style))
-                    
-                        section_elems.append(Spacer(1, 6))
-                        story.append(KeepTogether(section_elems))
+                    p_c1 = tf_cov.paragraphs[0]
+                    p_c1.text = "SOUTENANCE OFFICIELLE DE CERTIFICATION LEAN SIX SIGMA"
+                    p_c1.font.size = Pt(12); p_c1.font.bold = True; p_c1.font.color.rgb = c_accent
+                
+                    p_c2 = tf_cov.add_paragraph()
+                    p_c2.text = f"\n{str(project_name)}"
+                    p_c2.font.size = Pt(32); p_c2.font.bold = True; p_c2.font.color.rgb = c_primary
+                
+                    p_c3 = tf_cov.add_paragraph()
+                    p_c3.text = f"\nCandidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}"
+                    p_c3.font.size = Pt(13); p_c3.font.color.rgb = c_text
 
-                doc.build(story)
-                buffer_pdf.seek(0)
+                    for nom_phase, liste_elements in elements_dmaic_organises.items():
+                        if not liste_elements: continue
+                        ajouter_diapositive_titre_phase(nom_phase)
+                        for elem in liste_elements:
+                            slide = prs.slides.add_slide(blank_layout)
+                            ajouter_en_tete(slide, nom_phase, elem["titre"])
+                        
+                            if elem["type"] == "dataframe":
+                                valeur_df = elem["data"].astype(str)
+                                rows, cols = min(len(valeur_df) + 1, 10), len(valeur_df.columns)
+                                table_shape = slide.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.7), Inches(min(5.2, 0.5 * rows)))
+                                table = table_shape.table
+                            
+                                for col_idx, col_name in enumerate(valeur_df.columns):
+                                    cell = table.cell(0, col_idx)
+                                    cell.text = str(col_name)
+                                    cell.fill.solid(); cell.fill.fore_color.rgb = c_accent
+                                    for p in cell.text_frame.paragraphs:
+                                        p.font.size = Pt(10); p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255)
+                                        p.alignment = PP_ALIGN.CENTER
+                                    
+                                for row_idx, row in enumerate(valeur_df.values[:9]):
+                                    for col_idx, val in enumerate(row):
+                                        cell = table.cell(row_idx + 1, col_idx)
+                                        cell.text = str(val) if val != "nan" else ""
+                                        cell.fill.solid()
+                                        cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
+                                        for p in cell.text_frame.paragraphs:
+                                            p.font.size = Pt(9); p.font.color.rgb = c_text
 
-                st.success("✨ Rapport PDF structuré généré avec succès !")
-                st.download_button(
-                    label="📥 Télécharger (.pdf)",
-                    data=buffer_pdf,
-                    file_name=f"Soutenance_{str(project_name).replace(' ', '_')}.pdf",
-                    mime="application/pdf",
-                    key="dl_pdf_file_final"
-                )
-            except Exception as e:
-                st.error(f"Erreur lors de la génération PDF : {e}")
+                            elif elem["type"] == "figure":
+                                fig = elem["data"]
+                                img_bytes = None
+                                if hasattr(fig, 'to_image'): 
+                                    img_bytes = fig.to_image(format="png", width=1000, height=500)
+                                elif hasattr(fig, 'savefig'): 
+                                    buf = io.BytesIO()
+                                    fig.savefig(buf, format='png', bbox_inches='tight')
+                                    img_bytes = buf.getvalue()
+                                
+                                if img_bytes:
+                                    image_stream = io.BytesIO(img_bytes)
+                                    slide.shapes.add_picture(image_stream, Inches(1.2), Inches(1.6), width=Inches(10.8))
+
+                            else:
+                                card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.3))
+                                card.fill.solid(); card.fill.fore_color.rgb = RGBColor(255, 255, 255); card.line.color.rgb = RGBColor(203, 213, 225)
+                                tf_card = card.text_frame; tf_card.word_wrap = True
+                                p_txt = tf_card.paragraphs[0]
+                                p_txt.text = str(elem["data"])
+                                p_txt.font.size = Pt(12); p_txt.font.color.rgb = c_text
+
+                    buffer_pptx = io.BytesIO()
+                    prs.save(buffer_pptx)
+                    buffer_pptx.seek(0)
+            
+                    st.success("✨ Présentation PowerPoint style Gamma générée avec succès !")
+                    st.download_button(
+                        label="📥 Télécharger PowerPoint (.pptx)",
+                        data=buffer_pptx,
+                        file_name=f"Soutenance_{str(project_name).replace(' ', '_')}.pptx",
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                        key="dl_pptx_file_final"
+                    )
+                except Exception as e:
+                    st.error(f"Erreur lors de la génération PowerPoint : {e}")
+
+            st.markdown("---")
+
+            # ==========================================================
+            # 4. BOUTON 3 : "Générer présentation PDF" (Rapport officiel complet)
+            # ==========================================================
+            if st.button("📄 3. Générer présentation PDF", use_container_width=True, key="btn_export_pdf_lss"):
+                try:
+                    from reportlab.lib.pagesizes import A4
+                    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether, HRFlowable, Image
+                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                    from reportlab.lib import colors
+
+                    buffer_pdf = io.BytesIO()
+                    doc = SimpleDocTemplate(buffer_pdf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=40, bottomMargin=40)
+                    story = []
+            
+                    primary_color = colors.HexColor(st.session_state.get('primary_color', '#1E3A8A'))
+
+                    styles = getSampleStyleSheet()
+                    title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=primary_color, spaceAfter=4, alignment=1)
+                    subtitle_style = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=9.5, leading=13, textColor=colors.HexColor('#475569'), spaceAfter=8, alignment=1)
+                    phase_title_style = ParagraphStyle('PhaseHead', parent=styles['Heading2'], fontSize=12, leading=15, textColor=primary_color, spaceBefore=14, spaceAfter=6, keepWithNext=True)
+                    h1_style = ParagraphStyle('SecH1', parent=styles['Heading3'], fontSize=10.5, leading=14, textColor=colors.HexColor('#0F172A'), spaceBefore=8, spaceAfter=4, keepWithNext=True)
+                    body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=9, leading=13, textColor=colors.HexColor('#1E293B'), spaceAfter=6)
+
+                    story.append(Paragraph("<b>DOSSIER DE SOUTENANCE OFFICIEL — LEAN SIX SIGMA</b>", subtitle_style))
+                    story.append(Paragraph(f"<b>{str(project_name)}</b>", title_style))
+                    story.append(Paragraph(f"Candidat : {str(auteur_nom)}  |  Date du projet : {str(date_projet)}", subtitle_style))
+                    story.append(HRFlowable(width="100%", thickness=1.5, color=primary_color, spaceAfter=12))
+
+                    for nom_phase, liste_elements in elements_dmaic_organises.items():
+                        if not liste_elements: continue
+                        story.append(Paragraph(f"<b>--- PHASE DMAIC : {str(nom_phase)} ---</b>", phase_title_style))
+                    
+                        for elem in liste_elements:
+                            section_elems = [Paragraph(f"<b>{str(elem['titre'])}</b>", h1_style)]
+                        
+                            if elem["type"] == "dataframe":
+                                valeur_df = elem["data"].astype(str)
+                                df_data = [list(valeur_df.columns)] + valeur_df.values.tolist()
+                                t = Table(df_data, colWidths=[100]*min(len(valeur_df.columns), 5))
+                                t.setStyle(TableStyle([
+                                    ('BACKGROUND', (0,0), (-1,0), primary_color),
+                                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                                    ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+                                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                                    ('FONTSIZE', (0,0), (-1,-1), 8),
+                                    ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.HexColor('#F8FAFC'), colors.white]),
+                                    ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))
+                                ]))
+                                section_elems.append(t)
+                            elif elem["type"] == "figure":
+                                fig = elem["data"]
+                                img_bytes = None
+                                if hasattr(fig, 'to_image'): 
+                                    img_bytes = fig.to_image(format="png", width=800, height=400)
+                                elif hasattr(fig, 'savefig'):
+                                    buf = io.BytesIO()
+                                    fig.savefig(buf, format='png', bbox_inches='tight')
+                                    img_bytes = buf.getvalue()
+                                if img_bytes:
+                                    image_stream = io.BytesIO(img_bytes)
+                                    section_elems.append(Image(image_stream, width=480, height=240))
+                            else:
+                                texte_affiche = str(elem["data"]).replace('\n', '<br/>')
+                                section_elems.append(Paragraph(texte_affiche, body_style))
+                        
+                            section_elems.append(Spacer(1, 6))
+                            story.append(KeepTogether(section_elems))
+
+                    doc.build(story)
+                    buffer_pdf.seek(0)
+
+                    st.success("✨ Rapport PDF complet généré avec succès !")
+                    st.download_button(
+                        label="📥 Télécharger PDF (.pdf)",
+                        data=buffer_pdf,
+                        file_name=f"Soutenance_{str(project_name).replace(' ', '_')}.pdf",
+                        mime="application/pdf",
+                        key="dl_pdf_file_final"
+                    )
+                except Exception as e:
+                    st.error(f"Erreur lors de la génération PDF : {e}")
+        else:
+            st.warning("⚠️ Veuillez d'abord cliquer sur le bouton **1. Agent IA : Organiser la présentation** pour initialiser le plan MBB.")
     else:
         st.warning("⚠️ Aucun projet enregistré dans l'application pour le moment.")
 
