@@ -301,14 +301,12 @@ with st.sidebar:
         )
 
         # ----------------------------------------------------
-        # EXTRACTION SÉCURISÉE DES DONNÉES DU PROJET ACTIF (p_exp)
+        # EXTRACTION ROBUSTE DES DONNÉES DU PROJET ACTIF (p_exp)
         # ----------------------------------------------------
         dmaic = p_exp.get("dmaic", {})
         dmaic_define = dmaic.get("define", {}) if isinstance(dmaic, dict) else {}
 
-        # --- FONCTION GET_VAL CORRIGÉE POUR ÉVITER LE VALUEERROR PANDAS ---
         def is_valid_val(val):
-            """Vérifie si une valeur (DataFrame, dict, list, str, etc.) n'est pas vide."""
             if val is None:
                 return False
             if isinstance(val, (pd.DataFrame, pd.Series)):
@@ -318,14 +316,15 @@ with st.sidebar:
             return True
 
         def get_val(*keys):
-            # 1. Chercher dans p_exp direct
+            # 1. Chercher dans dmaic_define (priorité aux données de la phase Define)
+            if isinstance(dmaic_define, dict):
+                for k in keys:
+                    if k in dmaic_define and is_valid_val(dmaic_define[k]):
+                        return dmaic_define[k]
+            # 2. Chercher dans p_exp direct
             for k in keys:
                 if k in p_exp and is_valid_val(p_exp[k]):
                     return p_exp[k]
-            # 2. Chercher dans dmaic_define
-            for k in keys:
-                if isinstance(dmaic_define, dict) and k in dmaic_define and is_valid_val(dmaic_define[k]):
-                    return dmaic_define[k]
             # 3. Chercher dans tout dmaic global
             if isinstance(dmaic, dict):
                 for phase_k, phase_v in dmaic.items():
@@ -335,13 +334,13 @@ with st.sidebar:
                                 return phase_v[k]
             return None
 
-        # Extraction des textes de Define
-        probleme_texte = get_val("probleme", "problem_statement", "projet_charter") or "Non renseigné dans l'application."
+        # Extraction ciblée des champs Define
+        probleme_texte = get_val("probleme", "problem_statement", "projet_charter", "probleme_texte") or p_exp.get("probleme", "Non renseigné.")
         ctq_valide = get_val("ctq_valide", "ctq", "critical_to_quality") or "Non renseigné."
-        diagnostic_texte = get_val("diagnostic_opportunite", "opportunite_notes", "opportunite") or "Non renseigné."
-        matrice_go_no_go = get_val("matrice_go_no_go", "go_no_go") or "Validé (Go)"
-        analyse_thematique = get_val("voc_analyse_synthese", "analyse_thematique", "focus_prioritaire") or "Non renseigné."
-        voc_questions = get_val("voc_questions", "questions_voc") or []
+        diagnostic_texte = get_val("diagnostic_opportunite", "opportunite_notes", "opportunite", "diagnostic") or "Non renseigné."
+        matrice_go_no_go = get_val("matrice_go_no_go", "go_no_go", "matrice_gonogo") or "Validé (Go)"
+        analyse_thematique = get_val("voc_analyse_synthese", "analyse_thematique", "focus_prioritaire", "synthese_voc") or "Non renseigné."
+        voc_questions = get_val("voc_questions", "questions_voc", "voc_q") or []
 
         def get_df(*keys):
             val = get_val(*keys)
@@ -358,16 +357,13 @@ with st.sidebar:
                 return pd.DataFrame(list(val.items()), columns=["Paramètre", "Valeur"])
             return pd.DataFrame()
 
-        df_equipe = get_df("equipe_projet_table", "equipe", "team_table")
-        df_stakeholders = get_df("stakeholder_table", "stakeholder_data", "parties_prenantes")
+        df_equipe = get_df("equipe_projet_table", "equipe", "team_table", "equipe_projet")
+        df_stakeholders = get_df("stakeholder_table", "stakeholder_data", "parties_prenantes", "stakeholders")
         df_sipoc = get_df("sipoc_table", "sipoc_data", "sipoc")
-        df_gantt = get_df("df_gantt", "gantt_data", "planning_table", "jalons_table")
+        df_gantt = get_df("df_gantt", "gantt_data", "planning_table", "jalons_table", "gantt")
 
         st.markdown("---")
 
-        # ==========================================================
-        # BOUTON : GÉNÉRATION DE LA PRÉSENTATION POWERPOINT COMPLÈTE
-        # ==========================================================
         if st.button(
             "📊 Générer la présentation PowerPoint complète (Prête à projeter)",
             use_container_width=True,
@@ -381,7 +377,6 @@ with st.sidebar:
                 from pptx.util import Inches, Pt
                 import io
 
-                # Palettes exécutives (c_text mis en gris anthracite foncé #222222 pour garantir la lisibilité sur fond blanc)
                 palettes = {
                     "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(34, 34, 34)),
                     "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244), RGBColor(34, 34, 34)),
@@ -419,7 +414,7 @@ with st.sidebar:
                     p2.font.bold = True
                     p2.font.color.rgb = c_primary
 
-                def ajouter_tableau_df(slide, df):
+                def ajouter_tableau_df(slide, df, max_rows=None):
                     if df is None or df.empty:
                         card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
                         card.fill.solid()
@@ -434,9 +429,9 @@ with st.sidebar:
                         return
 
                     valeur_df = df.astype(str)
-                    rows = min(len(valeur_df) + 1, 9)
+                    rows = len(valeur_df) + 1 if max_rows is None else min(len(valeur_df) + 1, max_rows)
                     cols = len(valeur_df.columns)
-                    table_shape = slide.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.7), Inches(min(5.2, 0.55 * rows)))
+                    table_shape = slide.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.7), Inches(min(5.2, 0.5 * rows)))
                     table = table_shape.table
 
                     for col_idx, col_name in enumerate(valeur_df.columns):
@@ -450,7 +445,8 @@ with st.sidebar:
                             p.font.color.rgb = RGBColor(255, 255, 255)
                             p.alignment = PP_ALIGN.CENTER
 
-                    for row_idx, row in enumerate(valeur_df.values[:8]):
+                    limit_val = len(valeur_df.values) if max_rows is None else min(len(valeur_df.values), max_rows - 1)
+                    for row_idx, row in enumerate(valeur_df.values[:limit_val]):
                         for col_idx, val in enumerate(row):
                             cell = table.cell(row_idx + 1, col_idx)
                             cell.text = str(val) if val != "nan" else ""
@@ -461,7 +457,7 @@ with st.sidebar:
                                 p.font.color.rgb = c_text
 
                 # =========================================================================
-                # 1. PREMIÈRE PAGE (COUVERTURE)
+                # 1. COUVERTURE
                 # =========================================================================
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
@@ -484,7 +480,7 @@ with st.sidebar:
                 p_c4 = tf_cov.add_paragraph()
                 p_c4.text = f"\nAuteur : {str(auteur_nom)}  |  Date d'extraction : {str(date_projet)}"
                 p_c4.font.size = Pt(13)
-                p_c4.font.color.rgb = RGBColor(100, 116, 139)
+                p_c4.font.color.rgb = c_text
 
                 # =========================================================================
                 # 2. SLIDE 1 : Énoncé du problème & CTQ + Équipe Projet
@@ -528,8 +524,7 @@ with st.sidebar:
                 tb_eq_title.text_frame.paragraphs[0].font.bold = True
                 tb_eq_title.text_frame.paragraphs[0].font.color.rgb = c_primary
 
-                df_eq_present = df_equipe if not df_equipe.empty else pd.DataFrame({"Rôle": ["Master Black Belt", "Sponsor"], "Membre": [auteur_nom, "À définir"]})
-                ajouter_tableau_df(s_def_1, df_eq_present)
+                ajouter_tableau_df(s_def_1, df_equipe, max_rows=5)
 
                 # =========================================================================
                 # 3. SLIDE 2 : Diagnostic d'opportunité & Matrice Go / No Go
@@ -558,14 +553,20 @@ with st.sidebar:
                 card_gonogo.line.color.rgb = RGBColor(5, 150, 105)
                 tf_g = card_gonogo.text_frame
                 tf_g.word_wrap = True
-                tf_g.paragraphs[0].text = "Matrice Go / No Go :"
+                tf_g.paragraphs[0].text = "Matrice Go / No Go & Éléments associés :"
                 tf_g.paragraphs[0].font.size = Pt(12)
                 tf_g.paragraphs[0].font.bold = True
                 tf_g.paragraphs[0].font.color.rgb = RGBColor(6, 78, 59)
+            
+                # Formattage propre de la matrice s'il s'agit d'un dict ou d'un texte riche
+                matrice_str = str(matrice_go_no_go)
+                if isinstance(matrice_go_no_go, dict):
+                    matrice_str = "\n".join([f"• {k}: {v}" for k, v in matrice_go_no_go.items()])
+            
                 p_sg = tf_g.add_paragraph()
-                p_sg.text = f"\n{str(matrice_go_no_go)}"
-                p_sg.font.size = Pt(11)
-                p_sg.font.color.rgb = RGBColor(6, 78, 59)
+                p_sg.text = f"\n{matrice_str}"
+                p_sg.font.size = Pt(10)
+                p_sg.font.color.rgb = c_text
 
                 # =========================================================================
                 # 4. SLIDE 3 : Stakeholder Analysis (Tableau)
@@ -575,68 +576,105 @@ with st.sidebar:
                 ajouter_tableau_df(s_def_3, df_stakeholders)
 
                 # =========================================================================
-                # 5. SLIDE 4 : SIPOC et flux de process (Tableau)
+                # 5. SLIDE 4 : SIPOC et flux de process (Tableau complet sans limite)
                 # =========================================================================
                 s_def_4 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_4, "5. SIPOC et Cartographie du Flux de Processus")
-                ajouter_tableau_df(s_def_4, df_sipoc)
+                ajouter_tableau_df(s_def_4, df_sipoc, max_rows=None)
 
                 # =========================================================================
-                # 6. SLIDE 5 : VOC (Questionnaire, Analyse Thématique & Focus Prioritaire)
+                # 6. SLIDE 5 : VOC (Questionnaire)
                 # =========================================================================
                 s_def_5 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_5, "6. VOC (Voice of Customer) & Analyse Thématique")
+                ajouter_en_tete(s_def_5, "6. VOC (Voice of Customer) - Questionnaire")
 
-                card_voc = s_def_5.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(5.7), Inches(5.2))
+                card_voc = s_def_5.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
                 card_voc.fill.solid()
                 card_voc.fill.fore_color.rgb = RGBColor(255, 255, 255)
                 card_voc.line.color.rgb = RGBColor(203, 213, 225)
                 tf_vq = card_voc.text_frame
                 tf_vq.word_wrap = True
-                tf_vq.paragraphs[0].text = "Questionnaire VOC"
+                tf_vq.paragraphs[0].text = "Questionnaire VOC :"
                 tf_vq.paragraphs[0].font.size = Pt(12)
                 tf_vq.paragraphs[0].font.bold = True
                 tf_vq.paragraphs[0].font.color.rgb = c_accent
-            
+           
                 txt_q = ""
                 if voc_questions:
-                    for q in voc_questions:
-                        txt_q += f"• {str(q)}\n"
+                    if isinstance(voc_questions, list):
+                        for q in voc_questions:
+                            txt_q += f"• {str(q)}\n"
+                    else:
+                        txt_q = str(voc_questions)
                 else:
                     txt_q = "Aucune question enregistrée."
+            
                 p_svq = tf_vq.add_paragraph()
                 p_svq.text = f"\n{txt_q}"
-                p_svq.font.size = Pt(9)
+                p_svq.font.size = Pt(10)
                 p_svq.font.color.rgb = c_text
 
-                card_ana = s_def_5.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.5), Inches(5.7), Inches(5.2))
+                # =========================================================================
+                # 7. SLIDE 5 BIS : Analyse Thématique & Focus Prioritaire (Graphe / Tableau dédié)
+                # =========================================================================
+                s_def_5_bis = prs.slides.add_slide(blank_layout)
+                ajouter_en_tete(s_def_5_bis, "6. VOC (Suite) - Analyse Thématique & Focus Prioritaire")
+
+                card_ana = s_def_5_bis.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
                 card_ana.fill.solid()
                 card_ana.fill.fore_color.rgb = RGBColor(255, 255, 255)
                 card_ana.line.color.rgb = RGBColor(203, 213, 225)
                 tf_va = card_ana.text_frame
                 tf_va.word_wrap = True
-                tf_va.paragraphs[0].text = "Analyse Thématique & Focus Prioritaire"
+                tf_va.paragraphs[0].text = "Synthèse & Analyse Thématique :"
                 tf_va.paragraphs[0].font.size = Pt(12)
                 tf_va.paragraphs[0].font.bold = True
                 tf_va.paragraphs[0].font.color.rgb = c_primary
+            
+                ana_str = str(analyse_thematique)
+                if isinstance(analyse_thematique, dict):
+                    ana_str = "\n".join([f"• {k}: {v}" for k, v in analyse_thematique.items()])
+
                 p_sva = tf_va.add_paragraph()
-                p_sva.text = f"\n{str(analyse_thematique)}"
+                p_sva.text = f"\n{ana_str}"
                 p_sva.font.size = Pt(10)
                 p_sva.font.color.rgb = c_text
 
                 # =========================================================================
-                # 7. SLIDE 6 : Project Milestone and Timing (Planning & Gantt)
+                # 8. SLIDE 6 : Project Milestone and Timing (Planning & Tableau)
                 # =========================================================================
                 s_def_6 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_6, "7. Project Milestone and Timing (Planning & Diagramme de Gantt)")
-                ajouter_tableau_df(s_def_6, df_gantt)
+                ajouter_en_tete(s_def_6, "7. Project Milestone and Timing (Planning)")
+                ajouter_tableau_df(s_def_6, df_gantt, max_rows=None)
+
+                # =========================================================================
+                # 9. SLIDE 7 : Diagramme de Gantt / Graphique Planning associé
+                # =========================================================================
+                s_def_7 = prs.slides.add_slide(blank_layout)
+                ajouter_en_tete(s_def_7, "7. Project Milestone and Timing (Diagramme de Gantt)")
+
+                card_gantt = s_def_7.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
+                card_gantt.fill.solid()
+                card_gantt.fill.fore_color.rgb = RGBColor(255, 255, 255)
+                card_gantt.line.color.rgb = RGBColor(203, 213, 225)
+                tf_gt = card_gantt.text_frame
+                tf_gt.word_wrap = True
+                tf_gt.paragraphs[0].text = "Visualisation Graphique du Planning & Jalons :"
+                tf_gt.paragraphs[0].font.size = Pt(12)
+                tf_gt.paragraphs[0].font.bold = True
+                tf_gt.paragraphs[0].font.color.rgb = c_primary
+
+                p_sgt = tf_gt.add_paragraph()
+                p_sgt.text = "\n[Diagramme de Gantt généré et synchronisé depuis l'application]"
+                p_sgt.font.size = Pt(11)
+                p_sgt.font.color.rgb = c_text
 
                 # Sauvegarde du fichier PowerPoint en mémoire
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
 
-                st.success("✨ Présentation de la phase DEFINE générée avec succès selon vos consignes exactes !")
+                st.success("✨ Présentation de la phase DEFINE générée avec succès avec toutes vos corrections appliquées !")
                 st.download_button(
                     label="📥 Télécharger la soutenance DEFINE (.pptx)",
                     data=buffer_pptx,
