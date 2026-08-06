@@ -357,20 +357,31 @@ with st.sidebar:
                 date_projet = datetime.now().strftime("%d/%m/%Y")
                 palette_couleurs = st.session_state.get("palette_couleurs", "Bleu")
 
-                # Récupération sécurisée du dictionnaire Define
+                # Récupération sécurisée et élargie des dictionnaires dmaic / state
                 dmaic_global = st.session_state.get("dmaic", {})
                 dmaic_define = dmaic_global.get("define", {}) if isinstance(dmaic_global, dict) else {}
 
                 def get_val(*keys):
+                    # 1. Chercher d'abord directement dans st.session_state
                     for k in keys:
-                        if k in st.session_state and st.session_state[k]:
+                        if k in st.session_state and st.session_state[k] not in [None, "", {}]:
                             return st.session_state[k]
-                        if k in dmaic_define and dmaic_define[k]:
+                    
+                    # 2. Chercher dans dmaic_define (sous-dictionnaire)
+                    for k in keys:
+                        if isinstance(dmaic_define, dict) and k in dmaic_define and dmaic_define[k] not in [None, "", {}]:
                             return dmaic_define[k]
+                            
+                    # 3. Chercher dans dmaic_global complet si applicable
+                    if isinstance(dmaic_global, dict):
+                        for k in keys:
+                            if k in dmaic_global and dmaic_global[k] not in [None, "", {}]:
+                                return dmaic_global[k]
+                                
                     return None
 
-                # Extraction des données textuelles de Define
-                probleme_texte = get_val("projet_charter", "probleme", "problem_statement") or "Non renseigné dans l'application."
+                # Extraction des données textuelles de Define (avec fallbacks améliorés)
+                probleme_texte = get_val("probleme", "problem_statement", "projet_charter") or "Non renseigné dans l'application."
                 ctq_valide = get_val("ctq_valide", "ctq", "critical_to_quality") or "Non renseigné."
                 diagnostic_texte = get_val("diagnostic_opportunite", "opportunite_notes", "opportunite") or "Non renseigné."
                 matrice_go_no_go = get_val("matrice_go_no_go", "go_no_go") or "Validé (Go)"
@@ -396,13 +407,13 @@ with st.sidebar:
                 df_sipoc = get_df("sipoc_table", "sipoc_data", "sipoc")
                 df_gantt = get_df("df_gantt", "planning_table", "jalons_table")
 
-                # Palettes exécutives
+                # Palettes exécutives (c_text mis en gris anthracite foncé #222222 pour garantir la lisibilité sur fond blanc)
                 palettes = {
-                    "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(30, 41, 59)),
-                    "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244), RGBColor(6, 78, 59)),
-                    "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242), RGBColor(69, 10, 10)),
-                    "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235), RGBColor(67, 20, 7)),
-                    "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250), RGBColor(38, 38, 38)),
+                    "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(34, 34, 34)),
+                    "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244), RGBColor(34, 34, 34)),
+                    "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242), RGBColor(34, 34, 34)),
+                    "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235), RGBColor(34, 34, 34)),
+                    "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250), RGBColor(34, 34, 34)),
                 }
                 c_primary, c_accent, c_bg, c_text = palettes.get(palette_couleurs, palettes["Bleu"])
 
@@ -543,7 +554,6 @@ with st.sidebar:
                 tb_eq_title.text_frame.paragraphs[0].font.bold = True
                 tb_eq_title.text_frame.paragraphs[0].font.color.rgb = c_primary
 
-                # Insertion du tableau de l'équipe
                 df_eq_present = df_equipe if not df_equipe.empty else pd.DataFrame({"Rôle": ["Master Black Belt", "Sponsor"], "Membre": [auteur_nom, "À définir"]})
                 ajouter_tableau_df(s_def_1, df_eq_present)
 
@@ -645,8 +655,6 @@ with st.sidebar:
                 # =========================================================================
                 s_def_6 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_6, "7. Project Milestone and Timing (Planning & Diagramme de Gantt)")
-
-                # Affichage du tableau de planification et espace visuel Gantt
                 ajouter_tableau_df(s_def_6, df_gantt)
 
                 # Sauvegarde du fichier PowerPoint en mémoire
