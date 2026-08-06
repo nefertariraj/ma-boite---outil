@@ -316,16 +316,13 @@ with st.sidebar:
             return True
 
         def get_val(*keys):
-            # 1. Chercher dans dmaic_define (priorité aux données de la phase Define)
             if isinstance(dmaic_define, dict):
                 for k in keys:
                     if k in dmaic_define and is_valid_val(dmaic_define[k]):
                         return dmaic_define[k]
-            # 2. Chercher dans p_exp direct
             for k in keys:
                 if k in p_exp and is_valid_val(p_exp[k]):
                     return p_exp[k]
-            # 3. Chercher dans tout dmaic global
             if isinstance(dmaic, dict):
                 for phase_k, phase_v in dmaic.items():
                     if isinstance(phase_v, dict):
@@ -334,7 +331,6 @@ with st.sidebar:
                                 return phase_v[k]
             return None
 
-        # Extraction ciblée des champs Define
         probleme_texte = get_val("probleme", "problem_statement", "projet_charter", "probleme_texte") or p_exp.get("probleme", "Non renseigné.")
         ctq_valide = get_val("ctq_valide", "ctq", "critical_to_quality") or "Non renseigné."
         diagnostic_texte = get_val("diagnostic_opportunite", "opportunite_notes", "opportunite", "diagnostic") or "Non renseigné."
@@ -377,14 +373,17 @@ with st.sidebar:
                 from pptx.util import Inches, Pt
                 import io
 
+                # COULEUR UNIFIÉE DU CORPS DE TEXTE : Gris foncé anthracite (#222222) garanti anti-blanc sur fond blanc
+                c_body_text = RGBColor(34, 34, 34)
+
                 palettes = {
-                    "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252), RGBColor(34, 34, 34)),
-                    "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244), RGBColor(34, 34, 34)),
-                    "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242), RGBColor(34, 34, 34)),
-                    "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235), RGBColor(34, 34, 34)),
-                    "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250), RGBColor(34, 34, 34)),
+                    "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252)),
+                    "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244)),
+                    "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242)),
+                    "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235)),
+                    "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250)),
                 }
-                c_primary, c_accent, c_bg, c_text = palettes.get(palette_couleurs, palettes["Bleu"])
+                c_primary, c_accent, c_bg = palettes.get(palette_couleurs, palettes["Bleu"])
 
                 prs = Presentation()
                 prs.slide_width = Inches(13.33)
@@ -425,7 +424,7 @@ with st.sidebar:
                         p = tf.paragraphs[0]
                         p.text = "Aucune donnée enregistrée dans l'application pour cette section."
                         p.font.size = Pt(13)
-                        p.font.color.rgb = c_text
+                        p.font.color.rgb = c_body_text
                         return
 
                     valeur_df = df.astype(str)
@@ -454,7 +453,7 @@ with st.sidebar:
                             cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
                             for p in cell.text_frame.paragraphs:
                                 p.font.size = Pt(9)
-                                p.font.color.rgb = c_text
+                                p.font.color.rgb = c_body_text
 
                 # =========================================================================
                 # 1. COUVERTURE
@@ -480,7 +479,7 @@ with st.sidebar:
                 p_c4 = tf_cov.add_paragraph()
                 p_c4.text = f"\nAuteur : {str(auteur_nom)}  |  Date d'extraction : {str(date_projet)}"
                 p_c4.font.size = Pt(13)
-                p_c4.font.color.rgb = c_text
+                p_c4.font.color.rgb = c_body_text
 
                 # =========================================================================
                 # 2. SLIDE 1 : Énoncé du problème & CTQ + Équipe Projet
@@ -501,7 +500,7 @@ with st.sidebar:
                 p_sp = tf_p.add_paragraph()
                 p_sp.text = f"\n{str(probleme_texte)}"
                 p_sp.font.size = Pt(10)
-                p_sp.font.color.rgb = c_text
+                p_sp.font.color.rgb = c_body_text
 
                 card_ctq = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.5), Inches(5.7), Inches(2.2))
                 card_ctq.fill.solid()
@@ -516,7 +515,7 @@ with st.sidebar:
                 p_sc = tf_c.add_paragraph()
                 p_sc.text = f"\n{str(ctq_valide)}"
                 p_sc.font.size = Pt(10)
-                p_sc.font.color.rgb = c_text
+                p_sc.font.color.rgb = c_body_text
 
                 tb_eq_title = s_def_1.shapes.add_textbox(Inches(0.8), Inches(3.8), Inches(11.7), Inches(0.4))
                 tb_eq_title.text_frame.paragraphs[0].text = "2. Équipe Projet Validée :"
@@ -545,7 +544,7 @@ with st.sidebar:
                 p_sd = tf_d.add_paragraph()
                 p_sd.text = f"\n{str(diagnostic_texte)}"
                 p_sd.font.size = Pt(10)
-                p_sd.font.color.rgb = c_text
+                p_sd.font.color.rgb = c_body_text
 
                 card_gonogo = s_def_2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(8.5), Inches(1.5), Inches(4.0), Inches(5.2))
                 card_gonogo.fill.solid()
@@ -553,12 +552,11 @@ with st.sidebar:
                 card_gonogo.line.color.rgb = RGBColor(5, 150, 105)
                 tf_g = card_gonogo.text_frame
                 tf_g.word_wrap = True
-                tf_g.paragraphs[0].text = "Matrice Go / No Go & Éléments associés :"
+                tf_g.paragraphs[0].text = "Matrice Go / No Go & Éléments :"
                 tf_g.paragraphs[0].font.size = Pt(12)
                 tf_g.paragraphs[0].font.bold = True
                 tf_g.paragraphs[0].font.color.rgb = RGBColor(6, 78, 59)
             
-                # Formattage propre de la matrice s'il s'agit d'un dict ou d'un texte riche
                 matrice_str = str(matrice_go_no_go)
                 if isinstance(matrice_go_no_go, dict):
                     matrice_str = "\n".join([f"• {k}: {v}" for k, v in matrice_go_no_go.items()])
@@ -566,7 +564,7 @@ with st.sidebar:
                 p_sg = tf_g.add_paragraph()
                 p_sg.text = f"\n{matrice_str}"
                 p_sg.font.size = Pt(10)
-                p_sg.font.color.rgb = c_text
+                p_sg.font.color.rgb = c_body_text
 
                 # =========================================================================
                 # 4. SLIDE 3 : Stakeholder Analysis (Tableau)
@@ -612,10 +610,10 @@ with st.sidebar:
                 p_svq = tf_vq.add_paragraph()
                 p_svq.text = f"\n{txt_q}"
                 p_svq.font.size = Pt(10)
-                p_svq.font.color.rgb = c_text
+                p_svq.font.color.rgb = c_body_text
 
                 # =========================================================================
-                # 7. SLIDE 5 BIS : Analyse Thématique & Focus Prioritaire (Graphe / Tableau dédié)
+                # 7. SLIDE 5 BIS : Analyse Thématique & Focus Prioritaire
                 # =========================================================================
                 s_def_5_bis = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_5_bis, "6. VOC (Suite) - Analyse Thématique & Focus Prioritaire")
@@ -638,7 +636,7 @@ with st.sidebar:
                 p_sva = tf_va.add_paragraph()
                 p_sva.text = f"\n{ana_str}"
                 p_sva.font.size = Pt(10)
-                p_sva.font.color.rgb = c_text
+                p_sva.font.color.rgb = c_body_text
 
                 # =========================================================================
                 # 8. SLIDE 6 : Project Milestone and Timing (Planning & Tableau)
@@ -667,14 +665,14 @@ with st.sidebar:
                 p_sgt = tf_gt.add_paragraph()
                 p_sgt.text = "\n[Diagramme de Gantt généré et synchronisé depuis l'application]"
                 p_sgt.font.size = Pt(11)
-                p_sgt.font.color.rgb = c_text
+                p_sgt.font.color.rgb = c_body_text
 
                 # Sauvegarde du fichier PowerPoint en mémoire
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
 
-                st.success("✨ Présentation de la phase DEFINE générée avec succès avec toutes vos corrections appliquées !")
+                st.success("✨ Présentation de la phase DEFINE générée avec succès ! Les textes sont maintenant parfaitement lisibles en gris foncé sur fond blanc.")
                 st.download_button(
                     label="📥 Télécharger la soutenance DEFINE (.pptx)",
                     data=buffer_pptx,
