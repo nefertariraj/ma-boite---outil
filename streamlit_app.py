@@ -351,7 +351,6 @@ with st.sidebar:
                 import io
 
                 # 1. LECTURE DIRECTE ET DYNAMIQUE DE SESSION_STATE (Données réelles de l'app)
-                # On récupère l'ensemble des données saisies dans l'application
                 dmaic = st.session_state.get("dmaic", {})
                 dmaic_define = dmaic.get("define", {})
                 
@@ -365,7 +364,6 @@ with st.sidebar:
 
                 # Fonction universelle pour extraire n'importe quel tableau ou données de l'app
                 def extraire_donnees_app(cle_cle):
-                    # Cherche d'abord dans session_state global, puis dans define
                     val = st.session_state.get(cle_cle) or dmaic_define.get(cle_cle)
                     if isinstance(val, pd.DataFrame):
                         return val
@@ -682,7 +680,7 @@ with st.sidebar:
                 )
 
             except Exception as e:
-                st.error(f"Erreur lors de la génération de la présentation : {e}"))
+                st.error(f"Erreur lors de la génération de la présentation : {e}")
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
