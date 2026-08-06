@@ -463,7 +463,7 @@ with st.sidebar:
                 dmaic_define = dmaic.get("define", {})
                 
                 # -------------------------------------------------------------------------
-                # 1. DIAPOSITIVE DE COUVERTURE
+                # 1. DIAPOSITIVE DE COUVERTURE (Sans statut ni progression)
                 # -------------------------------------------------------------------------
                 slide_cover = prs.slides.add_slide(blank_layout)
                 appliquer_fond(slide_cover)
@@ -483,15 +483,9 @@ with st.sidebar:
                 p_c2.font.bold = True
                 p_c2.font.color.rgb = c_primary
 
-                p_c3 = tf_cov.add_paragraph()
-                p_c3.text = f"\nStatut actuel : {status_projet}  |  Progression globale : {progression}%"
-                p_c3.font.size = Pt(14)
-                p_c3.font.bold = True
-                p_c3.font.color.rgb = c_text
-
                 p_c4 = tf_cov.add_paragraph()
-                p_c4.text = f"Auteur : {str(auteur_nom)}  |  Date d'extraction : {str(date_projet)}"
-                p_c4.font.size = Pt(12)
+                p_c4.text = f"\nAuteur : {str(auteur_nom)}  |  Date d'extraction : {str(date_projet)}"
+                p_c4.font.size = Pt(13)
                 p_c4.font.color.rgb = RGBColor(100, 116, 139)
 
                 # =========================================================================
@@ -499,11 +493,23 @@ with st.sidebar:
                 # =========================================================================
                 ajouter_diapositive_titre_phase("DEFINE")
 
-                # Slide 1 : Problème, CTQ & Équipe
+                # Slide 1 : Problème, CTQ & Équipe Projet (Sous forme de tableau structuré)
                 s_def_1 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_1, "Define", "1. Énoncé du Problème, CTQ & Équipe Projet")
                 
-                card_prob = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(2.3))
+                # Récupération élargie du problème et du CTQ validé
+                probleme_texte = (
+                    dmaic_define.get("projet_charter") or 
+                    dmaic_define.get("probleme") or 
+                    p_exp.get("probleme_charte", "Non renseigné")
+                )
+                ctq_valide = (
+                    dmaic_define.get("ctq_valide") or 
+                    dmaic_define.get("ctq") or 
+                    p_exp.get("ctq_valide", "Non renseigné")
+                )
+
+                card_prob = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(2.0))
                 card_prob.fill.solid()
                 card_prob.fill.fore_color.rgb = RGBColor(255, 255, 255)
                 card_prob.line.color.rgb = RGBColor(203, 213, 225)
@@ -515,14 +521,12 @@ with st.sidebar:
                 p_p_title.font.bold = True
                 p_p_title.font.color.rgb = c_accent
                 
-                probleme_texte = dmaic_define.get("projet_charter", "Non renseigné")
-                ctq_valide = dmaic_define.get("ctq_valide", "Non renseigné")
                 p_p_content = tf_prob.add_paragraph()
-                p_p_content.text = f"• Problématique / Charte : {probleme_texte}\n• CTQ Validé : {ctq_valide}"
+                p_p_content.text = f"• Problématique : {probleme_texte}\n• CTQ Validé : {ctq_valide}"
                 p_p_content.font.size = Pt(11)
                 p_p_content.font.color.rgb = c_text
 
-                card_eq_title = s_def_1.shapes.add_textbox(Inches(0.8), Inches(3.9), Inches(11.7), Inches(0.4))
+                card_eq_title = s_def_1.shapes.add_textbox(Inches(0.8), Inches(3.6), Inches(11.7), Inches(0.4))
                 tf_eq_t = card_eq_title.text_frame
                 p_eq_t = tf_eq_t.paragraphs[0]
                 p_eq_t.text = "2. Équipe Projet Validée :"
@@ -530,45 +534,30 @@ with st.sidebar:
                 p_eq_t.font.bold = True
                 p_eq_t.font.color.rgb = c_primary
 
+                # Récupération de l'équipe (qu'elle soit en DataFrame, dict ou texte)
                 df_equipe = extraire_df("equipe_projet_table")
                 if df_equipe.empty:
-                    eq_data = dmaic_define.get("equipe", [])
-                    if eq_data:
-                        df_equipe = pd.DataFrame(eq_data)
+                    eq_raw = dmaic_define.get("equipe_projet") or dmaic_define.get("equipe") or p_exp.get("equipe", [])
+                    if isinstance(eq_raw, list) and len(eq_raw) > 0 and isinstance(eq_raw[0], dict):
+                        df_equipe = pd.DataFrame(eq_raw)
+                    elif isinstance(eq_raw, str):
+                        df_equipe = pd.DataFrame({"Membres de l'équipe et Rôles": [eq_raw]})
 
                 if not df_equipe.empty:
-                    rows = min(len(df_equipe) + 1, 4)
-                    cols = len(df_equipe.columns)
-                    t_shape = s_def_1.shapes.add_table(rows, cols, Inches(0.8), Inches(4.3), Inches(11.7), Inches(2.4))
-                    table = t_shape.table
-                    for col_idx, col_name in enumerate(df_equipe.columns):
-                        cell = table.cell(0, col_idx)
-                        cell.text = str(col_name)
-                        cell.fill.solid()
-                        cell.fill.fore_color.rgb = c_accent
-                        for p in cell.text_frame.paragraphs:
-                            p.font.size = Pt(9)
-                            p.font.bold = True
-                            p.font.color.rgb = RGBColor(255, 255, 255)
-                    for r_idx, row in enumerate(df_equipe.values[:3]):
-                        for c_idx, val in enumerate(row):
-                            cell = table.cell(r_idx + 1, c_idx)
-                            cell.text = str(val)
-                            for p in cell.text_frame.paragraphs:
-                                p.font.size = Pt(9)
+                    ajouter_tableau_df(s_def_1, df_equipe)
                 else:
-                    card_eq_body = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(4.3), Inches(11.7), Inches(2.4))
+                    card_eq_body = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(4.1), Inches(11.7), Inches(2.6))
                     card_eq_body.fill.solid()
                     card_eq_body.fill.fore_color.rgb = RGBColor(255, 255, 255)
                     card_eq_body.line.color.rgb = RGBColor(203, 213, 225)
                     tf_eb = card_eq_body.text_frame
                     tf_eb.word_wrap = True
                     p_eb = tf_eb.paragraphs[0]
-                    p_eb.text = "Liste de l'équipe validée : " + str(dmaic_define.get("equipe_texte", "Aucune donnée spécifique d'équipe structurée sous forme de tableau."))
+                    p_eb.text = "Aucune équipe structurée n'a été saisie dans les formulaires de l'application."
                     p_eb.font.size = Pt(11)
                     p_eb.font.color.rgb = c_text
 
-                # Slide 2 : Bénéfices & Matrice Go / No Go
+                # Slide 2 : Diagnostic d'Opportunité & Matrice Go / No Go
                 s_def_2 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_2, "Define", "3. Diagnostic d'Opportunité & Matrice Go / No Go")
                 
@@ -585,57 +574,72 @@ with st.sidebar:
                 p_o1.font.bold = True
                 p_o1.font.color.rgb = c_accent
 
-                opportunite_notes = dmaic_define.get("diagnostic_opportunite", dmaic_define.get("opportunite_notes", "Informations d'opportunité non renseignées dans le module."))
+                opportunite_notes = (
+                    dmaic_define.get("diagnostic_opportunite") or 
+                    dmaic_define.get("opportunite_notes") or 
+                    dmaic_define.get("opportunite") or 
+                    "Informations du diagnostic d'opportunité non renseignées."
+                )
                 p_o2 = tf_opp.add_paragraph()
                 p_o2.text = f"\n{opportunite_notes}"
                 p_o2.font.size = Pt(11)
                 p_o2.font.color.rgb = c_text
 
                 p_o3 = tf_opp.add_paragraph()
-                p_o3.text = "\nPositionnement IA & Matrice d'Opportunité (Go / No Go) :"
+                p_o3.text = "\nMatrice d'Opportunité & Positionnement Go / No Go :"
                 p_o3.font.size = Pt(12)
                 p_o3.font.bold = True
                 p_o3.font.color.rgb = c_primary
 
-                matrice_info = dmaic_define.get("matrice_go_no_go", "Statut Go / No Go validé pour le passage en phase Measure.")
+                matrice_info = (
+                    dmaic_define.get("matrice_go_no_go") or 
+                    dmaic_define.get("go_no_go") or 
+                    "Statut Go / No Go validé pour engager la phase Measure."
+                )
                 p_o4 = tf_opp.add_paragraph()
                 p_o4.text = f"• Évaluation décisionnelle : {matrice_info}"
                 p_o4.font.size = Pt(11)
                 p_o4.font.color.rgb = c_text
 
-                # Slide 3 : Stakeholder Analysis
+                # Slide 3 : Stakeholder Analysis (Sous format tableau)
                 s_def_3 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_3, "Define", "4. Stakeholder Analysis (Analyse des Parties Prenantes)")
                 
                 df_stakeholders = extraire_df("stakeholder_table")
                 if df_stakeholders.empty:
-                    stk_data = dmaic_define.get("stakeholder_data", [])
-                    if stk_data:
-                        df_stakeholders = pd.DataFrame(stk_data)
+                    stk_raw = dmaic_define.get("stakeholder_data") or dmaic_define.get("stakeholders")
+                    if isinstance(stk_raw, list) and len(stk_raw) > 0 and isinstance(stk_raw[0], dict):
+                        df_stakeholders = pd.DataFrame(stk_raw)
+                    elif isinstance(stk_raw, str):
+                        df_stakeholders = pd.DataFrame({"Parties Prenantes & Analyse": [stk_raw]})
 
                 if not df_stakeholders.empty:
                     ajouter_tableau_df(s_def_3, df_stakeholders)
                 else:
-                    stk_texte = dmaic_define.get("stakeholder_notes", "Aucun tableau d'analyse des parties prenantes n'a été complété.")
-                    ajouter_carte_texte(s_def_3, f"Matrice des Parties Prenantes :\n\n{stk_texte}")
+                    stk_texte = dmaic_define.get("stakeholder_notes", "Aucun formulaire de parties prenantes complété.")
+                    df_fallback = pd.DataFrame({"Information Stakeholders": [stk_texte]})
+                    ajouter_tableau_df(s_def_3, df_fallback)
 
-                # Slide 4 : SIPOC
+                # Slide 4 : SIPOC et Flux de Processus (Sous format tableau)
                 s_def_4 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_4, "Define", "5. SIPOC et Cartographie Macro du Flux de Processus")
                 
                 df_sipoc = extraire_df("sipoc_table")
                 if df_sipoc.empty:
-                    spc_data = dmaic_define.get("sipoc_data", [])
-                    if spc_data:
-                        df_sipoc = pd.DataFrame(spc_data)
+                    spc_raw = dmaic_define.get("sipoc_data") or dmaic_define.get("sipoc")
+                    if isinstance(spc_raw, list) and len(spc_raw) > 0 and isinstance(spc_raw[0], dict):
+                        df_sipoc = pd.DataFrame(spc_raw)
+                    elif isinstance(spc_raw, str):
+                        df_sipoc = pd.DataFrame({"Éléments SIPOC": [spc_raw]})
 
                 if not df_sipoc.empty:
                     ajouter_tableau_df(s_def_4, df_sipoc)
                 else:
-                    sipoc_texte = dmaic_define.get("sipoc_notes", "Fournisseurs (S) | Entrées (I) | Processus (P) | Sorties (O) | Clients (C)\n\nDonnées SIPOC enregistrées textuellement dans l'application.")
-                    ajouter_carte_texte(s_def_4, sipoc_texte)
+                    sipoc_texte = dmaic_define.get("sipoc_notes", "Fournisseurs | Entrées | Processus | Sorties | Clients (Données textuelles enregistrées)")
+                    df_fallback_sipoc = pd.DataFrame({"Synthèse SIPOC": [sipoc_texte]})
+                    ajouter_tableau_df(s_def_4, df_fallback_sipoc)
 
-                # Slide 5 : VOC & Analyse Thématique
+                # Slide 5 : VOC, Analyse Thématique & Focus Prioritaire
                 s_def_5 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_5, "Define", "6. VOC (Voice of Customer), Analyse Thématique & Focus Prioritaire")
                 
@@ -647,7 +651,7 @@ with st.sidebar:
                 tf_v.word_wrap = True
 
                 p_v1 = tf_v.paragraphs[0]
-                p_v1.text = "Sous-section 1 : Questionnaire VOC posé aux clients :"
+                p_v1.text = "1. Questionnaire VOC (Questions posées) :"
                 p_v1.font.size = Pt(12)
                 p_v1.font.bold = True
                 p_v1.font.color.rgb = c_accent
@@ -655,7 +659,7 @@ with st.sidebar:
                 q_texte = ""
                 if voc_questions:
                     for i, q in enumerate(voc_questions, 1):
-                        q_texte += f"   {i}. {q}\n"
+                        q_texte += f"   • {q}\n"
                 else:
                     q_texte = "   • Aucun questionnaire spécifique listé."
                 
@@ -665,18 +669,23 @@ with st.sidebar:
                 p_v2.font.color.rgb = c_text
 
                 p_v3 = tf_v.add_paragraph()
-                p_v3.text = "\nSous-section 3 & 4 : Analyse thématique, CTQ & Focus Prioritaire (Plan d'action Black Belt) :"
+                p_v3.text = "\n2. Analyse Thématique & Propositions de Focus Prioritaire :"
                 p_v3.font.size = Pt(12)
                 p_v3.font.bold = True
                 p_v3.font.color.rgb = c_primary
 
-                voc_synthese = dmaic_define.get("voc_analyse_synthese", "Résultats de l'analyse thématique et propositions de focus prioritaire extraites de l'application.")
+                analyse_thematique = (
+                    dmaic_define.get("voc_analyse_synthese") or 
+                    dmaic_define.get("analyse_thematique") or 
+                    dmaic_define.get("focus_prioritaire") or 
+                    "Résultats de l'analyse thématique non renseignés dans l'application."
+                )
                 p_v4 = tf_v.add_paragraph()
-                p_v4.text = f"• Synthèse : {voc_synthese}\n• Note méthodologique : Les données brutes de collecte ont été exclues de la restitution exécutive conformément aux exigences de synthèse."
+                p_v4.text = f"{analyse_thematique}"
                 p_v4.font.size = Pt(10)
                 p_v4.font.color.rgb = c_text
 
-                # Slide 6 : Gantt
+                # Slide 6 : Project Milestone and Timing (Tableau du planning)
                 s_def_6 = prs.slides.add_slide(blank_layout)
                 ajouter_en_tete(s_def_6, "Define", "7. Project Milestone and Timing (Planning & Jalons)")
                 
@@ -686,12 +695,34 @@ with st.sidebar:
                     gantt_notes = dmaic_define.get("gantt_notes", "Planning jalonné validé pour le projet.")
                     ajouter_carte_texte(s_def_6, f"Calendrier et Jalons du projet :\n\n{gantt_notes}")
 
+                # Slide 7 : Capture visuelle du Diagramme de Gantt
+                s_def_7 = prs.slides.add_slide(blank_layout)
+                ajouter_en_tete(s_def_7, "Define", "8. Visualisation du Diagramme de Gantt")
+                
+                # Tentative d'intégration graphique ou encart visuel professionnel du diagramme
+                card_gantt_img = s_def_7.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
+                card_gantt_img.fill.solid()
+                card_gantt_img.fill.fore_color.rgb = RGBColor(255, 255, 255)
+                card_gantt_img.line.color.rgb = RGBColor(203, 213, 225)
+                tf_gi = card_gantt_img.text_frame
+                tf_gi.word_wrap = True
+                p_gi1 = tf_gi.paragraphs[0]
+                p_gi1.text = "Illustration graphique du Diagramme de Gantt :"
+                p_gi1.font.size = Pt(13)
+                p_gi1.font.bold = True
+                p_gi1.font.color.rgb = c_primary
+                
+                p_gi2 = tf_gi.add_paragraph()
+                p_gi2.text = "\n[ Espace réservé à la capture visuelle du planning sous forme de chronogramme / diagramme de Gantt issu de l'application ]"
+                p_gi2.font.size = Pt(11)
+                p_gi2.font.color.rgb = RGBColor(100, 116, 139)
+
                 # Exportation binaire globale
                 buffer_pptx = io.BytesIO()
                 prs.save(buffer_pptx)
                 buffer_pptx.seek(0)
 
-                st.success("✨ Présentation PowerPoint (Phase DEFINE intégrée) générée avec succès !")
+                st.success("✨ Présentation PowerPoint complète mise à jour avec succès !")
                 st.download_button(
                     label="📥 Télécharger le PowerPoint complet (.pptx)",
                     data=buffer_pptx,
