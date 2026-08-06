@@ -306,21 +306,32 @@ with st.sidebar:
         dmaic = p_exp.get("dmaic", {})
         dmaic_define = dmaic.get("define", {}) if isinstance(dmaic, dict) else {}
 
+        # --- FONCTION GET_VAL CORRIGÉE POUR ÉVITER LE VALUEERROR PANDAS ---
+        def is_valid_val(val):
+            """Vérifie si une valeur (DataFrame, dict, list, str, etc.) n'est pas vide."""
+            if val is None:
+                return False
+            if isinstance(val, (pd.DataFrame, pd.Series)):
+                return not val.empty
+            if isinstance(val, (dict, list, set, str)):
+                return len(val) > 0
+            return True
+
         def get_val(*keys):
             # 1. Chercher dans p_exp direct
             for k in keys:
-                if k in p_exp and p_exp[k] not in [None, "", {}]:
+                if k in p_exp and is_valid_val(p_exp[k]):
                     return p_exp[k]
             # 2. Chercher dans dmaic_define
             for k in keys:
-                if isinstance(dmaic_define, dict) and k in dmaic_define and dmaic_define[k] not in [None, "", {}]:
+                if isinstance(dmaic_define, dict) and k in dmaic_define and is_valid_val(dmaic_define[k]):
                     return dmaic_define[k]
             # 3. Chercher dans tout dmaic global
             if isinstance(dmaic, dict):
                 for phase_k, phase_v in dmaic.items():
                     if isinstance(phase_v, dict):
                         for k in keys:
-                            if k in phase_v and phase_v[k] not in [None, "", {}]:
+                            if k in phase_v and is_valid_val(phase_v[k]):
                                 return phase_v[k]
             return None
 
