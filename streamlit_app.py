@@ -305,6 +305,8 @@ with st.sidebar:
         # ----------------------------------------------------
         # FONCTIONS D'EXTRACTION DE DONNÉES SÉCURISÉES & ROBUSTES
         # ----------------------------------------------------
+        dmaic = p_exp.get("dmaic", {})
+
         def extraire_df(*cles):
             for cle in cles:
                 # 1. Chercher dans p_exp
@@ -362,8 +364,6 @@ with st.sidebar:
         voc_questions = p_exp.get("voc_questions", [])
         if not voc_questions and isinstance(dmaic, dict):
             voc_questions = dmaic.get("define", {}).get("voc_questions", [])
-
-        dmaic = p_exp.get("dmaic", {})
         
         # Récupération sécurisée des textes et notes
         def get_note(*chemins, defaut="Non renseigné"):
