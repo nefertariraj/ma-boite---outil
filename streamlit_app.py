@@ -266,11 +266,9 @@ with st.sidebar:
     if "projects" in st.session_state and len(st.session_state.projects) > 0:
         indices_projets_tous = list(range(len(st.session_state.projects)))
 
-
         def formateur_liste_enregistrer(idx):
             p_test = st.session_state.projects[idx]
             return f"📁 {p_test.get('nom', 'Sans nom')} | Jalon: {p_test.get('status', 'Define')}"
-
 
         proj_sel_idx = st.selectbox(
             "Sélectionnez le projet à analyser par l'Agent IA :",
@@ -303,90 +301,56 @@ with st.sidebar:
         )
 
         # ----------------------------------------------------
-        # FONCTIONS D'EXTRACTION DE DONNÉES SÉCURISÉES & ROBUSTES
+        # EXTRACTION SÉCURISÉE DES DONNÉES DU PROJET ACTIF (p_exp)
         # ----------------------------------------------------
         dmaic = p_exp.get("dmaic", {})
+        dmaic_define = dmaic.get("define", {}) if isinstance(dmaic, dict) else {}
 
-        def extraire_df(*cles):
-            for cle in cles:
-                # 1. Chercher dans p_exp
-                val = p_exp.get(cle, {})
-                
-                # Cas A : Format sérialisé avec _type_df_
-                if isinstance(val, dict) and val.get("_type_df_"):
-                    df_res = pd.DataFrame(val.get("data", []))
-                    if not df_res.empty:
-                        return df_res
-                
-                # Cas B : Déjà un DataFrame natif
-                elif isinstance(val, pd.DataFrame):
-                    if not val.empty:
-                        return val
-                        
-                # Cas C : Liste de dictionnaires (ex: lignes de tableau)
-                elif isinstance(val, list) and len(val) > 0:
-                    if isinstance(val[0], dict):
-                        return pd.DataFrame(val)
-                    else:
-                        return pd.DataFrame({cles[0]: val})
-                        
-                # Cas D : Dictionnaire de dictionnaires / paires
-                elif isinstance(val, dict) and len(val) > 0:
-                    try:
-                        return pd.DataFrame(list(val.items()), columns=["Paramètre", "Valeur"])
-                    except:
-                        pass
+        def get_val(*keys):
+            # 1. Chercher dans p_exp direct
+            for k in keys:
+                if k in p_exp and p_exp[k] not in [None, "", {}]:
+                    return p_exp[k]
+            # 2. Chercher dans dmaic_define
+            for k in keys:
+                if isinstance(dmaic_define, dict) and k in dmaic_define and dmaic_define[k] not in [None, "", {}]:
+                    return dmaic_define[k]
+            # 3. Chercher dans tout dmaic global
+            if isinstance(dmaic, dict):
+                for phase_k, phase_v in dmaic.items():
+                    if isinstance(phase_v, dict):
+                        for k in keys:
+                            if k in phase_v and phase_v[k] not in [None, "", {}]:
+                                return phase_v[k]
+            return None
 
-                # 2. Chercher dans dmaic (define, measure, analyze, improve, control)
-                if isinstance(dmaic, dict):
-                    for phase_key, phase_dict in dmaic.items():
-                        if isinstance(phase_dict, dict) and cle in phase_dict:
-                            sub_val = phase_dict[cle]
-                            if isinstance(sub_val, pd.DataFrame) and not sub_val.empty:
-                                return sub_val
-                            elif isinstance(sub_val, list) and len(sub_val) > 0:
-                                if isinstance(sub_val[0], dict):
-                                    return pd.DataFrame(sub_val)
-                                else:
-                                    return pd.DataFrame({cles[0]: sub_val})
-                            elif isinstance(sub_val, dict) and sub_val.get("_type_df_"):
-                                return pd.DataFrame(sub_val.get("data", []))
+        # Extraction des textes de Define
+        probleme_texte = get_val("probleme", "problem_statement", "projet_charter") or "Non renseigné dans l'application."
+        ctq_valide = get_val("ctq_valide", "ctq", "critical_to_quality") or "Non renseigné."
+        diagnostic_texte = get_val("diagnostic_opportunite", "opportunite_notes", "opportunite") or "Non renseigné."
+        matrice_go_no_go = get_val("matrice_go_no_go", "go_no_go") or "Validé (Go)"
+        analyse_thematique = get_val("voc_analyse_synthese", "analyse_thematique", "focus_prioritaire") or "Non renseigné."
+        voc_questions = get_val("voc_questions", "questions_voc") or []
 
+        def get_df(*keys):
+            val = get_val(*keys)
+            if isinstance(val, pd.DataFrame):
+                return val
+            elif isinstance(val, dict) and val.get("_type_df_"):
+                return pd.DataFrame(val.get("data", []))
+            elif isinstance(val, list) and len(val) > 0:
+                if isinstance(val[0], dict):
+                    return pd.DataFrame(val)
+                else:
+                    return pd.DataFrame({"Élément": val})
+            elif isinstance(val, dict) and len(val) > 0:
+                return pd.DataFrame(list(val.items()), columns=["Paramètre", "Valeur"])
             return pd.DataFrame()
 
-        # Extractions sécurisées des DataFrames avec recherche multi-clés
-        df_gantt = extraire_df("gantt_data", "df_gantt", "planning_table", "jalons_table")
-        df_mesure = extraire_df("mesure_data", "msa_data", "mesure")
-        df_voc = extraire_df("voc_raw_data", "voc_table", "sipoc_table")
-        df_stakeholders = extraire_df("stakeholder_table", "stakeholder_data", "parties_prenantes")
-        df_equipe = extraire_df("equipe_projet_table", "equipe", "team_table")
-
-        voc_questions = p_exp.get("voc_questions", [])
-        if not voc_questions and isinstance(dmaic, dict):
-            voc_questions = dmaic.get("define", {}).get("voc_questions", [])
-        
-        # Récupération sécurisée des textes et notes
-        def get_note(*chemins, defaut="Non renseigné"):
-            for chemin in chemins:
-                # Si le chemin est direct dans p_exp
-                if chemin in p_exp and p_exp[chemin] not in [None, ""]:
-                    return p_exp[chemin]
-                # Si le chemin est dans dmaic (ex: ("define", "projet_charter"))
-                if len(chemin) == 2:
-                    phase, cle = chemin
-                    if isinstance(dmaic, dict) and phase in dmaic and isinstance(dmaic[phase], dict):
-                        if cle in dmaic[phase] and dmaic[phase][cle] not in [None, ""]:
-                            return dmaic[phase][cle]
-            return defaut
-
-        charte = get_note(("define", "projet_charter"), "projet_charter", "probleme")
-        msa_notes = get_note(("measure", "msa_notes"), "msa_notes")
-        ishikawa_notes = get_note(("analyze", "ishikawa_notes"), "ishikawa_notes")
-        strategies = get_note(("improve", "strategies"), "strategies", defaut=[])
-        gains = get_note(("control", "gains_financiers"), "gains_financiers", defaut="Non chiffré")
-        
-        status_projet = p_exp.get("status", "Define")
-        progression = p_exp.get("progression", 0)
+        df_equipe = get_df("equipe_projet_table", "equipe", "team_table")
+        df_stakeholders = get_df("stakeholder_table", "stakeholder_data", "parties_prenantes")
+        df_sipoc = get_df("sipoc_table", "sipoc_data", "sipoc")
+        df_gantt = get_df("df_gantt", "gantt_data", "planning_table", "jalons_table")
 
         st.markdown("---")
 
@@ -404,65 +368,7 @@ with st.sidebar:
                 from pptx.enum.shapes import MSO_SHAPE
                 from pptx.enum.text import PP_ALIGN
                 from pptx.util import Inches, Pt
-                import pandas as pd
                 import io
-                from datetime import datetime
-
-                # 1. PARAMÈTRES GLOBAUX & SAISIE AUTEUR
-                project_name = st.session_state.get("project_name", "Projet Lean Six Sigma")
-                auteur_nom = st.session_state.get("auteur_nom", "Master Black Belt")
-                date_projet = datetime.now().strftime("%d/%m/%Y")
-                palette_couleurs = st.session_state.get("palette_couleurs", "Bleu")
-
-                # Récupération sécurisée et élargie des dictionnaires dmaic / state
-                dmaic_global = st.session_state.get("dmaic", {})
-                dmaic_define = dmaic_global.get("define", {}) if isinstance(dmaic_global, dict) else {}
-
-                def get_val(*keys):
-                    # 1. Chercher d'abord directement dans st.session_state
-                    for k in keys:
-                        if k in st.session_state and st.session_state[k] not in [None, "", {}]:
-                            return st.session_state[k]
-                    
-                    # 2. Chercher dans dmaic_define (sous-dictionnaire)
-                    for k in keys:
-                        if isinstance(dmaic_define, dict) and k in dmaic_define and dmaic_define[k] not in [None, "", {}]:
-                            return dmaic_define[k]
-                            
-                    # 3. Chercher dans dmaic_global complet si applicable
-                    if isinstance(dmaic_global, dict):
-                        for k in keys:
-                            if k in dmaic_global and dmaic_global[k] not in [None, "", {}]:
-                                return dmaic_global[k]
-                                
-                    return None
-
-                # Extraction des données textuelles de Define (avec fallbacks améliorés)
-                probleme_texte = get_val("probleme", "problem_statement", "projet_charter") or "Non renseigné dans l'application."
-                ctq_valide = get_val("ctq_valide", "ctq", "critical_to_quality") or "Non renseigné."
-                diagnostic_texte = get_val("diagnostic_opportunite", "opportunite_notes", "opportunite") or "Non renseigné."
-                matrice_go_no_go = get_val("matrice_go_no_go", "go_no_go") or "Validé (Go)"
-                analyse_thematique = get_val("voc_analyse_synthese", "analyse_thematique", "focus_prioritaire") or "Non renseigné."
-                voc_questions = get_val("voc_questions", "questions_voc") or []
-
-                # Fonction de conversion sécurisée en DataFrame pour les tableaux
-                def get_df(*keys):
-                    val = get_val(*keys)
-                    if isinstance(val, pd.DataFrame):
-                        return val
-                    elif isinstance(val, list) and len(val) > 0:
-                        if isinstance(val[0], dict):
-                            return pd.DataFrame(val)
-                        else:
-                            return pd.DataFrame({"Élément": val})
-                    elif isinstance(val, dict) and len(val) > 0:
-                        return pd.DataFrame(list(val.items()), columns=["Paramètre", "Valeur"])
-                    return pd.DataFrame()
-
-                df_equipe = get_df("equipe_projet_table", "equipe", "team_table")
-                df_stakeholders = get_df("stakeholder_table", "stakeholder_data", "parties_prenantes")
-                df_sipoc = get_df("sipoc_table", "sipoc_data", "sipoc")
-                df_gantt = get_df("df_gantt", "planning_table", "jalons_table")
 
                 # Palettes exécutives (c_text mis en gris anthracite foncé #222222 pour garantir la lisibilité sur fond blanc)
                 palettes = {
@@ -641,7 +547,7 @@ with st.sidebar:
                 card_gonogo.line.color.rgb = RGBColor(5, 150, 105)
                 tf_g = card_gonogo.text_frame
                 tf_g.word_wrap = True
-                tf_g.paragraphs[0].text = "Matrice Go / No Go (Positionnement IA) :"
+                tf_g.paragraphs[0].text = "Matrice Go / No Go :"
                 tf_g.paragraphs[0].font.size = Pt(12)
                 tf_g.paragraphs[0].font.bold = True
                 tf_g.paragraphs[0].font.color.rgb = RGBColor(6, 78, 59)
@@ -676,11 +582,11 @@ with st.sidebar:
                 card_voc.line.color.rgb = RGBColor(203, 213, 225)
                 tf_vq = card_voc.text_frame
                 tf_vq.word_wrap = True
-                tf_vq.paragraphs[0].text = "Sous-section 1 : Questionnaire VOC"
+                tf_vq.paragraphs[0].text = "Questionnaire VOC"
                 tf_vq.paragraphs[0].font.size = Pt(12)
                 tf_vq.paragraphs[0].font.bold = True
                 tf_vq.paragraphs[0].font.color.rgb = c_accent
-                
+            
                 txt_q = ""
                 if voc_questions:
                     for q in voc_questions:
@@ -698,7 +604,7 @@ with st.sidebar:
                 card_ana.line.color.rgb = RGBColor(203, 213, 225)
                 tf_va = card_ana.text_frame
                 tf_va.word_wrap = True
-                tf_va.paragraphs[0].text = "Sous-section 3 & 4 : Analyse Thématique & Focus Prioritaire"
+                tf_va.paragraphs[0].text = "Analyse Thématique & Focus Prioritaire"
                 tf_va.paragraphs[0].font.size = Pt(12)
                 tf_va.paragraphs[0].font.bold = True
                 tf_va.paragraphs[0].font.color.rgb = c_primary
