@@ -302,32 +302,89 @@ with st.sidebar:
             "🤖 **Agent IA Actif :** Génération directe du deck PowerPoint exécutif structuré par phase DMAIC."
         )
 
+        # ----------------------------------------------------
+        # FONCTIONS D'EXTRACTION DE DONNÉES SÉCURISÉES & ROBUSTES
+        # ----------------------------------------------------
+        def extraire_df(*cles):
+            for cle in cles:
+                # 1. Chercher dans p_exp
+                val = p_exp.get(cle, {})
+                
+                # Cas A : Format sérialisé avec _type_df_
+                if isinstance(val, dict) and val.get("_type_df_"):
+                    df_res = pd.DataFrame(val.get("data", []))
+                    if not df_res.empty:
+                        return df_res
+                
+                # Cas B : Déjà un DataFrame natif
+                elif isinstance(val, pd.DataFrame):
+                    if not val.empty:
+                        return val
+                        
+                # Cas C : Liste de dictionnaires (ex: lignes de tableau)
+                elif isinstance(val, list) and len(val) > 0:
+                    if isinstance(val[0], dict):
+                        return pd.DataFrame(val)
+                    else:
+                        return pd.DataFrame({cles[0]: val})
+                        
+                # Cas D : Dictionnaire de dictionnaires / paires
+                elif isinstance(val, dict) and len(val) > 0:
+                    try:
+                        return pd.DataFrame(list(val.items()), columns=["Paramètre", "Valeur"])
+                    except:
+                        pass
 
-        # ----------------------------------------------------
-        # FONCTIONS D'EXTRACTION DE DONNÉES SÉCURISÉES
-        # ----------------------------------------------------
-        def extraire_df(cle):
-            val = p_exp.get(cle, {})
-            if isinstance(val, dict) and val.get("_type_df_"):
-                return pd.DataFrame(val.get("data", []))
-            elif isinstance(val, pd.DataFrame):
-                return val
+                # 2. Chercher dans dmaic (define, measure, analyze, improve, control)
+                if isinstance(dmaic, dict):
+                    for phase_key, phase_dict in dmaic.items():
+                        if isinstance(phase_dict, dict) and cle in phase_dict:
+                            sub_val = phase_dict[cle]
+                            if isinstance(sub_val, pd.DataFrame) and not sub_val.empty:
+                                return sub_val
+                            elif isinstance(sub_val, list) and len(sub_val) > 0:
+                                if isinstance(sub_val[0], dict):
+                                    return pd.DataFrame(sub_val)
+                                else:
+                                    return pd.DataFrame({cles[0]: sub_val})
+                            elif isinstance(sub_val, dict) and sub_val.get("_type_df_"):
+                                return pd.DataFrame(sub_val.get("data", []))
+
             return pd.DataFrame()
 
+        # Extractions sécurisées des DataFrames avec recherche multi-clés
+        df_gantt = extraire_df("gantt_data", "df_gantt", "planning_table", "jalons_table")
+        df_mesure = extraire_df("mesure_data", "msa_data", "mesure")
+        df_voc = extraire_df("voc_raw_data", "voc_table", "sipoc_table")
+        df_stakeholders = extraire_df("stakeholder_table", "stakeholder_data", "parties_prenantes")
+        df_equipe = extraire_df("equipe_projet_table", "equipe", "team_table")
 
-        df_gantt = extraire_df("gantt_data")
-        df_mesure = extraire_df("mesure_data")
-        df_voc = extraire_df("voc_raw_data")
         voc_questions = p_exp.get("voc_questions", [])
+        if not voc_questions and isinstance(dmaic, dict):
+            voc_questions = dmaic.get("define", {}).get("voc_questions", [])
 
         dmaic = p_exp.get("dmaic", {})
-        charte = dmaic.get("define", {}).get("projet_charter", "Non renseigné")
-        msa_notes = dmaic.get("measure", {}).get("msa_notes", "Non renseigné")
-        ishikawa_notes = dmaic.get("analyze", {}).get(
-            "ishikawa_notes", "Non renseigné"
-        )
-        strategies = dmaic.get("improve", {}).get("strategies", [])
-        gains = dmaic.get("control", {}).get("gains_financiers", "Non chiffré")
+        
+        # Récupération sécurisée des textes et notes
+        def get_note(*chemins, defaut="Non renseigné"):
+            for chemin in chemins:
+                # Si le chemin est direct dans p_exp
+                if chemin in p_exp and p_exp[chemin] not in [None, ""]:
+                    return p_exp[chemin]
+                # Si le chemin est dans dmaic (ex: ("define", "projet_charter"))
+                if len(chemin) == 2:
+                    phase, cle = chemin
+                    if isinstance(dmaic, dict) and phase in dmaic and isinstance(dmaic[phase], dict):
+                        if cle in dmaic[phase] and dmaic[phase][cle] not in [None, ""]:
+                            return dmaic[phase][cle]
+            return defaut
+
+        charte = get_note(("define", "projet_charter"), "projet_charter", "probleme")
+        msa_notes = get_note(("measure", "msa_notes"), "msa_notes")
+        ishikawa_notes = get_note(("analyze", "ishikawa_notes"), "ishikawa_notes")
+        strategies = get_note(("improve", "strategies"), "strategies", defaut=[])
+        gains = get_note(("control", "gains_financiers"), "gains_financiers", defaut="Non chiffré")
+        
         status_projet = p_exp.get("status", "Define")
         progression = p_exp.get("progression", 0)
 
