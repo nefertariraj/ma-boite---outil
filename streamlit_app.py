@@ -500,7 +500,7 @@ with st.sidebar:
                 p_sp = tf_p.add_paragraph()
                 p_sp.text = f"\n{str(probleme_texte)}"
                 p_sp.font.size = Pt(10)
-                p_sp.font.color.rgb = c_primary
+                p_sp.font.color.rgb = c_body_text
 
                 card_ctq = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.5), Inches(5.7), Inches(2.2))
                 card_ctq.fill.solid()
@@ -515,7 +515,7 @@ with st.sidebar:
                 p_sc = tf_c.add_paragraph()
                 p_sc.text = f"\n{str(ctq_valide)}"
                 p_sc.font.size = Pt(10)
-                p_sc.font.color.rgb = c_primary
+                p_sc.font.color.rgb = c_body_text
 
                 tb_eq_title = s_def_1.shapes.add_textbox(Inches(0.8), Inches(3.8), Inches(11.7), Inches(0.4))
                 tb_eq_title.text_frame.paragraphs[0].text = "2. Équipe Projet Validée :"
@@ -556,11 +556,11 @@ with st.sidebar:
                 tf_g.paragraphs[0].font.size = Pt(12)
                 tf_g.paragraphs[0].font.bold = True
                 tf_g.paragraphs[0].font.color.rgb = RGBColor(6, 78, 59)
-             
+            
                 matrice_str = str(matrice_go_no_go)
                 if isinstance(matrice_go_no_go, dict):
                     matrice_str = "\n".join([f"• {k}: {v}" for k, v in matrice_go_no_go.items()])
-             
+            
                 p_sg = tf_g.add_paragraph()
                 p_sg.text = f"\n{matrice_str}"
                 p_sg.font.size = Pt(10)
@@ -596,7 +596,7 @@ with st.sidebar:
                 tf_vq.paragraphs[0].font.size = Pt(12)
                 tf_vq.paragraphs[0].font.bold = True
                 tf_vq.paragraphs[0].font.color.rgb = c_accent
-             
+            
                 txt_q = ""
                 if voc_questions:
                     if isinstance(voc_questions, list):
@@ -606,7 +606,7 @@ with st.sidebar:
                         txt_q = str(voc_questions)
                 else:
                     txt_q = "Aucune question enregistrée."
-             
+            
                 p_svq = tf_vq.add_paragraph()
                 p_svq.text = f"\n{txt_q}"
                 p_svq.font.size = Pt(10)
@@ -628,7 +628,7 @@ with st.sidebar:
                 tf_va.paragraphs[0].font.size = Pt(12)
                 tf_va.paragraphs[0].font.bold = True
                 tf_va.paragraphs[0].font.color.rgb = c_primary
-             
+            
                 ana_str = str(analyse_thematique)
                 if isinstance(analyse_thematique, dict):
                     ana_str = "\n".join([f"• {k}: {v}" for k, v in analyse_thematique.items()])
