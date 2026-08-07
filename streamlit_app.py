@@ -500,7 +500,7 @@ with st.sidebar:
                 p_sp = tf_p.add_paragraph()
                 p_sp.text = f"\n{str(probleme_texte)}"
                 p_sp.font.size = Pt(10)
-                p_sp.font.color.rgb = c_body_text
+                p_sp.font.color.rgb = c_primary
 
                 card_ctq = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.5), Inches(5.7), Inches(2.2))
                 card_ctq.fill.solid()
@@ -515,7 +515,7 @@ with st.sidebar:
                 p_sc = tf_c.add_paragraph()
                 p_sc.text = f"\n{str(ctq_valide)}"
                 p_sc.font.size = Pt(10)
-                p_sc.font.color.rgb = c_body_text
+                p_sc.font.color.rgb = c_primary
 
                 tb_eq_title = s_def_1.shapes.add_textbox(Inches(0.8), Inches(3.8), Inches(11.7), Inches(0.4))
                 tb_eq_title.text_frame.paragraphs[0].text = "2. Équipe Projet Validée :"
