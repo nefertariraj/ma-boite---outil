@@ -1,4 +1,5 @@
-# Fichier initialisé proprement sans résidu de texte
+# LSS Toolbox — application Lean Six Sigma niveau Black Belt
+# Version intégrée : corrections + IA gratuite + modules Black Belt + soutenance complète
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -7,6 +8,32 @@ from datetime import datetime, date
 import json
 import io
 import copy
+
+import lss_ai as AI
+import lss_stats as S
+import lss_report as R
+import modules_bb as MBB
+from tab_resultats import render_results_tab, render_ai_coach
+from tab_centre_ia import render_ai_center, render_portfolio
+from tab_outils_stats import render_stats_toolbox
+
+# Clés de session propres à UN projet : purgées à chaque ouverture / création
+# (corrige le mélange de données entre projets)
+_CLES_PROJET = ["vsm_macro_steps", "vsm_detailed_map", "vsm_totals", "voc_results", "future_state_map",
+                "future_macro_steps", "summary_data_phase6", "msa_validated_vars", "msa_bias_history",
+                "dc_master_data", "dc_last_processed_file", "results", "ai_suggest_ctq", "reference_master_config"]
+_PREFIXES_PROJET = ("vsm_map_init_", "voc_results_init_", "future_state_fmea_", "status_lock_",
+                    "reference_master_config_", "gantt_fig_", "coach_out_", "res_pptx_", "causes_", "ctrl_last_processed_")
+
+
+def purger_etat_projet():
+    for cle in list(st.session_state.keys()):
+        if cle in _CLES_PROJET or cle.startswith(_PREFIXES_PROJET):
+            try:
+                del st.session_state[cle]
+            except Exception:
+                pass
+
 
 def synchroniser_et_capturer_tout(projet_en_cours, index_projet):
     """
@@ -149,7 +176,7 @@ def traiter_importation_json():
                         continue
                     
                     # On crée la base vierge
-                    projet_reconstruit = PROJET_MODELE_REFERENCE.copy()
+                    projet_reconstruit = copy.deepcopy(PROJET_MODELE_REFERENCE)
                     # On y injecte tout ce que le JSON contient (y compris le voc_raw_data sauvé !)
                     projet_reconstruit.update(p_item)
                     
@@ -195,6 +222,7 @@ def traiter_importation_json():
                 if projets_valides:
                     st.session_state.projects = projets_valides
                     st.session_state["current_project_idx"] = None
+                    purger_etat_projet()
         except Exception as e:
             st.sidebar.error(f"Erreur de restauration : {e}")
 
@@ -228,15 +256,24 @@ if 'current_project_idx' not in st.session_state:
     st.session_state.current_project_idx = None
 
 # --- ÉCRAN DE CONNEXION ---
-if not st.session_state.authenticated:
+# Mot de passe facultatif défini dans les Secrets Streamlit (APP_PASSWORD = "...").
+# Sans secret, l'application s'ouvre directement (outil personnel).
+def _mot_de_passe_app():
+    try:
+        return str(st.secrets.get("APP_PASSWORD", ""))
+    except Exception:
+        return ""
+
+if _mot_de_passe_app() and not st.session_state.authenticated:
     st.title("🔐 Lean Six Sigma - Personal Toolbox")
     with st.container(border=True):
-        user = st.text_input("Identifiant (Email Google)", key="login_user_input")
         pwd = st.text_input("Mot de passe", type="password", key="login_pwd_input")
-        if st.button("Se connecter via Google Drive", key="login_submit_btn"):
-            if user and pwd: 
+        if st.button("Se connecter", key="login_submit_btn"):
+            if pwd == _mot_de_passe_app():
                 st.session_state.authenticated = True
                 st.rerun()
+            else:
+                st.error("Mot de passe incorrect.")
     st.stop()
 
 import io
@@ -261,428 +298,14 @@ with st.sidebar:
     st.session_state.primary_color = color
     st.divider()
     
-    st.subheader("💾 Agent IA - Soutenance Master Black Belt")
-
-    if "projects" in st.session_state and len(st.session_state.projects) > 0:
-        indices_projets_tous = list(range(len(st.session_state.projects)))
-
-        def formateur_liste_enregistrer(idx):
-            p_test = st.session_state.projects[idx]
-            return f"📁 {p_test.get('nom', 'Sans nom')} | Jalon: {p_test.get('status', 'Define')}"
-
-        proj_sel_idx = st.selectbox(
-            "Sélectionnez le projet à analyser par l'Agent IA :",
-            options=indices_projets_tous,
-            format_func=formateur_liste_enregistrer,
-            key="sb_enregistrer_sous_selector",
-        )
-
-        p_exp = st.session_state.projects[proj_sel_idx]
-        project_name = p_exp.get("nom", "Projet_LSS")
-
-        st.markdown("---")
-        st.markdown("### 🎛️ Paramètres de l'Agent IA (Master Black Belt)")
-
-        palette_couleurs = st.selectbox(
-            "Palette de couleurs",
-            ["Bleu", "Vert", "Rouge", "Orange", "Gris", "Personnalisée"],
-            key="lss_palette_couleurs",
-        )
-
-        auteur_nom = st.text_input(
-            "Nom du Candidat", "Nom du Candidat", key="lss_auteur_nom"
-        )
-        date_projet = st.text_input(
-            "Date du projet", datetime.now().strftime("%d/%m/%Y"), key="lss_date_projet"
-        )
-
-        st.info(
-            "🤖 **Agent IA Actif :** Génération directe du deck PowerPoint exécutif structuré par phase DMAIC."
-        )
-
-        # ----------------------------------------------------
-        # EXTRACTION ROBUSTE DES DONNÉES DU PROJET ACTIF (p_exp)
-        # ----------------------------------------------------
-        dmaic = p_exp.get("dmaic", {})
-        dmaic_define = dmaic.get("define", {}) if isinstance(dmaic, dict) else {}
-
-        def is_valid_val(val):
-            if val is None:
-                return False
-            if isinstance(val, (pd.DataFrame, pd.Series)):
-                return not val.empty
-            if isinstance(val, (dict, list, set, str)):
-                return len(val) > 0
-            return True
-
-        def get_val(*keys):
-            if isinstance(dmaic_define, dict):
-                for k in keys:
-                    if k in dmaic_define and is_valid_val(dmaic_define[k]):
-                        return dmaic_define[k]
-            for k in keys:
-                if k in p_exp and is_valid_val(p_exp[k]):
-                    return p_exp[k]
-            if isinstance(dmaic, dict):
-                for phase_k, phase_v in dmaic.items():
-                    if isinstance(phase_v, dict):
-                        for k in keys:
-                            if k in phase_v and is_valid_val(phase_v[k]):
-                                return phase_v[k]
-            return None
-
-        probleme_texte = get_val("probleme", "problem_statement", "projet_charter", "probleme_texte") or p_exp.get("probleme", "Non renseigné.")
-        ctq_valide = get_val("ctq_valide", "ctq", "critical_to_quality") or "Non renseigné."
-        diagnostic_texte = get_val("diagnostic_opportunite", "opportunite_notes", "opportunite", "diagnostic") or "Non renseigné."
-        matrice_go_no_go = get_val("matrice_go_no_go", "go_no_go", "matrice_gonogo") or "Validé (Go)"
-        analyse_thematique = get_val("voc_analyse_synthese", "analyse_thematique", "focus_prioritaire", "synthese_voc") or "Non renseigné."
-        voc_questions = get_val("voc_questions", "questions_voc", "voc_q") or []
-
-        def get_df(*keys):
-            val = get_val(*keys)
-            if isinstance(val, pd.DataFrame):
-                return val
-            elif isinstance(val, dict) and val.get("_type_df_"):
-                return pd.DataFrame(val.get("data", []))
-            elif isinstance(val, list) and len(val) > 0:
-                if isinstance(val[0], dict):
-                    return pd.DataFrame(val)
-                else:
-                    return pd.DataFrame({"Élément": val})
-            elif isinstance(val, dict) and len(val) > 0:
-                return pd.DataFrame(list(val.items()), columns=["Paramètre", "Valeur"])
-            return pd.DataFrame()
-
-        df_equipe = get_df("equipe_projet_table", "equipe", "team_table", "equipe_projet")
-        df_stakeholders = get_df("stakeholder_table", "stakeholder_data", "parties_prenantes", "stakeholders")
-        df_sipoc = get_df("sipoc_table", "sipoc_data", "sipoc")
-        df_gantt = get_df("df_gantt", "gantt_data", "planning_table", "jalons_table", "gantt")
-
-        st.markdown("---")
-
-        if st.button(
-            "📊 Générer la présentation PowerPoint complète (Prête à projeter)",
-            use_container_width=True,
-            key="btn_export_pptx_gamma_style",
-        ):
-            try:
-                from pptx import Presentation
-                from pptx.dml.color import RGBColor
-                from pptx.enum.shapes import MSO_SHAPE
-                from pptx.enum.text import PP_ALIGN
-                from pptx.util import Inches, Pt
-                import io
-
-                # CORRECTION APPLIQUÉE : Corps de texte en GRIS FONCÉ (#222222) pour garantir la lisibilité sur fond blanc
-                c_body_text = RGBColor(34, 34, 34)
-
-                palettes = {
-                    "Bleu": (RGBColor(15, 23, 42), RGBColor(37, 99, 235), RGBColor(248, 250, 252)),
-                    "Vert": (RGBColor(6, 78, 59), RGBColor(5, 150, 105), RGBColor(240, 253, 244)),
-                    "Rouge": (RGBColor(127, 29, 29), RGBColor(220, 38, 38), RGBColor(254, 242, 242)),
-                    "Orange": (RGBColor(124, 45, 18), RGBColor(234, 88, 12), RGBColor(255, 251, 235)),
-                    "Gris": (RGBColor(38, 38, 38), RGBColor(82, 82, 82), RGBColor(250, 250, 250)),
-                }
-                c_primary, c_accent, c_bg = palettes.get(palette_couleurs, palettes["Bleu"])
-
-                prs = Presentation()
-                prs.slide_width = Inches(13.33)
-                prs.slide_height = Inches(7.5)
-                blank_layout = prs.slide_layouts[6]
-
-                def appliquer_fond(slide):
-                    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
-                    bg.fill.solid()
-                    bg.fill.fore_color.rgb = c_bg
-                    bg.line.fill.background()
-
-                def ajouter_en_tete(slide, titre_diapo):
-                    appliquer_fond(slide)
-                    tb = slide.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.7), Inches(0.9))
-                    tf = tb.text_frame
-                    tf.word_wrap = True
-                    p1 = tf.paragraphs[0]
-                    p1.text = "PHASE DMAIC : DEFINE"
-                    p1.font.size = Pt(10)
-                    p1.font.bold = True
-                    p1.font.color.rgb = c_accent
-
-                    p2 = tf.add_paragraph()
-                    p2.text = str(titre_diapo)
-                    p2.font.size = Pt(18)
-                    p2.font.bold = True
-                    p2.font.color.rgb = c_primary
-
-                def ajouter_tableau_df(slide, df, max_rows=None):
-                    if df is None or df.empty:
-                        card = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
-                        card.fill.solid()
-                        card.fill.fore_color.rgb = RGBColor(255, 255, 255)
-                        card.line.color.rgb = RGBColor(203, 213, 225)
-                        tf = card.text_frame
-                        tf.word_wrap = True
-                        p = tf.paragraphs[0]
-                        p.text = "Aucune donnée enregistrée dans l'application pour cette section."
-                        p.font.size = Pt(13)
-                        p.font.color.rgb = c_body_text
-                        return
-
-                    valeur_df = df.astype(str)
-                    rows = len(valeur_df) + 1 if max_rows is None else min(len(valeur_df) + 1, max_rows)
-                    cols = len(valeur_df.columns)
-                    table_shape = slide.shapes.add_table(rows, cols, Inches(0.8), Inches(1.5), Inches(11.7), Inches(min(5.2, 0.5 * rows)))
-                    table = table_shape.table
-
-                    for col_idx, col_name in enumerate(valeur_df.columns):
-                        cell = table.cell(0, col_idx)
-                        cell.text = str(col_name)
-                        cell.fill.solid()
-                        cell.fill.fore_color.rgb = c_accent
-                        for p in cell.text_frame.paragraphs:
-                            p.font.size = Pt(10)
-                            p.font.bold = True
-                            p.font.color.rgb = RGBColor(255, 255, 255)
-                            p.alignment = PP_ALIGN.CENTER
-
-                    limit_val = len(valeur_df.values) if max_rows is None else min(len(valeur_df.values), max_rows - 1)
-                    for row_idx, row in enumerate(valeur_df.values[:limit_val]):
-                        for col_idx, val in enumerate(row):
-                            cell = table.cell(row_idx + 1, col_idx)
-                            cell.text = str(val) if val != "nan" else ""
-                            cell.fill.solid()
-                            cell.fill.fore_color.rgb = RGBColor(248, 250, 252) if row_idx % 2 == 0 else RGBColor(255, 255, 255)
-                            for p in cell.text_frame.paragraphs:
-                                p.font.size = Pt(9)
-                                p.font.color.rgb = c_body_text
-
-                # =========================================================================
-                # 1. COUVERTURE
-                # =========================================================================
-                slide_cover = prs.slides.add_slide(blank_layout)
-                appliquer_fond(slide_cover)
-                tb_cov = slide_cover.shapes.add_textbox(Inches(1.2), Inches(1.8), Inches(11), Inches(4.5))
-                tf_cov = tb_cov.text_frame
-                tf_cov.word_wrap = True
-
-                p_c1 = tf_cov.paragraphs[0]
-                p_c1.text = "SOUTENANCE OFFICIELLE MASTER BLACK BELT • DMAIC"
-                p_c1.font.size = Pt(12)
-                p_c1.font.bold = True
-                p_c1.font.color.rgb = c_accent
-
-                p_c2 = tf_cov.add_paragraph()
-                p_c2.text = f"\n{str(project_name)}"
-                p_c2.font.size = Pt(32)
-                p_c2.font.bold = True
-                p_c2.font.color.rgb = c_primary
-
-                p_c4 = tf_cov.add_paragraph()
-                p_c4.text = f"\nAuteur : {str(auteur_nom)}  |  Date d'extraction : {str(date_projet)}"
-                p_c4.font.size = Pt(13)
-                p_c4.font.color.rgb = c_body_text
-
-                # =========================================================================
-                # 2. SLIDE 1 : Énoncé du problème & CTQ + Équipe Projet
-                # =========================================================================
-                s_def_1 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_1, "1. Énoncé du Problème, CTQ & Équipe Projet")
-
-                card_p = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(5.7), Inches(2.2))
-                card_p.fill.solid()
-                card_p.fill.fore_color.rgb = RGBColor(255, 255, 255)
-                card_p.line.color.rgb = RGBColor(203, 213, 225)
-                tf_p = card_p.text_frame
-                tf_p.word_wrap = True
-                tf_p.paragraphs[0].text = "Problématique :"
-                tf_p.paragraphs[0].font.size = Pt(11)
-                tf_p.paragraphs[0].font.bold = True
-                tf_p.paragraphs[0].font.color.rgb = c_accent
-                p_sp = tf_p.add_paragraph()
-                p_sp.text = f"\n{str(probleme_texte)}"
-                p_sp.font.size = Pt(10)
-                p_sp.font.color.rgb = c_body_text
-
-                card_ctq = s_def_1.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(6.8), Inches(1.5), Inches(5.7), Inches(2.2))
-                card_ctq.fill.solid()
-                card_ctq.fill.fore_color.rgb = RGBColor(255, 255, 255)
-                card_ctq.line.color.rgb = RGBColor(203, 213, 225)
-                tf_c = card_ctq.text_frame
-                tf_c.word_wrap = True
-                tf_c.paragraphs[0].text = "CTQ Validé :"
-                tf_c.paragraphs[0].font.size = Pt(11)
-                tf_c.paragraphs[0].font.bold = True
-                tf_c.paragraphs[0].font.color.rgb = c_primary
-                p_sc = tf_c.add_paragraph()
-                p_sc.text = f"\n{str(ctq_valide)}"
-                p_sc.font.size = Pt(10)
-                p_sc.font.color.rgb = c_body_text
-
-                tb_eq_title = s_def_1.shapes.add_textbox(Inches(0.8), Inches(3.8), Inches(11.7), Inches(0.4))
-                tb_eq_title.text_frame.paragraphs[0].text = "2. Équipe Projet Validée :"
-                tb_eq_title.text_frame.paragraphs[0].font.size = Pt(11)
-                tb_eq_title.text_frame.paragraphs[0].font.bold = True
-                tb_eq_title.text_frame.paragraphs[0].font.color.rgb = c_primary
-
-                ajouter_tableau_df(s_def_1, df_equipe, max_rows=5)
-
-                # =========================================================================
-                # 3. SLIDE 2 : Diagnostic d'opportunité & Matrice Go / No Go
-                # =========================================================================
-                s_def_2 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_2, "3. Diagnostic d'Opportunité & Matrice Go / No Go")
-
-                card_diag = s_def_2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(7.5), Inches(5.2))
-                card_diag.fill.solid()
-                card_diag.fill.fore_color.rgb = RGBColor(255, 255, 255)
-                card_diag.line.color.rgb = RGBColor(203, 213, 225)
-                tf_d = card_diag.text_frame
-                tf_d.word_wrap = True
-                tf_d.paragraphs[0].text = "Analyse du Diagnostic d'Opportunité :"
-                tf_d.paragraphs[0].font.size = Pt(12)
-                tf_d.paragraphs[0].font.bold = True
-                tf_d.paragraphs[0].font.color.rgb = c_accent
-                p_sd = tf_d.add_paragraph()
-                p_sd.text = f"\n{str(diagnostic_texte)}"
-                p_sd.font.size = Pt(10)
-                p_sd.font.color.rgb = c_body_text
-
-                card_gonogo = s_def_2.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(8.5), Inches(1.5), Inches(4.0), Inches(5.2))
-                card_gonogo.fill.solid()
-                card_gonogo.fill.fore_color.rgb = RGBColor(240, 253, 244)
-                card_gonogo.line.color.rgb = RGBColor(5, 150, 105)
-                tf_g = card_gonogo.text_frame
-                tf_g.word_wrap = True
-                tf_g.paragraphs[0].text = "Matrice Go / No Go & Éléments :"
-                tf_g.paragraphs[0].font.size = Pt(12)
-                tf_g.paragraphs[0].font.bold = True
-                tf_g.paragraphs[0].font.color.rgb = RGBColor(6, 78, 59)
-            
-                matrice_str = str(matrice_go_no_go)
-                if isinstance(matrice_go_no_go, dict):
-                    matrice_str = "\n".join([f"• {k}: {v}" for k, v in matrice_go_no_go.items()])
-            
-                p_sg = tf_g.add_paragraph()
-                p_sg.text = f"\n{matrice_str}"
-                p_sg.font.size = Pt(10)
-                p_sg.font.color.rgb = c_body_text
-
-                # =========================================================================
-                # 4. SLIDE 3 : Stakeholder Analysis (Tableau)
-                # =========================================================================
-                s_def_3 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_3, "4. Stakeholder Analysis (Parties Prenantes)")
-                ajouter_tableau_df(s_def_3, df_stakeholders)
-
-                # =========================================================================
-                # 5. SLIDE 4 : SIPOC et flux de process (Tableau complet sans limite)
-                # =========================================================================
-                s_def_4 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_4, "5. SIPOC et Cartographie du Flux de Processus")
-                ajouter_tableau_df(s_def_4, df_sipoc, max_rows=None)
-
-                # =========================================================================
-                # 6. SLIDE 5 : VOC (Questionnaire)
-                # =========================================================================
-                s_def_5 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_5, "6. VOC (Voice of Customer) - Questionnaire")
-
-                card_voc = s_def_5.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
-                card_voc.fill.solid()
-                card_voc.fill.fore_color.rgb = RGBColor(255, 255, 255)
-                card_voc.line.color.rgb = RGBColor(203, 213, 225)
-                tf_vq = card_voc.text_frame
-                tf_vq.word_wrap = True
-                tf_vq.paragraphs[0].text = "Questionnaire VOC :"
-                tf_vq.paragraphs[0].font.size = Pt(12)
-                tf_vq.paragraphs[0].font.bold = True
-                tf_vq.paragraphs[0].font.color.rgb = c_accent
-            
-                txt_q = ""
-                if voc_questions:
-                    if isinstance(voc_questions, list):
-                        for q in voc_questions:
-                            txt_q += f"• {str(q)}\n"
-                    else:
-                        txt_q = str(voc_questions)
-                else:
-                    txt_q = "Aucune question enregistrée."
-            
-                p_svq = tf_vq.add_paragraph()
-                p_svq.text = f"\n{txt_q}"
-                p_svq.font.size = Pt(10)
-                p_svq.font.color.rgb = c_body_text
-
-                # =========================================================================
-                # 7. SLIDE 5 BIS : Analyse Thématique & Focus Prioritaire
-                # =========================================================================
-                s_def_5_bis = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_5_bis, "6. VOC (Suite) - Analyse Thématique & Focus Prioritaire")
-
-                card_ana = s_def_5_bis.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
-                card_ana.fill.solid()
-                card_ana.fill.fore_color.rgb = RGBColor(255, 255, 255)
-                card_ana.line.color.rgb = RGBColor(203, 213, 225)
-                tf_va = card_ana.text_frame
-                tf_va.word_wrap = True
-                tf_va.paragraphs[0].text = "Synthèse & Analyse Thématique :"
-                tf_va.paragraphs[0].font.size = Pt(12)
-                tf_va.paragraphs[0].font.bold = True
-                tf_va.paragraphs[0].font.color.rgb = c_primary
-            
-                ana_str = str(analyse_thematique)
-                if isinstance(analyse_thematique, dict):
-                    ana_str = "\n".join([f"• {k}: {v}" for k, v in analyse_thematique.items()])
-
-                p_sva = tf_va.add_paragraph()
-                p_sva.text = f"\n{ana_str}"
-                p_sva.font.size = Pt(10)
-                p_sva.font.color.rgb = c_body_text
-
-                # =========================================================================
-                # 8. SLIDE 6 : Project Milestone and Timing (Planning & Tableau)
-                # =========================================================================
-                s_def_6 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_6, "7. Project Milestone and Timing (Planning)")
-                ajouter_tableau_df(s_def_6, df_gantt, max_rows=None)
-
-                # =========================================================================
-                # 9. SLIDE 7 : Diagramme de Gantt / Graphique Planning associé
-                # =========================================================================
-                s_def_7 = prs.slides.add_slide(blank_layout)
-                ajouter_en_tete(s_def_7, "7. Project Milestone and Timing (Diagramme de Gantt)")
-
-                card_gantt = s_def_7.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.2))
-                card_gantt.fill.solid()
-                card_gantt.fill.fore_color.rgb = RGBColor(255, 255, 255)
-                card_gantt.line.color.rgb = RGBColor(203, 213, 225)
-                tf_gt = card_gantt.text_frame
-                tf_gt.word_wrap = True
-                tf_gt.paragraphs[0].text = "Visualisation Graphique du Planning & Jalons :"
-                tf_gt.paragraphs[0].font.size = Pt(12)
-                tf_gt.paragraphs[0].font.bold = True
-                tf_gt.paragraphs[0].font.color.rgb = c_primary
-
-                p_sgt = tf_gt.add_paragraph()
-                p_sgt.text = "\n[Diagramme de Gantt généré et synchronisé depuis l'application]"
-                p_sgt.font.size = Pt(11)
-                p_sgt.font.color.rgb = c_body_text
-
-                # Sauvegarde du fichier PowerPoint en mémoire
-                buffer_pptx = io.BytesIO()
-                prs.save(buffer_pptx)
-                buffer_pptx.seek(0)
-
-                st.success("✨ Présentation de la phase DEFINE générée avec succès ! Les textes sont maintenant parfaitement lisibles en gris foncé sur fond blanc.")
-                st.download_button(
-                    label="📥 Télécharger la soutenance DEFINE (.pptx)",
-                    data=buffer_pptx,
-                    file_name=f"Soutenance_Define_{str(project_name).replace(' ', '_')}.pptx",
-                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                    key="dl_pptx_define_final",
-                )
-
-            except Exception as e:
-                st.error(f"Erreur lors de la génération de la présentation : {e}")
+    st.subheader("🤖 Intelligence artificielle")
+    _cfg_ia = AI.get_config()
+    if AI.is_available(_cfg_ia):
+        st.success(f"IA active : {_cfg_ia['provider'].capitalize()}")
+    else:
+        st.warning("IA hors-ligne : ajoutez une clé gratuite Groq dans les Secrets (voir le guide).")
+    st.info("📣 La soutenance PowerPoint complète se génère dans l'onglet **RÉSULTATS & SOUTENANCE** du projet.")
+    st.divider()
 
     # ------------------------------------------------
     # 💾 SAUVEGARDE ET IMPORTATION GLOBALE (CONSERVÉS)
@@ -797,6 +420,7 @@ with st.sidebar:
 # --- NAVIGATION PRINCIPALE ---
 if st.session_state.current_project_idx is None:
     st.title("🚀 Mes Projets Lean Six Sigma")
+    render_portfolio(st.session_state.get("projects", []))
     
     with st.expander("➕ Initialiser un nouveau projet"):
         p_name = st.text_input("Nom du projet", key="input_nouveau_projet_nom")
@@ -866,6 +490,7 @@ if st.session_state.current_project_idx is None:
                     except Exception:
                         pass
 
+                purger_etat_projet()
                 st.success("Projet créé et initialisé à vide !")
                 st.rerun()
 
@@ -918,6 +543,7 @@ if st.session_state.current_project_idx is None:
                     else:
                         st.session_state["improve_strategies"] = pd.DataFrame()
 
+                    purger_etat_projet()
                     # Purge élargie et agressive des caches d'édition pour forcer le rechargement propre
                     for k in list(st.session_state.keys()):
                         k_lower = k.lower()
@@ -947,7 +573,7 @@ else:
         st.title(f"Projet : {p['name']}")
 
     # Définition des onglets
-    tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL"])
+    tabs = st.tabs(["DEFINE", "MEASURE", "ANALYZE", "IMPROVE", "CONTROL", "🤝 CHANGEMENT", "🧮 OUTILS STATS", "🧠 CENTRE IA", "📣 RÉSULTATS & SOUTENANCE"])
 
     # --- PHASE DEFINE ---
     with tabs[0]:
@@ -966,15 +592,18 @@ else:
             # Utilisation de .get pour éviter le KeyError si le projet est ancien
             p_input = st.text_area("Saisie libre", value=p.get("problem", ""), height=150, key=f"prob_in_{p_idx}")
         
-            if st.button("🪄 Retranscrire via IA"):
-                p["problem"] = p_input
-                st.session_state.ai_suggest_ctq = [
-                    "⏱️ Temps : Réduire le Lead Time global",
-                    "🎯 Qualité : Augmenter le taux de conformité (%C&A)",
-                    "💰 Coût : Réduire les coûts opérationnels",
-                    f"✨ Spécifique : {p_input[:30]}..."
-                ]
-                st.rerun() 
+            p["problem"] = p_input  # le problème est enregistré en continu
+            if st.button("🪄 Reformuler et proposer des CTQ (IA)", key=f"btn_ctq_ia_{p_idx}"):
+                _cfg = AI.get_config()
+                if AI.is_available(_cfg):
+                    with st.spinner("L'IA analyse votre énoncé…"):
+                        st.session_state.ai_suggest_ctq = AI.suggest_ctq(p_input, _cfg)
+                else:
+                    st.session_state.ai_suggest_ctq = [
+                        "⚠️ IA hors-ligne — modèle de CTQ à adapter : « Délai de traitement ≤ X h pour 95 % des cas »",
+                        "Modèle : « Taux de dossiers conformes du premier coup ≥ X % »",
+                        "Modèle : « Coût par unité traitée ≤ X Ar »"]
+                st.rerun()
 
         with col2:
             st.write("Propositions de l'IA (CTQ) :")
@@ -1027,53 +656,30 @@ else:
             key=f"area_ben_v13_{p_idx}"
         )
 
-        if len(p["benefices_saisie"]) > 10:
-            st.markdown("---")
-        
-            # 1. ANALYSE SÉMANTIQUE BLACK BELT
-            c_alt1, c_alt2 = st.columns([2, 1])
-            with c_alt1:
-                st.markdown("### 💎 Diagnostic de l'Opportunité")
-                st.success(f"""
-                **Analyse de la Valeur Ajoutée :**
-                Votre description (« *{p['benefices_saisie'][:60]}...* ») suggère un potentiel de réduction des **COPQ** (Coûts de Non-Qualité) significatif. 
-            
-                *   **Levier Principal :** Optimisation de la performance (Sigma Level).
-                *   **Type de Gain :** Hard Savings identifiés.
-                *   **Risque de Cadrage :** Faible (Périmètre cohérent avec une démarche DMAIC).
-                """)
-        
-            with c_alt2:
-                st.metric("Potentiel de ROI", "Élevé", delta="Top 10% Projets")
-                st.write("**Statut :** Candidat idéal pour analyse approfondie.")
-
-            # 2. LA MATRICE D'OPPORTUNITÉ (Visualisation)
-            with st.expander("👁️ Visualiser la Matrice d'Opportunité (Go / No-Go)"):
-                st.write("Cette matrice évalue si le projet est 'éligible' à une certification Black Belt ou s'il s'agit d'un simple projet de maintenance.")
-            
-                # Mise en page de la matrice
-                m_col1, m_col2 = st.columns([2, 1])
-            
-                with m_col1:
-                    st.markdown("""
-                    | | **COMPLEXITÉ MAÎTRISÉE** | **COMPLEXITÉ ÉLEVÉE** |
-                    |---|---|---|
-                    | **VALEUR STRATÉGIQUE** | ✨ **OPPORTUNITÉ MAJEURE** (Go) | 🏗️ **CHANTIER COMPLEXE** |
-                    | **VALEUR MODÉRÉE** | 🤏 **MICRO-AMÉLIORATION** | ❌ **HORS PÉRIMÈTRE** |
-                    """)
-            
-                with m_col2:
-                    st.markdown("**Positionnement IA**")
-                    # Curseur de positionnement basé sur le texte
-                    st.select_slider(
-                        "Éligibilité :",
-                        options=["Hors périmètre", "Micro-Amélioration", "Chantier Complexe", "Opportunité Majeure"],
-                        value="Opportunité Majeure",
-                        disabled=True
-                    )
-                    st.caption("L'IA préconise le passage en phase 'Measure'.")
+        # Diagnostic d'opportunité : notation par le Black Belt (et non plus un verdict figé)
+        opp = p.setdefault("opportunite", {})
+        st.markdown("##### 💎 Matrice d'opportunité (Go / No-Go)")
+        o1, o2, o3, o4 = st.columns(4)
+        opp["valeur"] = o1.slider("Valeur stratégique / financière", 1, 5, int(opp.get("valeur", 3)), key=f"opp_v_{p_idx}",
+                                  help="1 = marginale, 5 = enjeu majeur pour la direction")
+        opp["complexite"] = o2.slider("Complexité / incertitude", 1, 5, int(opp.get("complexite", 3)), key=f"opp_c_{p_idx}",
+                                      help="1 = solution évidente, 5 = causes inconnues, multi-services")
+        opp["donnees"] = o3.slider("Données disponibles", 1, 5, int(opp.get("donnees", 3)), key=f"opp_d_{p_idx}")
+        opp["sponsor"] = o4.slider("Engagement du sponsor", 1, 5, int(opp.get("sponsor", 3)), key=f"opp_s_{p_idx}")
+        if opp["valeur"] >= 3 and opp["complexite"] >= 3:
+            opp["verdict"] = "🏗️ Projet Black Belt (DMAIC complet)"
+        elif opp["valeur"] >= 3:
+            opp["verdict"] = "⚡ Quick win / Kaizen (solution connue : agir directement)"
+        elif opp["complexite"] >= 3:
+            opp["verdict"] = "❌ Hors périmètre : effort élevé pour une valeur faible"
         else:
-            st.info("💡 Décrivez vos bénéfices pour activer le diagnostic d'opportunité Black Belt.")
+            opp["verdict"] = "🤏 Micro-amélioration (Green Belt / juste-faire)"
+        alertes = []
+        if opp["donnees"] <= 2:
+            alertes.append("peu de données : prévoir une collecte longue en Measure")
+        if opp["sponsor"] <= 2:
+            alertes.append("sponsor peu engagé : risque majeur d'échec")
+        st.info(f"**Positionnement : {opp['verdict']}**" + (" — ⚠️ " + " ; ".join(alertes) if alertes else ""))
 
         # 4. Stakeholder Analysis
         st.divider()
@@ -1261,7 +867,24 @@ else:
                 st.session_state.voc_results = pd.DataFrame()
             st.session_state[f"voc_results_init_{p_idx}"] = True  # <--- Correction ici (True au lieu de Tru)
 
-        if st.button("🧠 Lancer l'Analyse (Vue Black Belt)", key=f"btn_run_voc_{p_idx}"):
+        if st.button("🤖 Analyse thématique par IA (recommandée)", key=f"btn_voc_ia_{p_idx}"):
+            _cfg = AI.get_config()
+            _df_voc = p["voc_raw_data"]
+            if not AI.is_available(_cfg):
+                st.warning("IA hors-ligne : utilisez l'analyse par mots-clés ci-dessous ou configurez une clé gratuite.")
+            elif isinstance(_df_voc, pd.DataFrame) and not _df_voc.empty:
+                with st.spinner("Lecture et regroupement des verbatims…"):
+                    _res = AI.analyse_voc(_df_voc.iloc[:, -1].astype(str).tolist(), _cfg)
+                if "CTQ" in _res.columns:
+                    st.session_state.voc_results = _res
+                    p["saved_voc_results"] = _res.to_dict("records")
+                    st.rerun()
+                else:
+                    st.error(str(_res.iloc[0].to_dict()))
+            else:
+                st.warning("⚠️ Le tableau est vide.")
+
+        if st.button("🧠 Analyse rapide par mots-clés (hors-ligne)", key=f"btn_run_voc_{p_idx}"):
             df_to_analyze = p["voc_raw_data"]
             if isinstance(df_to_analyze, pd.DataFrame) and not df_to_analyze.empty:
                 verbatims = df_to_analyze.iloc[:, -1].astype(str).str.lower().tolist()
@@ -1486,6 +1109,9 @@ else:
         if f"gantt_fig_{p_idx}" in st.session_state and st.session_state[f"gantt_fig_{p_idx}"] is not None:
             st.plotly_chart(st.session_state[f"gantt_fig_{p_idx}"], use_container_width=True)
     
+        MBB.render_charte_plus(p, p_idx)
+        render_ai_coach(p, "define")
+
     # --- PHASE MEASURE ---
     with tabs[1]:
         st.header("Phase Measure")
@@ -1496,7 +1122,7 @@ else:
         
         # Récupération des données réelles de la phase Define
         ctq_v = p.get("selected_ctq", "Non défini")
-        voc_df = st.session_state.get("voc_raw_data", pd.DataFrame())
+        voc_df = p.get("voc_raw_data") if isinstance(p.get("voc_raw_data"), pd.DataFrame) else R.as_df(p.get("voc_raw_data"))
         
         with st.container(border=True):
             st.markdown(f"### 🎯 Objectif du Projet (Y) : `{ctq_v}`")
@@ -1620,11 +1246,12 @@ else:
                     sipoc_macro_steps.append(str(step_name).strip())
 
         # 1. Les étapes viennent EXCLUSIVEMENT du SIPOC du projet actuel s'il existe
-        if sipoc_macro_steps:
-            st.session_state["vsm_macro_steps"] = sipoc_macro_steps
-        else:
-            # Si le SIPOC du projet actuel est vide, les étapes sont vides
-            st.session_state["vsm_macro_steps"] = []
+        # Les sections ajoutées à la main sont conservées ; les nouvelles étapes du SIPOC sont ajoutées
+        if "vsm_macro_steps" not in st.session_state:
+            st.session_state["vsm_macro_steps"] = list(p.get("vsm_macro_steps") or sipoc_macro_steps)
+        for _etape in sipoc_macro_steps:
+            if _etape not in st.session_state["vsm_macro_steps"]:
+                st.session_state["vsm_macro_steps"].append(_etape)
             
         st.session_state[f"vsm_macro_steps_{p_idx}"] = True
 
@@ -1658,9 +1285,11 @@ else:
                 
         # 3. INITIALISATION DES METRICS CALCULÉES
         if "vsm_totals" not in st.session_state:
+            _t = R.vsm_totals(st.session_state["vsm_macro_steps"], st.session_state.get("vsm_detailed_map", {}))
             st.session_state["vsm_totals"] = {
-                "lead_time": 0.0, "va": 0.0, "nva": 0.0, "bnrva": 0.0, "attente": 0.0, "pce": 0.0,
-                "section_totals": {step: 5.0 for step in st.session_state["vsm_macro_steps"]}
+                "lead_time": _t["lead_time"], "va": _t["va"], "nva": _t["nva"], "bnrva": _t["bnva"],
+                "attente": _t["attente"], "pce": _t["pce"],
+                "section_totals": {x["etape"]: x["VA"] + x["NVA"] + x["BNVA"] + x["Attente"] for x in _t["steps"]}
             }
 
         # Fonction de conversion interne sécurisée
@@ -2600,6 +2229,8 @@ else:
                     if is_validated:
                         st.success("🚀 **Measurement System Validated – Ready for Data Collection**")
 
+        MBB.render_gage_rr(p, p_idx)
+
         # =====================================================================
         # 5. DATA COLLECTION (WITH SENSITIVE AI ALIGNMENT & FILTERED E1)
         # =====================================================================
@@ -3270,6 +2901,8 @@ else:
                     }
                     st.table(pd.DataFrame(stats_t0))
     
+        render_ai_coach(p, "measure")
+
     # --- PHASE ANALYSE ---
     with tabs[2]: 
         st.header("Phase Analyse")
@@ -3297,75 +2930,11 @@ else:
             x_cols = st.multiselect("Sélectionnez les variables X à tester :", [c for c in colonnes_disponibles if c != y_col])
 
             if st.button("🚀 Lancer l'analyse statistique"):
-                results = []
-                y_data = pd.to_numeric(df[y_col], errors='coerce')
-                is_y_num = y_data.notna().sum() > (len(df) * 0.5)
-
-                for x in x_cols:
-                    # Conversion sécurisée de X
-                    x_data = pd.to_numeric(df[x], errors='coerce')
-                    is_x_num = x_data.notna().sum() > (len(df) * 0.5)
-                
-                    impact = "Aucun"
-                    degre = "N/A"
-                    p_value = 1.0
-                
-                    try:
-                        # 1. Corrélation Pearson (Numérique vs Numérique)
-                        if is_x_num and is_y_num:
-                            corr, p_value = stats.pearsonr(x_data.dropna(), y_data.dropna())
-                            if p_value < 0.05:
-                                impact = "Oui, influence démontrée"
-                                degre = "Fort" if abs(corr) > 0.7 else ("Modéré" if abs(corr) > 0.3 else "Faible")
-                            else:
-                                impact = "Non, influence non démontrée"
-                                degre = "Nul"
-
-                        # 2. ANOVA (Catégoriel vs Numérique)
-                        elif not is_x_num and is_y_num:
-                            groups = [group[y_col].dropna().values for _, group in df.groupby(x)]
-                            if len(groups) > 1:
-                                _, p_value = stats.f_oneway(*groups)
-                                if p_value < 0.05:
-                                    impact = "Oui, les moyennes diffèrent"
-                                    degre = "Modéré à Fort"
-                                else:
-                                    impact = "Non, pas de différence"
-                                    degre = "Nul"
-                    
-                        # 3. Chi-2 (Qualitatif vs Qualitatif) - REMPLACE L'ANCIEN ELSE
-                        else:
-                            contingency = pd.crosstab(df[x], df[y_col])
-                            if contingency.size > 0:
-                                chi2, p_value, _, _ = stats.chi2_contingency(contingency)
-                                if p_value < 0.05:
-                                    impact = "Oui, lien statistique trouvé"
-                                    degre = "Modéré à Fort"
-                                else:
-                                    impact = "Non, variables indépendantes"
-                                    degre = "Nul"
-                            else:
-                                impact = "Données insuffisantes"
-                                degre = "N/A"
-
-                    except Exception as e:
-                        impact = f"Erreur de calcul : {e}"
-
-                    results.append({
-                        "Variable X": x,
-                        "Le X agit-il sur Y ?": impact,
-                        "Degré d'influence": degre,
-                        "P-value": round(float(p_value), 4)
-                    })
-                
-                # --- CORRECTION POUR SAUVEGARDE JSON ---
-                # On récupère l'index du projet en cours
+                # Tests appariés et choix automatique du test (Pearson/Spearman, ANOVA/Kruskal, Khi-deux/Fisher)
+                results = S.screen_xs(df, y_col, x_cols).to_dict("records")
                 idx = st.session_state["current_project_idx"]
-                
-                # On injecte les résultats DANS le projet actif
-                # C'est cette ligne qui garantit que le JSON récupérera les données
                 st.session_state.projects[idx]["dmaic"]["analyze"]["results"] = results
-                
+                st.session_state.projects[idx]["dmaic"]["analyze"]["y_teste"] = y_col
                 st.rerun()
 
             # --- AFFICHAGE ---
@@ -3758,6 +3327,9 @@ else:
         else:
             st.warning("⚠️ Phase Analyse incomplète : Certaines causes nécessitent encore une décision.")
             
+        MBB.render_regression(p, p_idx)
+        render_ai_coach(p, "analyze")
+
     # --- PHASE IMPROVE ---
     with tabs[3]: 
         st.header("Phase Improve")
@@ -3961,12 +3533,14 @@ else:
                         score_ben = 0
                         score_eff = 0
                         for crit_name, cat in dmaic_improve["criteria_mapping"].items():
-                            val = row.get(crit_name, 3) 
+                            val = pd.to_numeric(row.get(crit_name, 3), errors="coerce")
+                            val = 3.0 if pd.isna(val) else float(val)
                             w = poids_map.get(crit_name, 0)
                             if cat == "Bénéfice":
                                 score_ben += val * w
                             else:
-                                score_eff += val * w
+                                # Note 5 = « très facile / peu coûteux » → effort faible : on inverse l'échelle
+                                score_eff += (6 - val) * w
                         return pd.Series([score_ben, score_eff])
 
                     df_filtered[["Score Bénéfice", "Score Effort"]] = df_filtered.apply(calculate_scores, axis=1)
@@ -4082,10 +3656,12 @@ else:
                 sol = row["Solution potentielle"]
         
                 # Récupération des données existantes (pour pré-remplir)
-                saved = dmaic_improve["action_plan"].get(sol, {
-                    "responsable": "", "debut": date.today(), "fin": date.today(),
-                    "charge": 0, "budget": 0, "risques": "", "predecesseur": None
-                })
+                saved = {"responsable": "", "debut": date.today(), "fin": date.today(),
+                         "charge": 0, "budget": 0, "risques": "", "predecesseur": None}
+                saved.update(dmaic_improve["action_plan"].get(sol, {}) or {})
+                for _k in ("debut", "fin"):
+                    _d = pd.to_datetime(saved[_k], errors="coerce")
+                    saved[_k] = _d.date() if pd.notna(_d) else date.today()
         
                 with st.expander(f"Action : {sol} (Priorité : {row['Priorité']})"):
                     # L'utilisation de st.form bloque le rechargement jusqu'au clic sur le bouton
@@ -4308,9 +3884,9 @@ else:
             if step in temp_editors:
                 df_temp = temp_editors[step]
                 # Calcul basé sur ce qui est saisi dans le formulaire actuel
-                calc_actuel_lt += float(df_temp["Délai Actuel"].sum())
-                va_mask = df_temp["Type d'activité"] == "VA (Valeur Ajoutée)"
-                calc_actuel_va += float(df_temp.loc[va_mask, "Délai Actuel"].sum())
+                _mins = [R._to_minutes(v, u) for v, u in zip(df_temp["Délai Actuel"], df_temp["Unité"])]
+                calc_actuel_lt += float(sum(_mins))
+                calc_actuel_va += float(sum(m for m, t in zip(_mins, df_temp["Type d'activité"]) if str(t).startswith("VA")))
 
         # 3. AFFICHAGE DE LA SYNTHÈSE
         st.markdown("### 📊 Synthèse des gains")
@@ -4505,6 +4081,10 @@ else:
                 st.success("✅ Future State FMEA enregistrée avec succès !")
                 st.rerun()
     
+        MBB.render_doe(p, p_idx)
+        MBB.render_pilote(p, p_idx)
+        render_ai_coach(p, "improve")
+
     # --- PHASE CONTROL ---
     with tabs[4]: 
         st.header("Phase Control")
@@ -4961,3 +4541,21 @@ else:
                         Nb_Points=("Valeur_Num", "count")
                     ).reset_index().round(2)
                     st.table(recap_stats)
+
+        render_ai_coach(p, "control")
+
+    # --- CONDUITE DU CHANGEMENT ---
+    with tabs[5]:
+        MBB.render_change(p, p_idx)
+
+    # --- BOÎTE À OUTILS STATISTIQUE ---
+    with tabs[6]:
+        render_stats_toolbox(p, p_idx)
+
+    # --- CENTRE IA (agents) ---
+    with tabs[7]:
+        render_ai_center(p, p_idx)
+
+    # --- RÉSULTATS & SOUTENANCE ---
+    with tabs[8]:
+        render_results_tab(p, p_idx)
